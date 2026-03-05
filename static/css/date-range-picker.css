@@ -1,0 +1,15 @@
+/* 优化日期范围选择器样式 */
+#dateRange {
+    cursor: pointer;
+    background-image: none;
+}
+
+/* 为日期范围容器设置固定宽度以便更好的布局 */
+.search-item.date-range-item .layui-input-inline {
+    position: relative;
+}
+
+/* 确保日期范围输入框有合适的最小宽度 */
+.search-item.date-range-item {
+    min-width: 250px;
+}

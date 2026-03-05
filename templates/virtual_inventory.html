@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>虚拟库存管理</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+<style>
+        body {
+            padding: 10px;
+            background-color: #ededed;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .table-container {
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .layui-table-cell {
+            height: auto;
+            white-space: normal;
+            word-break: break-all;
+            padding: 0 8px;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .search-form {
+            margin-bottom: 10px;
+        }
+        .search-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .search-item {
+            min-width: 150px;
+            max-width: 180px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .update-msg-item {
+            min-width: 180px;
+            max-width: 220px;
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .search-buttons {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+        .layui-input-inline {
+            width: 100%;
+        }
+        .statistics-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .stat-item {
+            background-color: #f0f8ff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid #d0e8ff;
+        }
+        .header-and-search {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 0;
+            flex-shrink: 0;
+        }
+        .layui-form-label {
+            width: auto;
+            padding-right: 5px;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .layui-input-inline {
+            display: inline-block;
+            vertical-align: middle;
+            width: 100%;
+        }
+        
+        /* 添加业务日期选择样式 */
+        .business-date-item {
+            min-width: 150px;
+            max-width: 180px;
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-and-search">
+        <div class="header-title" id="headerTitle">虚拟库存管理</div>
+        <div class="statistics-info" id="statisticsInfo">
+            <!-- 统计信息将在这里动态加载 -->
+        </div>
+    </div>
+    
+    <!-- 搜索表单 -->
+    <div class="table-container search-form">
+        <form class="layui-form" id="searchForm">
+            <div class="search-row">
+                <div class="search-item">
+                    <div class="layui-input-inline">
+                        <input type="text" name="supplier_name" placeholder="供应商名称" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="search-item">
+                    <div class="layui-input-inline">
+                        <input type="text" name="oe_code" placeholder="OE码" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="search-item">
+                    <div class="layui-input-inline">
+                        <input type="text" name="brand" placeholder="品牌" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="search-item">
+                    <div class="layui-input-inline">
+                        <input type="text" name="warehouse" placeholder="仓库" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="search-item">
+                    <div class="layui-input-inline">
+                        <input type="text" name="remark" placeholder="备注" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="update-msg-item">
+                    <div class="layui-input-inline">
+                        <select name="update_msg" id="updateMsgSelect" class="layui-select">
+                            <option value="">选择更新信息分类</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="business-date-item">
+                    <div class="layui-input-inline">
+                        <select name="business_date_type" id="businessDateTypeSelect" class="layui-select">
+                            <option value="">全部数据</option>
+                            <option value="today">今天数据</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="search-buttons">
+                <button type="button" class="layui-btn layui-btn-normal" id="summaryBtn">各供应商汇总</button>
+                <button type="submit" class="layui-btn layui-btn-normal" lay-submit lay-filter="search">搜索</button>
+                <button type="button" class="layui-btn layui-btn-normal" id="resetBtn">重置</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- 表格 -->
+    <div class="table-container">
+        <table class="layui-table" id="virtualInventoryTable" lay-filter="virtualInventoryTable"></table>
+    </div>
+
+<script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+<script>
+    // 创建独立的命名空间
+    window.VirtualInventoryApp = window.VirtualInventoryApp || {};
+
+    // 定义格式化日期函数
+    function formatDateTime(dateStr) {
+        if (!dateStr) return dateStr;
+        
+        var date = new Date(dateStr);
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        var hours = String(date.getHours()).padStart(2, '0');
+        var minutes = String(date.getMinutes()).padStart(2, '0');
+        var seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+    }
+
+    // 定义页面功能
+    var app = {
+        // 初始化表格
+        initTable: function(searchParams = {}) {                
+            layui.use(['table', 'jquery'], function() {
+                var table = layui.table;
+                var $ = layui.jquery;
+                
+                // 确定API端点 - 保持使用统一的API接口
+                var apiUrl = '/api/virtual_inventory_by_msg_pattern';
+                
+                // 创建实际传递给API的参数，保留业务日期类型参数
+                var apiParams = {...searchParams};
+                
+                // 渲染表格
+                table.render({
+                    elem: '#virtualInventoryTable',
+                    url: apiUrl,
+                    method: 'get',
+                    page: true,
+                    limit: 200,
+                    limits: [50, 100, 200],
+                    height: 'full-265',
+                    where: apiParams, 
+                    cols: [[
+                        {field: 'supplier_name', title: '供应商名称', width: 120, sort: true},
+                        {field: 'oe_code', title: 'OE码', width: 130, sort: true},
+                        {field: 'brand', title: '品牌', width: 90, sort: true},
+                        {field: 'price', title: '价格', width: 100, sort: true},
+                        {field: 'expiry_date', title: '过期日期', width: 150, sort: true, templet: function(d) {
+                            return formatDateTime(d.expiry_date);
+                        }},
+                        {field: 'warehouse', title: '仓库', width: 120},
+                        {field: 'stock', title: '库存', width: 100, sort: true, sort: true},
+                        {field: 'remark', title: '备注', width: 180, sort: true},
+                        {field: 'fetch_time', title: '获取时间', width: 180, sort: true, templet: function(d) {
+                            return formatDateTime(d.fetch_time);
+                        }},
+                        {field: 'update_msg', title: '更新信息', width: 600, sort: true} 
+                    ]],
+                    // 禁用前端排序，所有排序都通过后端处理，使用fetch_time作为默认排序
+                    initSort: {
+                        field: 'fetch_time',
+                        type: 'desc'
+                    },
+                    // 监听排序事件，通过后端排序
+                    done: function(res, curr, count) {
+                        console.log('表格数据加载完成', res);
+                        console.log('当前搜索参数:', apiParams);
+                        
+                        // 如果是业务日期数据，显示业务日期范围
+                        if (res.business_time_range) {
+                            $('#headerTitle').html(`虚拟库存管理 - ${res.business_time_range}`);
+                        } else {
+                            $('#headerTitle').html('虚拟库存管理');
+                        }
+                        
+                        // 重新设置表格高度
+                        setTimeout(function() {
+                            var tableBox = $('.layui-table-box');
+                            var tableMain = $('.layui.table-main');
+                            if(tableBox.length > 0 && tableMain.length > 0) {
+                                tableBox.css('height', 'calc(100% - 41px)'); // 减去头部高度
+                            }
+                        }, 100);
+                    },
+                    error: function(res, msg) {
+                        console.error('表格加载失败: ' + msg);
+                        layer.msg('表格加载失败: ' + msg, {icon: 2});
+                    }
+                });
+            });
+        },
+        
+        // 加载更新信息选项
+        loadUpdateMsgOptions: function() {
+            layui.use(['jquery'], function() {
+                var $ = layui.jquery;
+                
+                // 获取更新信息选项
+                $.ajax({
+                    url: '/api/update_msg_options',
+                    type: 'GET',
+                    success: function(res) {
+                        if(res.code === 0) {
+                            var select = $('#updateMsgSelect');
+                            select.empty(); // 清空现有选项
+                            select.append('<option value="">选择更新信息分类</option>'); // 添加默认选项
+                            
+                            // 添加获取到的分类选项
+                            res.data.forEach(function(category) {
+                                select.append('<option value="' + category + '">' + category + '</option>');
+                            });
+                            
+                            // 重新渲染下拉框
+                            if(layui.form) {
+                                layui.form.render('select');
+                            }
+                        } else {
+                            console.error('获取更新信息选项失败:', res.msg);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('获取更新信息选项失败:', error);
+                    }
+                });
+            });
+        },
+        
+        getStatistics: function() {
+            layui.use(['jquery'], function() {
+                var $ = layui.jquery;
+                
+                console.log('开始请求统计数据...');
+                $.ajax({
+                    url: '/api/virtual_inventory_statistics',
+                    type: 'GET',
+                    success: function(res) {
+                        console.log('收到统计数据响应:', res);
+                        if(res.code === 0) {
+                            var data = res.data;
+                            console.log('统计数据详情:', data);
+                            var statsHtml = `
+                                <span class="stat-item">成功上传：${data.success_count}条</span>
+                                <span class="stat-item">失败：${data.failed_count}条</span>
+                                <span class="stat-item">没有档案：${data.no_record_count}条</span>
+                                <span class="stat-item">新建档案：${data.new_archive_count}条</span>
+                            `;
+                            $('#statisticsInfo').html(statsHtml);
+                            console.log('统计数据已更新到页面');
+                        } else {
+                            console.error('获取统计数据失败:', res.msg);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('获取统计数据失败:', error);
+                        console.error('错误详情:', xhr, status, error);
+                    }
+                });
+            });
+        },
+        
+        // 获取今日业务日期统计数据
+        getTodayStatistics: function() {
+            layui.use(['jquery'], function() {
+                var $ = layui.jquery;
+                
+                console.log('开始请求今日统计数据...');
+                $.ajax({
+                    url: '/api/virtual_inventory_statistics_today',
+                    type: 'GET',
+                    success: function(res) {
+                        console.log('收到今日统计数据响应:', res);
+                        if(res.code === 0) {
+                            var data = res.data;
+                            console.log('今日统计数据详情:', data);
+                            var statsHtml = `
+                                <span class="stat-item">业务日期：${data.business_date}</span>
+                                <span class="stat-item">业务时间：${data.business_time_range}</span>
+                                <span class="stat-item">总记录：${data.total_count}条</span>
+                                <span class="stat-item">成功上传：${data.success_count}条</span>
+                                <span class="stat-item">失败：${data.failed_count}条</span>
+                                <span class="stat-item">没有档案：${data.no_record_count}条</span>
+                                <span class="stat-item">新建档案：${data.new_archive_count}条</span>
+                            `;
+                            $('#statisticsInfo').html(statsHtml);
+                            console.log('今日统计数据已更新到页面');
+                        } else {
+                            console.error('获取今日统计数据失败:', res.msg);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('获取今日统计数据失败:', error);
+                        console.error('错误详情:', xhr, status, error);
+                    }
+                });
+            });
+        },
+        
+        // 在app对象中添加获取供应商汇总的方法
+        getSupplierSummary: function() {
+        layui.use(['jquery', 'table'], function() {
+            var $ = layui.jquery;
+            var table = layui.table;
+            
+            // 获取当前业务日期类型
+            var currentBusinessDateType = $('#businessDateTypeSelect').val();
+            
+            // 根据当前业务日期类型选择相应的API
+            var apiUrl = '/api/supplier_summary';
+            if (currentBusinessDateType === 'today') {
+                apiUrl = '/api/supplier_summary?business_date_type=today';
+            }
+            
+            $.ajax({
+                url: apiUrl,
+                type: 'GET',
+                success: function(res) {
+                    if(res.code === 0) {
+                        var summaryData = res.data;
+                        
+                        // 构建弹窗内容
+                        var content = '<table class="layui-table" style="width: 100%;">';
+                        content += '<thead><tr><th>供应商名称</th><th>上传成功</th><th>上传失败</th><th>操作</th></tr></thead>';
+                        content += '<tbody>';
+                        
+                        summaryData.forEach(function(item) {
+                            content += '<tr>';
+                            content += '<td>' + item.supplier_name + '</td>';
+                            content += '<td>' + item.success_count + '</td>';
+                            content += '<td>' + item.failed_count + '</td>';
+                            content += '<td><button class="layui-btn layui-btn-xs layui-btn-danger search-failed-btn" data-supplier="' + item.supplier_name + '">查看失败数据</button></td>';
+                            content += '</tr>';
+                        });
+                        
+                        content += '</tbody></table>';
+                        
+                        // 显示弹窗
+                        layer.open({
+                            type: 1,
+                            title: '各供应商汇总' + (currentBusinessDateType === 'today' ? '（今日数据）' : '（全部数据）'),
+                            area: ['700px', '500px'],
+                            content: content,
+                            cancel: function(){
+                                // 弹窗关闭时的回调
+                            }
+                        });
+                        
+                        // 为"查看失败数据"按钮绑定点击事件
+                        $('.search-failed-btn').off('click').on('click', function() {
+                            var supplierName = $(this).data('supplier');
+                            
+                            // 关闭弹窗
+                            layer.closeAll();
+                            
+                            // 设置搜索条件为该供应商，并设置更新信息为失败状态
+                            $('input[name="supplier_name"]').val(supplierName);
+                            
+                            // 在现有基础上增加更新信息筛选（失败）
+                            $('#updateMsgSelect').val('上传失败');
+                            if(layui.form) {
+                                layui.form.render('select');
+                            }
+                            
+                            // 设置业务日期类型为"今日数据"
+                            $('#businessDateTypeSelect').val('today');
+                            if(layui.form) {
+                                layui.form.render('select');
+                            }
+                            
+                            // 触发搜索 - 保持当前业务日期类型
+                            var searchParams = {
+                                supplier_name: supplierName,
+                                pattern: '上传失败',
+                                business_date_type: 'today'  // 设置为今日数据
+                            };
+                            
+                            app.initTable(searchParams);
+                        });
+                    } else {
+                        layer.msg('获取供应商汇总失败: ' + res.msg, {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error) {
+                    layer.msg('获取供应商汇总失败', {icon: 2});
+                }
+            });
+        });
+    },
+
+        // 添加重置功能
+        resetSearch: function() {
+            console.log('重置按钮被点击');
+            layui.use(['jquery', 'form'], function() {
+                var $ = layui.jquery;
+                var form = layui.form;
+                
+                // 重置所有搜索输入框
+                $('input[name="supplier_name"]').val('');
+                $('input[name="oe_code"]').val('');
+                $('input[name="brand"]').val('');
+                $('input[name="warehouse"]').val('');
+                $('input[name="remark"]').val('');
+                
+                // 重置下拉选择框为默认值
+                $('#updateMsgSelect')[0].selectedIndex = 0; // 重置为第一个选项
+                $('#businessDateTypeSelect')[0].selectedIndex = 0; // 重置业务日期类型为默认
+                form.render('select'); // 重新渲染下拉框
+            });
+            
+            // 刷新表格，不带任何搜索参数
+            app.initTable({});
+        },
+
+        // 在init方法中调用统计数据加载
+        init: function() {
+            // 先加载更新信息选项
+            app.loadUpdateMsgOptions();
+            
+            // 根据默认业务日期类型加载统计数据
+            app.getStatistics();
+            
+            // 初始化表格
+            app.initTable({});
+            
+            // 使用layui的form模块绑定事件
+            layui.use(['form', 'jquery'], function() {
+                var form = layui.form;
+                var $ = layui.jquery;
+                
+                // 表单提交事件
+                form.on('submit(search)', function(data) {
+                    var searchParams = {};
+                    
+                    // 获取所有搜索字段的值
+                    searchParams.supplier_name = $('input[name="supplier_name"]').val();
+                    searchParams.oe_code = $('input[name="oe_code"]').val();
+                    searchParams.brand = $('input[name="brand"]').val();
+                    searchParams.warehouse = $('input[name="warehouse"]').val();
+                    searchParams.remark = $('input[name="remark"]').val();
+                    searchParams.pattern = $('#updateMsgSelect').val(); // 获取更新信息筛选值
+                    searchParams.business_date_type = $('#businessDateTypeSelect').val(); // 获取业务日期类型
+                    
+                    console.log('搜索参数:', searchParams);
+                    
+                    // 根据业务日期类型选择不同的统计数据API
+                    if (searchParams.business_date_type === 'today') {
+                        app.getTodayStatistics();
+                    } else {
+                        app.getStatistics();
+                    }
+                    
+                    // 重新加载表格
+                    app.initTable(searchParams);
+                    return false; // 阻止表单默认提交
+                });
+                
+                // 为重置按钮添加点击事件
+                $('#resetBtn').on('click', function() {
+                    app.resetSearch();
+                    return false;
+                });
+
+                // 在app.init()方法中的现有事件绑定后添加
+                $('#summaryBtn').on('click', function() {
+                    app.getSupplierSummary();
+                    return false;
+                });
+                
+                // 监听业务日期类型变化
+                form.on('select(businessDateTypeSelect)', function(data) {
+                    var selectedValue = data.value;
+                    
+                    // 根据选择的业务日期类型更新统计数据
+                    if (selectedValue === 'today') {
+                        app.getTodayStatistics();
+                    } else {
+                        app.getStatistics();
+                    }
+                    
+                    // 重新加载表格
+                    var searchParams = {};
+                    searchParams.supplier_name = $('input[name="supplier_name"]').val();
+                    searchParams.oe_code = $('input[name="oe_code"]').val();
+                    searchParams.brand = $('input[name="brand"]').val();
+                    searchParams.warehouse = $('input[name="warehouse"]').val();
+                    searchParams.remark = $('input[name="remark"]').val();
+                    searchParams.pattern = $('#updateMsgSelect').val();
+                    searchParams.business_date_type = selectedValue;
+                    
+                    app.initTable(searchParams);
+                });
+            });
+        }
+    };
+
+    // 保存到全局命名空间
+    window.VirtualInventoryApp = app;
+
+    // 页面加载完成后初始化
+    layui.use(['jquery'], function() {
+        var $ = layui.jquery;
+        $(document).ready(function() {
+            app.init();
+        });
+    });
+</script>
+</body>
+</html>

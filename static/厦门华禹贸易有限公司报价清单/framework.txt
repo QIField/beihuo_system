@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid black;
+            text-align: left;
+            padding: 5px;
+        }
+        .centered-image {
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-size:contain;
+        }
+    </style>
+</head>
+<body style="font-weight: bold;">
+<div style="width: 815px;height: 800px;border: 1px dashed #e0e0e0;margin: auto;padding: 20px">
+    <div style="height: 160px; width: 820px;">
+        <div style="width: 180px;height: 160px; float: left">
+            <div class="centered-image" style="width: 160px;height: 106px;margin: auto;background-image: url('Z1D');"></div>
+            <div style="width: 90px;text-align: center;margin: auto;">Z2D</div>
+        </div>
+        <div style="width: 640px; height: 160px; float: right">
+            <div style="font-size: 26px;font-weight: 500;font-weight: 600;">Z3D</div>
+            <div style="margin-top: 20px">
+                <div style="width: 150px;height: 110px;float: left">
+                    <div style="margin: 10px">发货人：Z4D</div>
+                    <div style="margin: 10px">销售人：Z5D</div>
+                    <div style="margin: 10px">验货人：Z6D</div>
+                </div>
+                <div style="width: 455px;height: 110px;float: left">
+                    <div style="margin: 10px">客服地址：Z7D</div>
+                    <div style="margin: 10px">客服电话：Z8D</div>
+                    <div style="margin: 10px">单据日期：Z9D</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="height: 45px; width: 815px;text-align: center;font-size: 24px;margin-top: 20px;">销售订单</div>
+    <div>
+        <table>
+            <tr>
+                <td>客户名称：</td>
+                <td>Z10D</td>
+                <td>单据编号：</td>
+                <td>Z11D</td>
+            </tr>
+            <tr>
+                <td>地址：</td>
+                <td colspan="3">Z12D</td>
+            </tr>
+            <tr>
+                <td>联系人：</td>
+                <td>Z13D</td>
+                <td>电话：</td>
+                <td>Z14D</td>
+            </tr>
+            <tr>
+                <td>送货方式：</td>
+                <td>Z15D</td>
+                <td>运费承担：</td>
+                <td>Z16D</td>
+            </tr>
+            <tr>
+                <td>结算方式：</td>
+                <td colspan="3">Z17D</td>
+            </tr>
+            <tr>
+                <td>备注：</td>
+                <td colspan="3">Z18D</td>
+            </tr>
+        </table>
+        <table>
+            <tr>
+                <td>序号</td>
+                <td>零件编码</td>
+                <td>原厂编码</td>
+                <td>零件名</td>
+                <td>出库数</td>
+                <td>售价</td>
+                <td>金额</td>
+            </tr>
+            ZBGMXD
+<!--            <tr>-->
+<!--                <td>1</td>-->
+<!--                <td>34216864900</td>-->
+<!--                <td>34216864900</td>-->
+<!--                <td>后刹车碟</td>-->
+<!--                <td>2</td>-->
+<!--                <td>420.00</td>-->
+<!--                <td>840.00</td>-->
+<!--            </tr>-->
+<!--            <tr>-->
+<!--                <td>1</td>-->
+<!--                <td>34216864900</td>-->
+<!--                <td>34216864900</td>-->
+<!--                <td>后刹车碟</td>-->
+<!--                <td>2</td>-->
+<!--                <td>420.00</td>-->
+<!--                <td>840.00</td>-->
+<!--            </tr>-->
+<!--            <tr>-->
+<!--                <td colspan="4" style="text-align: right">合计：</td>-->
+<!--                <td>2</td>-->
+<!--                <td>420.00</td>-->
+<!--                <td>840.00</td>-->
+<!--            </tr>-->
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>使用事项 - 巴博瑞科技</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <style>
+        body {
+            background-color: #f2f2f2;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #5FB878;
+        }
+        .content {
+            line-height: 1.8;
+            color: #555;
+            font-size: 16px;
+        }
+        .content h3 {
+            color: #5FB878;
+            border-left: 4px solid #5FB878;
+            padding-left: 10px;
+            margin-top: 20px;
+        }
+        .content ul {
+            padding-left: 20px;
+        }
+        .content li {
+            margin-bottom: 10px;
+        }
+        .highlight {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-left: 4px solid #1E9FFF;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">使用事项</div>
+        
+        <div class="content">
+            <h3>一、选中单元格后：</h3>
+            <ul>
+                <li>可使用Ctrl+C复制选中的单元格内容</li>                
+                <li>快捷键alt+q添加购物车，删除购物车</li>
+                <li>复制固定列时，需要拉到最左边，否则会出现数据重叠</li>
+                <li>如果遇到选中框和鼠标位置偏移，刷新一下表格即可</li>
+            </ul>
+            <h3>二、其他功能说明：</h3>
+            <ul>
+                <li>账号仅支持第一台登录的设备使用，若需要更换设备，需联系管理员重置</li>
+                <li>支持多行或者被空格隔开的数据（oe、物料条码、品牌号）搜索，多个物料名称需要手动加上中英文逗号</li>
+                <li>已存在购物车的商品会被渲染为红色背景</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

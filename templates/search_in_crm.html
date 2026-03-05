@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>搜索产品</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+<style>
+        body {
+            padding: 10px;
+            background-color: #ededed;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .table-container {
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .layui-table-cell {
+            height: auto;
+            white-space: normal;
+            word-break: break-all;
+            padding: 0 8px;
+        }
+        /* 添加文本溢出处理样式 */
+        .layui-table-cell {
+            height: 25px;
+            line-height: 25px;
+            padding: 1px 5px !important;
+            position: relative;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .search-form {
+            margin-bottom: 10px;
+        }
+        .search-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .search-item {
+            min-width: 150px;
+            max-width: 180px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .search-buttons {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+        .layui-input-inline {
+            width: 100%;
+        }
+        .header-and-search {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 0;
+            flex-shrink: 0;
+        }
+        .layui-form-label {
+            width: auto;
+            padding-right: 5px;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .layui-input-inline {
+            display: inline-block;
+            vertical-align: middle;
+            width: 100%;
+        }
+        textarea[name="oe"] {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        /* 复选框选中行的绿色背景 - 优先级最低 */
+        #searchInCrmTable + .layui-table-view .layui-table-body tbody tr.layui-table-tr-selected {
+            background-color: #e6ffec !important;
+        }
+        
+        /* 购物车中商品的红色背景 - 优先级中等 */
+        #searchInCrmTable + .layui-table-view .layui-table-body tbody tr.in-cart-row {
+            background-color: #ffcccc !important;
+        }
+        
+        /* 鼠标悬停行的蓝色背景 - 优先级最高 */
+        #searchInCrmTable + .layui-table-view .layui-table-body tbody tr:hover {
+            background-color: #d3eafe !important;
+        }
+        
+        
+    </style>
+
+</head>
+<body>
+    <div class="header-and-search">
+        <div class="header-title">搜索产品</div>
+    </div>
+    
+    <!-- 搜索表单 -->
+    <div class="table-container search-form">
+        <form class="layui-form" id="searchForm">
+            <div class="search-row">
+                <div class="search-item">
+                    <div class="layui-input-inline">
+                        <textarea name="oe" placeholder="请输入OE码（支持换行输入多个OE）" autocomplete="off" class="layui-textarea" rows="5"></textarea>
+                    </div>
+                </div>
+                <div class="search-buttons">
+                    <button type="submit" class="layui-btn" lay-submit lay-filter="search">搜索</button>
+                    <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                    <button type="button" class="layui-btn layui-btn-normal layui-btn-disabled" id="addToCartBtn" disabled>添加购物车</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- 表格 -->
+    <div class="table-container">
+        <table class="layui-table" id="searchInCrmTable" lay-filter="searchInCrmTable"></table>
+    </div>
+
+<script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+<script>
+    // 创建独立的命名空间
+    window.SearchInCrmApp = window.SearchInCrmApp || {};
+
+    // 定义格式化日期函数
+    function formatDateTime(dateStr) {
+        if (!dateStr) return dateStr;
+        
+        var date = new Date(dateStr);
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        var hours = String(date.getHours()).padStart(2, '0');
+        var minutes = String(date.getMinutes()).padStart(2, '0');
+        var seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+    }
+
+    // 定义页面功能
+    var app = {
+        // 初始化表格
+        initTable: function(searchParams = {}) {                
+            layui.use(['table', 'jquery'], function() {
+                var table = layui.table;
+                var $ = layui.jquery;
+                
+                // 渲染表格
+                table.render({
+                    elem: '#searchInCrmTable',
+                    url: '/api/search_in_crm',
+                    method: 'get',
+                    page: true,
+                    limit: 200,
+                    limits: [50, 100, 200],
+                    height: 'full-280',
+                    where: searchParams, 
+                    cols: [[
+                        {type: 'checkbox', fixed: 'left'},
+                        {type: 'numbers', title: '行号', width: 50, fixed: 'left', unresize: true},
+                        {field: 'oe', title: 'OE', width: 100, sort: true, unresize: false, fieldAlias: 'oe', fixed: 'left'},
+                        {field: '物料名称', title: '物料名称', width: 120, sort: true, unresize: false, fieldAlias: 'material_name', fixed: 'left'},
+                        {field: '品牌', title: '品牌', width: 80, sort: true, unresize: false, fieldAlias: 'brand', fixed: 'left'},
+                        {field: '物料条码', title: '物料条码', width: 120, sort: true, unresize: false, fieldAlias: 'barcode', fixed: 'left'},
+                        {field: '品牌号', title: '品牌号', width: 100, sort: true, unresize: false, fieldAlias: 'brand_code', fixed: 'left'},
+                        {field: '替换号', title: '替换号', width: 100, sort: true, unresize: false, fixed: 'left'},
+                        {field: '车型品牌', title: '车型品牌', width: 100, sort: true, unresize: false, fieldAlias: 'car_brand', fixed: 'left'},
+                        {field: '标签', title: '标签', width: 40, sort: true, unresize: false, fieldAlias: 'tag', fixed: 'left'},
+                        {field: '车型', title: '车型', width: 80, sort: true, fieldAlias: 'car_model', fixed: 'left'},            
+                        {field: '库存数量', title: '库存数量', width: 100, align: 'right', fixed: 'left', sort: true, templet: function(d) {
+                            return '<div class="stock-cell" data-barcode="' + (d.barcode || d.物料条码 || '') + '">' + 
+                                (d.stock || d['库存数量'] || 0) + 
+                                '<div class="stock-tooltip" style="display:none;"></div></div>';
+                        }, style: 'background-color: #d2d2d2;'},
+                        {field: '在途数量', title: '在途数量', width: 100, align: 'right', sort: true, fixed: 'left', style: 'background-color: #d2d2d2;'},
+                        {
+                            field: 'sales_data', 
+                            title: '销量', 
+                            width: 250, 
+                            sort: false, 
+                            fixed: 'left',
+                            unresize: false, 
+                            templet: function(d) {
+                                var today = d['今日销量'] || 0;
+                                var yesterday = d['昨日销量'] || 0;
+                                var sales_7d = d['近7天销量'] || 0;
+                                var sales_month = d['本月销量'] || 0;
+                                var avg_sales_6m = d['近6个月月均销量'] || 0;
+                                var avg_sales_12m = d['近12个月月均销量'] || 0;
+                                
+                                var salesText = '今/昨/近7天:' + today + '/' + yesterday + '/' + sales_7d + ';\n';
+                                salesText += '近1/6/12月:' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + ';';
+                                
+                                return salesText;
+                            }
+                        },
+                        {field: '库存金额', title: '库存金额', width: 88, sort: true, align: 'right', unresize: false, fieldAlias: 'stock_amount'},
+                        {field: '成本价', title: '成本价', width: 100, sort: true, align: 'right', unresize: false, fieldAlias: 'cost_price'},
+                        {field: '成品可卖天数', title: '成品可卖天数', width: 100, sort: true, align: 'right', fieldAlias: 'sellable_days'},
+                        {field: '预警状态', title: '预警状态', width: 100, sort: true, unresize: false, fieldAlias: 'warning_status'},
+                        {field: '供应商', title: '供应商', width: 120, sort: true, unresize: false, fieldAlias: 'supplier', templet: function(d) {
+                            // 确保数据正确获取
+                            var supplierContent = d.供应商 || d.supplier || '';
+                            var suppliers = supplierContent ? supplierContent.split(' ') : [];
+                            
+                            var tooltipContent = '';
+                            for(var i = 0; i < suppliers.length; i++) {
+                                var supplier = suppliers[i];
+                                if(supplier && supplier.trim() !== '') {
+                                    var parts = supplier.split('：');
+                                    if(parts.length >= 2) {
+                                        tooltipContent += `<div class="supplier-tooltip-row">
+                                            <span class="supplier-name">${parts[0]}</span>
+                                            <span class="supplier-price">${parts[1]}</span>
+                                        </div>`;
+                                    } else {
+                                        // 如果没有找到'：'分隔符，直接显示整个字符串
+                                        tooltipContent += `<div class="supplier-tooltip-row">
+                                            <span class="supplier-name">${supplier}</span>
+                                            <span class="supplier-price">-</span>
+                                        </div>`;
+                                    }
+                                }
+                            }
+
+                            // 创建一个包含供应商信息和工具提示的HTML结构
+                            var tooltipHtml = `<div class="supplier-cell" style="position: relative; cursor: pointer; display: inline-block;">
+                                ${supplierContent}
+                                <div class="supplier-tooltip" style="display: none; position: absolute; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; min-width: 250px; font-size: 12px; z-index: 3000;">  /* 调整z-index层级，用于供应商悬浮面板 */
+                                    <div class="supplier-tooltip-header" style="padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #e6e6e6; font-weight: 500; color: #333; font-size: 14px;">供应商 - 单价</div>
+                                    <div class="supplier-tooltip-content" style="padding: 12px 16px; max-height: 300px; overflow-y: auto;">
+                                        ${tooltipContent || '<div class="supplier-tooltip-row">暂无供应商信息</div>'}
+                                    </div>
+                                </div>
+                            </div>`;
+
+                            return tooltipHtml;
+                        }},
+                        {field: '近1个月询价量', title: '近1个月询价量', width: 120, sort: true, align: 'right', fieldAlias: 'inquiry_1m'},
+                        {field: '近3个月月均询价量', title: '近3个月月均询价量', width: 130, sort: true, align: 'right', fieldAlias: 'inquiry_3m'},
+                        {field: '全国近1个月询价量', title: '全国近1个月询价量', width: 130, sort: true, align: 'right', fieldAlias: 'national_inquiry_1m'},
+                        {field: '全国近3个月月均询价量', title: '全国近3个月月均询价量', width: 140, sort: true, align: 'right', fieldAlias: 'national_inquiry_3m'},
+                        {field: '内部备注', title: '内部备注', width: 150, sort: true, unresize: false, fieldAlias: 'internal_remarks'}
+                    ]],
+                    // 禁用前端排序，所有排序都通过后端处理，使用fetch_time作为默认排序
+                    initSort: {
+                        field: 'oe',
+                        type: 'asc'
+                    },
+                    // 监听排序事件，通过后端排序
+                    done: function(res, curr, count) {
+                        // 重新设置表格高度
+                        setTimeout(function() {
+                            var tableBox = $('.layui.table-main');
+                            if(tableBox.length > 0) {
+                                tableBox.css('height', 'calc(100% - 41px)'); // 减去头部高度
+                            }
+                        }, 100);
+                        
+                        // 更新添加购物车按钮状态
+                        app.updateAddToCartButtonState();
+                        
+                        // 初始化Excel风格单元格选择功能
+                        setTimeout(function() {
+                            initExcelCellSelectionForSearchInCrm('searchInCrmTable');
+                        }, 100);
+                        
+                        // 加载购物车缓存并高亮商品
+                        setTimeout(function() {
+                            loadCartCacheAndHighlight();
+                        }, 150);
+                    },
+                    error: function(res, msg) {
+                    }
+                });
+                
+                // 监听表格排序事件，通过后端排序
+                table.on('sort(searchInCrmTable)', function(obj) {
+                    // 获取当前搜索参数
+                    var searchParams = {};
+                    searchParams.oe = $('textarea[name="oe"]').val();
+                    
+                    // 重新渲染表格，使用后端排序并保留搜索条件
+                    table.reload('searchInCrmTable', {
+                        initSort: obj,
+                        where: {
+                            field: obj.field,
+                            order: obj.type,
+                            oe: searchParams.oe
+                        },
+                        page: {
+                            curr: 1 // 排序后返回第一页
+                        }
+                    });
+                });
+                
+                // 监听表格复选框选择事件
+                table.on('checkbox(searchInCrmTable)', function(obj){
+                    // 更新行的选中状态类
+                    setTimeout(function() {
+                        updateCheckboxRowStyles();
+                    }, 50);
+                    app.updateAddToCartButtonState();
+                });
+            });
+        },
+        
+        // 初始化页面
+        init: function() {
+            // 监听搜索表单提交
+            layui.use(['form', 'jquery'], function() {
+                var form = layui.form;
+                var $ = layui.jquery;
+                
+                // 防止在textarea中按Enter键提交表单，允许Shift+Enter换行
+                $(document).on('keydown', 'textarea[name="oe"]', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        // 普通回车键不提交表单，只允许Shift+Enter换行
+                        e.preventDefault();
+                        return false;
+                    }
+                });
+                
+                // 表单提交事件
+                form.on('submit(search)', function(data) {
+                    var searchParams = {};
+                    
+                    // 获取搜索字段的值 - 现在是textarea
+                    var oeValue = $('textarea[name="oe"]').val();
+                    
+                    if (!oeValue.trim()) {
+                        layui.layer.msg('请输入OE号码', {icon: 2});
+                        return false;
+                    }
+                    
+                    // 显示加载提示
+                    var loadingIndex = layui.layer.load(2, {
+                        content: '正在搜索...',
+                        shade: [0.3, '#000']
+                    });
+                    
+                    // 发送POST请求到后端API
+                    fetch('/api/search_in_crm', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({oe: oeValue})
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        layui.layer.close(loadingIndex);
+                        
+                        if (result.code === 0) {
+                            // 显示成功消息
+                            layui.layer.msg(result.msg, {icon: 1});
+                            
+                            // 如果有失败的OE，显示详细信息
+                            if (result.failed_oes && result.failed_oes.length > 0) {
+                                var failedMsg = '以下OE查询失败：\n' + result.failed_oes.map(f => f.oe + ' (' + f.error + ')').join('\n');
+                                layui.layer.open({
+                                    title: '部分OE查询失败',
+                                    content: failedMsg,
+                                    area: ['500px', '300px'],
+                                    type: 1
+                                });
+                            }
+                            
+                            // 重新加载表格以显示新保存的数据
+                            app.initTable({oe: oeValue});
+                        } else {
+                            layui.layer.msg(result.msg, {icon: 2});
+                        }
+                    })
+                    .catch(error => {
+                        layui.layer.close(loadingIndex);
+                        layui.layer.msg('搜索失败: ' + error.message, {icon: 2});
+                    });
+                    
+                    return false; // 阻止表单默认提交
+                });
+                
+                // 监听添加购物车按钮点击事件
+                $(document).on('click', '#addToCartBtn', function() {
+                    var selectedData = layui.table.checkStatus('searchInCrmTable').data;
+                    
+                    if (selectedData.length === 0) {
+                        layui.layer.msg('请先选择要添加到购物车的产品！', {icon: 2});
+                        return;
+                    }
+                    
+                    // 准备要添加到购物车的数据
+                    var cartItems = selectedData.map(function(item) {
+                        return {
+                            'oe': item.oe || '',
+                            'supplier': item.供应商 || '',
+                            'brand': item.品牌 || '',
+                            'material_name': item.物料名称 || '',
+                            'barcode': item.物料条码 || '',
+                            'car_brand': item.车型品牌 || '',
+                            'tag': item.标签 || '',
+                            'inquiry_1m': item['近1个月询价量'] || 0,
+                            'inquiry_3m': item['近3个月月均询价量'] || 0,
+                            'national_inquiry_1m': item['全国近1个月询价量'] || 0,
+                            'national_inquiry_3m': item['全国近3个月月均询价量'] || 0,
+                            'brand_code': item.品牌号 || '',
+                            'internal_remarks': item.内部备注 || '',
+                            'stock_amount': item.库存金额 || 0,
+                            'cost_price': item.成本价 || 0,
+                            'stock_quantity': item['库存数量'] || 0,
+                            'avg_sales_12m': item['近12个月月均销量'] || 0,
+                            'avg_sales_6m': item['近6个月月均销量'] || 0,
+                            'sales_7d': item['近7天销量'] || 0,
+                            'warning_status': item['预警状态'] || '',
+                            'on_way': item['在途数量'] || 0,
+                            'car_model': item.车型 || '',
+                            'company': item.company || ''
+                        };
+                    });
+                    
+                    // 发送请求到后端添加到购物车
+                    layui.layer.load(2, {
+                        content: '正在添加到购物车...',
+                        shade: [0.3, '#000']
+                    });
+                    
+                    fetch('/api/cart/add', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            'item_details': cartItems
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        layui.layer.closeAll('loading');
+                        
+                        if (result.code === 0) {
+                            // 处理详细统计信息（兼容性处理：如果后端没有返回统计信息，则使用旧逻辑）
+                            var totalSelected = selectedData.length;
+                            var addedCount = result.added_count || 0;
+                            var existingCount = result.existing_count || 0;
+                            var totalCount = result.total_count || 0;
+                            
+                            // 如果后端没有返回统计信息，根据响应消息推断状态
+                            if (addedCount === 0 && existingCount === 0) {
+                                // 检查是否是已存在的情况（后端可能只返回了消息）
+                                if (result.msg && (result.msg.includes('已存在') || result.msg.includes('已在') || result.msg.includes('重复'))) {
+                                    existingCount = totalSelected;
+                                } else if (result.msg && result.msg.includes('成功')) {
+                                    addedCount = totalSelected;
+                                } else {
+                                    // 无法确定状态，使用默认值
+                                    addedCount = totalSelected; // 假设全部添加成功
+                                }
+                            }
+                            
+                            // 显示详细统计信息
+                            var msg = '';
+                            var icon = 1; // 默认成功图标
+                            
+                            if (addedCount > 0 && existingCount > 0) {
+                                // 部分新增，部分已存在
+                                msg = `成功添加 ${addedCount} 个，${existingCount} 个已存在购物车中`;
+                                icon = 6; // 感叹号图标
+                            } else if (addedCount > 0 && existingCount === 0) {
+                                // 全部新增
+                                msg = `成功添加 ${addedCount} 个产品到购物车！`;
+                                icon = 1; // 成功图标
+                            } else if (addedCount === 0 && existingCount > 0) {
+                                // 全部已存在
+                                msg = `所选 ${existingCount} 个商品已在购物车中`;
+                                icon = 6; // 感叹号图标
+                            } else if (addedCount === 0 && existingCount === 0) {
+                                // 没有任何商品被处理
+                                msg = '没有商品被添加到购物车';
+                                icon = 2; // 错误图标
+                            } else {
+                                // 其他情况，使用返回的消息
+                                msg = result.msg || '操作完成';
+                                icon = 1;
+                            }
+                            
+                            layui.layer.msg(msg, {icon: icon});
+                            
+                            // 清除选中状态
+                            app.clearTableSelection();
+                            app.updateAddToCartButtonState();
+                            
+                            // 重新加载购物车缓存并高亮
+                            setTimeout(function() {
+                                loadCartCacheAndHighlight();
+                            }, 100);
+                        } else {
+                            layui.layer.msg(result.msg || '添加购物车失败', {icon: 2});
+                        }
+                    })
+                    .catch(error => {
+                        layui.layer.closeAll('loading');
+                        layui.layer.msg('添加购物车失败: ' + error.message, {icon: 2});
+                    });
+                });
+            });
+            
+            // 初始化表格
+            app.initTable();
+        },
+        
+        // 添加购物车按钮状态更新函数
+        updateAddToCartButtonState: function() {
+            layui.use(['table', 'jquery'], function() {
+                var $ = layui.jquery;
+                var selectedData = layui.table.checkStatus('searchInCrmTable').data;
+                var addToCartBtn = $('#addToCartBtn');
+                
+                if (selectedData.length > 0) {
+                    addToCartBtn.removeClass('layui-btn-disabled');
+                    addToCartBtn.prop('disabled', false);
+                } else {
+                    addToCartBtn.addClass('layui-btn-disabled');
+                    addToCartBtn.prop('disabled', true);
+                }
+            });
+        },
+        
+        // 清除表格选中状态
+        clearTableSelection: function() {
+            layui.use(['table'], function() {
+                var table = layui.table;
+                // 重新渲染表格，但不改变数据，这会清除所有选中状态
+                table.reload('searchInCrmTable', {
+                    // 保持当前所有参数，但不改变数据
+                });
+            });
+        }
+    };
+
+    // 更新复选框选中行的样式
+    function updateCheckboxRowStyles() {
+        layui.use(['table', 'jquery'], function() {
+            var table = layui.table;
+            var $ = layui.jquery;
+            
+            // 获取表格视图元素
+            var tableView = $('#searchInCrmTable').closest('.layui-table-view');
+            var tableBody = tableView.find('.layui-table-body tbody');
+            
+            // 移除所有行的选中样式
+            tableBody.find('tr').removeClass('layui-table-tr-selected');
+            
+            // 获取当前选中的数据
+            var selectedData = table.checkStatus('searchInCrmTable').data;
+            
+            // 为每个选中的行添加绿色背景
+            selectedData.forEach(function(item) {
+                // 通过数据匹配行并添加样式
+                tableBody.find('tr').each(function() {
+                    var rowData = table.cache['searchInCrmTable'][$(this).data('index')];
+                    if (rowData && rowData.oe === item.oe) {
+                        $(this).addClass('layui-table-tr-selected');
+                    }
+                });
+            });
+        });
+    }
+    
+    // 加载购物车缓存并高亮商品
+    function loadCartCacheAndHighlight() {
+        // 从服务器获取购物车数据
+        fetch('/api/cart')
+            .then(response => response.json())
+            .then(result => {
+                if (result.code === 0) {
+                    var cartItems = result.data;
+                    var cartBarcodeSet = new Set();
+                    
+                    // 收集购物车中的物料条码
+                    cartItems.forEach(function(item) {
+                        if (item.barcode) {
+                            cartBarcodeSet.add(item.barcode);
+                        }
+                    });
+                    
+                    // 遍历表格中的所有行并高亮购物车中的商品
+                    var tableRows = document.querySelectorAll('#searchInCrmTable + .layui-table-view .layui-table-body tbody tr');
+                    
+                    tableRows.forEach(function(row, index) {
+                        // 获取物料条码 - 查找物料条码单元格
+                        var barcodeCell = row.querySelector('td[data-field="barcode"] div.layui-table-cell') || 
+                                         row.querySelector('td[data-field="物料条码"] div.layui-table-cell') ||
+                                         row.querySelector('td[data-field="barcode"]') ||
+                                         row.querySelector('td[data-field="物料条码"]');
+                                         
+                        if (barcodeCell) {
+                            var barcode = (barcodeCell.textContent || barcodeCell.innerText || '').trim();
+                            
+                            // 检查当前行是否在购物车缓存中
+                            if (cartBarcodeSet.has(barcode)) {
+                                // 高亮显示该行（设置背景色为红色）
+                                row.classList.add('in-cart-row');
+                            } else {
+                                // 移除红色背景
+                                row.classList.remove('in-cart-row');
+                            }
+                        }
+                    });
+                    
+                    // 更新复选框选中行的样式
+                    updateCheckboxRowStyles();
+                }
+            })
+            .catch(error => {
+                console.error('获取购物车数据失败:', error);
+            });
+    }
+
+    // 专门用于searchInCrmTable的单元格选择功能（参考dateQueryTable实现）
+    function initExcelCellSelectionForSearchInCrm(tableId) {
+        // 只对备货表格生效
+        if (tableId !== 'searchInCrmTable') return;
+        
+        const tableView = document.querySelector('#' + tableId + ' + .layui-table-view');
+        if (!tableView || tableView.__hasCellSel__) return;
+        tableView.__hasCellSel__ = true;
+
+        const tableBox = tableView.querySelector('.layui-table-box');
+        const tableBody = tableView.querySelector('.layui-table-body'); // 👈 新增
+        if (!tableBox || !tableBody) return;
+
+        // 注入样式
+        if (!document.getElementById('excel-cell-sel-style')) {
+            const style = document.createElement('style');
+            style.id = 'excel-cell-sel-style';
+            style.textContent = `
+                .cell-excel-selected {
+                    background-color: #d0e8ff !important;
+                    position: relative;
+                }
+                .cell-excel-selected::after {
+                    content: '';
+                    position: absolute;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    border: 2px solid #1e90ff;
+                    pointer-events: none;
+                    box-sizing: border-box;
+                }
+                #drag-sel-rect {
+                    position: absolute;
+                    border: 1px dashed #1e90ff;
+                    background: rgba(30, 144, 255, 0.1);
+                    z-index: 2000;  /* 调整z-index层级，用于拖拽选择框 */
+                    pointer-events: none;
+                    display: none;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        let rectDiv = document.getElementById('drag-sel-rect');
+        if (!rectDiv) {
+            rectDiv = document.createElement('div');
+            rectDiv.id = 'drag-sel-rect';
+        }
+
+        let isDragging = false;
+        let selectedCells = [];
+        let startX, startY;
+
+        // 清除选中
+        function clearSelection() {
+            document.querySelectorAll('.cell-excel-selected').forEach(el => el.classList.remove('cell-excel-selected'));
+            selectedCells = [];
+        }
+
+        // 获取单元格相对于 tableView 的坐标（考虑滚动）
+        function getCellRect(cell) {
+            const cellRect = cell.getBoundingClientRect();
+            const viewRect = tableView.getBoundingClientRect();
+            return {
+                left: cellRect.left - viewRect.left + tableView.scrollLeft,
+                top: cellRect.top - viewRect.top + tableView.scrollTop,
+                right: cellRect.right - viewRect.left + tableView.scrollLeft,
+                bottom: cellRect.bottom - viewRect.top + tableView.scrollTop,
+                element: cell
+            };
+        }
+
+        function intersects(a, b) {
+            return !(b.left > a.right || b.right < a.left || b.top > a.bottom || b.bottom < a.top);
+        }
+
+        function updateSelection(selRect) {
+            clearSelection();
+            const cells = tableBox.querySelectorAll('.layui-table-cell');
+            const matched = [];
+
+            cells.forEach(cell => {
+                const cRect = getCellRect(cell);
+                if (intersects(cRect, selRect)) {
+                    cell.classList.add('cell-excel-selected');
+                    const tr = cell.closest('tr[data-index]');
+                    if (!tr) return;
+                    const rowIndex = parseInt(tr.getAttribute('data-index'), 10);
+                    const td = cell.closest('td');
+                    const colIndex = Array.from(td.parentNode.children).indexOf(td);
+                    matched.push({
+                        text: cell.innerText.trim(),
+                        row: rowIndex,
+                        col: colIndex
+                    });
+                }
+            });
+
+            selectedCells = matched;
+        }
+
+        function generateCopyText() {
+            if (selectedCells.length === 0) return '';
+            const rows = {};
+            let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+
+            selectedCells.forEach(({row, col, text}) => {
+                minR = Math.min(minR, row); maxR = Math.max(maxR, row);
+                minC = Math.min(minC, col); maxC = Math.max(maxC, col);
+                if (!rows[row]) rows[row] = {};
+                rows[row][col] = text;
+            });
+
+            let lines = [];
+            for (let r = minR; r <= maxR; r++) {
+                let line = [];
+                for (let c = minC; c <= maxC; c++) {
+                    line.push(rows[r] && rows[r][c] !== undefined ? rows[r][c] : '');
+                }
+                lines.push(line.join('\t'));
+            }
+            return lines.join('\n');
+        }
+
+            function copyText(text) {
+            console.log('[Debug] 复制内容:', text); // 调试用
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    layui.layer.msg('已复制选区内容', { icon: 1, time: 800 });
+                    // 自动清除选中
+                    clearSelection();
+                    selectedCells = [];
+                }).catch(err => {
+                    console.error('Clipboard API 失败:', err);
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                if (document.execCommand('copy')) {
+                    layui.layer.msg('已复制到剪贴板', { icon: 1, time: 800 });
+                    // 自动清除选中
+                    clearSelection();
+                    selectedCells = [];
+                } else {
+                    layui.layer.msg('复制失败', { icon: 2 });
+                }
+            } catch (e) {
+                console.error('execCommand 复制失败:', e);
+                layui.layer.msg('浏览器不支持复制', { icon: 2 });
+            }
+            document.body.removeChild(ta);
+        }
+
+            // 添加选中商品到购物车的函数
+        function addToCartFromSelection(selectedCells, tableId) {
+            console.log('addToCartFromSelection函数被调用，选中单元格数量:', selectedCells.length, '表格ID:', tableId);
+            if (selectedCells.length === 0) {
+                layui.layer.msg('未选中任何数据', { icon: 2 });
+                return;
+            }
+
+            // 直接使用layui.table.cache获取表格数据，移除对全局实例的依赖
+            let tableCache = layui.table.cache[tableId];
+            console.log('表格缓存:', tableCache);
+            if (!tableCache) {
+                layui.layer.msg('无法获取表格数据', { icon: 2 });
+                return;
+            }
+
+            // 从选中的单元格中提取行数据
+            const processedRows = new Set(); // 避免重复添加
+            const selectedRows = [];
+
+            selectedCells.forEach(cellData => {
+                const rowIndex = cellData.row;
+                console.log('处理行索引:', rowIndex);
+                if (!processedRows.has(rowIndex) && tableCache[rowIndex]) {
+                    selectedRows.push(tableCache[rowIndex]);
+                    processedRows.add(rowIndex);
+                }
+            });
+
+            if (selectedRows.length === 0) {
+                layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
+                return;
+            }
+
+            // 提取商品OE和物料条码的组合
+            var itemDetails = [];
+            selectedRows.forEach(function(item) {
+                console.log('处理商品:', item);
+                if (item.oe) {
+                    var barcode = item.barcode || item['物料条码'] || '';
+                    console.log('提取OE:', item.oe, '条码:', barcode);
+                    itemDetails.push({
+                        oe: item.oe,
+                        barcode: barcode
+                    });
+                }
+            });
+
+            if (itemDetails.length === 0) {
+                layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
+                return;
+            }
+
+            console.log('准备发送到购物车的商品:', itemDetails);
+            // 发送请求添加到购物车
+            fetch('/api/cart/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ item_details: itemDetails })
+            })
+            .then(response => response.json())
+            .then(result => {
+                console.log('服务器响应:', result);
+                if (result.code === 0) {
+                    layui.layer.msg(result.msg, {icon: 1});
+                    
+                    // 重新加载购物车缓存并高亮商品
+                    setTimeout(() => {
+                        loadCartCacheAndHighlight();
+                    }, 100);
+                    
+                    // 自动清除选中状态
+                    clearSelection();
+                } else {
+                    layui.layer.msg(result.msg, { icon: 2 });
+                }
+            })
+            .catch(error => {
+                console.error('添加购物车失败:', error);
+                layui.layer.msg('添加失败: ' + error.message, { icon: 2 });
+            });
+        }
+
+        // 坐标转换
+        const viewRect = tableView.getBoundingClientRect();
+        const offsetX = viewRect.left + window.pageXOffset - tableView.scrollLeft;
+        const offsetY = viewRect.top + window.pageYOffset - tableView.scrollTop;
+
+        function toTableCoord(clientX, clientY) {
+            return {
+                x: clientX - offsetX,
+                y: clientY - offsetY
+            };
+        }
+
+        // 鼠标事件
+        tableBox.addEventListener('mousedown', function(e) {
+            if (e.button !== 0 || e.target.closest('.layui-table-tool,.layui-table-header,.layui-table-total')) return;
+            const pt = toTableCoord(e.clientX, e.clientY);
+            isDragging = true;
+            startX = pt.x;
+            startY = pt.y;
+
+            rectDiv.style.cssText = `
+                position: absolute;
+                left: ${startX}px;
+                top: ${startY}px;
+                width: 0;
+                height: 0;
+                display: block;
+                border: 1px dashed #1e90ff;
+                background: rgba(30,144,255,0.1);
+                z-index: 9999;
+                pointer-events: none;
+            `;
+            if (rectDiv.parentNode !== tableView) {
+                tableView.appendChild(rectDiv);
+            }
+            clearSelection();
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            const pt = toTableCoord(e.clientX, e.clientY);
+            let x = pt.x, y = pt.y;
+            let w = x - startX, h = y - startY;
+            let l = startX, t = startY;
+            if (w < 0) { l = x; w = -w; }
+            if (h < 0) { t = y; h = -h; }
+
+            rectDiv.style.left = l + 'px';
+            rectDiv.style.top = t + 'px';
+            rectDiv.style.width = w + 'px';
+            rectDiv.style.height = h + 'px';
+
+            updateSelection({ left: l, top: t, right: l + w, bottom: t + h });
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                isDragging = false;
+                rectDiv.style.display = 'none';
+            }
+        });
+
+        // ====== 关键：绑定 Ctrl+C 复制 和 Alt+Q 功能 ======
+        function handleKeydown(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedCells.length > 0) {
+                e.preventDefault();
+                copyText(generateCopyText());
+            }
+            // ====== 新增：绑定 Alt+Q 功能（仅在备货表格中添加商品） ======
+            if (e.altKey && e.key.toLowerCase() === 'q' && selectedCells.length > 0) {
+                e.preventDefault();
+                addToCartFromSelection(selectedCells, tableId);
+            }
+        }
+
+        // 移除可能存在的旧监听器
+        if (tableView.__keyHandler) {
+            document.removeEventListener('keydown', tableView.__keyHandler);
+        }
+        tableView.__keyHandler = handleKeydown;
+        document.addEventListener('keydown', handleKeydown);
+        
+        // 添加点击屏幕任意地方取消选中（排除表格区域）
+        document.addEventListener('click', function(e) {
+            // 检查点击的是否是表格内部元素或表格相关元素
+            const isTableElement = tableView.contains(e.target) || 
+                                e.target.closest('.layui-table-cell') ||
+                                e.target.closest('.layui-table-view') ||
+                                e.target.closest('.layui-table-box');
+            
+            if (!isTableElement) {
+                // 如果点击的不是表格相关元素，则清除选中
+                setTimeout(() => {
+                    clearSelection();
+                    selectedCells = [];
+                }, 100); // 延迟执行，确保不影响表格内部的点击事件
+            }
+        });
+    }
+
+    // 保存到全局命名空间
+    window.SearchInCrmApp = app;
+
+    // 页面加载完成后初始化
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            app.init();
+        });
+    } else {
+        app.init();
+    }
+    
+</script>
+</body>
+</html>

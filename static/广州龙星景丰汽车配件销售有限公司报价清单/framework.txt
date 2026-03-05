@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        table.table2 th, table.table2 td {
+            border: 1px solid black;
+            text-align: left;
+            padding: 5px;
+        }
+
+        table.table1 th, table.table1 td {
+            border: 1px solid #fff;
+            text-align: left;
+        }
+
+        .centered-image {
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-size: contain;
+        }
+        .ddiw div{
+            float: left;
+            margin: 10px;
+        }
+        .ddiw2 div{
+            float: left;
+        }
+    </style>
+</head>
+<body style="font-weight: bold;">
+<div style="width: 815px;height: 800px;border: 1px dashed #e0e0e0;margin: auto;padding: 20px">
+    <div style="height: 100px; width: 820px;">
+        <div style="width: 180px;height: 100px; float: left">
+            <div class="centered-image"
+                 style="width: 160px;height: 85px;margin: auto;background-image: url('Z1D');"></div>
+        </div>
+        <div style="width: 640px; height: 100px; float: right">
+            <div style="font-size: 26px;font-weight: 500;font-weight: 600;">Z2D
+            </div>
+            <div style="margin-top: 20px">
+                <div style="width: 250px;float: right;">
+                    <div style="margin: 10px">【付款方式：Z3D】</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="width: 815px;text-align: left;">购货单位：Z4D</div>
+    <div style="border: 1px solid black;">
+        <table class="table1">
+            <tr>
+                <td>客户代码：Z5D</td>
+                <td>购货日期：Z6D</td>
+                <td>单号：Z7D</td>
+            </tr>
+            <tr>
+                <td>税号：Z8D</td>
+                <td>账号：Z9D</td>
+                <td>电话：Z10D</td>
+            </tr>
+            <tr>
+                <td>地址：Z11D</td>
+                <td></td>
+                <td>打印时间：Z12D</td>
+            </tr>
+        </table>
+    </div>
+
+    <table class="table2" style="margin-top: 4px">
+        <tr>
+            <td>序号</td>
+            <td>零件编码</td>
+            <td>零件名</td>
+            <td>车型</td>
+            <td>出库数量</td>
+            <td>售价</td>
+            <td>金额</td>
+            <td>库号</td>
+            <td>仓位</td>
+        </tr>
+        ZBGMXD
+<!--        <tr>-->
+<!--            <td>Z13D</td>-->
+<!--            <td>Z14D</td>-->
+<!--            <td>Z15D</td>-->
+<!--            <td>Z16D</td>-->
+<!--            <td>Z17D</td>-->
+<!--            <td>Z18D</td>-->
+<!--            <td>Z19D</td>-->
+<!--            <td>Z20D</td>-->
+<!--            <td>Z21D</td>-->
+<!--        </tr>-->
+    </table>
+    <div class="ddiw">
+        <div>营业员：Z22D</div><div style="margin-left: 80px;">制单：Z23D</div><div style="margin-left: 100px;">合计：Z24D</div><div style="margin-left: 100px;">￥</div><div style="margin-left: 30px;">Z25D</div>
+    </div>
+    <div style="width: 815px;margin-top: 36px;height: 1px;background-color: #0C0C0C"></div>
+    <div class="ddiw2" style="height: 30px;margin-left: 290px;">
+        <div></div><div style="margin-left: 80px;"></div><div style="margin-left: 100px;">合计：</div><div style="margin-left: 60px;">￥</div><div>Z25D</div>
+    </div>
+    <div class="ddiw2" style="height: 30px;margin-left: 290px;">
+        <div></div><div style="margin-left: 80px;"></div><div style="margin-left: 100px;"></div><div style="margin-left: 180px;">人民币大写：Z26D</div><div></div>
+    </div>
+    <div class="ddiw2" style="height: 30px;">
+        <div>【发货方式：汽运到 物流公司：代发】</div><div style="margin-left: 80px;"></div><div style="margin-left: 100px;"></div><div style="margin-left: 180px;">（其中  货价：Z27D 税金：Z28D）</div><div></div>
+    </div>
+    <div style="width: 815px;height: 1px;background-color: #0C0C0C"></div>
+    <div style="margin: 5px">商品即出,恕不退换!*本清单为双方结算货款依据，如有异议请在收货三天内以书面形式通知我司，逾期视为认同*</div>
+    <div style="width: 815px;height: 1px;background-color: #0C0C0C"></div>
+
+</div>
+
+
+
+</body>
+</html>

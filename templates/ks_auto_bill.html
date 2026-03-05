@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>crm自动开单</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/date-range-picker.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/excel-cell-selection.css') }}">
+    
+    <!-- 直接引入WebSocket相关库 -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/websocket-notifications.js') }}"></script>
+    
+<style>
+        body {
+            padding: 10px;
+            background-color: #ededed;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .table-container {
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .layui-table-cell {
+            height: auto;
+            white-space: normal;
+            word-break: break-all;
+            padding: 0 8px;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .search-form {
+            margin-bottom: 10px;
+        }
+        .search-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .search-item {
+            min-width: 150px;
+            max-width: 180px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .search-buttons {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+            gap: 10px;
+        }
+        .layui-input-inline {
+            width: 100%;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="header-and-search">
+        <div class="header-title" id="headerTitle">开思自动开单</div>
+    </div>
+    
+    <!-- 搜索表单 -->
+    <div class="table-container search-form">
+        <form class="layui-form" id="searchForm">
+            <div class="search-row">
+                <div class="search-item">
+                    <div class="layui-input-inline">
+                        <input type="text" name="ks_order_id" placeholder="开思订单号" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="search-item">
+                    <div class="layui-input-inline">
+                        <input type="text" name="crm_order_id" placeholder="CRM订单号" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                <div class="search-item date-range-item">
+                    <div class="layui-input-inline">
+                        <input type="text" name="date_range" id="dateRange" placeholder="请选择日期范围" autocomplete="off" class="layui-input" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="search-buttons">
+                <button type="submit" class="layui-btn layui-btn-normal" lay-submit lay-filter="search">搜索</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="autoBilledTopBtn">已自动开单置顶</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- 表格 -->
+    <div class="table-container">
+        <table class="layui-table" id="ksAutoBillTable" lay-filter="ksAutoBillTable"></table>
+    </div>
+
+<script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/form-handler.js') }}"></script>
+<script src="{{ url_for('static', filename='js/form-resetter.js') }}"></script>
+<script src="{{ url_for('static', filename='js/table-cell-utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cell-keyboard-shortcuts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/excel-cell-selection.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ks-auto-bill-config.js') }}"></script>
+<script>
+/**
+ * 开思自动开单页面主脚本
+ * 基于配置驱动的现代化架构
+ */
+
+layui.use(['table', 'jquery', 'form', 'laydate'], function() {
+    const table = layui.table;
+    const $ = layui.jquery;
+    const form = layui.form;
+    const laydate = layui.laydate;
+    const config = KSAutoBillConfig;
+    
+    let myTable; // 表格实例
+    
+    // 初始化应用
+    function initApp() {
+        initComponents();
+        initTable();
+        bindEvents();
+    }
+    
+    // 初始化组件
+    function initComponents() {
+        initDateRangePicker(config.SELECTORS.DATE_RANGE.substring(1)); // 移除#
+    }
+    
+    // 初始化表格
+    function initTable() {
+        myTable = table.render({
+            elem: `#${config.TABLE.ID}`,
+            url: config.API.DATA_URL,
+            method: 'get',
+            page: true,
+            limit: config.TABLE.PAGE_SIZE,
+            limits: config.TABLE.PAGE_SIZES,
+            height: config.TABLE.HEIGHT,
+            cols: [config.FIELDS],
+            done: onTableRenderComplete
+        });
+    }
+    
+    // 表格渲染完成回调
+    function onTableRenderComplete(res, curr, count) {
+        setTimeout(() => {
+            initExcelCellSelection(
+                config.TABLE.ID, 
+                table, 
+                layui.layer, 
+                config.FEATURES
+            );
+        }, 100);
+    }
+    
+    // 绑定事件处理器
+    function bindEvents() {
+        // 表单事件
+        handleFormSubmit(config.SELECTORS.SEARCH_FORM, config.TABLE.ID, config.API.DATA_URL);
+        handleFormReset(config.SELECTORS.SEARCH_FORM, config.TABLE.ID);
+        
+        // 按钮事件
+        $(config.SELECTORS.AUTO_BILLED_TOP_BTN).on('click', handleAutoBilledTop);
+    }
+
+    // 处理已自动开单置顶功能
+    function handleAutoBilledTop() {
+        const loadIndex = layer.load(1, {shade: [0.1, '#fff']});
+        const formData = collectFormData();
+        const searchParams = buildSearchParams(formData);
+        
+        table.reload(config.TABLE.ID, {
+            where: searchParams,
+            page: { curr: 1 },
+            done: function(res, curr, count) {
+                layer.close(loadIndex);
+                onTableRenderComplete(res, curr, count);
+            }
+        });
+    }
+    
+    // 收集表单数据
+    function collectFormData() {
+        const formData = {};
+        $(`${config.SELECTORS.SEARCH_FORM} input`).each(function() {
+            const fieldName = $(this).attr('name');
+            if (fieldName) {
+                formData[fieldName] = $(this).val();
+            }
+        });
+        return formData;
+    }
+    
+    // 构建搜索参数
+    function buildSearchParams(formData) {
+        let startDate = '';
+        let endDate = '';
+        
+        if (formData.date_range) {
+            const dates = formData.date_range.split(' - ');
+            if (dates.length === 2) {
+                [startDate, endDate] = dates.map(date => date.trim());
+            }
+        }
+        
+        return {
+            sort_auto_billed_first: 'true',
+            ks_order_id: formData.ks_order_id || '',
+            crm_order_id: formData.crm_order_id || '',
+            start_date: startDate,
+            end_date: endDate
+        };
+    }
+    
+    // 页面加载完成后初始化应用
+    initApp();
+});
+</script>
+</body>
+</html>

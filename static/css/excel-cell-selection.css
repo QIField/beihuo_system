@@ -1,0 +1,39 @@
+/* Excel风格的单元格选择样式 */
+.cell-excel-selected {
+    background-color: #d0e8ff !important;
+    position: relative;
+}
+
+/* 为选中单元格添加伪元素边框，提供更清晰的视觉反馈 */
+.cell-excel-selected::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px solid #1e90ff;
+    pointer-events: none;
+    box-sizing: border-box;
+    z-index: 2;
+}
+
+#drag-sel-rect {
+    position: absolute;
+    border: 1px dashed #1e90ff;
+    background: rgba(30,144,255,0.1);
+    z-index: 2000;
+    pointer-events: none;
+    display: none;
+    box-sizing: border-box;
+}
+
+/* 购物车表格特殊样式 */
+.in-cart-row {
+    background-color: #ffcccc !important;
+}
+
+/* 确保 Excel 单元格选择框能正确显示在表格上 */
+.layui-table-box {
+    overflow: visible !important;
+}
