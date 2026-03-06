@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # 从统一的数据库连接模块导入 - 使用 DBCursorContext 上下文管理器
-from app.utils.database_connection import db_cursor
+from app.utils.database_connection import db_cursor, get_db_connection
 
 # CRM开单接口地址
 CRM_API_URL = "http://113.45.176.129:8001/ks_kaidan_api"
@@ -90,27 +90,28 @@ def save_order_result_to_db(order_id, result_data, connection=None, status='已�
         crm_order_number = result_data.get('orderNumber', '')
         crm_order_url = result_data.get('url', '')
 
-    def update_operation(cursor):
-        sql = """
-        UPDATE crmapp_ks_auto_bill 
-        SET `crm订单号`=%s, `crm订单链接`=%s, `crm订单状态`=%s, `开单时间`=%s
-        WHERE `开思订单号` = %s
-        """
-        cursor.execute(sql, (crm_order_number, crm_order_url, status, current_time, order_id))
-        
-        # 检查是否有更新记录，如果没有则插入新记录
-        if cursor.rowcount == 0:
-            insert_sql = """
-            INSERT INTO crmapp_ks_auto_bill (`开思订单号`, `crm订单号`, `crm订单链接`, `crm订单状态`, `开单时间`) 
-            VALUES (%s, %s, %s, %s, %s)
+    try:
+        # 使用 db_cursor 上下文管理器，自动管理连接和事务
+        # 如果传入了外部连接，则使用外部连接；否则自动创建新连接
+        with db_cursor(dict_cursor=False, connection=connection) as cursor:
+            sql = """
+            UPDATE crmapp_ks_auto_bill 
+            SET `crm订单号`=%s, `crm订单链接`=%s, `crm订单状态`=%s, `开单时间`=%s
+            WHERE `开思订单号` = %s
             """
-            cursor.execute(insert_sql, (order_id, crm_order_number, crm_order_url, status, current_time))
+            cursor.execute(sql, (crm_order_number, crm_order_url, status, current_time, order_id))
             
-        return cursor.rowcount > 0
-
-    result = _execute_db_operation(update_operation, connection)
-    if result:
+            # 检查是否有更新记录，如果没有则插入新记录
+            if cursor.rowcount == 0:
+                insert_sql = """
+                INSERT INTO crmapp_ks_auto_bill (`开思订单号`, `crm订单号`, `crm订单链接`, `crm订单状态`, `开单时间`) 
+                VALUES (%s, %s, %s, %s, %s)
+                """
+                cursor.execute(insert_sql, (order_id, crm_order_number, crm_order_url, status, current_time))
+                
         print(f"         ✓ 订单 {order_id} 信息已保存到数据库")
+    except Exception as e:
+        print(f"         ✗ 保存订单 {order_id} 到数据库失败: {str(e)}")
 
 
 def send_order_to_crm(order_id, connection=None):

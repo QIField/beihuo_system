@@ -16,12 +16,12 @@ class CartRequestHandler:
 
     def handle_get_cart_request(self, store: str, is_admin: bool, args: Dict = None) -> Dict[str, Any]:
         """
-        处理获取购物车数据的请求
+        处理获取购物车数据的请求，支持分页和排序
 
         Args:
             store: 门店代码
             is_admin: 是否为管理员
-            args: 请求参数，可包含 dimension 参数（'product' 或 'supplier'）和搜索参数
+            args: 请求参数，可包含 dimension 参数（'product' 或 'supplier'）、搜索参数、分页参数、排序参数
         """
         total_start = time.time()
 
@@ -29,8 +29,35 @@ class CartRequestHandler:
         dimension = 'product'
         # 提取搜索参数
         search_params = {}
+        # 分页参数
+        page = 1
+        limit = 50
+        # 排序参数
+        sort_field = None
+        sort_order = None
+
         if args and isinstance(args, dict):
             dimension = args.get('dimension', 'product')
+
+            # 提取分页参数
+            try:
+                page = int(args.get('page', 1))
+                limit = int(args.get('limit', 50))
+                # 限制最大每页数量，防止性能问题
+                if limit > 500:
+                    limit = 500
+                if limit < 1:
+                    limit = 50
+                if page < 1:
+                    page = 1
+            except (ValueError, TypeError):
+                page = 1
+                limit = 50
+
+            # 提取排序参数（Layui表格传递的参数）
+            sort_field = args.get('field')  # 排序字段
+            sort_order = args.get('order')  # 排序方向：asc 或 desc
+
             # 提取搜索参数
             search_keys = ['cart_barcode', 'cart_oe', 'cart_material_name', 'cart_brand', 'cart_tag', 'cart_car_model']
             for key in search_keys:
@@ -39,20 +66,22 @@ class CartRequestHandler:
 
         # 获取购物车数据
         try:
-            # 使用CartDataService中的get_cart_data方法，传入维度参数和搜索参数
-            cart_data = self.cart_data_service.get_cart_data(store, is_admin, dimension, search_params)
+            # 使用CartDataService中的get_cart_data方法，传入维度参数、搜索参数、分页参数和排序参数
+            cart_data, total_count = self.cart_data_service.get_cart_data(
+                store, is_admin, dimension, search_params, page, limit, sort_field, sort_order
+            )
 
             total_end = time.time()
             total_elapsed_ms = (total_end - total_start) * 1000
 
-            print(f"⏱️ 【获取购物车请求】查询耗时: {total_elapsed_ms:.2f}ms")
+            print(f"⏱️ 【获取购物车请求】查询耗时: {total_elapsed_ms:.2f}ms, 页码: {page}, 每页: {limit}, 总数: {total_count}, 排序: {sort_field} {sort_order}")
 
-            # 返回符合API接口格式的结果
+            # 返回符合API接口格式的结果（包含分页信息）
             result = {
                 'code': 0,
                 'msg': '查询成功',
-                'count': len(cart_data),
-                'data': cart_data
+                'count': total_count,  # 总数量
+                'data': cart_data      # 当前页数据
             }
 
             return result
@@ -100,12 +129,12 @@ class CartRequestHandler:
     def handle_get_cart_summary(self, store: str, is_admin: bool) -> Dict[str, Any]:
         """获取购物车摘要信息"""
         try:
-            # 使用CartDataService中现有的get_cart_data方法
-            cart_data = self.cart_data_service.get_cart_data(store, is_admin)
+            # 使用CartDataService中现有的get_cart_data方法，不分页获取总数
+            cart_data, total_count = self.cart_data_service.get_cart_data(store, is_admin, 'product', None, 1, 1)
 
             # 添加清理结果信息
             summary = {
-                'total_items': len(cart_data),
+                'total_items': total_count,
                 'store': store,
                 'is_admin': is_admin
             }

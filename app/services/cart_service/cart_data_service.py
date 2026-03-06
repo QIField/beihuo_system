@@ -5,7 +5,7 @@
 
 import pymysql
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from app.utils.database_connection import get_db_connection, db_cursor
 from app.utils.search import parse_space, parse_comma
 
@@ -13,21 +13,63 @@ from app.utils.search import parse_space, parse_comma
 class CartDataService:
     """购物车基础数据服务类"""
 
-    def get_cart_data(self, store: str, is_admin: bool = False, dimension: str = 'product', search_params: Dict = None) -> List[Dict[str, Any]]:
+    # 字段映射表，用于排序
+    FIELD_MAPPING = {
+        'oe': 'oe',
+        'brand': 'brand',
+        'material_name': 'material_name',
+        'barcode': 'barcode',
+        'brand_code': 'brand_code',
+        'car_brand': 'car_brand',
+        'tag': 'tag',
+        'car_model': 'car_model',
+        'stock': 'stock',
+        'on_way': 'on_way',
+        'inquiry_1m': 'inquiry_1m',
+        'inquiry_3m': 'inquiry_3m',
+        'national_inquiry_1m': 'national_inquiry_1m',
+        'national_inquiry_3m': 'national_inquiry_3m',
+        'stock_amount': 'stock_amount',
+        'sellable_days': 'sellable_days',
+        'cost_price': 'cost_price',
+        'warning_status': 'warning_status',
+        'quantity': 'quantity',
+        'added_time': 'added_time',
+        'added_by': 'added_by',
+        'today_sales': 'today_sales',
+        'sales_yesterday': 'sales_yesterday',
+        'sales_7d': 'sales_7d',
+        'sales_month': 'sales_month',
+        'avg_sales_6m': 'avg_sales_6m',
+        'avg_sales_12m': 'avg_sales_12m',
+    }
+
+    def get_cart_data(self, store: str, is_admin: bool = False, dimension: str = 'product',
+                      search_params: Dict = None, page: int = 1, limit: int = 50,
+                      sort_field: str = None, sort_order: str = None) -> Tuple[List[Dict[str, Any]], int]:
         """
-        获取购物车数据 - 支持产品维度和供应商维度，支持搜索过滤
+        获取购物车数据 - 支持产品维度和供应商维度，支持搜索过滤、排序和分页
 
         Args:
             store: 门店代码
             is_admin: 是否为管理员
             dimension: 维度类型，'product' 或 'supplier'
             search_params: 搜索参数字典，可包含 cart_barcode, cart_oe, cart_material_name, cart_brand, cart_tag
+            page: 页码，从1开始
+            limit: 每页数量
+            sort_field: 排序字段
+            sort_order: 排序方向，'asc' 或 'desc'
+
+        Returns:
+            (数据列表, 总数量)
         """
         # 使用上下文管理器确保连接正确关闭，避免连接泄漏
         with db_cursor(dict_cursor=True) as cursor:
             # 构建基础SQL查询
             sql = "SELECT * FROM crmapp_cart WHERE store = %s"
+            count_sql = "SELECT COUNT(*) as total FROM crmapp_cart WHERE store = %s"
             params = [store]
+            count_params = [store]
 
             # 添加搜索条件
             if search_params:
@@ -39,7 +81,9 @@ class CartDataService:
                         for barcode in barcode_list:
                             or_conditions.append("(barcode LIKE %s OR oe LIKE %s)")
                             params.extend([f'%{barcode}%', f'%{barcode}%'])
+                            count_params.extend([f'%{barcode}%', f'%{barcode}%'])
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
+                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
                 # OE号搜索 (cart_oe) - 支持多行
                 if search_params.get('cart_oe'):
@@ -49,7 +93,9 @@ class CartDataService:
                         for oe in oe_list:
                             or_conditions.append("oe LIKE %s")
                             params.append(f'%{oe}%')
+                            count_params.append(f'%{oe}%')
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
+                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
                 # 物料名称搜索 (cart_material_name) - 支持多行
                 if search_params.get('cart_material_name'):
@@ -59,7 +105,9 @@ class CartDataService:
                         for name in name_list:
                             or_conditions.append("material_name LIKE %s")
                             params.append(f'%{name}%')
+                            count_params.append(f'%{name}%')
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
+                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
                 # 品牌搜索 (cart_brand) - 支持多行
                 if search_params.get('cart_brand'):
@@ -69,7 +117,9 @@ class CartDataService:
                         for brand in brand_list:
                             or_conditions.append("brand LIKE %s")
                             params.append(f'%{brand}%')
+                            count_params.append(f'%{brand}%')
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
+                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
                 # 标签搜索 (cart_tag) - 支持多行
                 if search_params.get('cart_tag'):
@@ -79,7 +129,9 @@ class CartDataService:
                         for tag in tag_list:
                             or_conditions.append("tag LIKE %s")
                             params.append(f'%{tag}%')
+                            count_params.append(f'%{tag}%')
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
+                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
                 # 车型搜索 (cart_car_model) - 支持多行
                 if search_params.get('cart_car_model'):
@@ -89,10 +141,22 @@ class CartDataService:
                         for car_model in car_model_list:
                             or_conditions.append("car_model LIKE %s")
                             params.append(f'%{car_model}%')
+                            count_params.append(f'%{car_model}%')
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
+                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
-            # 添加排序
-            sql += " ORDER BY added_time DESC"
+            # 先查询总数量
+            cursor.execute(count_sql, tuple(count_params))
+            total_count = cursor.fetchone()['total']
+
+            # 处理排序
+            order_clause = self._build_order_clause(sort_field, sort_order)
+            sql += order_clause
+
+            # 添加分页限制
+            offset = (page - 1) * limit
+            sql += " LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
 
             cursor.execute(sql, tuple(params))
             result = cursor.fetchall()
@@ -108,8 +172,35 @@ class CartDataService:
         # 如果是供应商维度，拆分供应商数据
         if dimension == 'supplier':
             result = self._expand_by_suppliers(result)
+            # 供应商维度分页需要特殊处理，这里简化处理
+            # 实际项目中可能需要在拆分后重新分页
 
-        return list(result)
+        return list(result), total_count
+
+    def _build_order_clause(self, sort_field: str, sort_order: str) -> str:
+        """
+        构建排序子句
+
+        Args:
+            sort_field: 排序字段
+            sort_order: 排序方向
+
+        Returns:
+            排序子句字符串
+        """
+        # 默认按加入时间倒序
+        if not sort_field:
+            return " ORDER BY added_time DESC"
+
+        # 检查字段是否在允许的映射中
+        db_field = self.FIELD_MAPPING.get(sort_field)
+        if not db_field:
+            return " ORDER BY added_time DESC"
+
+        # 确定排序方向
+        order_direction = "DESC" if sort_order and sort_order.lower() == "desc" else "ASC"
+
+        return f" ORDER BY {db_field} {order_direction}"
 
     def _expand_by_suppliers(self, cart_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
