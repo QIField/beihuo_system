@@ -28,8 +28,8 @@ import uuid
 from backend.get_order import get_order_bp
 from flask_socketio import SocketIO
 from app.sockets import register_socket_events, notification_manager
-from app.utils.database_connection import get_db_connection 
-
+from app.utils.database_connection import get_db_connection
+from app.utils.search import parse_space, parse_comma
 
 
 app = Flask(__name__, 
@@ -597,82 +597,20 @@ def is_alpha_only(s):
     """检查字符串是否只包含字母"""
     return s.isalpha()
 
+# 使用新的搜索工具包，保留原函数名作为别名
 def process_barcode_search(barcode_str):
     """处理条码搜索，特别处理空格分隔的条码"""
-    if not barcode_str:
-        return []
-    
-    # 如果包含换行符，按换行符分割
-    if '\n' in barcode_str:
-        lines = [line.strip() for line in barcode_str.split('\n') if line.strip()]
-    else:
-        lines = [barcode_str.strip()] if barcode_str.strip() else []
-    
-    result = []
-    for line in lines:
-        # 检查行中是否包含空格
-        parts = line.split()
-        if len(parts) > 1:
-            # 检查空格后的部分是否只包含字母
-            i = 0
-            while i < len(parts):
-                if i < len(parts) - 1 and is_alpha_only(parts[i+1]):
-                    # 如果下一个部分只包含字母，将其与当前部分合并
-                    combined = parts[i] + ' ' + parts[i+1]
-                    result.append(combined)
-                    i += 2  # 跳过下一个部分，因为它已经被合并
-                else:
-                    result.append(parts[i])
-                    i += 1
-        else:
-            # 没有空格，直接添加
-            result.append(line)
-    
-    # 过滤空值
-    return [item.strip() for item in result if item.strip()]
+    return parse_space(barcode_str)
+
 
 def process_oe_search(oe_str):
     """处理OE搜索，空格分隔的每个部分作为一个独立的搜索项"""
-    if not oe_str:
-        return []
-    
-    # 如果包含换行符，按换行符分割
-    if '\n' in oe_str:
-        lines = [line.strip() for line in oe_str.split('\n') if line.strip()]
-    else:
-        lines = [oe_str.strip()] if oe_str.strip() else []
-    
-    result = []
-    for line in lines:
-        # 按空格分割，每个部分作为一个独立的搜索项
-        parts = line.split()
-        for part in parts:
-            if part.strip():
-                result.append(part.strip())
-    
-    return result
+    return parse_space(oe_str)
+
 
 def process_material_name_search(material_name_str):
     """处理物料名称搜索，使用逗号分隔（中文逗号或英文逗号）"""
-    if not material_name_str:
-        return []
-    
-    # 如果包含换行符，按换行符分割
-    if '\n' in material_name_str:
-        lines = [line.strip() for line in material_name_str.split('\n') if line.strip()]
-    else:
-        lines = [material_name_str.strip()] if material_name_str.strip() else []
-    
-    result = []
-    for line in lines:
-        # 使用逗号（中文或英文）分割
-        import re
-        parts = re.split(r'[,，]', line)
-        for part in parts:
-            if part.strip():
-                result.append(part.strip())
-    
-    return result
+    return parse_comma(material_name_str)
 
 #调用虚拟库存文件并新建档案=========================================================================================================
 import os
@@ -812,6 +750,40 @@ def run_virtual_inventory_task():
 
 # 注册定时任务
 schedule.every().day.at("13:00").do(run_virtual_inventory_task)
+
+# 注册每小时购物车高库存清理任务
+def run_cart_cleanup_task():
+    """每小时自动清理购物车高库存商品"""
+    # 检查是否为主进程
+    if os.getpid() != MAIN_PROCESS_ID:
+        print(f"[{datetime.now()}] 非主进程({os.getpid()})，跳过执行购物车清理任务")
+        return
+
+    print(f"[{datetime.now()}] 🕒 开始执行每小时购物车高库存清理任务...")
+
+    try:
+        from app.services.cart_service.cart_auto_cleanup import CartAutoCleanupService
+
+        cleanup_service = CartAutoCleanupService()
+        results = cleanup_service.cleanup_after_data_update()
+
+        # 统计清理结果
+        total_deleted = sum(
+            r.get('deleted_count', 0)
+            for r in results
+            if r.get('status') == 'success'
+        )
+
+        if total_deleted > 0:
+            print(f"✅ 每小时购物车清理完成：共删除 {total_deleted} 个高库存商品")
+        else:
+            print("ℹ️ 每小时购物车清理完成：无高库存商品需要清理")
+
+    except Exception as e:
+        print(f"❌ 每小时购物车清理任务失败: {str(e)}")
+
+# 每小时执行一次购物车清理（整点执行）
+schedule.every().hour.at(":00").do(run_cart_cleanup_task)
 
 def run_scheduler():
     """运行调度器的后台线程"""

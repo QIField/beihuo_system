@@ -39,9 +39,12 @@
         // 建立WebSocket连接
         connect() {
             try {
-                this.socket = io(CONFIG.SOCKET_PATH);
+                // 强制使用长轮询，避免与uWSGI的WebSocket兼容问题
+                this.socket = io(CONFIG.SOCKET_PATH, {
+                    transports: ['polling']
+                });
                 this.bindEvents();
-                console.log('[WebSocket] 尝试连接...');
+                console.log('[WebSocket] 尝试连接...(使用长轮询模式)');
             } catch (error) {
                 console.error('[WebSocket] 连接初始化失败:', error);
                 this.scheduleReconnect();

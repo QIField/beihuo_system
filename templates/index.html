@@ -4943,6 +4943,9 @@ function showCartPanel(table) {
                 <div class="layui-input-inline" style="flex: 1; min-width: 100px; max-width: 180px;">
                     <input type="text" name="cart_tag" placeholder="标签搜索" autocomplete="off" class="layui-input" style="width: 100%;">
                 </div>
+                <div class="layui-input-inline" style="flex: 1; min-width: 100px; max-width: 180px;">
+                    <input type="text" name="cart_car_model" placeholder="车型搜索" autocomplete="off" class="layui-input" style="width: 100%;">
+                </div>
                 <button class="layui-btn layui-btn-sm layui-btn-normal" id="cartSearchBtn">搜索</button>
                 <button class="layui-btn layui-btn-sm layui-btn-primary" id="cartResetBtn">重置</button>
             </div>
@@ -4981,6 +4984,7 @@ function showCartPanel(table) {
                     searchParams.cart_material_name = layero.find('input[name="cart_material_name"]').val();
                     searchParams.cart_brand = layero.find('input[name="cart_brand"]').val();
                     searchParams.cart_tag = layero.find('input[name="cart_tag"]').val();
+                    searchParams.cart_car_model = layero.find('input[name="cart_car_model"]').val();
                     
                     // 过滤空值
                     for (var key in searchParams) {
@@ -5011,6 +5015,7 @@ function showCartPanel(table) {
                     layero.find('input[name="cart_material_name"]').val('');
                     layero.find('input[name="cart_brand"]').val('');
                     layero.find('input[name="cart_tag"]').val('');
+                    layero.find('input[name="cart_car_model"]').val('');
                     
                     // 重新加载购物车表格，不带搜索条件
                     cartTable.reload({

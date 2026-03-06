@@ -9,6 +9,7 @@ import concurrent.futures
 from functools import partial
 from pathlib import Path
 from app.utils.database_connection import get_db_connection  # 使用统一的连接池实现
+from app.utils.search import parse_mixed  # 使用搜索工具包
 
 # 创建蓝图
 search_in_crm_bp = Blueprint('search_in_crm', __name__)
@@ -346,27 +347,8 @@ def save_search_results_batch(username, company, search_results_list):
 
 def parse_input_oes(input_str):
     """解析输入的OE号码字符串，返回标准化的OE列表"""
-    # 按换行符分割
-    lines = input_str.split('\n')
-    all_terms = []
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-            
-        # 检查是否有逗号分隔符
-        if ',' in line or '，' in line:
-            # 按逗号分割
-            comma_separated = line.replace('，', ',').split(',')
-            all_terms.extend([term.strip() for term in comma_separated if term.strip()])
-        else:
-            # 按空格分割
-            space_separated = line.split(' ')
-            all_terms.extend([term.strip() for term in space_separated if term.strip()])
-    
-    # 过滤掉空字符串
-    return [term for term in all_terms if term]
+    # 使用搜索工具包的混合解析（支持空格、逗号、换行）
+    return parse_mixed(input_str)
 
 def search_and_save_crm_data(search_terms, username, company):
     """批量搜索并保存CRM数据 - 使用线程池并发处理API请求"""

@@ -4,8 +4,22 @@
 """
 
 import pymysql
+import time
 from typing import List, Dict, Any, Optional
 from app.utils.database_connection import get_db_connection
+
+
+def log_step(step_name: str, start_time: float, end_time: float):
+    """
+    记录步骤执行时间
+    
+    参数:
+        step_name: 步骤名称
+        start_time: 开始时间戳（秒）
+        end_time: 结束时间戳（秒）
+    """
+    elapsed_ms = (end_time - start_time) * 1000
+    print(f"⏱️ [{step_name}] 耗时: {elapsed_ms:.2f}ms")
 
 
 class CartRemoveService:
@@ -17,17 +31,39 @@ class CartRemoveService:
         适用场景：用户一键清空当前门店购物车
         数据安全：通过store参数确保只删除当前门店数据
         """
+        total_start = time.time()
+        step_start = total_start
+        
         try:
             conn = get_db_connection()
+            step_end = time.time()
+            log_step("获取数据库连接", step_start, step_end)
+            step_start = step_end
+            
             cursor = conn.cursor()
+            step_end = time.time()
+            log_step("创建游标", step_start, step_end)
+            step_start = step_end
             
             # 明确指定只删除当前门店数据
             sql = "DELETE FROM crmapp_cart WHERE store = %s"
             cursor.execute(sql, (store,))
+            step_end = time.time()
+            log_step("执行DELETE语句", step_start, step_end)
+            step_start = step_end
             
             deleted_count = cursor.rowcount
             conn.commit()
+            step_end = time.time()
+            log_step("提交事务", step_start, step_end)
+            step_start = step_end
+            
             conn.close()
+            step_end = time.time()
+            log_step("关闭连接", step_start, step_end)
+            
+            total_end = time.time()
+            log_step("【清空购物车】总耗时", total_start, total_end)
             
             return {
                 'code': 0,
@@ -38,6 +74,8 @@ class CartRemoveService:
         except Exception as e:
             if 'conn' in locals():
                 conn.close()
+            total_end = time.time()
+            log_step("【清空购物车】失败总耗时", total_start, total_end)
             return {
                 'code': 1,
                 'msg': f'清空购物车失败: {str(e)}'
@@ -49,6 +87,9 @@ class CartRemoveService:
         适用场景：用户明确选择要删除的具体商品
         优势：精确控制，避免误删，性能优秀
         """
+        total_start = time.time()
+        step_start = total_start
+        
         if not item_details:
             return {
                 'code': 1,
@@ -57,7 +98,14 @@ class CartRemoveService:
         
         try:
             conn = get_db_connection()
+            step_end = time.time()
+            log_step("获取数据库连接", step_start, step_end)
+            step_start = step_end
+            
             cursor = conn.cursor()
+            step_end = time.time()
+            log_step("创建游标", step_start, step_end)
+            step_start = step_end
             
             # 分离有条码和无条码的商品
             items_with_barcode = []
@@ -71,6 +119,10 @@ class CartRemoveService:
                     items_with_barcode.append((item_oe, item_barcode))
                 else:
                     items_without_barcode.append(item_oe)
+            
+            step_end = time.time()
+            log_step("分离商品数据", step_start, step_end)
+            step_start = step_end
             
             deleted_count = 0
             
@@ -91,6 +143,10 @@ class CartRemoveService:
                 params = oe_list + barcode_list + [store]
                 cursor.execute(sql, params)
                 deleted_count += cursor.rowcount
+                
+                step_end = time.time()
+                log_step(f"删除有条码商品({len(items_with_barcode)}个)", step_start, step_end)
+                step_start = step_end
             
             # 处理无条码的商品 - 使用IN子句批量删除
             if items_without_barcode:
@@ -99,9 +155,22 @@ class CartRemoveService:
                 params = items_without_barcode + [store]
                 cursor.execute(sql, params)
                 deleted_count += cursor.rowcount
+                
+                step_end = time.time()
+                log_step(f"删除无条码商品({len(items_without_barcode)}个)", step_start, step_end)
+                step_start = step_end
             
             conn.commit()
+            step_end = time.time()
+            log_step("提交事务", step_start, step_end)
+            step_start = step_end
+            
             conn.close()
+            step_end = time.time()
+            log_step("关闭连接", step_start, step_end)
+            
+            total_end = time.time()
+            log_step("【批量删除商品】总耗时", total_start, total_end)
             
             return {
                 'code': 0,
@@ -112,6 +181,8 @@ class CartRemoveService:
         except Exception as e:
             if 'conn' in locals():
                 conn.close()
+            total_end = time.time()
+            log_step("【批量删除商品】失败总耗时", total_start, total_end)
             return {
                 'code': 1,
                 'msg': f'批量删除失败: {str(e)}'
@@ -135,9 +206,19 @@ class CartRemoveService:
         适用场景：系统定时自动清理库存过高的商品
         优势：符合库存管理业务逻辑，自动化处理
         """
+        total_start = time.time()
+        step_start = total_start
+        
         try:
             conn = get_db_connection()
+            step_end = time.time()
+            log_step("获取数据库连接", step_start, step_end)
+            step_start = step_end
+            
             cursor = conn.cursor(pymysql.cursors.DictCursor)
+            step_end = time.time()
+            log_step("创建游标", step_start, step_end)
+            step_start = step_end
             
             # 方法1: 先获取购物车中所有具有有效条码的项目
             query_cart_sql = """
@@ -148,8 +229,16 @@ class CartRemoveService:
             cursor.execute(query_cart_sql, (store,))
             cart_items = cursor.fetchall()
             
+            step_end = time.time()
+            log_step(f"查询购物车商品({len(cart_items)}条)", step_start, step_end)
+            step_start = step_end
+            
             if not cart_items:
                 conn.close()
+                step_end = time.time()
+                log_step("关闭连接", step_start, step_end)
+                total_end = time.time()
+                log_step("【自动删除高库存商品】总耗时(无商品)", total_start, total_end)
                 return {
                     'code': 0,
                     'msg': '购物车中没有带条码的商品',
@@ -162,6 +251,10 @@ class CartRemoveService:
             
             if not barcodes:
                 conn.close()
+                step_end = time.time()
+                log_step("关闭连接", step_start, step_end)
+                total_end = time.time()
+                log_step("【自动删除高库存商品】总耗时(无条码)", total_start, total_end)
                 return {
                     'code': 0,
                     'msg': '购物车中没有有效的条码',
@@ -178,6 +271,10 @@ class CartRemoveService:
             """
             cursor.execute(query_stock_sql, barcodes + [store, threshold])
             high_stock_items = cursor.fetchall()
+            
+            step_end = time.time()
+            log_step(f"查询高库存商品({len(high_stock_items)}条)", step_start, step_end)
+            step_start = step_end
             
             # 获取高库存商品的条码
             high_stock_barcodes = {item['物料条码'] for item in high_stock_items}
@@ -198,13 +295,26 @@ class CartRemoveService:
                     """
                     cursor.execute(delete_sql, cart_ids_to_delete + [store])
                     deleted_count = cursor.rowcount
+                    
+                    step_end = time.time()
+                    log_step(f"执行删除({deleted_count}条)", step_start, step_end)
+                    step_start = step_end
                 else:
                     deleted_count = 0
             else:
                 deleted_count = 0
         
             conn.commit()
+            step_end = time.time()
+            log_step("提交事务", step_start, step_end)
+            step_start = step_end
+            
             conn.close()
+            step_end = time.time()
+            log_step("关闭连接", step_start, step_end)
+            
+            total_end = time.time()
+            log_step("【自动删除高库存商品】总耗时", total_start, total_end)
         
             return {
                 'code': 0,
@@ -216,6 +326,8 @@ class CartRemoveService:
         except Exception as e:
             if 'conn' in locals():
                 conn.close()
+            total_end = time.time()
+            log_step("【自动删除高库存商品】失败总耗时", total_start, total_end)
             return {
                 'code': 1,
                 'msg': f'自动删除高库存商品失败: {str(e)}'

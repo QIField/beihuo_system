@@ -3,10 +3,9 @@ import json
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-import pymysql
 
-# 从统一的数据库连接模块导入
-from app.utils.database_connection import get_db_connection, _execute_db_operation
+# 从统一的数据库连接模块导入 - 使用 DBCursorContext 上下文管理器
+from app.utils.database_connection import db_cursor
 
 # CRM开单接口地址
 CRM_API_URL = "http://113.45.176.129:8001/ks_kaidan_api"
@@ -14,52 +13,61 @@ CRM_API_URL = "http://113.45.176.129:8001/ks_kaidan_api"
 
 def filter_unprocessed_orders(order_ids):
     """
-    根据订单ID列表，过滤出需要处理的订单（即CRM状态不是'已自动开单'或不存在的订单）
+    根据订单ID列表，过滤出需要处理的订单（即CRM状态不是'已自动开单'或'开单失败'或不存在的订单）
     
     参数:
         order_ids: 待处理订单ID列表
     
     返回:
         list: 需要发送到CRM的订单ID列表
+    
+    说明:
+        - '已自动开单'：成功处理的订单，不需要再次处理
+        - '开单失败'：已经尝试过但失败的订单，不再重复尝试，避免无限循环
     """
     if not order_ids:
         return []
-
-    def query_operation(cursor):
-        # 计算一周前的时间（从当前时间往前一周）
-        one_week_ago = datetime.now() - timedelta(days=7)
-        one_week_ago_str = one_week_ago.strftime('%Y-%m-%d %H:%M:%S')
-        
-        # 构建SQL查询，获取一周内且在提供的订单ID列表中的记录
-        placeholders = ','.join(['%s'] * len(order_ids))
-        sql = f"""
-        SELECT `开思订单号`, `crm订单状态` 
-        FROM crmapp_ks_auto_bill 
-        WHERE `日期` >= %s 
-        AND `开思订单号` IN ({placeholders})
-        """
-        
-        params = [one_week_ago_str] + order_ids
-        cursor.execute(sql, params)
-        results = cursor.fetchall()
-        
-        # 使用集合优化：将已处理的订单ID存储到集合中，方便O(1)时间复杂度查找
-        processed_orders_set = set()
-        for row in results:
-            if row['crm订单状态'] == '已自动开单':
-                processed_orders_set.add(row['开思订单号'])
-        
-        # 过滤出需要处理的订单ID
-        unprocessed_orders = []
-        for order_id in order_ids:
-            # 如果订单不在已处理集合中，则需要处理
-            if order_id not in processed_orders_set:
-                unprocessed_orders.append(order_id)
-        
-        return unprocessed_orders
     
-    result = _execute_db_operation(query_operation)
-    return result if result is not None else []
+    try:
+        # 使用 DBCursorContext 上下文管理器，自动管理连接和事务
+        # dict_cursor=True 表示使用字典游标，可以通过列名访问数据
+        with db_cursor(dict_cursor=True) as cursor:
+            # 计算一周前的时间（从当前时间往前一周）
+            one_week_ago = datetime.now() - timedelta(days=7)
+            one_week_ago_str = one_week_ago.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 构建SQL查询，获取一周内且在提供的订单ID列表中的记录
+            placeholders = ','.join(['%s'] * len(order_ids))
+            sql = f"""
+            SELECT `开思订单号`, `crm订单状态` 
+            FROM crmapp_ks_auto_bill 
+            WHERE `日期` >= %s 
+            AND `开思订单号` IN ({placeholders})
+            """
+            
+            params = [one_week_ago_str] + order_ids
+            cursor.execute(sql, params)
+            results = cursor.fetchall()
+            
+            # 使用集合优化：将已处理的订单ID存储到集合中，方便O(1)时间复杂度查找
+            # 已处理包括：成功开单 和 开单失败的订单（避免失败订单无限重试）
+            processed_orders_set = set()
+            for row in results:
+                if row['crm订单状态'] in ('已自动开单', '开单失败'):
+                    processed_orders_set.add(row['开思订单号'])
+            
+            # 过滤出需要处理的订单ID
+            unprocessed_orders = []
+            for order_id in order_ids:
+                # 如果订单不在已处理集合中，则需要处理
+                if order_id not in processed_orders_set:
+                    unprocessed_orders.append(order_id)
+            
+            return unprocessed_orders
+            
+    except Exception as e:
+        print(f"         ✗ 数据库操作出错: {str(e)}")
+        return []
 
 
 def save_order_result_to_db(order_id, result_data, connection=None, status='已自动开单'):
