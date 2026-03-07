@@ -748,8 +748,17 @@ def run_virtual_inventory_task():
             task_execution_tracker['task_running'] = False
             print(f"[{datetime.now()}] DEBUG: 任务执行结束，重置task_running标志")
 
-# 注册定时任务
-schedule.every().day.at("13:00").do(run_virtual_inventory_task)
+# 导入统一任务管理器
+from app.core.task_manager import task_manager
+
+# 注册定时任务 - 使用 task_manager
+task_manager.schedule(
+    run_virtual_inventory_task,
+    'cron',
+    'virtual_inventory_daily',
+    hour=13,
+    minute=0
+)
 
 # 注册每小时购物车高库存清理任务
 def run_cart_cleanup_task():
@@ -783,14 +792,12 @@ def run_cart_cleanup_task():
         print(f"❌ 每小时购物车清理任务失败: {str(e)}")
 
 # 每小时执行一次购物车清理（整点执行）
-schedule.every().hour.at(":00").do(run_cart_cleanup_task)
-
-def run_scheduler():
-    """运行调度器的后台线程"""
-    print("⏰ 启动定时任务调度器...")
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # 每分钟检查一次
+task_manager.schedule(
+    run_cart_cleanup_task,
+    'cron',
+    'cart_cleanup_hourly',
+    minute=0
+)
 
 def print_task_debug_info():
     """打印任务执行调试信息"""
@@ -802,6 +809,15 @@ def print_task_debug_info():
     print(f"- virtual_inventory_last_run: {task_execution_tracker['virtual_inventory_last_run']}")
     print(f"- execution_log_count: {len(task_execution_tracker['execution_log'])}")
     
+    # 显示task_manager统计
+    stats = task_manager.get_stats()
+    print(f"\nTask Manager 统计:")
+    print(f"- 提交任务: {stats['submitted']}")
+    print(f"- 运行中: {stats['running']}")
+    print(f"- 已完成: {stats['completed']}")
+    print(f"- 失败: {stats['failed']}")
+    print(f"- 活跃线程: {stats['active_threads']}")
+    
     # 显示最近5次执行记录
     recent_logs = task_execution_tracker['execution_log'][-5:] if task_execution_tracker['execution_log'] else []
     print("\n最近的执行记录:")
@@ -809,18 +825,14 @@ def print_task_debug_info():
         print(f"  - {log}")
     print("="*50)
 
-# 启动后台调度线程
-scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-scheduler_thread.start()
-
 print("定时任务已启动：每天13:00执行虚拟库存数据同步，完成后执行CRM新建产品")
 print("调试信息将在任务执行时输出，可通过 print_task_debug_info() 查看当前状态")
+print("任务统计信息可通过 /api/tasks/stats 查看")
 
 
 #定时更新========================================================================================================================================
-import schedule
 import time
-from threading import Thread, Timer
+from threading import Timer
 from datetime import datetime, timedelta
 import atexit
 import re
@@ -1336,45 +1348,26 @@ def insert_or_update_data(data_list, company, gx_date):
         if conn:
             conn.close()
 
-# 配置定时任务
+# 配置定时任务 - 使用 task_manager
 def setup_scheduled_tasks():
     """设置定时任务"""
     # 从早上7:20到晚上22:00，每15分钟执行一次
-    # 7:20, 7:35, 7:50, 8:05, 8:20, 8:35, ..., 21:35, 21:50, 22:05
+    # 使用 interval 触发器更简单
     
-    # 计算所有需要执行的时间点
-    for hour in range(7, 23):  # 从早上7点到晚上22点
-        if hour == 7:
-            # 7点开始从20分执行
-            minutes = [20, 35, 50]
-        elif hour == 22:
-            # 22点只执行到05分
-            minutes = [5]
-        else:
-            # 其他小时执行在05, 20, 35, 50分
-            minutes = [5, 20, 35, 50]
-        
-        for minute in minutes:
-            schedule.every().day.at(f"{hour:02d}:{minute:02d}").do(auto_update_and_fetch)
-
+    # 注册间隔任务（每15分钟）
+    task_manager.schedule(
+        auto_update_and_fetch,
+        'interval',
+        'auto_update_interval',
+        minutes=15
+    )
+    
     print("⏰ 定时任务已配置完成")
-    print("📋 定时更新时间: 每天 07:20 到 22:05，每15分钟运行一次")
-
-
-def run_scheduler():
-    """运行调度器的后台线程"""
-    print("⏰ 启动定时任务调度器...")
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # 每分钟检查一次
+    print("📋 定时更新时间: 每15分钟运行一次")
 
 
 # 在应用启动时配置并启动定时任务
 setup_scheduled_tasks()
-
-# 启动后台调度线程
-scheduler_thread = Thread(target=run_scheduler, daemon=True)
-scheduler_thread.start()
 
 print("⏰ 定时任务调度器已启动")
 
@@ -1405,6 +1398,57 @@ def instructions():
     if 'logged_in' not in session:
         return render_template('login.html')
     return render_template('instructions.html')
+
+
+# ==================== 任务管理 API ====================
+
+@app.route('/api/tasks/stats')
+def get_task_stats():
+    """获取任务统计信息"""
+    return jsonify(task_manager.get_stats())
+
+
+@app.route('/api/tasks/jobs')
+def get_scheduled_jobs():
+    """获取所有定时任务列表"""
+    return jsonify(task_manager.get_jobs())
+
+
+@app.route('/api/tasks/history')
+def get_task_history():
+    """获取任务执行历史"""
+    limit = request.args.get('limit', 20, type=int)
+    return jsonify(task_manager.get_history(limit))
+
+
+@app.route('/api/tasks/jobs/<job_id>/pause', methods=['POST'])
+def pause_scheduled_job(job_id):
+    """暂停定时任务"""
+    success = task_manager.pause_job(job_id)
+    if success:
+        return jsonify({'code': 0, 'msg': f'任务 {job_id} 已暂停'})
+    return jsonify({'code': 1, 'msg': f'暂停任务失败: {job_id}'})
+
+
+@app.route('/api/tasks/jobs/<job_id>/resume', methods=['POST'])
+def resume_scheduled_job(job_id):
+    """恢复定时任务"""
+    success = task_manager.resume_job(job_id)
+    if success:
+        return jsonify({'code': 0, 'msg': f'任务 {job_id} 已恢复'})
+    return jsonify({'code': 1, 'msg': f'恢复任务失败: {job_id}'})
+
+
+@app.route('/api/tasks/jobs/<job_id>', methods=['DELETE'])
+def delete_scheduled_job(job_id):
+    """删除定时任务"""
+    success = task_manager.unschedule(job_id)
+    if success:
+        return jsonify({'code': 0, 'msg': f'任务 {job_id} 已删除'})
+    return jsonify({'code': 1, 'msg': f'删除任务失败: {job_id}'})
+
+
+# ==================== 用户认证 API ====================
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -2609,17 +2653,14 @@ def extract_numeric_value(value):
 
 def get_cart_items_with_dimension(store, is_admin, dimension='product'):
     """获取购物车数据的辅助函数，支持维度参数 - 优化性能"""
-    print(f"Debug - get_cart_items_with_dimension: 开始处理，门店={store}, is_admin={is_admin}, 维度={dimension}")
-    
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
 
     # 统一使用传入的store参数，确保门店数据隔离
     sql = "SELECT * FROM crmapp_cart WHERE store = %s ORDER BY added_time DESC"
     cursor.execute(sql, (store,))
-    
+
     result = cursor.fetchall()
-    print(f"Debug - get_cart_items_with_dimension: 查询到 {len(result)} 条购物车数据")
     
     # 如果购物车数据为空，直接返回
     if not result:
@@ -2750,8 +2791,7 @@ def get_cart_items_with_dimension(store, is_admin, dimension='product'):
                 supplier_item['sales_data'] = sales_text
                 expanded_result.append(supplier_item)
         result = expanded_result
-    
-    print(f"Debug - get_cart_items_with_dimension: 返回 {len(result)} 条结果")
+
     conn.close()
     return result
 
@@ -2759,16 +2799,13 @@ def get_cart_items_with_dimension(store, is_admin, dimension='product'):
 @login_required
 def add_to_cart():
     """添加商品到购物车 - 根据 OE 和条码从备货表获取完整数据"""
-    import time
-    start_time = time.time()
-    
     try:
         data = request.get_json()
         item_details = data.get('item_details', [])
-        
+
         if not item_details:
             return jsonify({'code': 1, 'msg': '没有要添加的商品'}), 400
-        
+
         # 获取当前用户门店
         store = get_user_store()
         
@@ -2953,9 +2990,7 @@ def add_to_cart():
         
         conn.commit()
         conn.close()
-        
-        total_time = time.time() - start_time
-        
+
         return jsonify({
             'code': 0,
             'msg': f'成功添加 {len(new_items)} 个商品到购物车',
@@ -3163,29 +3198,29 @@ def remove_multiple_from_cart():
     # 检查用户是否有删除购物车权限
     can_delete_cart = session.get('can_delete_cart', False)
     is_admin = session.get('is_admin', False)
-    
+
     # 普通用户需要有删除购物车权限或为管理员
     if not (can_delete_cart or is_admin):
         return jsonify({'code': 1, 'msg': '权限不足，无法删除购物车商品'}), 403
-        
+
     try:
         data = request.get_json()
         item_details = data.get('item_details', [])
-        
+
         if not item_details:
             return jsonify({'code': 1, 'msg': '没有要删除的商品'}), 400
-        
+
         # 获取当前用户门店
         store = get_user_store()
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         deleted_count = 0
         for item in item_details:
             item_oe = item.get('item_oe')
             item_barcode = item.get('item_barcode')
-            
+
             # 修改删除逻辑：如果提供了物料条码，则按OE和物料条码组合删除；否则按OE删除（兼容旧逻辑）
             if item_barcode:
                 sql = "DELETE FROM crmapp_cart WHERE oe = %s AND barcode = %s AND store = %s"
@@ -3194,19 +3229,17 @@ def remove_multiple_from_cart():
                 # 兼容旧逻辑，仅按OE删除
                 sql = "DELETE FROM crmapp_cart WHERE oe = %s AND store = %s"
                 cursor.execute(sql, (item_oe, store))
-            
+
             deleted_count += cursor.rowcount
-        
+
         conn.commit()
         conn.close()
-        
-        # 获取维度参数以返回正确的数据格式
-        dimension = request.args.get('dimension', 'product')
+
+        # 删除成功后不返回购物车数据，前端自行调用获取购物车接口
         return jsonify({
-            'code': 0, 
+            'code': 0,
             'msg': f'成功删除 {deleted_count} 个商品',
-            'deleted_count': deleted_count,
-            'data': get_cart_items_with_dimension(store, session.get('is_admin', False), dimension)
+            'deleted_count': deleted_count
         })
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'删除失败: {str(e)}'})
@@ -3218,22 +3251,22 @@ def remove_from_cart():
     # 检查用户是否有删除购物车权限
     can_delete_cart = session.get('can_delete_cart', False)
     is_admin = session.get('is_admin', False)
-    
+
     # 普通用户需要有删除购物车权限或为管理员
     if not (can_delete_cart or is_admin):
         return jsonify({'code': 1, 'msg': '权限不足，无法删除购物车商品'}), 403
-        
+
     try:
         data = request.get_json()
         item_oe = data.get('item_oe')
         item_barcode = data.get('item_barcode')  # 新增：获取物料条码
-        
+
         # 获取当前用户门店
         store = get_user_store()
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         # 修改删除逻辑：如果提供了物料条码，则按OE和物料条码组合删除；否则按OE删除（兼容旧逻辑）
         if item_barcode:
             sql = "DELETE FROM crmapp_cart WHERE oe = %s AND barcode = %s AND store = %s"
@@ -3242,16 +3275,14 @@ def remove_from_cart():
             # 兼容旧逻辑，仅按OE删除
             sql = "DELETE FROM crmapp_cart WHERE oe = %s AND store = %s"
             cursor.execute(sql, (item_oe, store))
-            
+
         conn.commit()
         conn.close()
-        
-        # 获取维度参数以返回正确的数据格式
-        dimension = request.args.get('dimension', 'product')
+
+        # 删除成功后不返回购物车数据，前端自行调用获取购物车接口
         return jsonify({
-            'code': 0, 
-            'msg': '删除成功',
-            'data': get_cart_items_with_dimension(store, session.get('is_admin', False), dimension)
+            'code': 0,
+            'msg': '删除成功'
         })
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'删除失败: {str(e)}'})

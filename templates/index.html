@@ -202,16 +202,39 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
-        /* 调整表格单元格大小 */
+        /* 表格单元格基础样式 - 单行省略 */
         .layui-table-cell {
-            height: 25px;
-            line-height: 25px;
-            padding: 1px 5px !important;
+            min-height: 40px;
+            line-height: 1.4;
+            padding: 4px 5px !important;
             position: relative;
+            box-sizing: border-box;
+            word-wrap: break-word;
+            word-break: break-all;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            box-sizing: border-box;
+            max-height: 2.8em;
+        }
+
+        /* 允许表格行自动增高 */
+        .layui-table tbody tr {
+            height: auto !important;
+        }
+
+        /* 特定列多行显示 - 限制2行 */
+        td[data-field="sales_data"] .layui-table-cell,
+        td[data-field="car_model"] .layui-table-cell,
+        td[data-field="车型"] .layui-table-cell,
+        td[data-field="supplier"] .layui-table-cell,
+        td[data-field="供应商"] .layui-table-cell,
+        td[data-field="internal_remarks"] .layui-table-cell,
+        td[data-field="内部备注"] .layui-table-cell {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            white-space: normal;
         }
         
         /* 表格行悬停背景色 */
@@ -3231,12 +3254,13 @@ function renderBeihuoTable(table) {
             }, style: 'background-color: #d2d2d2;'},
             {field: '在途数量', title: '在途数量', width: 88, align: 'right', sort: true, fixed: 'left', style: 'background-color: #d2d2d2;'},
             {
-                field: 'sales_data', 
-                title: '销量', 
-                width: 250, 
-                sort: false, 
+                field: 'sales_data',
+                title: '销量',
+                width: 150,
+                sort: false,
                 fixed: 'left',
-                unresize: false, 
+                unresize: false,
+                style: 'background-color: #d2d2d2;',
                 templet: function(d) {
                     var today = d['今日销量'] || 0;
                     var yesterday = d['昨日销量'] || 0;
@@ -3244,10 +3268,10 @@ function renderBeihuoTable(table) {
                     var sales_month = d['本月销量'] || 0;
                     var avg_sales_6m = d['近6个月月均销量'] || 0;
                     var avg_sales_12m = d['近12个月月均销量'] || 0;
-                    
-                    var salesText = '今/昨/近7天:' + today + '/' + yesterday + '/' + sales_7d + ';\n';
-                    salesText += '近1/6/12月:' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + ';';
-                    
+
+                    var salesText = '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales_7d + '</div>';
+                    salesText += '<div>近1/6/12月: ' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + '</div>';
+
                     return salesText;
                 }
             },
@@ -3362,7 +3386,7 @@ function renderBeihuoTable(table) {
 
                 // 初始化单元格选择功能
                 initExcelCellSelection('beihuoTable');
-                
+
                 // 表格加载完成后，获取最新的更新时间
                 setTimeout(() => {
                     fetch('/api/latest_update_time')
@@ -5065,11 +5089,12 @@ function showCartPanel(table) {
                     }, style: 'background-color: #d2d2d2;'},
                     {field: 'on_way', title: '在途数量', width: 88, align: 'right', sort: true, fixed: 'left', style: 'background-color: #d2d2d2;'},
                     {
-                        field: 'sales_data', 
-                        title: '销量', 
-                        width: 250, 
+                        field: 'sales_data',
+                        title: '销量',
+                        width: 150,
                         fixed: 'left',
                         unresize: false,
+                        style: 'background-color: #d2d2d2;',
                         templet: function(d) {
                             var today = d['today_sales'] || d['今日销量'] || 0;
                             var yesterday = d['sales_yesterday'] || d['昨日销量'] || 0;
@@ -5077,10 +5102,10 @@ function showCartPanel(table) {
                             var sales_month = d['sales_month'] || d['本月销量'] || 0;
                             var avg_sales_6m = d['avg_sales_6m'] || d['近6个月月均销量'] || 0;
                             var avg_sales_12m = d['avg_sales_12m'] || d['近12个月月均销量'] || 0;
-                            
-                            var salesText = '今/昨/近7天:' + today + '/' + yesterday + '/' + sales_7d + ';\n';
-                            salesText += '近1/6/12月:' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + ';';
-                            
+
+                            var salesText = '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales_7d + '</div>';
+                            salesText += '<div>近1/6/12月: ' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + '</div>';
+
                             return salesText;
                         }
                     },
@@ -5161,11 +5186,12 @@ function showCartPanel(table) {
                     }, style: 'background-color: #d2d2d2;'},
                     {field: 'on_way', title: '在途数量', width: 60, align: 'right', sort: true, fixed: 'left', style: 'background-color: #d2d2d2;'},
                     {
-                        field: 'sales_data', 
-                        title: '销量', 
-                        width: 250, 
+                        field: 'sales_data',
+                        title: '销量',
+                        width: 150,
                         fixed: 'left',
                         unresize: false,
+                        style: 'background-color: #d2d2d2;',
                         templet: function(d) {
                             var today = d['today_sales'] || d['今日销量'] || 0;
                             var yesterday = d['sales_yesterday'] || d['昨日销量'] || 0;
@@ -5173,10 +5199,10 @@ function showCartPanel(table) {
                             var sales_month = d['sales_month'] || d['本月销量'] || 0;
                             var avg_sales_6m = d['avg_sales_6m'] || d['近6个月月均销量'] || 0;
                             var avg_sales_12m = d['avg_sales_12m'] || d['近12个月月均销量'] || 0;
-                            
-                            var salesText = '今/昨/近7天:' + today + '/' + yesterday + '/' + sales_7d + ';\n';
-                            salesText += '近1/6/12月:' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + ';';
-                            
+
+                            var salesText = '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales_7d + '</div>';
+                            salesText += '<div>近1/6/12月: ' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + '</div>';
+
                             return salesText;
                         }
                     },
@@ -5254,7 +5280,7 @@ function showCartPanel(table) {
 
                     // 绑定数量输入框事件
                     bindQuantityEditEvents(this);
-                    
+
                     // 优化固定列滚动同步
                     setTimeout(() => {
                         const tableBox = document.querySelector('#cartTable + .layui-table-view .layui-table-body');
@@ -6365,12 +6391,13 @@ function showDateQueryResults(data) {
             {field: '在途数量', title: '在途数量', width: 88, align: 'right', sort: true, fixed: 'left', style: 'background-color: #d2d2d2;'},
             {field: '销量', title: '销量', width: 40, sort: true ,fixed: 'left',style: 'background-color: #d2d2d2;'},
             {
-                field: 'sales_data', 
-                title: '销量', 
-                width: 250, 
-                sort: false, 
+                field: 'sales_data',
+                title: '销量',
+                width: 150,
+                sort: false,
                 fixed: 'left',
-                unresize: false, 
+                unresize: false,
+                style: 'background-color: #d2d2d2;',
                 templet: function(d) {
                     var today = d['今日销量'] || 0;
                     var yesterday = d['昨日销量'] || 0;
@@ -6378,10 +6405,10 @@ function showDateQueryResults(data) {
                     var sales_month = d['本月销量'] || 0;
                     var avg_sales_6m = d['近6个月月均销量'] || 0;
                     var avg_sales_12m = d['近12个月月均销量'] || 0;
-                    
-                    var salesText = '今/昨/近7天:' + today + '/' + yesterday + '/' + sales_7d + ';\n';
-                    salesText += '近1/6/12月:' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + ';';
-                    
+
+                    var salesText = '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales_7d + '</div>';
+                    salesText += '<div>近1/6/12月: ' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + '</div>';
+
                     return salesText;
                 }
             },
@@ -7734,7 +7761,6 @@ function addToCartFromSelectionForDateQuery(selectedCells, tableId) {
         layui.layer.msg('添加失败: ' + error.message, {icon: 2});
     });
 }
-
 
 </script>
 </body>

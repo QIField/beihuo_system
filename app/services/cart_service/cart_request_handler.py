@@ -3,7 +3,6 @@
 统一处理购物车相关的API请求
 """
 
-import time
 from typing import Dict, Any
 from app.services.cart_service.cart_data_service import CartDataService
 
@@ -23,8 +22,6 @@ class CartRequestHandler:
             is_admin: 是否为管理员
             args: 请求参数，可包含 dimension 参数（'product' 或 'supplier'）、搜索参数、分页参数、排序参数
         """
-        total_start = time.time()
-
         # 从参数中获取维度，默认为产品维度
         dimension = 'product'
         # 提取搜索参数
@@ -71,11 +68,6 @@ class CartRequestHandler:
                 store, is_admin, dimension, search_params, page, limit, sort_field, sort_order
             )
 
-            total_end = time.time()
-            total_elapsed_ms = (total_end - total_start) * 1000
-
-            print(f"⏱️ 【获取购物车请求】查询耗时: {total_elapsed_ms:.2f}ms, 页码: {page}, 每页: {limit}, 总数: {total_count}, 排序: {sort_field} {sort_order}")
-
             # 返回符合API接口格式的结果（包含分页信息）
             result = {
                 'code': 0,
@@ -86,9 +78,6 @@ class CartRequestHandler:
 
             return result
         except Exception as e:
-            total_end = time.time()
-            total_elapsed_ms = (total_end - total_start) * 1000
-            print(f"⏱️ 【获取购物车请求】失败，总耗时: {total_elapsed_ms:.2f}ms")
             return {
                 'code': 1,
                 'msg': f'获取购物车数据失败: {str(e)}',

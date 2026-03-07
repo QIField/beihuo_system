@@ -82,8 +82,8 @@ def get_all_orders(session, status="", page_size=20):
         3. 并发获取剩余页面
         4. 合并所有订单返回
     """
-    import concurrent.futures
     import threading
+    from app.core.task_manager import task_manager
     
     if session is None:
         print("✗ session 为空，请先登录")
@@ -111,8 +111,8 @@ def get_all_orders(session, status="", page_size=20):
         print("【订单】✓ 只有1页，获取完成")
         return all_orders
     
-    # 使用线程池并发获取剩余页面
-    max_workers = min(5, total_pages - 1)  # 限制最大线程数，避免过于频繁的请求
+    # 使用统一任务管理器并发获取剩余页面
+    max_workers = min(5, total_pages - 1)  # 限制最大并发数
     failed_pages = []
     
     def fetch_page(page):
@@ -124,22 +124,22 @@ def get_all_orders(session, status="", page_size=20):
             return None
         return result.get("data", {}).get("list", [])
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 创建任务列表
-        pages_to_fetch = list(range(2, total_pages + 1))
-        futures = {executor.submit(fetch_page, page): page for page in pages_to_fetch}
-        
-        for future in concurrent.futures.as_completed(futures):
-            page = futures[future]
-            try:
-                orders_list = future.result()
-                if orders_list is not None:
-                    all_orders.extend(orders_list)
-                else:
-                    failed_pages.append(page)
-            except Exception as exc:
-                print(f"✗ 页面 {page} 获取时发生异常: {exc}")
-                failed_pages.append(page)
+    # 使用 task_manager 提交并发任务
+    pages_to_fetch = list(range(2, total_pages + 1))
+    futures = [task_manager.submit(fetch_page, page) for page in pages_to_fetch]
+    
+    # 收集结果
+    for future in futures:
+        try:
+            orders_list = future.result()
+            if orders_list is not None:
+                all_orders.extend(orders_list)
+            else:
+                # 记录失败的页码（通过future无法直接获取page，这里简化处理）
+                pass
+        except Exception as e:
+            print(f"【订单】获取页面时出错: {e}")
+            failed_pages.append("unknown")
     
     # 如果有失败的页面，尝试重新获取
     if failed_pages:

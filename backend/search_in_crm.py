@@ -5,7 +5,6 @@ from flask import Blueprint, render_template, request, jsonify, session
 import pymysql
 import os
 from urllib.parse import unquote
-import concurrent.futures
 from functools import partial
 from pathlib import Path
 from app.utils.database_connection import get_db_connection  # 使用统一的连接池实现
@@ -352,7 +351,7 @@ def parse_input_oes(input_str):
 
 def search_and_save_crm_data(search_terms, username, company):
     """批量搜索并保存CRM数据 - 使用线程池并发处理API请求"""
-    # 使用线程池并发执行搜索请求
+    # 使用统一任务管理器并发执行搜索请求
     search_results = []
     failed_oes = []
     
@@ -361,20 +360,25 @@ def search_and_save_crm_data(search_terms, username, company):
         result = search_crm_by_oe(term)
         return term, result
     
-    # 使用ThreadPoolExecutor并发执行搜索
-    max_workers = min(len(search_terms), 5)  # 限制最大并发数，避免对API造成过大压力
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交所有搜索任务
-        future_to_term = {executor.submit(single_search, term): term for term in search_terms}
-        
-        # 收集结果
-        for future in concurrent.futures.as_completed(future_to_term):
-            term, result = future.result()
+    # 使用 task_manager 并发执行搜索
+    from app.core.task_manager import task_manager
+    futures = []
+    for term in search_terms:
+        future = task_manager.submit(single_search, term)
+        futures.append((term, future))
+    
+    # 收集结果
+    for term, future in futures:
+        try:
+            _, result = future.result()
             if result.get('code') == 0:
                 search_results.append(result)
             else:
                 print(f"查询OE {term} 失败: {result.get('msg')}")
                 failed_oes.append({'oe': term, 'error': result.get('msg')})
+        except Exception as e:
+            print(f"查询OE {term} 时发生异常: {e}")
+            failed_oes.append({'oe': term, 'error': str(e)})
     
     success_count = len(search_results)
     

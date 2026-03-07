@@ -3,8 +3,6 @@ import requests
 from urllib.parse import quote
 import os
 from datetime import datetime
-import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 import time
 import pandas as pd
@@ -864,23 +862,23 @@ def make_api_request(data, max_workers=10):  # 降低并发数以减少超时风
         print("无法建立数据库连接，无法更新处理结果")
         return
     
-    # 使用线程池并发处理
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交任务
-        future_to_row = {
-            executor.submit(process_single_row_with_db_update, conn, row): row 
-            for row in data
-        }
-        
-        # 处理完成的任务
-        for future in as_completed(future_to_row):
-            row = future_to_row[future]
-            oe_number = str(row['oe_code']).strip()
-            try:
-                result = future.result()
-                print(f"OE: {oe_number} 处理完成: {result}")
-            except Exception as e:
-                print(f"OE: {oe_number} 处理时发生异常: {e}")
+    # 使用统一任务管理器并发处理
+    from app.core.task_manager import task_manager
+    
+    # 提交任务
+    futures = []
+    for row in data:
+        future = task_manager.submit(process_single_row_with_db_update, conn, row)
+        futures.append((future, row))
+    
+    # 处理完成的任务
+    for future, row in futures:
+        oe_number = str(row['oe_code']).strip()
+        try:
+            result = future.result()
+            print(f"OE: {oe_number} 处理完成: {result}")
+        except Exception as e:
+            print(f"OE: {oe_number} 处理时发生异常: {e}")
     
     conn.close()
 
@@ -947,27 +945,26 @@ def main():
             return
         
         try:
-            # 使用线程池并发处理
-            max_workers = min(10, len(processing_items))  # 最大10个线程，或数据量
+            # 使用统一任务管理器并发处理
+            from app.core.task_manager import task_manager
+            
             completed_count = 0
             
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # 提交所有任务
-                future_to_item = {
-                    executor.submit(process_database_item_batch, db_manager, item): item 
-                    for item in processing_items
-                }
-                
-                # 收集结果
-                for future in as_completed(future_to_item):
-                    item = future_to_item[future]
-                    try:
-                        result = future.result()
-                        completed_count += 1
-                        print(f"数据库处理进度: {completed_count}/{len(processing_items)} - OE: {item['oe_code']}, 结果: {result}")
-                    except Exception as e:
-                        print(f"数据库处理OE: {item['oe_code']} 时发生异常: {e}")
-                        completed_count += 1
+            # 提交所有任务
+            futures = []
+            for item in processing_items:
+                future = task_manager.submit(process_database_item_batch, db_manager, item)
+                futures.append((future, item))
+            
+            # 收集结果
+            for future, item in futures:
+                try:
+                    result = future.result()
+                    completed_count += 1
+                    print(f"数据库处理进度: {completed_count}/{len(processing_items)} - OE: {item['oe_code']}, 结果: {result}")
+                except Exception as e:
+                    print(f"数据库处理OE: {item['oe_code']} 时发生异常: {e}")
+                    completed_count += 1
         
         finally:
             db_manager.close()
@@ -1249,29 +1246,28 @@ def process_excel_two_column_mode(file_path):
                         'row': row
                     })
             
-            # 使用线程池并发处理
-            results_dict = {}
-            max_workers = min(10, len(processing_items))  # 最大10个线程，或数据量
+            # 使用统一任务管理器并发处理
+            from app.core.task_manager import task_manager
             
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # 提交所有任务
-                future_to_item = {
-                    executor.submit(process_single_item_batch, session, item): item 
-                    for item in processing_items
-                }
-                
-                # 收集结果
-                completed_count = 0
-                for future in as_completed(future_to_item):
-                    item = future_to_item[future]
-                    try:
-                        result = future.result()
-                        results_dict[item['oe_number']] = result
-                        completed_count += 1
-                        print(f"工作表 {sheet_name} 处理进度: {completed_count}/{len(processing_items)} - OE: {item['oe_number']}, 结果: {result}")
-                    except Exception as e:
-                        print(f"工作表 {sheet_name} 处理OE: {item['oe_number']} 时发生异常: {e}")
-                        results_dict[item['oe_number']] = f"失败 - {str(e)}"
+            results_dict = {}
+            
+            # 提交所有任务
+            futures = []
+            for item in processing_items:
+                future = task_manager.submit(process_single_item_batch, session, item)
+                futures.append((future, item))
+            
+            # 收集结果
+            completed_count = 0
+            for future, item in futures:
+                try:
+                    result = future.result()
+                    results_dict[item['oe_number']] = result
+                    completed_count += 1
+                    print(f"工作表 {sheet_name} 处理进度: {completed_count}/{len(processing_items)} - OE: {item['oe_number']}, 结果: {result}")
+                except Exception as e:
+                    print(f"工作表 {sheet_name} 处理OE: {item['oe_number']} 时发生异常: {e}")
+                    results_dict[item['oe_number']] = f"失败 - {str(e)}"
             
             # 添加结果列到原工作表
             df['新建结果'] = ''
@@ -1359,29 +1355,28 @@ def process_excel_three_column_mode(file_path):
                         'mode': 'three_column'
                     })
             
-            # 使用线程池并发处理
-            results_dict = {}
-            max_workers = min(10, len(processing_items))  # 最大10个线程，或数据量
+            # 使用统一任务管理器并发处理
+            from app.core.task_manager import task_manager
             
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # 提交所有任务
-                future_to_item = {
-                    executor.submit(process_single_item_batch, session, item): item 
-                    for item in processing_items
-                }
-                
-                # 收集结果
-                completed_count = 0
-                for future in as_completed(future_to_item):
-                    item = future_to_item[future]
-                    try:
-                        result = future.result()
-                        results_dict[item['oe_number']] = result
-                        completed_count += 1
-                        print(f"工作表 {sheet_name} 处理进度: {completed_count}/{len(processing_items)} - OE: {item['oe_number']}, 结果: {result}")
-                    except Exception as e:
-                        print(f"工作表 {sheet_name} 处理OE: {item['oe_number']} 时发生异常: {e}")
-                        results_dict[item['oe_number']] = f"失败 - {str(e)}"
+            results_dict = {}
+            
+            # 提交所有任务
+            futures = []
+            for item in processing_items:
+                future = task_manager.submit(process_single_item_batch, session, item)
+                futures.append((future, item))
+            
+            # 收集结果
+            completed_count = 0
+            for future, item in futures:
+                try:
+                    result = future.result()
+                    results_dict[item['oe_number']] = result
+                    completed_count += 1
+                    print(f"工作表 {sheet_name} 处理进度: {completed_count}/{len(processing_items)} - OE: {item['oe_number']}, 结果: {result}")
+                except Exception as e:
+                    print(f"工作表 {sheet_name} 处理OE: {item['oe_number']} 时发生异常: {e}")
+                    results_dict[item['oe_number']] = f"失败 - {str(e)}"
             
             # 添加结果列到原工作表
             df['新建结果'] = ''
@@ -1745,31 +1740,31 @@ def process_batch_items(session, items, max_workers=3):
     """
     results = {}
     
-    # 使用ThreadPoolExecutor进行并发处理
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交所有任务
-        future_to_item = {
-            executor.submit(process_single_item_batch, session, item): item 
-            for item in items
-        }
+    # 使用统一任务管理器进行并发处理
+    from app.core.task_manager import task_manager
+    
+    # 提交所有任务
+    futures = []
+    for item in items:
+        future = task_manager.submit(process_single_item_batch, session, item)
+        futures.append((future, item))
+    
+    # 收集结果
+    completed = 0
+    total = len(items)
+    
+    for future, item in futures:
+        oe_number = item['oe_number']
         
-        # 收集结果
-        completed = 0
-        total = len(items)
-        
-        for future in as_completed(future_to_item):
-            item = future_to_item[future]
-            oe_number = item['oe_number']
-            
-            try:
-                result = future.result()
-                results[oe_number] = result
-                completed += 1
-                print(f"工作表 {item.get('sheet_name', 'Unknown')} 处理进度: {completed}/{total} - OE: {oe_number}, 结果: {result}")
-            except Exception as e:
-                results[oe_number] = f"处理出错: {str(e)}"
-                completed += 1
-                print(f"工作表 {item.get('sheet_name', 'Unknown')} 处理进度: {completed}/{total} - OE: {oe_number}, 结果: 处理出错: {str(e)}")
+        try:
+            result = future.result()
+            results[oe_number] = result
+            completed += 1
+            print(f"工作表 {item.get('sheet_name', 'Unknown')} 处理进度: {completed}/{total} - OE: {oe_number}, 结果: {result}")
+        except Exception as e:
+            results[oe_number] = f"处理出错: {str(e)}"
+            completed += 1
+            print(f"工作表 {item.get('sheet_name', 'Unknown')} 处理进度: {completed}/{total} - OE: {oe_number}, 结果: 处理出错: {str(e)}")
     
     return results
 
