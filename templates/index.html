@@ -667,6 +667,7 @@
     </div>    
 
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
 
 <script>
 // 在文件开头添加全局变量来存储购物车缓存
@@ -687,378 +688,78 @@ function initExcelCellSelection(tableId) {
     // 只对备货表格生效
     if (tableId !== 'beihuoTable') return;
     
-    const tableView = document.querySelector('#' + tableId + ' + .layui-table-view');
-    if (!tableView || tableView.__hasCellSel__) return;
-    tableView.__hasCellSel__ = true;
-
-    const tableBox = tableView.querySelector('.layui-table-box');
-    const tableBody = tableView.querySelector('.layui-table-body'); // 👈 新增
-    if (!tableBox || !tableBody) return;
-
-    // 注入样式
-    if (!document.getElementById('excel-cell-sel-style')) {
-        const style = document.createElement('style');
-        style.id = 'excel-cell-sel-style';
-        style.textContent = `
-            .cell-excel-selected {
-                background-color: #d0e8ff !important;
-                position: relative;
-            }
-            .cell-excel-selected::after {
-                content: '';
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                border: 2px solid #1e90ff;
-                pointer-events: none;
-                box-sizing: border-box;
-            }
-            #drag-sel-rect {
-                position: absolute;
-                border: 1px dashed #1e90ff;
-                background: rgba(30, 144, 255, 0.1);
-                z-index: 2000;  /* 调整z-index层级，用于拖拽选择框 */
-                pointer-events: none;
-                display: none;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    let rectDiv = document.getElementById('drag-sel-rect');
-    if (!rectDiv) {
-        rectDiv = document.createElement('div');
-        rectDiv.id = 'drag-sel-rect';
-    }
-
-    let isDragging = false;
-    let selectedCells = [];
-    let startX, startY;
-
-    // 清除选中
-    function clearSelection() {
-        document.querySelectorAll('.cell-excel-selected').forEach(el => el.classList.remove('cell-excel-selected'));
-        selectedCells = [];
-    }
-
-    // 获取单元格相对于 tableView 的坐标（考虑滚动）
-    function getCellRect(cell) {
-        const cellRect = cell.getBoundingClientRect();
-        const viewRect = tableView.getBoundingClientRect();
-        return {
-            left: cellRect.left - viewRect.left + tableView.scrollLeft,
-            top: cellRect.top - viewRect.top + tableView.scrollTop,
-            right: cellRect.right - viewRect.left + tableView.scrollLeft,
-            bottom: cellRect.bottom - viewRect.top + tableView.scrollTop,
-            element: cell
-        };
-    }
-
-    function intersects(a, b) {
-        return !(b.left > a.right || b.right < a.left || b.top > a.bottom || b.bottom < a.top);
-    }
-
-    function updateSelection(selRect) {
-        clearSelection();
-        const cells = tableBox.querySelectorAll('.layui-table-cell');
-        const matched = [];
-
-        cells.forEach(cell => {
-            const cRect = getCellRect(cell);
-            if (intersects(cRect, selRect)) {
-                cell.classList.add('cell-excel-selected');
-                const tr = cell.closest('tr[data-index]');
-                if (!tr) return;
-                const rowIndex = parseInt(tr.getAttribute('data-index'), 10);
-                const td = cell.closest('td');
-                const colIndex = Array.from(td.parentNode.children).indexOf(td);
-                matched.push({
-                    text: cell.innerText.trim(),
-                    row: rowIndex,
-                    col: colIndex
+    // 优先使用新模块（如果可用）
+    if (typeof TableCellSelector !== 'undefined') {
+        TableCellSelector.init('beihuoTable', {
+            enableCopy: true,
+            enableAddToCart: true,
+            onAddToCart: function(selectedRows, tableId) {
+                // 提取商品信息
+                var itemDetails = [];
+                selectedRows.forEach(function(item) {
+                    if (item.oe) {
+                        itemDetails.push({
+                            oe: item.oe,
+                            barcode: item.barcode || item['物料条码'] || ''
+                        });
+                    }
                 });
-            }
-        });
-
-        selectedCells = matched;
-    }
-
-    function generateCopyText() {
-        if (selectedCells.length === 0) return '';
-        const rows = {};
-        let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
-
-        selectedCells.forEach(({row, col, text}) => {
-            minR = Math.min(minR, row); maxR = Math.max(maxR, row);
-            minC = Math.min(minC, col); maxC = Math.max(maxC, col);
-            if (!rows[row]) rows[row] = {};
-            rows[row][col] = text;
-        });
-
-        let lines = [];
-        for (let r = minR; r <= maxR; r++) {
-            let line = [];
-            for (let c = minC; c <= maxC; c++) {
-                line.push(rows[r] && rows[r][c] !== undefined ? rows[r][c] : '');
-            }
-            lines.push(line.join('\t'));
-        }
-        return lines.join('\n');
-    }
-
-        function copyText(text) {
-        console.log('[Debug] 复制内容:', text); // 调试用
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-                layui.layer.msg('已复制选区内容', { icon: 1, time: 800 });
-                // 自动清除选中
-                clearSelection();
-                selectedCells = [];
-            }).catch(err => {
-                console.error('Clipboard API 失败:', err);
-                fallbackCopy(text);
-            });
-        } else {
-            fallbackCopy(text);
-        }
-    }
-
-    function fallbackCopy(text) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-            if (document.execCommand('copy')) {
-                layui.layer.msg('已复制到剪贴板', { icon: 1, time: 800 });
-                // 自动清除选中
-                clearSelection();
-                selectedCells = [];
-            } else {
-                layui.layer.msg('复制失败', { icon: 2 });
-            }
-        } catch (e) {
-            console.error('execCommand 复制失败:', e);
-            layui.layer.msg('浏览器不支持复制', { icon: 2 });
-        }
-        document.body.removeChild(ta);
-    }
-
-        // 添加选中商品到购物车的函数
-    function addToCartFromSelection(selectedCells, tableId) {
-        console.log('addToCartFromSelection函数被调用，选中单元格数量:', selectedCells.length, '表格ID:', tableId);
-        if (selectedCells.length === 0) {
-            layui.layer.msg('未选中任何数据', { icon: 2 });
-            return;
-        }
-
-        // 尝试获取表格实例 - 首先检查全局变量
-        let tableIns = window.beihuoTableInstance || window.beihuoTableIns;
-        console.log('表格实例:', tableIns);
-        
-        if (!tableIns) {
-            layui.layer.msg('无法获取表格实例', { icon: 2 });
-            return;
-        }
-
-        // 使用layui的table.cache来获取行数据
-        let tableCache = layui.table.cache[tableId];
-        console.log('表格缓存:', tableCache);
-        if (!tableCache) {
-            layui.layer.msg('无法获取表格数据', { icon: 2 });
-            return;
-        }
-
-        // 从选中的单元格中提取行数据
-        const processedRows = new Set(); // 避免重复添加
-        const selectedRows = [];
-
-        selectedCells.forEach(cellData => {
-            const rowIndex = cellData.row;
-            console.log('处理行索引:', rowIndex);
-            if (!processedRows.has(rowIndex) && tableCache[rowIndex]) {
-                selectedRows.push(tableCache[rowIndex]);
-                processedRows.add(rowIndex);
-            }
-        });
-
-        if (selectedRows.length === 0) {
-            layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-            return;
-        }
-
-        // 提取商品OE和物料条码的组合
-        var itemDetails = [];
-        selectedRows.forEach(function(item) {
-            console.log('处理商品:', item);
-            if (item.oe) {
-                var barcode = item.barcode || item['物料条码'] || '';
-                console.log('提取OE:', item.oe, '条码:', barcode);
-                itemDetails.push({
-                    oe: item.oe,
-                    barcode: barcode
-                });
-            }
-        });
-
-        if (itemDetails.length === 0) {
-            layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-            return;
-        }
-
-        console.log('准备发送到购物车的商品:', itemDetails);
-        // 发送请求添加到购物车
-        fetch('/api/cart/add', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ item_details: itemDetails })
-        })
-        .then(response => response.json())
-        .then(result => {
-            console.log('服务器响应:', result);
-            if (result.code === 0) {
-                layui.layer.msg(result.msg, {icon: 1});
-                updateCartCount();
                 
-                // 添加成功后，单独获取购物车数据更新界面
-                fetch('/api/cart')
-                    .then(response => response.json())
-                    .then(cartResult => {
-                        if (cartResult.code === 0) {
-                            // 更新购物车缓存
-                            window.cartCache.clear();
-                            cartResult.data.forEach(item => {
-                                var store = item.store || item['门店'] || window.currentUserStore || 'default';
-                                var barcode = item.barcode || item['物料条码'] || '';
-                                var cacheKey = store + '_' + barcode;
-                                window.cartCache.add(cacheKey);
+                if (itemDetails.length === 0) {
+                    layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
+                    return;
+                }
+                
+                // 发送请求添加到购物车
+                fetch('/api/cart/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item_details: itemDetails })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.code === 0) {
+                        layui.layer.msg(result.msg, {icon: 1});
+                        updateCartCount();
+                        
+                        // 更新购物车缓存
+                        fetch('/api/cart')
+                            .then(response => response.json())
+                            .then(cartResult => {
+                                if (cartResult.code === 0) {
+                                    window.cartCache.clear();
+                                    cartResult.data.forEach(item => {
+                                        var store = item.store || item['门店'] || window.currentUserStore || 'default';
+                                        var barcode = item.barcode || item['物料条码'] || '';
+                                        var cacheKey = store + '_' + barcode;
+                                        window.cartCache.add(cacheKey);
+                                    });
+                                    window.cartCacheLoaded = true;
+                                    
+                                    // 重新渲染相关表格
+                                    if (typeof layui !== 'undefined' && layui.table) {
+                                        layui.table.reload('beihuoTable', {
+                                            url: '/api/beihuo?' + new Date().getTime()
+                                        });
+                                    }
+                                    if (window.dateQueryTableInstance) {
+                                        highlightCartItemsForDateQueryTable();
+                                    }
+                                }
                             });
-                            window.cartCacheLoaded = true;
-                            
-                            // 重新渲染相关表格
-                            if (typeof layui !== 'undefined' && layui.table) {
-                                layui.table.reload('beihuoTable', {
-                                    url: '/api/beihuo?' + new Date().getTime()
-                                });
-                            } else {
-                                // 如果 layui 不可用，刷新页面
-                                location.reload();
-                            }
-                            if (window.dateQueryTableInstance) {
-                                highlightCartItemsForDateQueryTable();
-                            }
-                        }
-                    });
-            } else {
-                layui.layer.msg(result.msg, {icon: 2});
+                    } else {
+                        layui.layer.msg(result.msg, {icon: 2});
+                    }
+                })
+                .catch(error => {
+                    layui.layer.msg('添加失败: ' + error.message, {icon: 2});
+                });
             }
-        })
-        .catch(error => {
-            layui.layer.msg('添加失败: ' + error.message, {icon: 2});
         });
+        return; // 新模块初始化成功，直接返回
     }
-
-    // 坐标转换
-    const viewRect = tableView.getBoundingClientRect();
-    const offsetX = viewRect.left + window.pageXOffset - tableView.scrollLeft;
-    const offsetY = viewRect.top + window.pageYOffset - tableView.scrollTop;
-
-    function toTableCoord(clientX, clientY) {
-        return {
-            x: clientX - offsetX,
-            y: clientY - offsetY
-        };
-    }
-
-    // 鼠标事件
-    tableBox.addEventListener('mousedown', function(e) {
-        if (e.button !== 0 || e.target.closest('.layui-table-tool,.layui-table-header,.layui-table-total')) return;
-        const pt = toTableCoord(e.clientX, e.clientY);
-        isDragging = true;
-        startX = pt.x;
-        startY = pt.y;
-
-        rectDiv.style.cssText = `
-            position: absolute;
-            left: ${startX}px;
-            top: ${startY}px;
-            width: 0;
-            height: 0;
-            display: block;
-            border: 1px dashed #1e90ff;
-            background: rgba(30,144,255,0.1);
-            z-index: 9999;
-            pointer-events: none;
-        `;
-        if (rectDiv.parentNode !== tableView) {
-            tableView.appendChild(rectDiv);
-        }
-        clearSelection();
-        e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', function(e) {
-        if (!isDragging) return;
-        const pt = toTableCoord(e.clientX, e.clientY);
-        let x = pt.x, y = pt.y;
-        let w = x - startX, h = y - startY;
-        let l = startX, t = startY;
-        if (w < 0) { l = x; w = -w; }
-        if (h < 0) { t = y; h = -h; }
-
-        rectDiv.style.left = l + 'px';
-        rectDiv.style.top = t + 'px';
-        rectDiv.style.width = w + 'px';
-        rectDiv.style.height = h + 'px';
-
-        updateSelection({ left: l, top: t, right: l + w, bottom: t + h });
-    });
-
-    document.addEventListener('mouseup', function() {
-        if (isDragging) {
-            isDragging = false;
-            rectDiv.style.display = 'none';
-        }
-    });
-
-    // ====== 关键：绑定 Ctrl+C 复制 和 Alt+Q 功能 ======
-    function handleKeydown(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedCells.length > 0) {
-            e.preventDefault();
-            copyText(generateCopyText());
-        }
-        // ====== 新增：绑定 Alt+Q 功能（仅在备货表格中添加商品） ======
-        if (e.altKey && e.key.toLowerCase() === 'q' && selectedCells.length > 0) {
-            e.preventDefault();
-            addToCartFromSelection(selectedCells, tableId);
-        }
-    }
-
-    // 移除可能存在的旧监听器
-    if (tableView.__keyHandler) {
-        document.removeEventListener('keydown', tableView.__keyHandler);
-    }
-    tableView.__keyHandler = handleKeydown;
-    document.addEventListener('keydown', handleKeydown);
     
-    // 添加点击屏幕任意地方取消选中（排除表格区域）
-    document.addEventListener('click', function(e) {
-        // 检查点击的是否是表格内部元素或表格相关元素
-        const isTableElement = tableView.contains(e.target) || 
-                              e.target.closest('.layui-table-cell') ||
-                              e.target.closest('.layui-table-view') ||
-                              e.target.closest('.layui-table-box');
-        
-        if (!isTableElement) {
-            // 如果点击的不是表格相关元素，则清除选中
-            setTimeout(() => {
-                clearSelection();
-                selectedCells = [];
-            }, 100); // 延迟执行，确保不影响表格内部的点击事件
-        }
-    });
+    
 }
 
 
@@ -1066,411 +767,70 @@ function initExcelCellSelection(tableId) {
 function initExcelCellSelectionForCart(tableId) {
     // 只对购物车表格生效
     if (tableId !== 'cartTable') return;
-    
-    const tableView = document.querySelector('#' + tableId + ' + .layui-table-view');
-    if (!tableView || tableView.__hasCellSelForCart__) return;
-    tableView.__hasCellSelForCart__ = true;
-
-    const tableBox = tableView.querySelector('.layui-table-box');
-    const tableBody = tableView.querySelector('.layui-table-body');
-    if (!tableBox || !tableBody) return;
-
-    // 注入样式
-    if (!document.getElementById('excel-cell-sel-style')) {
-        const style = document.createElement('style');
-        style.id = 'excel-cell-sel-style';
-        style.textContent = `
-            .cell-excel-selected {
-                background-color: #d0e8ff !important;
-                position: relative;
-            }
-            .cell-excel-selected::after {
-                content: '';
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                border: 2px solid #1e90ff;
-                pointer-events: none;
-                box-sizing: border-box;
-            }
-            #drag-sel-rect {
-                position: absolute;
-                border: 1px dashed #1e90ff;
-                background: rgba(30,144,255,0.1);
-                z-index: 2000;  /* 调整z-index层级，用于拖拽选择框 */
-                pointer-events: none;
-                display: none;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    let rectDiv = document.getElementById('drag-sel-rect');
-    if (!rectDiv) {
-        rectDiv = document.createElement('div');
-        rectDiv.id = 'drag-sel-rect';
-    }
-
-    let isDragging = false;
-    let selectedCells = [];
-    let startX, startY;
-
-    // 清除选中
-    function clearSelection() {
-        document.querySelectorAll('.cell-excel-selected').forEach(el => el.classList.remove('cell-excel-selected'));
-        selectedCells = [];
-    }
-
-    // 获取单元格相对于 tableView 的坐标（考虑滚动）
-    function getCellRect(cell) {
-        const cellRect = cell.getBoundingClientRect();
-        const viewRect = tableView.getBoundingClientRect();
-        return {
-            left: cellRect.left - viewRect.left + tableView.scrollLeft,
-            top: cellRect.top - viewRect.top + tableView.scrollTop,
-            right: cellRect.right - viewRect.left + tableView.scrollLeft,
-            bottom: cellRect.bottom - viewRect.top + tableView.scrollTop,
-            element: cell
-        };
-    }
-
-    function intersects(a, b) {
-        return !(b.left > a.right || b.right < a.left || b.top > a.bottom || b.bottom < a.top);
-    }
-
-    function updateSelection(selRect) {
-        clearSelection();
-        const cells = tableBox.querySelectorAll('.layui-table-cell');
-        const matched = [];
-
-        cells.forEach(cell => {
-            const cRect = getCellRect(cell);
-            if (intersects(cRect, selRect)) {
-                cell.classList.add('cell-excel-selected');
-                const tr = cell.closest('tr[data-index]');
-                if (!tr) return;
-                const rowIndex = parseInt(tr.getAttribute('data-index'), 10);
-                const td = cell.closest('td');
-                const colIndex = Array.from(td.parentNode.children).indexOf(td);
-                matched.push({
-                    text: cell.innerText.trim(),
-                    row: rowIndex,
-                    col: colIndex
+    // 优先使用新模块（如果可用）
+    if (typeof TableCellSelector !== 'undefined') {
+        TableCellSelector.init('cartTable', {
+            enableCopy: true,
+            enableRemoveFromCart: true,
+            onRemoveFromCart: function(selectedRows, tableId) {
+                // 提取商品信息
+                var itemDetails = [];
+                selectedRows.forEach(function(item) {
+                    if (item.oe) {
+                        itemDetails.push({
+                            item_oe: item.oe,
+                            item_barcode: item.barcode || item['物料条码'] || ''
+                        });
+                    }
+                });
+                
+                if (itemDetails.length === 0) {
+                    layui.layer.msg('没有有效的商品可以移除', { icon: 2 });
+                    return;
+                }
+                
+                // 逐个删除商品
+                var successCount = 0;
+                var errorCount = 0;
+                
+                itemDetails.forEach(function(item) {
+                    fetch('/api/cart/remove', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ item_oe: item.item_oe, item_barcode: item.item_barcode })
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.code === 0) successCount++;
+                        else errorCount++;
+                        
+                        if (successCount + errorCount === itemDetails.length) {
+                            if (successCount > 0) {
+                                layui.layer.msg(`成功移除 ${successCount} 个商品`, {icon: 1});
+                                updateCartCount();
+                                
+                                if (window.cartTableInstance) {
+                                    var currentDimension = window.currentCartDimension || 'product';
+                                    layui.table.reload('cartTable', {
+                                        url: '/api/cart?' + new Date().getTime() + '&dimension=' + currentDimension,
+                                        page: { curr: 1 }
+                                    });
+                                }
+                            }
+                            if (errorCount > 0) {
+                                layui.layer.msg(`有 ${errorCount} 个商品移除失败`, {icon: 2});
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        errorCount++;
+                        console.error('删除请求失败:', error);
+                    });
                 });
             }
         });
-
-        selectedCells = matched;
+        return; // 新模块初始化成功，直接返回
     }
-
-    function generateCopyText() {
-        if (selectedCells.length === 0) return '';
-        const rows = {};
-        let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
-
-        selectedCells.forEach(({row, col, text}) => {
-            minR = Math.min(minR, row); maxR = Math.max(maxR, row);
-            minC = Math.min(minC, col); maxC = Math.max(maxC, col);
-            if (!rows[row]) rows[row] = {};
-            rows[row][col] = text;
-        });
-
-        let lines = [];
-        for (let r = minR; r <= maxR; r++) {
-            let line = [];
-            for (let c = minC; c <= maxC; c++) {
-                line.push(rows[r] && rows[r][c] !== undefined ? rows[r][c] : '');
-            }
-            lines.push(line.join('\t'));
-        }
-        return lines.join('\n');
-    }
-
-    function copyText(text) {
-        console.log('[Debug] 复制内容:', text); // 调试用
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-                layui.layer.msg('已复制选区内容', { icon: 1, time: 800 });
-                // 自动清除选中
-                clearSelection();
-                selectedCells = [];
-            }).catch(err => {
-                console.error('Clipboard API 失败:', err);
-                fallbackCopy(text);
-            });
-        } else {
-            fallbackCopy(text);
-        }
-    }
-
-    function fallbackCopy(text) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-            if (document.execCommand('copy')) {
-                layui.layer.msg('已复制到剪贴板', { icon: 1, time: 800 });
-                // 自动清除选中
-                clearSelection();
-                selectedCells = [];
-            } else {
-                layui.layer.msg('复制失败', { icon: 2 });
-            }
-        } catch (e) {
-            console.error('execCommand 复制失败:', e);
-            layui.layer.msg('浏览器不支持复制', { icon: 2 });
-        }
-        document.body.removeChild(ta);
-    }
-
-        // 从购物车移除选中商品的函数
-    function removeFromCartBySelection(selectedCells, tableId) {
-        if (selectedCells.length === 0) {
-            layui.layer.msg('未选中任何数据', { icon: 2 });
-            return;
-        }
-
-        // 使用layui的table.cache来获取行数据
-        let tableCache = layui.table.cache[tableId];
-        if (!tableCache) {
-            layui.layer.msg('无法获取表格数据', { icon: 2 });
-            return;
-        }
-
-        // 从选中的单元格中提取行数据
-        const processedRows = new Set(); // 避免重复添加
-        const selectedRows = [];
-
-        selectedCells.forEach(cellData => {
-            const rowIndex = cellData.row;
-            if (!processedRows.has(rowIndex) && tableCache[rowIndex]) {
-                selectedRows.push(tableCache[rowIndex]);
-                processedRows.add(rowIndex);
-            }
-        });
-
-        if (selectedRows.length === 0) {
-            layui.layer.msg('没有选中的商品可以移除', { icon: 2 });
-            return;
-        }
-
-        // 提取商品OE和物料条码的组合
-        var itemDetails = [];
-        selectedRows.forEach(function(item) {
-            if (item.oe) {
-                var barcode = item.barcode || item['物料条码'] || '';
-                itemDetails.push({
-                    item_oe: item.oe,
-                    item_barcode: barcode
-                });
-            }
-        });
-
-        if (itemDetails.length === 0) {
-            layui.layer.msg('没有有效的商品可以移除', { icon: 2 });
-            return;
-        }
-
-        // 逐个删除商品
-        var successCount = 0;
-        var errorCount = 0;
-
-        itemDetails.forEach(function(item, idx) {
-            // 创建请求体，包含OE和物料条码
-            const requestBody = { 
-                item_oe: item.item_oe
-            };
-            
-            // 如果提供了物料条码，则包含在请求中
-            if (item.item_barcode) {
-                requestBody.item_barcode = item.item_barcode;
-            }
-
-            fetch('/api/cart/remove', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.code === 0) {
-                    successCount++;
-                } else {
-                    errorCount++;
-                    console.error('删除失败:', result.msg);
-                }
-
-                // 当所有请求都完成时显示结果
-                if (successCount + errorCount === itemDetails.length) {
-                    if (successCount > 0) {
-                        layui.layer.msg(`成功移除 ${successCount} 个商品`, {icon: 1});
-                        updateCartCount();
-                        
-                        // 重新加载表格
-                        if (window.cartTableInstance) {
-                            var currentDimension = window.currentCartDimension || 'product';
-                            layui.table.reload('cartTable', {
-                                url: '/api/cart?' + new Date().getTime() + '&dimension=' + currentDimension,
-                                page: { curr: 1 },
-                                done: function(res, curr, count) {
-                                    // 检查是否有清理结果的返回数据
-                                    if (res.cleanup_result && res.cleanup_result.deleted_count > 0) {
-                                        layui.layer.msg(`库存大于20的商品已自动删除 ${res.cleanup_result.deleted_count} 个`, {
-                                            icon: 1,
-                                            time: 3000
-                                        });
-                                    }
-                                }
-                            });
-                        }
-                        
-                        // 自动清除选中
-                        clearSelection();
-                        selectedCells = [];
-                    }
-                    if (errorCount > 0) {
-                        layui.layer.msg(`有 ${errorCount} 个商品移除失败`, {icon: 2});
-                    }
-                }
-            })
-            .catch(error => {
-                errorCount++;
-                console.error('删除请求失败:', error);
-
-                // 当所有请求都完成时显示结果
-                if (successCount + errorCount === itemDetails.length) {
-                    if (successCount > 0) {
-                        layui.layer.msg(`成功移除 ${successCount} 个商品`, {icon: 1});
-                        updateCartCount();
-                        
-                        // 重新加载表格
-                        if (window.cartTableInstance) {
-                            var currentDimension = window.currentCartDimension || 'product';
-                            layui.table.reload('cartTable', {
-                                url: '/api/cart?' + new Date().getTime() + '&dimension=' + currentDimension,
-                                page: { curr: 1 },
-                                done: function(res, curr, count) {
-                                    // 检查是否有清理结果的返回数据
-                                    if (res.cleanup_result && res.cleanup_result.deleted_count > 0) {
-                                        layui.layer.msg(`库存大于20的商品已自动删除 ${res.cleanup_result.deleted_count} 个`, {
-                                            icon: 1,
-                                            time: 3000
-                                        });
-                                    }
-                                }
-                            });
-                        }
-                        
-                        // 自动清除选中
-                        clearSelection();
-                        selectedCells = [];
-                    }
-                    if (errorCount > 0) {
-                        layui.layer.msg(`有 ${errorCount} 个商品移除失败`, {icon: 2});
-                    }
-                }
-            });
-        });
-    }
-
-    // 鼠标事件 - 为购物车表格使用特殊处理
-    tableBox.addEventListener('mousedown', function(e) {
-        if (e.button !== 0 || e.target.closest('.layui-table-tool,.layui-table-header,.layui-table-total')) return;
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-
-        rectDiv.style.cssText = `
-            position: absolute;
-            left: ${startX}px;
-            top: ${startY}px;
-            width: 0;
-            height: 0;
-            display: block;
-            border: 1px dashed #1e90ff;
-            background: rgba(30,144,255,0.1);
-            z-index: 9999;
-            pointer-events: none;
-        `;
-        // 确保选择框添加到文档主体中
-        if (rectDiv.parentNode !== document.body) {
-            document.body.appendChild(rectDiv);
-        }
-        clearSelection();
-        e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', function(e) {
-        if (!isDragging) return;
-        let x = e.clientX, y = e.clientY;
-        let w = x - startX, h = y - startY;
-        let l = startX, t = startY;
-        if (w < 0) { l = x; w = -w; }
-        if (h < 0) { t = y; h = -h; }
-
-        rectDiv.style.left = l + 'px';
-        rectDiv.style.top = t + 'px';
-        rectDiv.style.width = w + 'px';
-        rectDiv.style.height = h + 'px';
-
-        // 计算选择区域（相对于表格容器）
-        const tableRect = tableView.getBoundingClientRect();
-        const selRect = {
-            left: l - tableRect.left + tableView.scrollLeft,
-            top: t - tableRect.top + tableView.scrollTop,
-            right: l + w - tableRect.left + tableView.scrollLeft,
-            bottom: t + h - tableRect.top + tableView.scrollTop
-        };
-
-        updateSelection(selRect);
-    });
-
-    document.addEventListener('mouseup', function() {
-        if (isDragging) {
-            isDragging = false;
-            rectDiv.style.display = 'none';
-        }
-    });
-
-    // ====== 关键：绑定 Ctrl+C 复制 和 Alt+Q 移除功能 ======
-    function handleKeydown(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedCells.length > 0) {
-            e.preventDefault();
-            copyText(generateCopyText());
-        }
-        // ====== 新增：绑定 Alt+Q 功能（仅在购物车表格中移除商品） ======
-        if (e.altKey && e.key.toLowerCase() === 'q' && selectedCells.length > 0) {
-            e.preventDefault();
-            removeFromCartBySelection(selectedCells, tableId);
-        }
-    }
-
-    // 移除可能存在的旧监听器
-    if (tableView.__keyHandlerForCart) {
-        document.removeEventListener('keydown', tableView.__keyHandlerForCart);
-    }
-    tableView.__keyHandlerForCart = handleKeydown;
-    document.addEventListener('keydown', handleKeydown);
-    
-    // 添加点击屏幕任意地方取消选中（排除表格区域）
-    document.addEventListener('click', function(e) {
-        // 检查点击的是否是表格内部元素或表格相关元素
-        const isTableElement = tableView.contains(e.target) || 
-                              e.target.closest('.layui-table-cell') ||
-                              e.target.closest('.layui-table-view') ||
-                              e.target.closest('.layui-table-box');
-        
-        if (!isTableElement) {
-            // 如果点击的不是表格相关元素，则清除选中
-            setTimeout(() => {
-                clearSelection();
-                selectedCells = [];
-            }, 100); // 延迟执行，确保不影响表格内部的点击事件
-        }
-    });
 }
 
 
@@ -3101,106 +2461,6 @@ function loadSelectOptions(form) {
                 layui.layer.msg('⚠️ 标签数据加载失败', {icon: 2});
             });
     }
-}function loadSelectOptions(form) {
-    // 加载品牌选项
-    var brandSelect = document.getElementById('searchBrand');
-    if(brandSelect) {  // 添加检查
-        fetch('/api/brands')
-            .then(res => res.json())
-            .then(response => {
-                // 检查API返回格式，提取data数组
-                const brands = response.data || [];
-                brands.forEach(brand => {
-                    const opt = document.createElement('option');
-                    opt.value = brand;
-                    opt.textContent = brand;
-                    brandSelect.appendChild(opt);
-                });
-                layui.use('form', function() {
-                    var f = layui.form;
-                    f.render('select');
-                });
-            })
-            .catch(err => {
-                console.error('加载品牌失败:', err);
-                layui.layer.msg('⚠️ 品牌数据加载失败', {icon: 2});
-            });
-    }
-    
-    // 加载标签选项
-    var tagSelect = document.getElementById('searchTag');
-    if(tagSelect) {  // 添加检查
-        fetch('/api/tags')
-            .then(res => res.json())
-            .then(response => {
-                // 检查API返回格式，提取data数组
-                const tags = response.data || [];
-                tags.forEach(tag => {
-                    const opt = document.createElement('option');
-                    opt.value = tag;
-                    opt.textContent = tag;
-                    tagSelect.appendChild(opt);
-                });
-                layui.use('form', function() {
-                    var f = layui.form;
-                    f.render('select');
-                });
-            })
-            .catch(err => {
-                console.error('加载标签失败:', err);
-                layui.layer.msg('⚠️ 标签数据加载失败', {icon: 2});
-            });
-    }
-}function loadSelectOptions(form) {
-    // 加载品牌选项
-    var brandSelect = document.getElementById('searchBrand');
-    if(brandSelect) {  // 添加检查
-        fetch('/api/brands')
-            .then(res => res.json())
-            .then(response => {
-                // 检查API返回格式，提取data数组
-                const brands = response.data || [];
-                brands.forEach(brand => {
-                    const opt = document.createElement('option');
-                    opt.value = brand;
-                    opt.textContent = brand;
-                    brandSelect.appendChild(opt);
-                });
-                layui.use('form', function() {
-                    var f = layui.form;
-                    f.render('select');
-                });
-            })
-            .catch(err => {
-                console.error('加载品牌失败:', err);
-                layui.layer.msg('⚠️ 品牌数据加载失败', {icon: 2});
-            });
-    }
-    
-    // 加载标签选项
-    var tagSelect = document.getElementById('searchTag');
-    if(tagSelect) {  // 添加检查
-        fetch('/api/tags')
-            .then(res => res.json())
-            .then(response => {
-                // 检查API返回格式，提取data数组
-                const tags = response.data || [];
-                tags.forEach(tag => {
-                    const opt = document.createElement('option');
-                    opt.value = tag;
-                    opt.textContent = tag;
-                    tagSelect.appendChild(opt);
-                });
-                layui.use('form', function() {
-                    var f = layui.form;
-                    f.render('select');
-                });
-            })
-            .catch(err => {
-                console.error('加载标签失败:', err);
-                layui.layer.msg('⚠️ 标签数据加载失败', {icon: 2});
-            });
-    }
 }
 
 // 在文件顶部定义一个全局变量来存储列配置
@@ -3415,245 +2675,7 @@ function renderBeihuoTable(table) {
     return tableInstance;
 }
 
-/**
- * 初始化单元格选择功能
- * @param {string} tableId 表格ID
- */
 
-function initDragCellSelection(tableSelector) {
-    const tableBox = document.querySelector(tableSelector + ' .layui-table-box');
-    if (!tableBox || window.__dragSelectionInitialized__) return;
-    window.__dragSelectionInitialized__ = true;
-
-    // 注入样式
-    if (!document.getElementById('drag-selection-style')) {
-        const style = document.createElement('style');
-        style.id = 'drag-selection-style';
-        style.textContent = `
-            .cell-drag-selected {
-                background-color: #d0e8ff !important;
-                position: relative;
-            }
-            .cell-drag-selected::after {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                border: 2px solid #1e90ff;
-                pointer-events: none;
-                box-sizing: border-box;
-            }
-            #selection-rect {
-                position: absolute;
-                border: 1px dashed #1e90ff;
-                background: rgba(30, 144, 255, 0.1);
-                z-index: 9999;
-                pointer-events: none;
-                display: none;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    // 创建选择框元素
-    let rectDiv = document.getElementById('selection-rect');
-    if (!rectDiv) {
-        rectDiv = document.createElement('div');
-        rectDiv.id = 'selection-rect';
-        document.body.appendChild(rectDiv);
-    }
-
-    let isDragging = false;
-    let startX, startY;
-    let selectedCells = [];
-    let keydownHandler = null;
-
-    // 获取单元格的全局位置（考虑滚动）
-    function getCellRect(cell) {
-        // 获取单元格相对于 .layui-table-view 的位置
-        const cellRect = cell.getBoundingClientRect();
-        const viewRect = tableView.getBoundingClientRect();
-        
-        return {
-            left: cellRect.left - viewRect.left + tableView.scrollLeft,
-            top: cellRect.top - viewRect.top + tableView.scrollTop,
-            right: cellRect.right - viewRect.left + tableView.scrollLeft,
-            bottom: cellRect.bottom - viewRect.top + tableView.scrollTop,
-            element: cell
-        };
-    }
-
-    // 判断两个矩形是否相交
-    function rectsIntersect(r1, r2) {
-        return !(r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top);
-    }
-
-    // 清除所有选中状态
-    function clearSelection() {
-        document.querySelectorAll('.cell-drag-selected').forEach(el => {
-            el.classList.remove('cell-drag-selected');
-        });
-        selectedCells = [];
-    }
-
-    // 更新选中单元格
-    function updateSelection(selectionRect) {
-        clearSelection();
-        const cells = tableBox.querySelectorAll('.layui-table-cell');
-        const matched = [];
-
-        cells.forEach(cell => {
-            const cellRect = getCellRect(cell);
-            if (rectsIntersect(cellRect, selectionRect)) {
-                cell.classList.add('cell-drag-selected');
-                matched.push({
-                    element: cell,
-                    text: cell.innerText.trim(),
-                    row: cell.closest('tr'),
-                    colIndex: Array.from(cell.parentNode.children).indexOf(cell)
-                });
-            }
-        });
-
-        selectedCells = matched;
-    }
-
-    // 生成复制用的文本（行列对齐）
-    function generateCopyText() {
-        if (selectedCells.length === 0) return '';
-
-        // 按行分组
-        const rowsMap = new Map();
-        selectedCells.forEach(item => {
-            const rowIndex = Array.from(item.row.parentNode.children).indexOf(item.row);
-            if (!rowsMap.has(rowIndex)) rowsMap.set(rowIndex, []);
-            rowsMap.get(rowIndex).push({ col: item.colIndex, text: item.text });
-        });
-
-        // 对每行按列排序，并填充空单元格
-        const sortedRows = Array.from(rowsMap.entries())
-            .sort((a, b) => a[0] - b[0])
-            .map(([rowIndex, cells]) => {
-                cells.sort((a, b) => a.col - b.col);
-                const minCol = Math.min(...cells.map(c => c.col));
-                const maxCol = Math.max(...cells.map(c => c.col));
-                const row = [];
-                for (let col = minCol; col <= maxCol; col++) {
-                    const found = cells.find(c => c.col === col);
-                    row.push(found ? found.text : '');
-                }
-                return row.join('\t');
-            });
-
-        return sortedRows.join('\n');
-    }
-
-    // 鼠标事件：开始拖拽
-    tableBox.addEventListener('mousedown', function(e) {
-        if (e.button !== 0) return; // 只响应左键
-        const target = e.target;
-        // 如果点击的是单元格内部，也允许开始拖拽（不像 Excel 必须从空白处开始）
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-
-        // 初始化选择框位置
-        rectDiv.style.left = startX + 'px';
-        rectDiv.style.top = startY + 'px';
-        rectDiv.style.width = '0px';
-        rectDiv.style.height = '0px';
-        rectDiv.style.display = 'block';
-
-        clearSelection();
-        e.preventDefault();
-    });
-
-    // 鼠标移动
-    document.addEventListener('mousemove', function(e) {
-        if (!isDragging) return;
-
-        let x = e.clientX, y = e.clientY;
-        let width = x - startX, height = y - startY;
-        let left = startX, top = startY;
-
-        if (width < 0) { left = x; width = -width; }
-        if (height < 0) { top = y; height = -height; }
-
-        rectDiv.style.left = left + 'px';
-        rectDiv.style.top = top + 'px';
-        rectDiv.style.width = width + 'px';
-        rectDiv.style.height = height + 'px';
-
-        // 计算选择区域（相对于表格容器）
-        const tableRect = tableBox.closest('.layui-table').getBoundingClientRect();
-        const selRect = {
-            left: left - tableRect.left + window.pageXOffset + tableBox.scrollLeft,
-            top: top - tableRect.top + window.pageYOffset + tableBox.scrollTop,
-            right: left + width - tableRect.left + window.pageXOffset + tableBox.scrollLeft,
-            bottom: top + height - tableRect.top + window.pageYOffset + tableBox.scrollTop
-        };
-
-        updateSelection(selRect);
-    });
-
-    // 鼠标释放
-    document.addEventListener('mouseup', function(e) {
-        if (!isDragging) return;
-        isDragging = false;
-        rectDiv.style.display = 'none';
-    });
-
-        if (tableView.__cellKeyHandler) {
-        document.removeEventListener('keydown', tableView.__cellKeyHandler);
-    }
-
-    // 定义新监听器（能访问当前 selectedCells）
-    tableView.__cellKeyHandler = function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedCells.length > 0) {
-            e.preventDefault();
-            copyText(generateCopyText());
-        }
-    };
-
-    document.addEventListener('keydown', tableView.__cellKeyHandler);
-    // 复制事件
-    document.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectedCells.length > 0) {
-            e.preventDefault();
-            const text = generateCopyText();
-            copyTextToClipboard(text);
-        }
-    });
-
-    // 通用复制函数
-    function copyTextToClipboard(text) {
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-                layui.layer.msg('已复制选区内容', { icon: 1, time: 800 });
-            }).catch(err => fallback());
-        } else {
-            fallback();
-        }
-
-        function fallback() {
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;';
-            document.body.appendChild(ta);
-            ta.select();
-            try {
-                if (document.execCommand('copy')) {
-                    layui.layer.msg('已复制选区内容', { icon: 1, time: 800 });
-                }
-            } catch (err) {
-                console.error('复制失败', err);
-            }
-            document.body.removeChild(ta);
-        }
-    }
-}
 
 /**
  * 初始化回顶按钮
@@ -5537,7 +4559,6 @@ function showCartPanel(table) {
         });
     });
 }
-// ... existing code ...
 
 /**
  * 绑定数量编辑事件
@@ -6991,384 +6012,72 @@ function initExcelCellSelectionForDateQuery(tableId) {
     // 只对dateQueryTable生效
     if (tableId !== 'dateQueryTable') return;
     
-    const tableView = document.querySelector('#' + tableId + ' + .layui-table-view');
-    if (!tableView || tableView.__hasCellSelForCart__) return;
-    tableView.__hasCellSelForCart__ = true;
-
-    const tableBox = tableView.querySelector('.layui-table-box');
-    const tableBody = tableView.querySelector('.layui-table-body');
-    if (!tableBox || !tableBody) return;
-
-    // 注入样式
-    if (!document.getElementById('excel-cell-sel-style')) {
-        const style = document.createElement('style');
-        style.id = 'excel-cell-sel-style';
-        style.textContent = `
-            .cell-excel-selected {
-                background-color: #d0e8ff !important;
-                position: relative;
-            }
-            .cell-excel-selected::after {
-                content: '';
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                border: 2px solid #1e90ff;
-                pointer-events: none;
-                box-sizing: border-box;
-            }
-            #drag-sel-rect {
-                position: absolute;
-                border: 1px dashed #1e90ff;
-                background: rgba(30,144,255,0.1);
-                z-index: 2000;  /* 调整z-index层级，用于拖拽选择框 */
-                pointer-events: none;
-                display: none;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    let rectDiv = document.getElementById('drag-sel-rect');
-    if (!rectDiv) {
-        rectDiv = document.createElement('div');
-        rectDiv.id = 'drag-sel-rect';
-    }
-
-    let isDragging = false;
-    let selectedCells = [];
-    let startX, startY;
-
-    // 清除选中
-    function clearSelection() {
-        document.querySelectorAll('.cell-excel-selected').forEach(el => el.classList.remove('cell-excel-selected'));
-        selectedCells = [];
-    }
-
-    // 获取单元格相对于 tableView 的坐标（考虑滚动）
-    function getCellRect(cell) {
-        const cellRect = cell.getBoundingClientRect();
-        const viewRect = tableView.getBoundingClientRect();
-        return {
-            left: cellRect.left - viewRect.left + tableView.scrollLeft,
-            top: cellRect.top - viewRect.top + tableView.scrollTop,
-            right: cellRect.right - viewRect.left + tableView.scrollLeft,
-            bottom: cellRect.bottom - viewRect.top + tableView.scrollTop,
-            element: cell
-        };
-    }
-
-    function intersects(a, b) {
-        return !(b.left > a.right || b.right < a.left || b.top > a.bottom || b.bottom < a.top);
-    }
-
-    function updateSelection(selRect) {
-        clearSelection();
-        const cells = tableBox.querySelectorAll('.layui-table-cell');
-        const matched = [];
-
-        cells.forEach(cell => {
-            const cRect = getCellRect(cell);
-            if (intersects(cRect, selRect)) {
-                cell.classList.add('cell-excel-selected');
-                const tr = cell.closest('tr[data-index]');
-                if (!tr) return;
-                const rowIndex = parseInt(tr.getAttribute('data-index'), 10);
-                const td = cell.closest('td');
-                const colIndex = Array.from(td.parentNode.children).indexOf(td);
-                matched.push({
-                    text: cell.innerText.trim(),
-                    row: rowIndex,
-                    col: colIndex
+    // 优先使用新模块（如果可用）
+    if (typeof TableCellSelector !== 'undefined') {
+        TableCellSelector.init('dateQueryTable', {
+            enableCopy: true,
+            enableAddToCart: true,
+            onAddToCart: function(selectedRows, tableId) {
+                // 提取商品信息
+                var itemDetails = [];
+                selectedRows.forEach(function(item) {
+                    if (item.oe) {
+                        itemDetails.push({
+                            oe: item.oe,
+                            barcode: item.barcode || item['物料条码'] || ''
+                        });
+                    }
                 });
-            }
-        });
-
-        selectedCells = matched;
-    }
-
-    function generateCopyText() {
-        if (selectedCells.length === 0) return '';
-        const rows = {};
-        let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
-
-        selectedCells.forEach(({row, col, text}) => {
-            minR = Math.min(minR, row); maxR = Math.max(maxR, row);
-            minC = Math.min(minC, col); maxC = Math.max(maxC, col);
-            if (!rows[row]) rows[row] = {};
-            rows[row][col] = text;
-        });
-
-        let lines = [];
-        for (let r = minR; r <= maxR; r++) {
-            let line = [];
-            for (let c = minC; c <= maxC; c++) {
-                line.push(rows[r] && rows[r][c] !== undefined ? rows[r][c] : '');
-            }
-            lines.push(line.join('\t'));
-        }
-        return lines.join('\n');
-    }
-
-    function copyText(text) {
-        console.log('[Debug] 复制内容:', text); // 调试用
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-                layui.layer.msg('已复制选区内容', { icon: 1, time: 800 });
-                // 自动清除选中
-                clearSelection();
-                selectedCells = [];
-            }).catch(err => {
-                console.error('Clipboard API 失败:', err);
-                fallbackCopy(text);
-            });
-        } else {
-            fallbackCopy(text);
-        }
-    }
-
-    function fallbackCopy(text) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-            if (document.execCommand('copy')) {
-                layui.layer.msg('已复制到剪贴板', { icon: 1, time: 800 });
-                // 自动清除选中
-                clearSelection();
-                selectedCells = [];
-            } else {
-                layui.layer.msg('复制失败', { icon: 2 });
-            }
-        } catch (e) {
-            console.error('execCommand 复制失败:', e);
-            layui.layer.msg('浏览器不支持复制', { icon: 2 });
-        }
-        document.body.removeChild(ta);
-    }
-
-    // 添加选中商品到购物车的函数
-    function addToCartFromSelection(selectedCells, tableId) {
-        if (selectedCells.length === 0) {
-            layui.layer.msg('未选中任何数据', { icon: 2 });
-            return;
-        }
-
-        // 根据表格ID使用不同的方式获取表格实例
-        let tableIns = null;
-        let tableCache = null;
-        
-        if (tableId === 'dateQueryTable') {
-            // 对于日期查询表格，使用全局变量或直接从layui.table.cache获取
-            tableCache = layui.table.cache[tableId];
-        } else {
-            // 对于其他表格，尝试获取全局实例
-            tableIns = window.beihuoTableInstance || window.beihuoTableIns;
-            tableCache = layui.table.cache[tableId];
-        }
-        
-        if (!tableCache) {
-            layui.layer.msg('无法获取表格数据', { icon: 2 });
-            return;
-        }
-
-        // 从选中的单元格中提取行数据，使用Map来确保每行只处理一次
-        const selectedRows = new Map();
-
-        selectedCells.forEach(cellData => {
-            const rowIndex = cellData.row;
-            if (tableCache[rowIndex] && !selectedRows.has(rowIndex)) {
-                selectedRows.set(rowIndex, tableCache[rowIndex]);
-            }
-        });
-
-        if (selectedRows.size === 0) {
-            layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-            return;
-        }
-
-        // 提取商品OE和物料条码的组合
-        var itemDetails = [];
-        selectedRows.forEach(function(item) {
-            if (item.oe) {
-                var barcode = item.barcode || item['物料条码'] || '';
-                itemDetails.push({
-                    oe: item.oe,
-                    barcode: barcode
-                });
-            }
-        });
-
-        if (itemDetails.length === 0) {
-            layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-            return;
-        }
-
-        // 去重：确保相同的oe+barcode组合只添加一次
-        const uniqueItems = [];
-        const seen = new Set();
-        itemDetails.forEach(item => {
-            const key = item.oe + '|' + item.barcode;
-            if (!seen.has(key)) {
-                seen.add(key);
-                uniqueItems.push(item);
-            }
-        });
-
-        if (uniqueItems.length === 0) {
-            layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-            return;
-        }
-        
-        // 发送请求添加到购物车
-        fetch('/api/cart/add', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ item_details: itemDetails })
-        })
-        .then(response => response.json())
-        .then(result => {
-            console.log('服务器响应:', result);
-            if (result.code === 0) {
-                layui.layer.msg(result.msg, {icon: 1});
-                updateCartCount();
                 
-                // 添加成功后，单独获取购物车数据更新界面
-                fetch('/api/cart')
-                    .then(response => response.json())
-                    .then(cartResult => {
-                        if (cartResult.code === 0) {
-                            // 更新购物车缓存
-                            window.cartCache.clear();
-                            cartResult.data.forEach(item => {
-                                var store = item.store || item['门店'] || window.currentUserStore || 'default';
-                                var barcode = item.barcode || item['物料条码'] || '';
-                                var cacheKey = store + '_' + barcode;
-                                window.cartCache.add(cacheKey);
+                if (itemDetails.length === 0) {
+                    layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
+                    return;
+                }
+                
+                // 发送请求添加到购物车
+                fetch('/api/cart/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item_details: itemDetails })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.code === 0) {
+                        layui.layer.msg(result.msg, {icon: 1});
+                        updateCartCount();
+                        
+                        // 更新购物车缓存
+                        fetch('/api/cart')
+                            .then(response => response.json())
+                            .then(cartResult => {
+                                if (cartResult.code === 0) {
+                                    window.cartCache.clear();
+                                    cartResult.data.forEach(item => {
+                                        var store = item.store || item['门店'] || window.currentUserStore || 'default';
+                                        var barcode = item.barcode || item['物料条码'] || '';
+                                        window.cartCache.add(store + '_' + barcode);
+                                    });
+                                    window.cartCacheLoaded = true;
+                                    
+                                    // 高亮购物车商品
+                                    if (window.dateQueryTableInstance) {
+                                        highlightCartItemsForDateQueryTable();
+                                    }
+                                }
                             });
-                            window.cartCacheLoaded = true;
-                            
-                            // 重新渲染相关表格
-                            if (typeof layui !== 'undefined' && layui.table) {
-                                layui.table.reload('beihuoTable', {
-                                    url: '/api/beihuo?' + new Date().getTime()
-                                });
-                            } else {
-                                // 如果 layui 不可用，刷新页面
-                                location.reload();
-                            }
-                            if (window.dateQueryTableInstance) {
-                                highlightCartItemsForDateQueryTable();
-                            }
-                        }
-                    });
-            } else {
-                layui.layer.msg(result.msg, {icon: 2});
+                    } else {
+                        layui.layer.msg(result.msg, {icon: 2});
+                    }
+                })
+                .catch(error => {
+                    layui.layer.msg('添加失败: ' + error.message, {icon: 2});
+                });
             }
-        })
-        .catch(error => {
-            layui.layer.msg('添加失败: ' + error.message, {icon: 2});
         });
+        return; // 新模块初始化成功，直接返回
     }
-
-    // 鼠标事件 - 为购物车表格使用特殊处理
-    tableBox.addEventListener('mousedown', function(e) {
-        if (e.button !== 0 || e.target.closest('.layui-table-tool,.layui-table-header,.layui-table-total')) return;
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-
-        rectDiv.style.cssText = `
-            position: absolute;
-            left: ${startX}px;
-            top: ${startY}px;
-            width: 0;
-            height: 0;
-            display: block;
-            border: 1px dashed #1e90ff;
-            background: rgba(30,144,255,0.1);
-            z-index: 9999;
-            pointer-events: none;
-        `;
-        // 确保选择框添加到文档主体中
-        if (rectDiv.parentNode !== document.body) {
-            document.body.appendChild(rectDiv);
-        }
-        clearSelection();
-        e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', function(e) {
-        if (!isDragging) return;
-        let x = e.clientX, y = e.clientY;
-        let w = x - startX, h = y - startY;
-        let l = startX, t = startY;
-        if (w < 0) { l = x; w = -w; }
-        if (h < 0) { t = y; h = -h; }
-
-        rectDiv.style.left = l + 'px';
-        rectDiv.style.top = t + 'px';
-        rectDiv.style.width = w + 'px';
-        rectDiv.style.height = h + 'px';
-
-        // 计算选择区域（相对于表格容器）
-        const tableRect = tableView.getBoundingClientRect();
-        const selRect = {
-            left: l - tableRect.left + tableView.scrollLeft,
-            top: t - tableRect.top + tableView.scrollTop,
-            right: l + w - tableRect.left + tableView.scrollLeft,
-            bottom: t + h - tableRect.top + tableView.scrollTop
-        };
-
-        updateSelection(selRect);
-    });
-
-    document.addEventListener('mouseup', function() {
-        if (isDragging) {
-            isDragging = false;
-            rectDiv.style.display = 'none';
-        }
-    });
-
-    // ====== 关键：绑定 Ctrl+C 复制 和 Alt+Q 功能 ======
-    function handleKeydown(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedCells.length > 0) {
-            e.preventDefault();
-            copyText(generateCopyText());
-        }
-        // ====== 新增：绑定 Alt+Q 功能（仅在备货表格中添加商品） ======
-        if (e.altKey && e.key.toLowerCase() === 'q' && selectedCells.length > 0) {
-            e.preventDefault();
-            addToCartFromSelection(selectedCells, tableId);
-        }
-    }
-
-    // 移除可能存在的旧监听器
-    if (tableView.__keyHandler) {
-        document.removeEventListener('keydown', tableView.__keyHandler);
-    }
-    tableView.__keyHandler = handleKeydown;
-    document.addEventListener('keydown', handleKeydown);
     
-    // 添加点击屏幕任意地方取消选中（排除表格区域）
-    document.addEventListener('click', function(e) {
-        // 检查点击的是否是表格内部元素或表格相关元素
-        const isTableElement = tableView.contains(e.target) || 
-                              e.target.closest('.layui-table-cell') ||
-                              e.target.closest('.layui-table-view') ||
-                              e.target.closest('.layui-table-box');
-        
-        if (!isTableElement) {
-            // 如果点击的不是表格相关元素，则清除选中
-            setTimeout(() => {
-                clearSelection();
-                selectedCells = [];
-            }, 100); // 延迟执行，确保不影响表格内部的点击事件
-        }
-    });
+    
 }
 
 // 从日期查询结果添加到购物车
@@ -7444,79 +6153,6 @@ function addToCartFromDateQuery(selectedData, layero, index) {
     });
 }
 
-// 绑定日期查询表格键盘事件
-function bindDateQueryKeyboardEvents(dateQueryTable, layero, index) {
-    const tableId = 'dateQueryTable';  // 添加缺失的变量定义
-    const tableView = document.querySelector(`#${tableId} + .layui-table-view`);
-    if (!tableView) return;
-    
-    // 从表格容器获取选中的单元格
-    let selectedCells = []; // 存储选中的单元格信息
-
-    // 清除选中状态的函数
-    function clearSelection() {
-        document.querySelectorAll('.cell-excel-selected').forEach(el => el.classList.remove('cell-excel-selected'));
-        selectedCells = [];
-    }
-
-    // 处理键盘事件
-    function handleKeydown(e) {
-        // 检查焦点是否在表格上或表格内的元素上
-        const isFocusedOnTable = tableView.contains(document.activeElement) ||
-                                document.activeElement === document.body ||
-                                document.activeElement === tableView ||
-                                document.querySelector('.layui-table-cell:focus') ||
-                                document.activeElement.classList.contains('layui-table-cell') ||
-                                document.activeElement.closest('.layui-table-view') === tableView;
-
-        if (!isFocusedOnTable) return;
-
-        // 获取当前选中的单元格
-        const selectedElements = document.querySelectorAll('.cell-excel-selected');
-        if (selectedElements.length > 0) {
-            // 重新获取选中的单元格信息
-            selectedCells = [];
-            selectedElements.forEach(el => {
-                const cell = el.querySelector('.layui-table-cell') || el;
-                const tr = cell.closest('tr');
-                const tbody = tr.parentNode;
-                const rowIndex = Array.from(tbody.children).indexOf(tr);
-                const colIndex = Array.from(tr.children).indexOf(el);
-                selectedCells.push({ row: rowIndex, col: colIndex });
-            });
-        }
-
-        // ====== 新增：绑定 Alt+Q 功能（在日期查询表格中添加商品到购物车） ======
-        if (e.altKey && e.key.toLowerCase() === 'q' && selectedCells.length > 0) {
-            e.preventDefault();
-            addToCartFromSelectionForDateQuery(selectedCells, tableId);
-        }
-    }
-
-    // 移除可能存在的旧监听器
-    if (tableView.__keyHandlerForDateQuery) {
-        document.removeEventListener('keydown', tableView.__keyHandlerForDateQuery);
-    }
-    tableView.__keyHandlerForDateQuery = handleKeydown;
-    document.addEventListener('keydown', handleKeydown);
-    
-    // 添加点击屏幕任意地方取消选中（排除表格区域）
-    document.addEventListener('click', function(e) {
-        // 检查点击的是否是表格内部元素或表格相关元素
-        const isTableElement = tableView.contains(e.target) || 
-                              e.target.closest('.layui-table-cell') ||
-                              e.target.closest('.layui-table-view') ||
-                              e.target.closest('.layui-table-box');
-        
-        if (!isTableElement) {
-            // 如果点击的不是表格相关元素，则清除选中
-            setTimeout(() => {
-                clearSelection();
-                selectedCells = [];
-            }, 100); // 延迟执行，确保不影响表格内部的点击事件
-        }
-    });
-}
 
 // 添加单个商品到购物车的函数（用于日期查询结果表格）
 function addToCartFromDateQueryItem(oe, barcode) {
@@ -7584,112 +6220,6 @@ function addToCartFromDateQueryItem(oe, barcode) {
     });
 }
 
-// 从日期查询表格选中单元格添加到购物车的函数
-function addToCartFromSelectionForDateQuery(selectedCells, tableId) {
-    console.log('addToCartFromSelectionForDateQuery函数被调用，选中单元格数量:', selectedCells.length, '表格ID:', tableId);
-    if (selectedCells.length === 0) {
-        layui.layer.msg('未选中任何数据', { icon: 2 });
-        return;
-    }
-
-    // 使用layui的table.cache来获取行数据
-    let tableCache = layui.table.cache[tableId];
-    console.log('日期查询表格缓存:', tableCache);
-    if (!tableCache) {
-        layui.layer.msg('无法获取表格数据', { icon: 2 });
-        return;
-    }
-
-    // 从选中的单元格中提取行数据
-    const processedRows = new Set(); // 避免重复添加
-    const selectedRows = [];
-
-    selectedCells.forEach(cellData => {
-        const rowIndex = cellData.row;
-        console.log('处理行索引:', rowIndex);
-        if (!processedRows.has(rowIndex) && tableCache[rowIndex]) {
-            selectedRows.push(tableCache[rowIndex]);
-            processedRows.add(rowIndex);
-        }
-    });
-
-    if (selectedRows.length === 0) {
-        layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-        return;
-    }
-
-    // 提取商品OE和物料条码的组合
-    var itemDetails = [];
-    selectedRows.forEach(function(item) {
-        console.log('处理商品:', item);
-        if (item.oe) {
-            var barcode = item.barcode || item['物料条码'] || '';
-            console.log('提取OE:', item.oe, '条码:', barcode);
-            itemDetails.push({
-                oe: item.oe,
-                barcode: barcode
-            });
-        }
-    });
-
-    if (itemDetails.length === 0) {
-        layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-        return;
-    }
-
-    console.log('准备发送到购物车的商品:', itemDetails);
-    // 发送请求添加到购物车
-    fetch('/api/cart/add', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ item_details: itemDetails })
-    })
-    .then(response => response.json())
-    .then(result => {
-        console.log('服务器响应:', result);
-        if (result.code === 0) {
-            layui.layer.msg(result.msg, {icon: 1});
-            updateCartCount();
-            
-            // 添加成功后，单独获取购物车数据更新界面
-            fetch('/api/cart')
-                .then(response => response.json())
-                .then(cartResult => {
-                    if (cartResult.code === 0) {
-                        // 更新购物车缓存
-                        window.cartCache.clear();
-                        cartResult.data.forEach(item => {
-                            var store = item.store || item['门店'] || window.currentUserStore || 'default';
-                            var barcode = item.barcode || item['物料条码'] || '';
-                            var cacheKey = store + '_' + barcode;
-                            window.cartCache.add(cacheKey);
-                        });
-                        window.cartCacheLoaded = true;
-                        
-                        // 重新渲染相关表格
-                        if (typeof layui !== 'undefined' && layui.table) {
-                            layui.table.reload('beihuoTable', {
-                                url: '/api/beihuo?' + new Date().getTime()
-                            });
-                        } else {
-                            // 如果 layui 不可用，刷新页面
-                            location.reload();
-                        }
-                        if (window.dateQueryTableInstance) {
-                            highlightCartItemsForDateQueryTable();
-                        }
-                    }
-                });
-        } else {
-            layui.layer.msg(result.msg, {icon: 2});
-        }
-    })
-    .catch(error => {
-        layui.layer.msg('添加失败: ' + error.message, {icon: 2});
-    });
-}
 
 </script>
 </body>

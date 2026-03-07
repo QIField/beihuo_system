@@ -42,13 +42,27 @@ register_excel_process_routes(app)  # 注册Excel处理API
 app.register_blueprint(search_in_crm_bp) 
 app.register_blueprint(get_order_bp)
 app.register_blueprint(ks_auto_bill_bp)
-socketio = SocketIO(
-    app, 
-    cors_allowed_origins="*",
-    async_mode='threading',  # 使用线程模式支持后台任务
-    logger=True,
-    engineio_logger=True
-)
+# 根据环境选择 async_mode
+# 生产环境（Linux）使用 eventlet，开发环境（Windows）使用 threading
+import platform
+if platform.system() == 'Linux':
+    # Linux 生产环境使用 eventlet
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode='eventlet',
+        logger=False,  # 关闭详细日志，减少输出
+        engineio_logger=False
+    )
+else:
+    # Windows 开发环境使用 threading（eventlet 在 Windows 上有兼容性问题）
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode='threading',
+        logger=False,  # 关闭详细日志，减少输出
+        engineio_logger=False
+    )
 # 将socketio实例存储到应用中，供notification_manager使用
 app.socketio = socketio
 
@@ -4844,7 +4858,51 @@ notification_manager.init_app(app, socketio)
 from app.sockets.notification_manager import init_global_socketio
 init_global_socketio(app, socketio)
 
+# 初始化子进程监控（生产环境）
+def init_subprocess_monitor():
+    """
+    初始化子进程监控
+    
+    注意：
+    1. 只在生产环境（非 __main__）初始化
+    2. 默认自动启动子进程（无需设置环境变量）
+    3. 监控任务使用 APScheduler，每分钟检查一次
+    4. 如需禁用自动启动，设置环境变量 AUTO_START_KS_BILL=false
+    """
+    try:
+        from app.core.task_manager import init_ks_bill_monitor
+        from backend.ks_auto_bill_api import start_ks_auto_bill_process
+        
+        # 初始化监控
+        init_ks_bill_monitor()
+        
+        # 检查是否禁用自动启动（默认启用）
+        auto_start = os.environ.get('AUTO_START_KS_BILL', 'true').lower() != 'false'
+        
+        if auto_start:
+            print("[应用启动] 正在自动启动开思自动对单子进程...")
+            success = start_ks_auto_bill_process()
+            if success:
+                print("[应用启动] 开思自动对单子进程启动成功")
+            else:
+                print("[应用启动] 开思自动对单子进程启动失败或已在运行")
+        else:
+            print("[应用启动] AUTO_START_KS_BILL=false，跳过后台子进程自动启动")
+            print("[应用启动] 如需启用自动启动，请移除环境变量 AUTO_START_KS_BILL")
+            
+    except Exception as e:
+        print(f"[应用启动] 初始化子进程监控失败: {e}")
+        import traceback
+        traceback.print_exc()
+
+# 在非 __main__ 模式下初始化（生产环境）
+if __name__ != '__main__':
+    init_subprocess_monitor()
+
 # 应用启动配置
 if __name__ == '__main__':
+    # 开发环境：也初始化监控
+    init_subprocess_monitor()
+    
     # 将原来的 app.run() 替换为：
     socketio.run(app, debug=False, host='0.0.0.0', port=5000)

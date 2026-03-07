@@ -140,6 +140,7 @@
     </div>
 
 <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
 <script>
     // 创建独立的命名空间
     window.SearchInCrmApp = window.SearchInCrmApp || {};
@@ -284,7 +285,46 @@
                         
                         // 初始化Excel风格单元格选择功能
                         setTimeout(function() {
-                            initExcelCellSelectionForSearchInCrm('searchInCrmTable');
+                            TableCellSelector.init('searchInCrmTable', {
+                                enableCopy: true,
+                                enableAddToCart: true,
+                                onAddToCart: function(selectedRows, tableId) {
+                                    // 从选中行提取商品信息
+                                    var itemDetails = [];
+                                    selectedRows.forEach(function(item) {
+                                        if (item.oe) {
+                                            itemDetails.push({
+                                                oe: item.oe,
+                                                barcode: item.barcode || item['物料条码'] || ''
+                                            });
+                                        }
+                                    });
+                                    
+                                    if (itemDetails.length === 0) {
+                                        layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
+                                        return;
+                                    }
+                                    
+                                    // 发送请求添加到购物车
+                                    fetch('/api/cart/add', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ item_details: itemDetails })
+                                    })
+                                    .then(response => response.json())
+                                    .then(result => {
+                                        if (result.code === 0) {
+                                            layui.layer.msg(result.msg, {icon: 1});
+                                            setTimeout(() => loadCartCacheAndHighlight(), 100);
+                                        } else {
+                                            layui.layer.msg(result.msg, { icon: 2 });
+                                        }
+                                    })
+                                    .catch(error => {
+                                        layui.layer.msg('添加失败: ' + error.message, { icon: 2 });
+                                    });
+                                }
+                            });
                         }, 100);
                         
                         // 加载购物车缓存并高亮商品
@@ -636,354 +676,6 @@
             .catch(error => {
                 console.error('获取购物车数据失败:', error);
             });
-    }
-
-    // 专门用于searchInCrmTable的单元格选择功能（参考dateQueryTable实现）
-    function initExcelCellSelectionForSearchInCrm(tableId) {
-        // 只对备货表格生效
-        if (tableId !== 'searchInCrmTable') return;
-        
-        const tableView = document.querySelector('#' + tableId + ' + .layui-table-view');
-        if (!tableView || tableView.__hasCellSel__) return;
-        tableView.__hasCellSel__ = true;
-
-        const tableBox = tableView.querySelector('.layui-table-box');
-        const tableBody = tableView.querySelector('.layui-table-body'); // 👈 新增
-        if (!tableBox || !tableBody) return;
-
-        // 注入样式
-        if (!document.getElementById('excel-cell-sel-style')) {
-            const style = document.createElement('style');
-            style.id = 'excel-cell-sel-style';
-            style.textContent = `
-                .cell-excel-selected {
-                    background-color: #d0e8ff !important;
-                    position: relative;
-                }
-                .cell-excel-selected::after {
-                    content: '';
-                    position: absolute;
-                    top: 0; left: 0; right: 0; bottom: 0;
-                    border: 2px solid #1e90ff;
-                    pointer-events: none;
-                    box-sizing: border-box;
-                }
-                #drag-sel-rect {
-                    position: absolute;
-                    border: 1px dashed #1e90ff;
-                    background: rgba(30, 144, 255, 0.1);
-                    z-index: 2000;  /* 调整z-index层级，用于拖拽选择框 */
-                    pointer-events: none;
-                    display: none;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-
-        let rectDiv = document.getElementById('drag-sel-rect');
-        if (!rectDiv) {
-            rectDiv = document.createElement('div');
-            rectDiv.id = 'drag-sel-rect';
-        }
-
-        let isDragging = false;
-        let selectedCells = [];
-        let startX, startY;
-
-        // 清除选中
-        function clearSelection() {
-            document.querySelectorAll('.cell-excel-selected').forEach(el => el.classList.remove('cell-excel-selected'));
-            selectedCells = [];
-        }
-
-        // 获取单元格相对于 tableView 的坐标（考虑滚动）
-        function getCellRect(cell) {
-            const cellRect = cell.getBoundingClientRect();
-            const viewRect = tableView.getBoundingClientRect();
-            return {
-                left: cellRect.left - viewRect.left + tableView.scrollLeft,
-                top: cellRect.top - viewRect.top + tableView.scrollTop,
-                right: cellRect.right - viewRect.left + tableView.scrollLeft,
-                bottom: cellRect.bottom - viewRect.top + tableView.scrollTop,
-                element: cell
-            };
-        }
-
-        function intersects(a, b) {
-            return !(b.left > a.right || b.right < a.left || b.top > a.bottom || b.bottom < a.top);
-        }
-
-        function updateSelection(selRect) {
-            clearSelection();
-            const cells = tableBox.querySelectorAll('.layui-table-cell');
-            const matched = [];
-
-            cells.forEach(cell => {
-                const cRect = getCellRect(cell);
-                if (intersects(cRect, selRect)) {
-                    cell.classList.add('cell-excel-selected');
-                    const tr = cell.closest('tr[data-index]');
-                    if (!tr) return;
-                    const rowIndex = parseInt(tr.getAttribute('data-index'), 10);
-                    const td = cell.closest('td');
-                    const colIndex = Array.from(td.parentNode.children).indexOf(td);
-                    matched.push({
-                        text: cell.innerText.trim(),
-                        row: rowIndex,
-                        col: colIndex
-                    });
-                }
-            });
-
-            selectedCells = matched;
-        }
-
-        function generateCopyText() {
-            if (selectedCells.length === 0) return '';
-            const rows = {};
-            let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
-
-            selectedCells.forEach(({row, col, text}) => {
-                minR = Math.min(minR, row); maxR = Math.max(maxR, row);
-                minC = Math.min(minC, col); maxC = Math.max(maxC, col);
-                if (!rows[row]) rows[row] = {};
-                rows[row][col] = text;
-            });
-
-            let lines = [];
-            for (let r = minR; r <= maxR; r++) {
-                let line = [];
-                for (let c = minC; c <= maxC; c++) {
-                    line.push(rows[r] && rows[r][c] !== undefined ? rows[r][c] : '');
-                }
-                lines.push(line.join('\t'));
-            }
-            return lines.join('\n');
-        }
-
-            function copyText(text) {
-            console.log('[Debug] 复制内容:', text); // 调试用
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(() => {
-                    layui.layer.msg('已复制选区内容', { icon: 1, time: 800 });
-                    // 自动清除选中
-                    clearSelection();
-                    selectedCells = [];
-                }).catch(err => {
-                    console.error('Clipboard API 失败:', err);
-                    fallbackCopy(text);
-                });
-            } else {
-                fallbackCopy(text);
-            }
-        }
-
-        function fallbackCopy(text) {
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;';
-            document.body.appendChild(ta);
-            ta.select();
-            try {
-                if (document.execCommand('copy')) {
-                    layui.layer.msg('已复制到剪贴板', { icon: 1, time: 800 });
-                    // 自动清除选中
-                    clearSelection();
-                    selectedCells = [];
-                } else {
-                    layui.layer.msg('复制失败', { icon: 2 });
-                }
-            } catch (e) {
-                console.error('execCommand 复制失败:', e);
-                layui.layer.msg('浏览器不支持复制', { icon: 2 });
-            }
-            document.body.removeChild(ta);
-        }
-
-            // 添加选中商品到购物车的函数
-        function addToCartFromSelection(selectedCells, tableId) {
-            console.log('addToCartFromSelection函数被调用，选中单元格数量:', selectedCells.length, '表格ID:', tableId);
-            if (selectedCells.length === 0) {
-                layui.layer.msg('未选中任何数据', { icon: 2 });
-                return;
-            }
-
-            // 直接使用layui.table.cache获取表格数据，移除对全局实例的依赖
-            let tableCache = layui.table.cache[tableId];
-            console.log('表格缓存:', tableCache);
-            if (!tableCache) {
-                layui.layer.msg('无法获取表格数据', { icon: 2 });
-                return;
-            }
-
-            // 从选中的单元格中提取行数据
-            const processedRows = new Set(); // 避免重复添加
-            const selectedRows = [];
-
-            selectedCells.forEach(cellData => {
-                const rowIndex = cellData.row;
-                console.log('处理行索引:', rowIndex);
-                if (!processedRows.has(rowIndex) && tableCache[rowIndex]) {
-                    selectedRows.push(tableCache[rowIndex]);
-                    processedRows.add(rowIndex);
-                }
-            });
-
-            if (selectedRows.length === 0) {
-                layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-                return;
-            }
-
-            // 提取商品OE和物料条码的组合
-            var itemDetails = [];
-            selectedRows.forEach(function(item) {
-                console.log('处理商品:', item);
-                if (item.oe) {
-                    var barcode = item.barcode || item['物料条码'] || '';
-                    console.log('提取OE:', item.oe, '条码:', barcode);
-                    itemDetails.push({
-                        oe: item.oe,
-                        barcode: barcode
-                    });
-                }
-            });
-
-            if (itemDetails.length === 0) {
-                layui.layer.msg('没有有效的商品可以添加', { icon: 2 });
-                return;
-            }
-
-            console.log('准备发送到购物车的商品:', itemDetails);
-            // 发送请求添加到购物车
-            fetch('/api/cart/add', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ item_details: itemDetails })
-            })
-            .then(response => response.json())
-            .then(result => {
-                console.log('服务器响应:', result);
-                if (result.code === 0) {
-                    layui.layer.msg(result.msg, {icon: 1});
-                    
-                    // 重新加载购物车缓存并高亮商品
-                    setTimeout(() => {
-                        loadCartCacheAndHighlight();
-                    }, 100);
-                    
-                    // 自动清除选中状态
-                    clearSelection();
-                } else {
-                    layui.layer.msg(result.msg, { icon: 2 });
-                }
-            })
-            .catch(error => {
-                console.error('添加购物车失败:', error);
-                layui.layer.msg('添加失败: ' + error.message, { icon: 2 });
-            });
-        }
-
-        // 坐标转换
-        const viewRect = tableView.getBoundingClientRect();
-        const offsetX = viewRect.left + window.pageXOffset - tableView.scrollLeft;
-        const offsetY = viewRect.top + window.pageYOffset - tableView.scrollTop;
-
-        function toTableCoord(clientX, clientY) {
-            return {
-                x: clientX - offsetX,
-                y: clientY - offsetY
-            };
-        }
-
-        // 鼠标事件
-        tableBox.addEventListener('mousedown', function(e) {
-            if (e.button !== 0 || e.target.closest('.layui-table-tool,.layui-table-header,.layui-table-total')) return;
-            const pt = toTableCoord(e.clientX, e.clientY);
-            isDragging = true;
-            startX = pt.x;
-            startY = pt.y;
-
-            rectDiv.style.cssText = `
-                position: absolute;
-                left: ${startX}px;
-                top: ${startY}px;
-                width: 0;
-                height: 0;
-                display: block;
-                border: 1px dashed #1e90ff;
-                background: rgba(30,144,255,0.1);
-                z-index: 9999;
-                pointer-events: none;
-            `;
-            if (rectDiv.parentNode !== tableView) {
-                tableView.appendChild(rectDiv);
-            }
-            clearSelection();
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', function(e) {
-            if (!isDragging) return;
-            const pt = toTableCoord(e.clientX, e.clientY);
-            let x = pt.x, y = pt.y;
-            let w = x - startX, h = y - startY;
-            let l = startX, t = startY;
-            if (w < 0) { l = x; w = -w; }
-            if (h < 0) { t = y; h = -h; }
-
-            rectDiv.style.left = l + 'px';
-            rectDiv.style.top = t + 'px';
-            rectDiv.style.width = w + 'px';
-            rectDiv.style.height = h + 'px';
-
-            updateSelection({ left: l, top: t, right: l + w, bottom: t + h });
-        });
-
-        document.addEventListener('mouseup', function() {
-            if (isDragging) {
-                isDragging = false;
-                rectDiv.style.display = 'none';
-            }
-        });
-
-        // ====== 关键：绑定 Ctrl+C 复制 和 Alt+Q 功能 ======
-        function handleKeydown(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedCells.length > 0) {
-                e.preventDefault();
-                copyText(generateCopyText());
-            }
-            // ====== 新增：绑定 Alt+Q 功能（仅在备货表格中添加商品） ======
-            if (e.altKey && e.key.toLowerCase() === 'q' && selectedCells.length > 0) {
-                e.preventDefault();
-                addToCartFromSelection(selectedCells, tableId);
-            }
-        }
-
-        // 移除可能存在的旧监听器
-        if (tableView.__keyHandler) {
-            document.removeEventListener('keydown', tableView.__keyHandler);
-        }
-        tableView.__keyHandler = handleKeydown;
-        document.addEventListener('keydown', handleKeydown);
-        
-        // 添加点击屏幕任意地方取消选中（排除表格区域）
-        document.addEventListener('click', function(e) {
-            // 检查点击的是否是表格内部元素或表格相关元素
-            const isTableElement = tableView.contains(e.target) || 
-                                e.target.closest('.layui-table-cell') ||
-                                e.target.closest('.layui-table-view') ||
-                                e.target.closest('.layui-table-box');
-            
-            if (!isTableElement) {
-                // 如果点击的不是表格相关元素，则清除选中
-                setTimeout(() => {
-                    clearSelection();
-                    selectedCells = [];
-                }, 100); // 延迟执行，确保不影响表格内部的点击事件
-            }
-        });
     }
 
     // 保存到全局命名空间

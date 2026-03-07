@@ -8,20 +8,24 @@ from flask_socketio import join_room, leave_room
 from datetime import datetime
 import json
 
+# 日志配置：设置为True显示详细连接日志，False则静默
+VERBOSE_WEBSOCKET_LOG = False
+
 
 def register_socket_events(socketio):
     """
     注册所有SocketIO事件处理函数
-    
+
     参数:
         socketio: Flask-SocketIO实例
     """
-    
+
     @socketio.on('connect', namespace='/notifications')
     def handle_connect():
         """处理客户端连接"""
-        client_ip = request.environ.get('REMOTE_ADDR')
-        print(f"[WebSocket] 客户端连接: {request.sid} (IP: {client_ip})")
+        if VERBOSE_WEBSOCKET_LOG:
+            client_ip = request.environ.get('REMOTE_ADDR')
+            print(f"[WebSocket] 客户端连接: {request.sid} (IP: {client_ip})")
         
         # 发送连接成功的欢迎消息
         socketio.emit('connected', {
@@ -33,7 +37,8 @@ def register_socket_events(socketio):
     @socketio.on('disconnect', namespace='/notifications')
     def handle_disconnect():
         """处理客户端断开连接"""
-        print(f"[WebSocket] 客户端断开连接: {request.sid}")
+        if VERBOSE_WEBSOCKET_LOG:
+            print(f"[WebSocket] 客户端断开连接: {request.sid}")
     
     @socketio.on('join_room', namespace='/notifications')
     def handle_join_room(data):

@@ -16,6 +16,10 @@
     - ks_orders.py: 订单获取模块
     - crm_auto_bill.py: CRM开单接口模块
     - main.py: 主程序入口
+
+修改说明:
+    - 添加信号处理，支持优雅退出
+    - 添加全局退出标志，避免强制终止导致内存损坏
 """
 
 import time
@@ -23,6 +27,7 @@ from pathlib import Path
 import pymysql
 import sys
 import os
+import signal
 from datetime import datetime
 import threading
 import queue
@@ -31,6 +36,27 @@ import queue
 current_dir = Path(__file__).parent
 project_root = current_dir.parent.parent
 sys.path.insert(0, str(project_root))
+
+# 全局退出标志，用于优雅退出
+_should_exit = False
+_exit_event = threading.Event()
+
+
+def signal_handler(signum, frame):
+    """
+    信号处理函数
+    当收到 SIGTERM 或 SIGINT 信号时，设置退出标志
+    """
+    global _should_exit
+    signal_name = signal.Signals(signum).name
+    print(f"\n[{datetime.now()}] [开思自动开单] 收到信号 {signal_name}({signum})，准备优雅退出...")
+    _should_exit = True
+    _exit_event.set()  # 唤醒正在等待的线程
+
+
+# 注册信号处理器
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 from app.ks_auto_bill.ks_login import login
 from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info
@@ -213,27 +239,38 @@ def order_processing_worker(order_queue):
     """
     订单处理工作线程函数
     持续监听队列，只要有订单就立即处理
+    
+    修改：添加退出标志检查，支持优雅退出
     """
+    global _should_exit
     print("[开单模块] 订单处理工作线程已启动")
     
-    while True:
-        # 从队列中获取订单批次，阻塞等待直到有订单可用
-        batch = order_queue.get()
-        
-        # 如果获取到None，则表示需要退出线程
-        if batch is None:
-            print("[开单模块] 收到退出信号，处理线程即将退出")
+    while not _should_exit:
+        try:
+            # 从队列中获取订单批次，添加超时以便检查退出标志
+            batch = order_queue.get(timeout=1)
+            
+            # 如果获取到None，则表示需要退出线程
+            if batch is None:
+                print("[开单模块] 收到退出信号，处理线程即将退出")
+                order_queue.task_done()
+                break
+            
+            print(f"[开单模块] 开始处理队列中的订单批次，包含 {len(batch)} 个订单...")
+            process_order_batch(batch)
+            
+            # 标记任务已完成
             order_queue.task_done()
-            break
-        
-        print(f"[开单模块] 开始处理队列中的订单批次，包含 {len(batch)} 个订单...")
-        process_order_batch(batch)
-        
-        # 标记任务已完成
-        order_queue.task_done()
-        
-        # 短暂休眠，确保系统资源释放
-        time.sleep(1)
+            
+            # 短暂休眠，确保系统资源释放
+            time.sleep(1)
+            
+        except queue.Empty:
+            # 队列为空，继续循环（检查退出标志）
+            continue
+        except Exception as e:
+            print(f"[开单模块] 处理订单时出错: {e}")
+            continue
     
     print("[开单模块] 订单处理工作线程已退出")
 
@@ -249,10 +286,15 @@ def main():
         4. 获取开思订单并保存到数据库
         5. 将待处理订单加入队列
         6. 等待1分钟后循环或直到非运行时间
+    
+    修改：添加退出标志检查，支持优雅退出
     """
+    global _should_exit
+    
     print("=" * 60)
     print("开思订单自动开单系统（循环模式）")
     print("=" * 60)
+    print(f"[主进程] PID: {os.getpid()}")
     
     # 在程序启动时检查并创建数据库表
     print("【初始化】正在检查数据库表...")
@@ -270,41 +312,50 @@ def main():
     
     print(f"[爬取模块] 系统启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    while True:
-        current_time = datetime.now()
-        
-        # 检查是否在运行时间内
-        if not is_running_time():
-            print(f"\n[爬取模块] 当前时间 {current_time.hour} 点，不在运行时间段内，等待至运行时间...")
+    try:
+        while not _should_exit:
+            current_time = datetime.now()
             
-            # 等待直到进入运行时间（下一个小时的第7分钟检查一次，确保不会错过7点整）
-            while not is_running_time():
-                time.sleep(60)  # 等待一分钟再检查
-                current_time = datetime.now()
-                if current_time.hour == 7:  # 如果是早上7点，跳出等待
+            # 检查是否在运行时间内
+            if not is_running_time():
+                print(f"\n[爬取模块] 当前时间 {current_time.hour} 点，不在运行时间段内，等待至运行时间...")
+                
+                # 等待直到进入运行时间，但每秒检查退出标志
+                while not is_running_time() and not _should_exit:
+                    # 使用 _exit_event 等待，可以被信号唤醒
+                    _exit_event.wait(timeout=60)
+                    current_time = datetime.now()
+                    if current_time.hour == 7:  # 如果是早上7点，跳出等待
+                        break
+                
+                if _should_exit:
                     break
-            
-            print(f"[爬取模块] 进入运行时间段，继续执行...")
-        else:
-            # 显示当前时间
-            print(f"\n{'=' * 60}")
-            print(f"[爬取模块] {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"{'=' * 60}")
-            
-            # 检查登录状态，过期则重新登录
-            print("\n[爬取模块] 检查登录状态...")
-            if not check_login_status(session):
-                print("[爬取模块] 登录已过期或未登录，重新登录...")
-                session = login()
                 
-                if session is None:
-                    print("[爬取模块] 登录失败，1分钟后重试")
-                    time.sleep(60)
-                    continue
-                
-                print("[爬取模块] 登录成功")
+                print(f"[爬取模块] 进入运行时间段，继续执行...")
             else:
-                print("[爬取模块] 登录状态有效")
+                # 显示当前时间
+                print(f"\n{'=' * 60}")
+                print(f"[爬取模块] {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"{'=' * 60}")
+                
+                # 检查登录状态，过期则重新登录
+                print("\n[爬取模块] 检查登录状态...")
+                if not check_login_status(session):
+                    print("[爬取模块] 登录已过期或未登录，重新登录...")
+                    session = login()
+                    
+                    if session is None:
+                        print("[爬取模块] 登录失败，1分钟后重试")
+                        # 分段等待，检查退出标志
+                        for _ in range(60):
+                            if _should_exit:
+                                break
+                            time.sleep(1)
+                        continue
+                    
+                    print("[爬取模块] 登录成功")
+                else:
+                    print("[爬取模块] 登录状态有效")
             
             # 获取开思订单并将信息保存到数据库
             print("\n[爬取模块] 获取开思订单并保存到数据库...")
@@ -315,7 +366,11 @@ def main():
                 print(f"[爬取模块] 找到 {len(pending_confirmation_orders)} 条待处理订单（等待商家确认）")
             except Exception as e:
                 print(f"[爬取模块] 获取订单信息失败: {str(e)}")
-                time.sleep(60)
+                # 分段等待，检查退出标志
+                for _ in range(60):
+                    if _should_exit:
+                        break
+                    time.sleep(1)
                 continue
             
             # 将待处理订单加入队列
@@ -326,9 +381,48 @@ def main():
             else:
                 print("[爬取模块] 没有待处理的订单，跳过添加到队列")
             
-            # 等待1分钟后继续爬取
+            # 等待1分钟后继续爬取，但每秒检查退出标志
             print(f"\n[爬取模块] 1分钟后进行下一次爬取...")
-            time.sleep(60)
+            for _ in range(60):
+                if _should_exit:
+                    break
+                time.sleep(1)
+    
+    except KeyboardInterrupt:
+        print("\n[主进程] 收到键盘中断信号")
+    finally:
+        # 优雅退出流程
+        print("\n" + "=" * 60)
+        print("[主进程] 开始优雅退出...")
+        print("=" * 60)
+        
+        # 设置退出标志
+        _should_exit = True
+        _exit_event.set()
+        
+        # 发送 None 到队列，通知处理线程退出
+        print("[主进程] 通知处理线程退出...")
+        order_queue.put(None)
+        
+        # 等待处理线程完成
+        print("[主进程] 等待处理线程完成...")
+        processing_thread.join(timeout=30)
+        
+        if processing_thread.is_alive():
+            print("[主进程] 处理线程未在30秒内退出，强制结束")
+        else:
+            print("[主进程] 处理线程已正常退出")
+        
+        # 清空队列
+        while not order_queue.empty():
+            try:
+                order_queue.get_nowait()
+            except queue.Empty:
+                break
+        
+        print("[主进程] 资源清理完成")
+        print(f"[{datetime.now()}] [开思自动开单] 已优雅退出")
+        print("=" * 60)
 
 
 if __name__ == "__main__":

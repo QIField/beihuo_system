@@ -1,8 +1,6 @@
 from flask import Blueprint, request, jsonify, render_template, session
 import sys
 import os
-from threading import Thread
-import subprocess
 from datetime import datetime
 
 # 添加项目根目录到Python路径
@@ -18,10 +16,14 @@ from app.utils.ks_auto_bill_model import (
 # 导入权限服务
 from app.utils.permission_service import org_required
 
+# 导入进程管理器
+from app.core.process_manager import ks_bill_process_manager
+
 # 定义main.py的路径
 main_py_path = os.path.join(os.path.dirname(__file__), '..', 'app', 'ks_auto_bill', 'main.py')
 
 ks_auto_bill_bp = Blueprint('ks_auto_bill', __name__)
+
 
 def login_required(f):
     """
@@ -35,6 +37,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
 @ks_auto_bill_bp.route('/ks_auto_bill')
 @login_required
 @org_required(['fsbbr'])  # 只允许fsbbr组织访问
@@ -46,6 +49,7 @@ def ks_auto_bill_page():
     if 'logged_in' not in session:
         return render_template('login.html')
     return render_template('ks_auto_bill.html')
+
 
 @ks_auto_bill_bp.route('/api/ks_auto_bill_data', methods=['GET'])
 @login_required
@@ -129,50 +133,130 @@ def get_ks_auto_bill_data():
             'data': []
         })
 
-# 全局变量存储主线程引用
-ks_auto_bill_thread = None
 
 def run_main_function():
     """
-    直接运行main函数（在当前进程中）
+    在子进程中运行开思自动对单主函数
+    这个函数会在独立的子进程中执行
     """
     try:
-        # 直接导入并运行main模块，而不是使用子进程
+        # 导入并运行main模块
         from app.ks_auto_bill.main import main
-        print("✅ 开思自动开单系统已在当前进程中启动")
+        print("✅ 开思自动开单子进程已启动")
         # 运行主函数
         main()
     except Exception as e:
-        print(f"运行开思自动开单系统时出错: {e}")
+        print(f"❌ 开思自动开单子进程出错: {e}")
         import traceback
         traceback.print_exc()
+        # 退出子进程，返回错误码
+        sys.exit(1)
 
-def check_ks_auto_bill_status():
+
+def start_ks_auto_bill_process():
     """
-    检查开思自动开单系统线程状态
+    启动开思自动对单子进程
+    
+    :return: 是否成功启动
     """
-    global ks_auto_bill_thread
-    if ks_auto_bill_thread is None:
-        return {"running": False, "thread": None, "message": "线程未启动"}
-    
-    is_running = ks_auto_bill_thread.is_alive() if ks_auto_bill_thread else False
-    return {
-        "running": is_running,
-        "thread": id(ks_auto_bill_thread) if ks_auto_bill_thread else None,
-        "message": f"线程{'正在运行' if is_running else '已停止'}"
-    }
+    return ks_bill_process_manager.start(run_main_function)
 
-# 在模块加载时自动启动开思自动开单系统
-def start_ks_auto_bill_on_startup():
-    """应用启动时自动启动开思自动开单系统"""
-    print("🚀 正在启动开思自动开单系统...")
-    # 使用daemon=False，这样线程不会随主线程退出
-    global ks_auto_bill_thread
-    ks_auto_bill_thread = Thread(target=run_main_function, daemon=True)  # 改为daemon线程
-    ks_auto_bill_thread.start()
-    print("✅ 开思自动开单系统已在后台启动")
-    
-    print(f"🔍 开思自动开单系统已在线程中运行")
 
-# 应用启动时自动运行
-start_ks_auto_bill_on_startup()
+def stop_ks_auto_bill_process():
+    """
+    停止开思自动对单子进程
+    
+    :return: 是否成功停止
+    """
+    return ks_bill_process_manager.stop()
+
+
+def restart_ks_auto_bill_process():
+    """
+    重启开思自动对单子进程
+    
+    :return: 是否成功重启
+    """
+    return ks_bill_process_manager.restart(run_main_function)
+
+
+def get_ks_auto_bill_status():
+    """
+    获取开思自动对单子进程状态
+    
+    :return: 状态字典
+    """
+    return ks_bill_process_manager.get_status()
+
+
+# API路由：控制子进程
+@ks_auto_bill_bp.route('/api/ks_auto_bill/control', methods=['POST'])
+@login_required
+@org_required(['fsbbr'])
+def control_ks_auto_bill():
+    """
+    控制开思自动对单子进程
+    
+    请求参数:
+        action: str - 操作类型 (start/stop/restart/status)
+    
+    返回:
+        code: int - 0表示成功，1表示失败
+        msg: str - 提示信息
+        data: dict - 状态信息（当action为status时）
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'code': 1, 'msg': '请求参数不能为空'}), 400
+        
+        action = data.get('action')
+        
+        if action == 'start':
+            success = start_ks_auto_bill_process()
+            return jsonify({
+                'code': 0 if success else 1,
+                'msg': '启动成功' if success else '启动失败或进程已在运行',
+                'status': get_ks_auto_bill_status()
+            })
+        
+        elif action == 'stop':
+            success = stop_ks_auto_bill_process()
+            return jsonify({
+                'code': 0 if success else 1,
+                'msg': '停止成功' if success else '停止失败',
+                'status': get_ks_auto_bill_status()
+            })
+        
+        elif action == 'restart':
+            success = restart_ks_auto_bill_process()
+            return jsonify({
+                'code': 0 if success else 1,
+                'msg': '重启成功' if success else '重启失败',
+                'status': get_ks_auto_bill_status()
+            })
+        
+        elif action == 'status':
+            return jsonify({
+                'code': 0,
+                'msg': '获取状态成功',
+                'status': get_ks_auto_bill_status()
+            })
+        
+        else:
+            return jsonify({'code': 1, 'msg': f'未知操作: {action}'}), 400
+            
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'操作失败: {str(e)}'
+        }), 500
+
+
+# 注意：不再在模块加载时自动启动
+# 子进程将通过以下方式启动：
+# 1. 手动通过API启动
+# 2. 通过APScheduler监控任务自动启动（如果配置了AUTO_START_KS_BILL）
+# 3. 在beihuo_system.py中应用启动后启动
+
+print("✅ 开思自动对单API模块已加载（子进程管理模式）")
