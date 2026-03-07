@@ -30,6 +30,7 @@ from flask_socketio import SocketIO
 from app.sockets import register_socket_events, notification_manager
 from app.utils.database_connection import get_db_connection
 from app.utils.search import parse_space, parse_comma
+from app.utils.export_tools import handle_export_request
 
 
 app = Flask(__name__, 
@@ -171,6 +172,8 @@ def init_user_table():
         store VARCHAR(50) DEFAULT 'fsbbr' COMMENT '所属门店代码',
         can_delete_cart TINYINT(1) DEFAULT 0 COMMENT '是否有权限删除购物车 0-否 1-是',
         can_process_orders TINYINT(1) DEFAULT 0 COMMENT '是否有权限处理单据 0-否 1-是',
+        department VARCHAR(20) DEFAULT NULL COMMENT '板块:业务/市场/后勤',
+        job_level VARCHAR(20) DEFAULT NULL COMMENT '职级:经理/主管/业务员',
         ip_records JSON COMMENT '登录IP记录，最多保留5个最近的IP地址',
         allowed_orgs JSON COMMENT '允许切换的组织列表，JSON格式，如["fsbbr", "zsbbr"]，null表示所有组织都可切换',
         created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -189,73 +192,56 @@ def init_user_table():
         cursor.close()
         conn.close()
         
-    # 检查并添加can_delete_cart字段（如果不存在）
+    # 检查并添加缺失的字段（使用循环统一处理）
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 检查can_delete_cart字段是否已存在
-        cursor.execute("""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_SCHEMA = DATABASE() 
-            AND TABLE_NAME = 'crmapp_users' 
-            AND COLUMN_NAME = 'can_delete_cart'
-        """)
+        # 定义需要检查和添加的字段列表
+        fields_to_check = [
+            {
+                'name': 'can_delete_cart',
+                'definition': "TINYINT(1) DEFAULT 0 COMMENT '是否有权限删除购物车 0-否 1-是'"
+            },
+            {
+                'name': 'can_process_orders',
+                'definition': "TINYINT(1) DEFAULT 0 COMMENT '是否有权限处理单据 0-否 1-是'"
+            },
+            {
+                'name': 'ip_records',
+                'definition': "JSON COMMENT '登录IP记录，最多保留5个最近的IP地址'"
+            },
+            {
+                'name': 'allowed_orgs',
+                'definition': "JSON COMMENT '允许切换的组织列表，JSON格式，如[\"fsbbr\", \"zsbbr\"]，null表示所有组织都可切换'"
+            },
+            {
+                'name': 'department',
+                'definition': "VARCHAR(20) DEFAULT NULL COMMENT '板块:业务/市场/后勤'"
+            },
+            {
+                'name': 'job_level',
+                'definition': "VARCHAR(20) DEFAULT NULL COMMENT '职级:经理/主管/业务员'"
+            }
+        ]
         
-        result = cursor.fetchone()
-        if not result:
-            cursor.execute("ALTER TABLE crmapp_users ADD COLUMN can_delete_cart TINYINT(1) DEFAULT 0 COMMENT '是否有权限删除购物车 0-否 1-是'")
-            print("已添加can_delete_cart字段")
-        
-        # 检查can_process_orders字段是否已存在
-        cursor.execute("""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_SCHEMA = DATABASE() 
-            AND TABLE_NAME = 'crmapp_users' 
-            AND COLUMN_NAME = 'can_process_orders'
-        """)
-        
-        result = cursor.fetchone()
-        if not result:
-            cursor.execute("ALTER TABLE crmapp_users ADD COLUMN can_process_orders TINYINT(1) DEFAULT 0 COMMENT '是否有权限处理单据 0-否 1-是'")
-            print("已添加can_process_orders字段")
-        
-        # 检查ip_records字段是否已存在
-        cursor.execute("""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_SCHEMA = DATABASE() 
-            AND TABLE_NAME = 'crmapp_users' 
-            AND COLUMN_NAME = 'ip_records'
-        """)
-        
-        result = cursor.fetchone()
-        if not result:
-            # 如果字段不存在，则添加
-            cursor.execute("ALTER TABLE crmapp_users ADD COLUMN ip_records JSON COMMENT '登录IP记录，最多保留5个最近的IP地址'")
-            print("ip_records字段已添加到用户表")
-        else:
-            print("ip_records字段已存在")
+        # 循环检查并添加字段
+        for field in fields_to_check:
+            cursor.execute("""
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'crmapp_users' 
+                AND COLUMN_NAME = %s
+            """, (field['name'],))
             
-        # 检查并添加allowed_orgs字段（如果不存在）
-        cursor.execute("""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_SCHEMA = DATABASE() 
-            AND TABLE_NAME = 'crmapp_users' 
-            AND COLUMN_NAME = 'allowed_orgs'
-        """)
+            result = cursor.fetchone()
+            if not result:
+                cursor.execute(f"ALTER TABLE crmapp_users ADD COLUMN {field['name']} {field['definition']}")
+                print(f"已添加 {field['name']} 字段")
+            else:
+                pass
         
-        result = cursor.fetchone()
-        if not result:
-            # 如果字段不存在，则添加
-            cursor.execute("ALTER TABLE crmapp_users ADD COLUMN allowed_orgs JSON COMMENT '允许切换的组织列表，JSON格式，如[\"fsbbr\", \"zsbbr\"]，null表示所有组织都可切换'")
-            print("allowed_orgs字段已添加到用户表")
-        else:
-            print("allowed_orgs字段已存在")
-            
         cursor.close()
         conn.close()
     except Exception as e:
@@ -358,38 +344,32 @@ def init_beihuo_table():
         cursor.execute(create_table_sql)
         print("备货数据表初始化完成")
         
-        # 检查并添加缺失的字段
-        # 检查是否存在在途数量字段
-        cursor.execute("""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_SCHEMA = DATABASE() 
-            AND TABLE_NAME = 'crmapp_beihuo' 
-            AND COLUMN_NAME = '在途数量'
-        """)
-        result = cursor.fetchone()
-        if not result:
-            # 如果字段不存在，则添加
-            cursor.execute("ALTER TABLE crmapp_beihuo ADD COLUMN `在途数量` INT DEFAULT 0 COMMENT '在途数量'")
-            print("在途数量字段已添加到备货数据表")
-        else:
-            print("在途数量字段已存在")
+        # 检查并添加缺失的字段（使用循环统一处理）
+        beihuo_fields = [
+            {
+                'name': '在途数量',
+                'definition': "INT DEFAULT 0 COMMENT '在途数量'"
+            },
+            {
+                'name': '车型',
+                'definition': "VARCHAR(255) COMMENT '车型'"
+            }
+        ]
         
-        # 检查是否存在车型字段
-        cursor.execute("""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_SCHEMA = DATABASE() 
-            AND TABLE_NAME = 'crmapp_beihuo' 
-            AND COLUMN_NAME = '车型'
-        """)
-        result = cursor.fetchone()
-        if not result:
-            # 如果字段不存在，则添加
-            cursor.execute("ALTER TABLE crmapp_beihuo ADD COLUMN `车型` VARCHAR(255) COMMENT '车型'")
-            print("车型字段已添加到备货数据表")
-        else:
-            print("车型字段已存在")
+        for field in beihuo_fields:
+            cursor.execute("""
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'crmapp_beihuo' 
+                AND COLUMN_NAME = %s
+            """, (field['name'],))
+            result = cursor.fetchone()
+            if not result:
+                cursor.execute(f"ALTER TABLE crmapp_beihuo ADD COLUMN `{field['name']}` {field['definition']}")
+                print(f"{field['name']} 字段已添加到备货数据表")
+            else:
+                pass
             
     except Exception as e:
         print(f"初始化备货数据表时出错: {e}")
@@ -404,45 +384,43 @@ def ensure_cart_indexes():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # 检查并创建物料条码和门店的组合索引
-        cursor.execute("SHOW INDEX FROM crmapp_cart WHERE Key_name = 'idx_barcode_store'")
-        if not cursor.fetchone():
-            cursor.execute("ALTER TABLE crmapp_cart ADD INDEX idx_barcode_store (barcode, store)")
-            print("✅ 购物车表物料条码和门店组合索引已创建")
-        else:
-            print("ℹ️ 购物车表物料条码和门店组合索引已存在")
-            
-        # 检查并创建oe和门店的组合索引
-        cursor.execute("SHOW INDEX FROM crmapp_cart WHERE Key_name = 'idx_oe_store'")
-        if not cursor.fetchone():
-            cursor.execute("ALTER TABLE crmapp_cart ADD INDEX idx_oe_store (oe, store)")
-            print("✅ 购物车表oe和门店组合索引已创建")
-        else:
-            print("ℹ️ 购物车表oe和门店组合索引已存在")
+        # 定义需要检查和创建的索引列表
+        cart_indexes = [
+            {
+                'name': 'idx_barcode_store',
+                'definition': 'ADD INDEX idx_barcode_store (barcode, store)',
+                'desc': '物料条码和门店组合索引'
+            },
+            {
+                'name': 'idx_oe_store',
+                'definition': 'ADD INDEX idx_oe_store (oe, store)',
+                'desc': 'oe和门店组合索引'
+            },
+            {
+                'name': 'idx_oe_barcode',
+                'definition': 'ADD INDEX idx_oe_barcode (oe, barcode)',
+                'desc': 'oe和物料条码组合索引'
+            },
+            {
+                'name': 'idx_added_time',
+                'definition': 'ADD INDEX idx_added_time (added_time)',
+                'desc': '添加时间索引'
+            },
+            {
+                'name': 'idx_oe_barcode_store',
+                'definition': 'ADD INDEX idx_oe_barcode_store (oe, barcode, store)',
+                'desc': 'oe、物料条码和门店组合索引'
+            }
+        ]
         
-        # 添加新的索引以优化添加购物车时的查询性能
-        cursor.execute("SHOW INDEX FROM crmapp_cart WHERE Key_name = 'idx_oe_barcode'")
-        if not cursor.fetchone():
-            cursor.execute("ALTER TABLE crmapp_cart ADD INDEX idx_oe_barcode (oe, barcode)")
-            print("✅ 购物车表oe和物料条码组合索引已创建")
-        else:
-            print("ℹ️ 购物车表oe和物料条码组合索引已存在")
-            
-        # 添加时间索引以优化排序性能
-        cursor.execute("SHOW INDEX FROM crmapp_cart WHERE Key_name = 'idx_added_time'")
-        if not cursor.fetchone():
-            cursor.execute("ALTER TABLE crmapp_cart ADD INDEX idx_added_time (added_time)")
-            print("✅ 购物车表添加时间索引已创建")
-        else:
-            print("ℹ️ 购物车表添加时间索引已存在")
-            
-        # 添加OE、物料条码和门店的组合索引
-        cursor.execute("SHOW INDEX FROM crmapp_cart WHERE Key_name = 'idx_oe_barcode_store'")
-        if not cursor.fetchone():
-            cursor.execute("ALTER TABLE crmapp_cart ADD INDEX idx_oe_barcode_store (oe, barcode, store)")
-            print("✅ 购物车表oe、物料条码和门店组合索引已创建")
-        else:
-            print("ℹ️ 购物车表oe、物料条码和门店组合索引已存在")
+        # 循环检查并创建索引
+        for idx in cart_indexes:
+            cursor.execute(f"SHOW INDEX FROM crmapp_cart WHERE Key_name = '{idx['name']}'")
+            if not cursor.fetchone():
+                cursor.execute(f"ALTER TABLE crmapp_cart {idx['definition']}")
+                print(f"✅ 购物车表{idx['desc']}已创建")
+            else:
+                pass
     except Exception as e:
         print(f"❌ 创建购物车表索引失败: {str(e)}")
     finally:
@@ -513,41 +491,22 @@ def ensure_table_structure():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    try:
-        # 检查并修改车型字段为TEXT类型，支持更长的内容
-        cursor.execute("""
-            ALTER TABLE crmapp_beihuo MODIFY COLUMN `车型` TEXT
-        """)
-        print("✅ 车型字段已更新为TEXT类型，支持更长的内容")
-    except Exception as e:
-        print(f"ℹ️ 修改车型字段类型时可能遇到预期情况: {e}")
+    # 定义需要修改的字段列表（表名、字段名、新定义）
+    fields_to_modify = [
+        {'table': 'crmapp_beihuo', 'field': '车型', 'definition': 'TEXT', 'desc': '车型字段'},
+        {'table': 'crmapp_cart', 'field': 'car_model', 'definition': 'TEXT', 'desc': '购物车车型字段'},
+        {'table': 'crmapp_beihuo', 'field': '供应商', 'definition': 'TEXT', 'desc': '供应商字段'},
+        {'table': 'crmapp_beihuo', 'field': '内部备注', 'definition': 'TEXT', 'desc': '内部备注字段'}
+    ]
     
-    try:
-        # 检查并修改购物车表中的车型字段为TEXT类型
-        cursor.execute("""
-            ALTER TABLE crmapp_cart MODIFY COLUMN `car_model` TEXT
-        """)
-        print("✅ 购物车车型字段已更新为TEXT类型")
-    except Exception as e:
-        print(f"ℹ️ 修改购物车车型字段类型时可能遇到预期情况: {e}")
-    
-    try:
-        # 检查并修改供应商字段为TEXT类型（通常供应商信息可能很长）
-        cursor.execute("""
-            ALTER TABLE crmapp_beihuo MODIFY COLUMN `供应商` TEXT
-        """)
-        print("✅ 供应商字段已更新为TEXT类型")
-    except Exception as e:
-        print(f"ℹ️ 修改供应商字段类型时可能遇到预期情况: {e}")
-    
-    try:
-        # 检查并修改内部备注字段为TEXT类型
-        cursor.execute("""
-            ALTER TABLE crmapp_beihuo MODIFY COLUMN `内部备注` TEXT
-        """)
-        print("✅ 内部备注字段已更新为TEXT类型")
-    except Exception as e:
-        print(f"ℹ️ 修改内部备注字段类型时可能遇到预期情况: {e}")
+    for field in fields_to_modify:
+        try:
+            cursor.execute(f"""
+                ALTER TABLE {field['table']} MODIFY COLUMN `{field['field']}` {field['definition']}
+            """)
+            print(f"✅ {field['desc']}已更新为{field['definition']}类型")
+        except Exception as e:
+            print(f"ℹ️ 修改{field['desc']}类型时可能遇到预期情况: {e}")
     
     cursor.close()
     conn.close()
@@ -1460,11 +1419,6 @@ def login():
     # 获取用户IP地址
     user_ip = request.remote_addr
     
-    # 检查用户IP限制
-    is_allowed, message = check_user_ip_restriction(username, user_ip)
-    if not is_allowed:
-        return jsonify({'code': 1, 'msg': message})
-    
     # 从数据库验证用户
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -1499,6 +1453,10 @@ def login():
         session['can_view_all_data'] = user.get('can_view_all_data', False)
         session['can_export_data'] = user.get('can_export_data', False)
         session['can_modify_prices'] = user.get('can_modify_prices', False)
+        
+        # 设置板块和职级信息（新增字段）
+        session['department'] = user.get('department', None)  # 板块:业务/市场/后勤
+        session['job_level'] = user.get('job_level', None)    # 职级:经理/主管/业务员
         
         # 处理允许切换的组织列表
         if user.get('allowed_orgs'):
@@ -1572,96 +1530,6 @@ def update_user_ip_record(user_id, ip_address):
         conn.close()
 
 
-def check_user_ip_restriction(username, user_ip):
-    """检查用户IP限制，非admin和fsbbr账号只能使用首次登录IP登录"""
-    conn = get_db_connection()
-    cursor = conn.cursor(pymysql.cursors.DictCursor)
-    
-    try:
-        cursor.execute("SELECT id, ip_records FROM crmapp_users WHERE username = %s", (username,))
-        user = cursor.fetchone()
-        
-        if not user:
-            return True, "用户不存在"
-        
-        ip_records = user['ip_records']
-        
-        # 检查是否为特殊账号（admin、fsbbr），这些账号不受IP限制
-        if username in ['admin', 'fsbbr']:
-            return True, "允许登录"
-        
-        # 如果用户没有IP记录（首次登录或已被重置），则允许登录并记录IP
-        if not ip_records:
-            return True, "允许登录"
-        
-        # 解析IP记录
-        import json
-        try:
-            ip_list = json.loads(ip_records) if ip_records else []
-        except:
-            ip_list = []
-        
-        # 如果IP列表为空，则允许登录
-        if not ip_list:
-            return True, "允许登录"
-        
-        # 检查当前IP是否是首次登录的IP（列表中最后的IP，因为新IP在前面）
-        first_login_ip = ip_list[-1] if ip_list else None
-        
-        if user_ip == first_login_ip:
-            return True, "允许登录"
-        else:
-            return False, f"IP地址受限，此账号只能从首次登录的IP地址({first_login_ip})访问"
-    finally:
-        cursor.close()
-        conn.close()
-
-
-
-
-# 添加重置用户IP记录的API
-@app.route('/api/reset_user_ip', methods=['POST'])
-@login_required
-def reset_user_ip():
-    """重置指定用户的IP记录，仅允许admin和fsbbr账号操作"""
-    current_username = session.get('username')
-    
-    # 检查当前用户是否有权限执行此操作
-    if current_username not in ['admin', 'fsbbr']:
-        return jsonify({'code': 1, 'msg': '权限不足，只有admin和fsbbr账号可以重置IP'}), 403
-    
-    data = request.get_json()
-    user_id = data.get('user_id')
-    
-    if not user_id:
-        return jsonify({'code': 1, 'msg': '用户ID不能为空'}), 400
-    
-    # 检查目标用户是否为admin或fsbbr，不允许重置这些账号的IP
-    conn = get_db_connection()
-    cursor = conn.cursor(pymysql.cursors.DictCursor)
-    cursor.execute("SELECT username FROM crmapp_users WHERE id = %s", (user_id,))
-    target_user = cursor.fetchone()
-    
-    if not target_user:
-        conn.close()
-        return jsonify({'code': 1, 'msg': '用户不存在'}), 404
-    
-    target_username = target_user['username']
-    if target_username in ['admin', 'fsbbr']:
-        conn.close()
-        return jsonify({'code': 1, 'msg': '不能重置管理员账号的IP'}), 400
-    
-    # 重置IP记录
-    try:
-        cursor.execute("UPDATE crmapp_users SET ip_records = NULL WHERE id = %s", (user_id,))
-        conn.commit()
-        conn.close()
-        return jsonify({'code': 0, 'msg': 'IP记录重置成功'})
-    except Exception as e:
-        conn.close()
-        return jsonify({'code': 1, 'msg': f'重置IP记录失败: {str(e)}'}), 500
-
-
 # 修改用户API，限制非admin和fsbbr账号对admin和fsbbr账号的操作
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
 @login_required
@@ -1699,6 +1567,20 @@ def update_user(user_id):
     can_process_orders = data.get('can_process_orders') 
     store = data.get('store')
     allowed_orgs = data.get('allowed_orgs')  # 新增：允许切换的组织列表
+    department = data.get('department')  # 板块:业务/市场/后勤
+    job_level = data.get('job_level')    # 职级:经理/主管/业务员
+
+    # 验证板块和职级的有效值（如果提供了的话）
+    if department is not None:
+        valid_departments = ['业务', '市场', '后勤']
+        if department and department not in valid_departments:
+            conn.close()
+            return jsonify({'code': 1, 'msg': f'板块必须是以下之一: {", ".join(valid_departments)}'}), 400
+    if job_level is not None:
+        valid_job_levels = ['经理', '主管', '业务员']
+        if job_level and job_level not in valid_job_levels:
+            conn.close()
+            return jsonify({'code': 1, 'msg': f'职级必须是以下之一: {", ".join(valid_job_levels)}'}), 400
 
     # 更新用户信息
     try:
@@ -1728,6 +1610,12 @@ def update_user(user_id):
             allowed_orgs_json = json.dumps(allowed_orgs) if allowed_orgs else None
             update_fields.append("allowed_orgs = %s")
             params.append(allowed_orgs_json)
+        if department is not None:
+            update_fields.append("department = %s")
+            params.append(department)
+        if job_level is not None:
+            update_fields.append("job_level = %s")
+            params.append(job_level)
         
         if update_fields:
             sql = f"UPDATE crmapp_users SET {', '.join(update_fields)} WHERE id = %s"
@@ -2239,327 +2127,6 @@ def api_car_brands():
     return jsonify({'code': 0, 'data': car_brands})
 
 
-@app.route('/api/beihuo/export', methods=['GET', 'POST'])
-@login_required
-def export_beihuo():
-    # 判断请求方式
-    if request.method == 'POST':
-        # 处理POST请求 - 导出选中的数据
-        data = request.get_json()
-        selected_oes = data.get('oes', [])
-        
-        if not selected_oes:
-            return jsonify({'code': 1, 'msg': '没有选择任何数据'}), 400
-
-        conn = get_db_connection()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-        # 构建基础查询 - 统一使用get_user_store()获取当前门店
-        current_store = get_user_store()
-        
-        # 使用IN查询来获取选中的数据
-        placeholders = ','.join(['%s'] * len(selected_oes))
-        base_query = f"""
-            SELECT `oe`, `今日销量`, `供应商`, `全国近1个月询价量`, `全国近3个月月均询价量`, 
-                   `内部备注`, `品牌`, `品牌号`, `库存数量`, `库存金额`, `成品可卖天数`, 
-                   `成本价`, `昨日销量`, `本月销量`, `标签`, `物料名称`, `物料条码`, 
-                   `车型品牌`, `近12个月月均销量`, `近1个月询价量`, `近3个月月均询价量`, 
-                   `近6个月月均销量`, `近7天销量`, `预警状态`, `company`, `在途数量`, 
-                   `车型`, `替换号`
-            FROM crmapp_beihuo 
-            WHERE `oe` IN ({placeholders}) AND `company` = %s
-            ORDER BY CASE WHEN `oe` IS NULL OR `oe` = '' THEN 1 ELSE 0 END, `oe`
-        """
-        params = selected_oes + [current_store]
-        cursor.execute(base_query, params)
-        rows = cursor.fetchall()
-        conn.close()
-        
-    else:
-        # 处理GET请求 - 导出搜索条件下的所有数据
-        # 获取与表格相同的搜索条件
-        oe = request.args.get('oe', '').strip()
-        supplier = request.args.get('supplier', '').strip()
-        brand = request.args.get('brand', '').strip()
-        material_name = request.args.get('material_name', '').strip()
-        tag = request.args.get('tag', '').strip()
-        barcode = request.args.get('barcode', '').strip()
-        car_brand = request.args.get('car_brand', '').strip()
-        
-        # 新增字段的搜索条件
-        today_sales_op = request.args.get('today_sales_op', '')
-        today_sales_val = request.args.get('today_sales_val', '').strip() or None
-        national_inquiry_1m_op = request.args.get('national_inquiry_1m_op', '')
-        national_inquiry_1m_val = request.args.get('national_inquiry_1m_val', '').strip() or None
-        national_inquiry_3m_op = request.args.get('national_inquiry_3m_op', '')
-        national_inquiry_3m_val = request.args.get('national_inquiry_3m_val', '').strip() or None
-        stock_amount_op = request.args.get('stock_amount_op', '')
-        stock_amount_val = request.args.get('stock_amount_val', '').strip() or None
-        sellable_days_op = request.args.get('sellable_days_op', '')
-        sellable_days_val = request.args.get('sellable_days_val', '').strip() or None
-        cost_price_op = request.args.get('cost_price_op', '')
-        cost_price_val = request.args.get('cost_price_val', '').strip() or None
-        avg_sales_12m_op = request.args.get('avg_sales_12m_op', '')
-        avg_sales_12m_val = request.args.get('avg_sales_12m_val', '').strip() or None
-        avg_sales_6m_op = request.args.get('avg_sales_6m_op', '')
-        avg_sales_6m_val = request.args.get('avg_sales_6m_val', '').strip() or None
-        sales_7d_op = request.args.get('sales_7d_op', '')
-        sales_7d_val = request.args.get('sales_7d_val', '').strip() or None
-        stock_op = request.args.get('stock_op', '')
-        stock_val = request.args.get('stock_val', '').strip() or None
-        inquiry_1m_op = request.args.get('inquiry_1m_op', '')
-        inquiry_1m_val = request.args.get('inquiry_1m_val', '').strip() or None
-        inquiry_3m_op = request.args.get('inquiry_3m_op', '')
-        inquiry_3m_val = request.args.get('inquiry_3m_val', '').strip() or None
-        sales_yesterday_op = request.args.get('sales_yesterday_op', '')
-        sales_yesterday_val = request.args.get('sales_yesterday_val', '').strip() or None
-        sales_month_op = request.args.get('sales_month_op', '')
-        sales_month_val = request.args.get('sales_month_val', '').strip() or None
-
-        conn = get_db_connection()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-        where_parts = []
-        params = []
-
-        # 根据用户权限过滤导出数据 - 统一使用get_user_store()获取当前门店
-        current_store = get_user_store()
-        where_parts.append("`company` = %s")
-        params.append(current_store)
-
-        if oe:
-            where_parts.append("`oe` LIKE %s")
-            params.append(f"%{oe}%")
-        if supplier:
-            where_parts.append("`供应商` LIKE %s")
-            params.append(f"%{supplier}%")
-        if brand:
-            where_parts.append("`品牌` = %s")
-            params.append(brand)
-        if material_name:
-            where_parts.append("`物料名称` LIKE %s")
-            params.append(f"%{material_name}%")
-        if tag:
-            where_parts.append("`标签` = %s")
-            params.append(tag)
-        if barcode:
-            where_parts.append("`物料条码` LIKE %s")
-            params.append(f"%{barcode}%")
-        if car_brand:
-            where_parts.append("`车型品牌` = %s")
-            params.append(car_brand)
-            
-        # 处理新增字段的数值比较条件 - 修复：确保op和val都存在才添加条件
-        if today_sales_val is not None and today_sales_val != '' and today_sales_op:
-            where_parts.append(f"`今日销量` {today_sales_op} %s")
-            params.append(today_sales_val)
-        if national_inquiry_1m_val is not None and national_inquiry_1m_val != '' and national_inquiry_1m_op:
-            where_parts.append(f"`全国近1个月询价量` {national_inquiry_1m_op} %s")
-            params.append(national_inquiry_1m_val)
-        if national_inquiry_3m_val is not None and national_inquiry_3m_val != '' and national_inquiry_3m_op:
-            where_parts.append(f"`全国近3个月月均询价量` {national_inquiry_3m_op} %s")
-            params.append(national_inquiry_3m_val)
-        if stock_amount_val is not None and stock_amount_val != '' and stock_amount_op:
-            where_parts.append(f"`库存金额` {stock_amount_op} %s")
-            params.append(stock_amount_val)
-        if sellable_days_val is not None and sellable_days_val != '' and sellable_days_op:
-            where_parts.append(f"`成品可卖天数` {sellable_days_op} %s")
-            params.append(sellable_days_val)
-        if cost_price_val is not None and cost_price_val != '' and cost_price_op:
-            where_parts.append(f"`成本价` {cost_price_op} %s")
-            params.append(cost_price_val)
-        if avg_sales_12m_val is not None and avg_sales_12m_val != '' and avg_sales_12m_op:
-            where_parts.append(f"`近12个月月均销量` {avg_sales_12m_op} %s")
-            params.append(avg_sales_12m_val)
-        if avg_sales_6m_val is not None and avg_sales_6m_val != '' and avg_sales_6m_op:
-            where_parts.append(f"`近6个月月均销量` {avg_sales_6m_op} %s")
-            params.append(avg_sales_6m_val)
-        if sales_7d_val is not None and sales_7d_val != '' and sales_7d_op:
-            where_parts.append(f"`近7天销量` {sales_7d_op} %s")
-            params.append(sales_7d_val)
-        if stock_val is not None and stock_val != '' and stock_op:
-            where_parts.append(f"`库存数量` {stock_op} %s")
-            params.append(stock_val)
-        if inquiry_1m_val is not None and inquiry_1m_val != '' and inquiry_1m_op:
-            where_parts.append(f"`近1个月询价量` {inquiry_1m_op} %s")
-            params.append(inquiry_1m_val)
-        if inquiry_3m_val is not None and inquiry_3m_val != '' and inquiry_3m_op:
-            where_parts.append(f"`近3个月月均询价量` {inquiry_3m_op} %s")
-            params.append(inquiry_3m_val)
-        if sales_yesterday_val is not None and sales_yesterday_val != '' and sales_yesterday_op:
-            where_parts.append(f"`昨日销量` {sales_yesterday_op} %s")
-            params.append(sales_yesterday_val)
-        if sales_month_val is not None and sales_month_val != '' and sales_month_op:
-            where_parts.append(f"`本月销量` {sales_month_op} %s")
-            params.append(sales_month_val)
-
-        where_clause = "WHERE " + " AND ".join(where_parts) if where_parts else ""
-
-        # 完整的字段列表，确保包含所有在表格中显示的字段
-        sql = f"""
-            SELECT `oe`, `今日销量`, `供应商`, `全国近1个月询价量`, `全国近3个月月均询价量`, 
-                   `内部备注`, `品牌`, `品牌号`, `库存数量`, `库存金额`, `成品可卖天数`, 
-                   `成本价`, `昨日销量`, `本月销量`, `标签`, `物料名称`, `物料条码`, 
-                   `车型品牌`, `近12个月月均销量`, `近1个月询价量`, `近3个月月均询价量`, 
-                   `近6个月月均销量`, `近7天销量`, `预警状态`, `company`, `在途数量`, 
-                   `车型`, `替换号`
-            FROM crmapp_beihuo
-            {where_clause}
-            ORDER BY CASE WHEN `oe` IS NULL OR `oe` = '' THEN 1 ELSE 0 END, `oe`
-        """
-        print(f"Debug - SQL查询: {sql}")  # 调试信息
-        print(f"Debug - 查询参数: {params}")  # 调试信息
-        print(f"Debug - Where子句: {where_clause}")  # 调试信息
-        cursor.execute(sql, params)
-        rows = cursor.fetchall()
-        print(f"Debug - 查询结果数量: {len(rows)}")  # 调试信息
-        conn.close()
-
-    # 添加数据处理逻辑以合并销量字段
-    processed_rows = []
-    for row in rows:
-        # 合并销量字段为一个格式化字符串
-        today_sales = row.get('今日销量', 0) or 0
-        yesterday_sales = row.get('昨日销量', 0) or 0
-        sales_7d = row.get('近7天销量', 0) or 0
-        sales_month = row.get('本月销量', 0) or 0
-        avg_sales_6m = row.get('近6个月月均销量', 0) or 0
-        avg_sales_12m = row.get('近12个月月均销量', 0) or 0
-        
-        # 创建合并的销量数据
-        sales_text = f"今/昨/近7天:{today_sales}/{yesterday_sales}/{sales_7d};\n近1/6/12:{sales_month}/{avg_sales_6m}/{avg_sales_12m};"
-        row['sales_data'] = sales_text
-        
-        processed_rows.append(row)
-    
-    rows = processed_rows
-
-    # 检查是否有数据 - 添加调试日志
-    print(f"Debug - 总共获取到 {len(rows) if rows else 0} 条记录")  # 调试信息
-    if not rows:
-        # 添加调试日志
-        print("Debug - 没有查询到数据，但会返回表头")
-        # 返回空的CSV文件，但包含表头
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow([
-            'OE', '今日销量', '供应商', '全国近1个月询价量', '全国近3个月月均询价量', 
-            '内部备注', '品牌', '品牌号', '库存数量', '库存金额', '成品可卖天数', 
-            '成本价', '昨日销量', '本月销量', '标签', '物料名称', '物料条码', 
-            '车型品牌', '近12个月月均销量', '近1个月询价量', '近3个月月均询价量', 
-            '近6个月月均销量', '近7天销量', '预警状态', '公司', '在途数量', 
-            '车型', '替换号', '销量'
-        ])
-        csv_data = output.getvalue()
-        output.close()
-        return Response(
-            csv_data,
-            mimetype="text/csv",
-            headers={"Content-Disposition": "attachment;filename=beihuo.csv"}
-        )
-
-    # 判断是否需要导出为XLSX格式
-    export_format = request.args.get('format', 'csv')  # 默认为CSV格式
-    if export_format == 'xlsx' and XLSX_SUPPORT:
-        # 创建Excel工作簿
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "备货数据"
-
-        # 定义表头
-        headers = [
-            'OE', '今日销量', '供应商', '全国近1个月询价量', '全国近3个月月均询价量', 
-            '内部备注', '品牌', '品牌号', '库存数量', '库存金额', '成品可卖天数', 
-            '成本价', '昨日销量', '本月销量', '标签', '物料名称', '物料条码', 
-            '车型品牌', '近12个月月均销量', '近1个月询价量', '近3个月月均询价量', 
-            '近6个月月均销量', '近7天销量', '预警状态', '公司', '在途数量', 
-            '车型', '替换号', '销量'
-        ]
-        
-        # 添加表头
-        for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col_num, value=header)
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-
-        # 添加数据
-        for row_num, row in enumerate(rows, 2):
-            for col_num, key in enumerate([
-                'oe', '今日销量', '供应商', '全国近1个月询价量', '全国近3个月月均询价量', 
-                '内部备注', '品牌', '品牌号', '库存数量', '库存金额', '成品可卖天数', 
-                '成本价', '昨日销量', '本月销量', '标签', '物料名称', '物料条码', 
-                '车型品牌', '近12个月月均销量', '近1个月询价量', '近3个月月均询价量', 
-                '近6个月月均销量', '近7天销量', '预警状态', 'company', '在途数量', 
-                '车型', '替换号', 'sales_data'
-            ], 1):
-                value = row.get(key, '')
-                if value is None:
-                    value = ''
-                ws.cell(row=row_num, column=col_num, value=value)
-
-        # 调整列宽
-        for column in ws.columns:
-            max_length = 0
-            column_letter = get_column_letter(column[0].column)
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)  # 限制最大宽度为50
-            ws.column_dimensions[column_letter].width = adjusted_width
-
-        # 将工作簿保存到字节流
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        return Response(
-            output.getvalue(),
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": "attachment;filename=beihuo.xlsx"}
-        )
-    else:
-        # 生成 CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        # 完整的列标题
-        writer.writerow([
-            'OE', '今日销量', '供应商', '全国近1个月询价量', '全国近3个月月均询价量', 
-            '内部备注', '品牌', '品牌号', '库存数量', '库存金额', '成品可卖天数', 
-            '成本价', '昨日销量', '本月销量', '标签', '物料名称', '物料条码', 
-            '车型品牌', '近12个月月均销量', '近1个月询价量', '近3个月月均询价量', 
-            '近6个月月均销量', '近7天销量', '预警状态', '公司', '在途数量', 
-            '车型', '替换号', '销量'
-        ])
-        
-        # 处理空值显示问题
-        for row in rows:
-            processed_row = []
-            for key in [
-                'oe', '今日销量', '供应商', '全国近1个月询价量', '全国近3个月月均询价量', 
-                '内部备注', '品牌', '品牌号', '库存数量', '库存金额', '成品可卖天数', 
-                '成本价', '昨日销量', '本月销量', '标签', '物料名称', '物料条码', 
-                '车型品牌', '近12个月月均销量', '近1个月询价量', '近3个月月均询价量', 
-                '近6个月月均销量', '近7天销量', '预警状态', 'company', '在途数量', 
-                '车型', '替换号', 'sales_data'
-            ]:
-                value = row.get(key, '')
-                processed_row.append(value if value is not None else '')
-            writer.writerow(processed_row)
-
-        csv_data = output.getvalue()
-        output.close()
-
-        return Response(
-            csv_data,
-            mimetype="text/csv",
-            headers={"Content-Disposition": "attachment;filename=beihuo.csv"}
-        )
-    
-
 @app.route('/api/cart', methods=['GET'])
 @login_required
 def get_cart():
@@ -3025,6 +2592,10 @@ def get_current_user():
     can_modify_prices = session.get('can_modify_prices', False)
     allowed_orgs = session.get('allowed_orgs', [])
     
+    # 板块和职级信息（新增字段）
+    department = session.get('department', None)  # 板块:业务/市场/后勤
+    job_level = session.get('job_level', None)    # 职级:经理/主管/业务员
+    
     # 检查store是否为无效值
     if not store or store == 'all' or store == 'none' or store == 'undefined' or store == '':
         store = 'fsbbr'
@@ -3060,6 +2631,8 @@ def get_current_user():
         'can_export_data': can_export_data,
         'can_modify_prices': can_modify_prices,
         'allowed_orgs': allowed_orgs,  # 允许切换的组织列表
+        'department': department,  # 板块:业务/市场/后勤
+        'job_level': job_level,    # 职级:经理/主管/业务员
         'store': store,
         'current_org': current_org,
         'store_name': STORES.get(store, '未知门店'),
@@ -3362,7 +2935,7 @@ def get_users():
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
     # 获取所有用户信息（不包括密码）
-    cursor.execute("SELECT id, username, is_admin, store, can_delete_cart, can_process_orders, ip_records, allowed_orgs FROM crmapp_users ORDER BY id")
+    cursor.execute("SELECT id, username, is_admin, store, can_delete_cart, can_process_orders, department, job_level, ip_records, allowed_orgs FROM crmapp_users ORDER BY id")
     users = cursor.fetchall()
     
     # 添加门店名称和处理权限字段
@@ -3422,10 +2995,26 @@ def create_user():
     can_delete_cart = data.get('can_delete_cart', 0)
     can_process_orders = data.get('can_process_orders', 0)  # 新增：处理单据权限
     store = data.get('store', 'fsbbr')
+    department = data.get('department')  # 板块:业务/市场/后勤
+    job_level = data.get('job_level')    # 职级:经理/主管/业务员
     
     # 验证必填字段
     if not username or not password:
         return jsonify({'code': 1, 'msg': '用户名和密码不能为空'}), 400
+    
+    # 验证板块和职级必填（新增用户时必须填写）
+    if not department:
+        return jsonify({'code': 1, 'msg': '板块不能为空'}), 400
+    if not job_level:
+        return jsonify({'code': 1, 'msg': '职级不能为空'}), 400
+    
+    # 验证板块和职级的有效值
+    valid_departments = ['业务', '市场', '后勤']
+    valid_job_levels = ['经理', '主管', '业务员']
+    if department not in valid_departments:
+        return jsonify({'code': 1, 'msg': f'板块必须是以下之一: {", ".join(valid_departments)}'}), 400
+    if job_level not in valid_job_levels:
+        return jsonify({'code': 1, 'msg': f'职级必须是以下之一: {", ".join(valid_job_levels)}'}), 400
     
     # 验证字段类型
     if not isinstance(is_admin, bool) and is_admin not in [0, 1]:
@@ -3451,8 +3040,8 @@ def create_user():
         
         # 插入新用户
         cursor.execute(
-            "INSERT INTO crmapp_users (username, password, is_admin, store, can_delete_cart, can_process_orders) VALUES (%s, %s, %s, %s, %s, %s)",
-            (username, password, is_admin, store, can_delete_cart, can_process_orders)  # 添加新字段
+            "INSERT INTO crmapp_users (username, password, is_admin, store, can_delete_cart, can_process_orders, department, job_level) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (username, password, is_admin, store, can_delete_cart, can_process_orders, department, job_level)  # 添加新字段
         )
         
         conn.commit()
@@ -3849,96 +3438,77 @@ def download_unmatched():
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'下载失败: {str(e)}'})
 
-# 导出选中数据的API接口
-@app.route('/api/beihuo/export_selected', methods=['POST'])
+# ==================== 通用导出API接口 ====================
+
+@app.route('/api/export/<export_type>', methods=['GET'])
 @login_required
-def export_selected_beihuo():
-    try:
-        data = request.get_json()
-        selected_oes = data.get('oes', [])
-        
-        if not selected_oes:
-            return jsonify({'code': 1, 'msg': '没有选择任何数据'}), 400
-
-        print(f"Debug - 接收到的OE列表: {selected_oes}")  # 调试信息
-
-        conn = get_db_connection()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-        # 根据用户权限过滤数据
-        if not session.get('is_admin'):
-            sql = """
-                SELECT `oe`, `今日销量`, `供应商`, `全国近1个月询价量`, `全国近3个月月均询价量`, 
-                       `内部备注`, `品牌`, `品牌号`, `库存数量`, `库存金额`, `成品可卖天数`, 
-                       `成本价`, `昨日销量`, `本月销量`, `标签`, `物料名称`, `物料条码`, 
-                       `车型品牌`, `近12个月月均销量`, `近1个月询价量`, `近3个月月均询价量`, 
-                       `近6个月月均销量`, `近7天销量`, `预警状态`, `company`
-                FROM crmapp_beihuo 
-                WHERE `oe` IN ({}) AND `company` = %s
-                ORDER BY CASE WHEN `oe` IS NULL OR `oe` = '' THEN 1 ELSE 0 END, `oe`
-            """.format(','.join(['%s'] * len(selected_oes)))
-            
-            params = selected_oes + [get_user_store()]
-        else:
-            sql = """
-                SELECT `oe`, `今日销量`, `供应商`, `全国近1个月询价量`, `全国近3个月月均询价量`, 
-                       `内部备注`, `品牌`, `品牌号`, `库存数量`, `库存金额`, `成品可卖天数`, 
-                       `成本价`, `昨日销量`, `本月销量`, `标签`, `物料名称`, `物料条码`, 
-                       `车型品牌`, `近12个月月均销量`, `近1个月询价量`, `近3个月月均询价量`, 
-                       `近6个月月均销量`, `近7天销量`, `预警状态`, `company`
-                FROM crmapp_beihuo 
-                WHERE `oe` IN ({})
-                ORDER BY CASE WHEN `oe` IS NULL OR `oe` = '' THEN 1 ELSE 0 END, `oe`
-            """.format(','.join(['%s'] * len(selected_oes)))
-            
-            params = selected_oes
-
-        print(f"Debug - SQL查询: {sql}")  # 调试信息
-        print(f"Debug - 查询参数: {params}")  # 调试信息
-
-        cursor.execute(sql, params)
-        rows = cursor.fetchall()
-        
-        print(f"Debug - 查询结果数量: {len(rows)}")  # 调试信息
-        if rows:
-            print(f"Debug - 第一条记录: {rows[0]}")  # 调试信息
-
-        conn.close()
-
-        # 生成 CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        # 保持原始列标题
-        writer.writerow(['OE', '今日销量', '供应商', '全国近1个月询价量', '全国近3个月月均询价量', 
-                         '内部备注', '品牌', '品牌号', '库存数量', '库存金额', '成品可卖天数', 
-                         '成本价', '昨日销量', '本月销量', '标签', '物料名称', '物料条码', 
-                         '车型品牌', '近12个月月均销量', '近1个月询价量', '近3个月月均询价量', 
-                         '近6个月月均销量', '近7天销量', '预警状态', '公司'])
-
-        # 处理空值显示问题
-        for row in rows:
-            processed_row = []
-            for key in ['oe', '今日销量', '供应商', '全国近1个月询价量', '全国近3个月月均询价量', 
-                       '内部备注', '品牌', '品牌号', '库存数量', '库存金额', '成品可卖天数', 
-                       '成本价', '昨日销量', '本月销量', '标签', '物料名称', '物料条码', 
-                       '车型品牌', '近12个月月均销量', '近1个月询价量', '近3个月月均询价量', 
-                       '近6个月月均销量', '近7天销量', '预警状态', '在途数量', '车型', 'company']:
-                value = row.get(key, '')
-                processed_row.append(value if value is not None else '')
-            writer.writerow(processed_row)
-
-        csv_data = output.getvalue()
-        output.close()
-
-        return Response(
-            csv_data,
-            mimetype="text/csv",
-            headers={"Content-Disposition": "attachment;filename=selected_beihuo.csv"}
-        )
-    except Exception as e:
-        print(f"Debug - 导出失败: {str(e)}")  # 调试信息
-        return jsonify({'code': 1, 'msg': f'导出失败: {str(e)}'}), 500
+def unified_export(export_type):
+    """
+    通用数据导出接口 - 根据搜索条件导出数据
     
+    Args:
+        export_type: 导出类型（beihuo/cart）
+        
+    Query参数（备货表）:
+        oe: OE号搜索
+        supplier: 供应商搜索
+        brand: 品牌搜索
+        material_name: 物料名称搜索
+        tag: 标签搜索
+        barcode: 物料条码搜索
+        car_brand: 车型品牌搜索
+        
+    Query参数（购物车表）:
+        oe: OE号搜索
+        barcode: 物料条码/品牌号搜索
+        material_name: 物料名称搜索
+        brand: 品牌搜索
+        tag: 标签搜索
+        car_model: 车型搜索
+        dimension: 维度（product/supplier），默认product
+    """
+    try:
+        # 获取当前门店
+        current_store = get_user_store()
+        
+        # 获取搜索条件
+        search_params = {}
+        
+        if export_type == 'beihuo':
+            # 备货表搜索参数
+            search_params = {
+                'oe': request.args.get('oe', '').strip(),
+                'supplier': request.args.get('supplier', '').strip(),
+                'brand': request.args.get('brand', '').strip(),
+                'material_name': request.args.get('material_name', '').strip(),
+                'tag': request.args.get('tag', '').strip(),
+                'barcode': request.args.get('barcode', '').strip(),
+                'car_brand': request.args.get('car_brand', '').strip(),
+            }
+        elif export_type == 'cart':
+            # 购物车表搜索参数
+            search_params = {
+                'oe': request.args.get('oe', '').strip(),
+                'barcode': request.args.get('barcode', '').strip(),
+                'material_name': request.args.get('material_name', '').strip(),
+                'brand': request.args.get('brand', '').strip(),
+                'tag': request.args.get('tag', '').strip(),
+                'car_model': request.args.get('car_model', '').strip(),
+                'dimension': request.args.get('dimension', 'product'),
+            }
+        
+        # 调用通用导出函数
+        return handle_export_request(
+            export_type=export_type,
+            store=current_store,
+            search_params=search_params
+        )
+        
+    except Exception as e:
+        print(f"导出失败: {str(e)}")
+        return jsonify({'code': 1, 'msg': f'导出失败: {str(e)}'}), 500
+
+
 # 添加更新备货数据的API接口
 @app.route('/api/beihuo/update', methods=['POST'])
 @login_required

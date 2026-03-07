@@ -145,21 +145,37 @@ class CartDataService:
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
                         count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
-            # 先查询总数量
-            cursor.execute(count_sql, tuple(count_params))
-            total_count = cursor.fetchone()['total']
-
             # 处理排序
             order_clause = self._build_order_clause(sort_field, sort_order)
             sql += order_clause
 
-            # 添加分页限制
-            offset = (page - 1) * limit
-            sql += " LIMIT %s OFFSET %s"
-            params.extend([limit, offset])
+            # 如果是供应商维度，需要先获取所有数据，拆分供应商后再分页
+            if dimension == 'supplier':
+                # 获取所有符合条件的数据（不分页）
+                cursor.execute(sql, tuple(params))
+                all_result = cursor.fetchall()
 
-            cursor.execute(sql, tuple(params))
-            result = cursor.fetchall()
+                # 拆分供应商数据
+                expanded_result = self._expand_by_suppliers(list(all_result))
+
+                # 计算拆分后的总数量
+                total_count = len(expanded_result)
+
+                # 对拆分后的数据进行分页
+                offset = (page - 1) * limit
+                result = expanded_result[offset:offset + limit]
+            else:
+                # 产品维度：先查询总数量
+                cursor.execute(count_sql, tuple(count_params))
+                total_count = cursor.fetchone()['total']
+
+                # 添加分页限制
+                offset = (page - 1) * limit
+                sql += " LIMIT %s OFFSET %s"
+                params.extend([limit, offset])
+
+                cursor.execute(sql, tuple(params))
+                result = cursor.fetchall()
 
             # 确保时间格式正确
             for item in result:
@@ -168,12 +184,6 @@ class CartDataService:
                 elif item['added_time'] and isinstance(item['added_time'], str):
                     # 如果已经是字符串格式，保持不变
                     pass
-
-        # 如果是供应商维度，拆分供应商数据
-        if dimension == 'supplier':
-            result = self._expand_by_suppliers(result)
-            # 供应商维度分页需要特殊处理，这里简化处理
-            # 实际项目中可能需要在拆分后重新分页
 
         return list(result), total_count
 

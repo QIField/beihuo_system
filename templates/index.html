@@ -5,6 +5,44 @@
     <title>巴博瑞科技</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
     <style>
+        /* 用户管理表格操作按钮样式 */
+        .user-action-btns {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+        .user-action-btns .layui-btn {
+            margin: 0;
+            padding: 0 10px;
+            height: 26px;
+            line-height: 26px;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+
+        /* 用户表格样式优化 */
+        #usersTable + .layui-table-view {
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e8e8e8;
+        }
+        #usersTable + .layui-table-view .layui-table-header {
+            background-color: #fafafa;
+            border-bottom: 2px solid #e8e8e8;
+        }
+        #usersTable + .layui-table-view th {
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+            padding: 10px 5px;
+        }
+        #usersTable + .layui-table-view td {
+            padding: 8px 5px;
+            font-size: 13px;
+        }
+        #usersTable + .layui-table-view tr:hover {
+            background-color: #f5f7fa;
+        }
         
         /* 优化折叠过渡动画 */
         .layui-layout-admin .layui-side {
@@ -601,7 +639,7 @@
                             <dd><a href="javascript:;" onclick="loadContent('db-table')">备货数据</a></dd>
                             <dd id="ksAutoBillMenuItem"><a href="javascript:void(0);" onclick="openKsAutoBillInNewTab()">开思自动开单</a></dd>
                             <dd><a href="javascript:void(0);" onclick="openVirtualInventoryInNewTab()">虚拟库存</a></dd>
-                            <dd><a href="javascript:;" onclick="openSearchInCrmInNewTab()">搜索产品</a></dd>
+                            <dd><a href="javascript:;" onclick="openSearchInCrmInNewTab()">搜索产品（待完善）</a></dd>
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed" id="permissionManagement" style="display: none;">
@@ -1494,6 +1532,28 @@ function addUser() {
                             </div>
                         </div>
                         <div class="layui-form-item">
+                            <label class="layui-form-label">板块</label>
+                            <div class="layui-input-block">
+                                <select name="department" required lay-verify="required" class="layui-select">
+                                    <option value="">请选择板块</option>
+                                    <option value="业务">业务</option>
+                                    <option value="市场">市场</option>
+                                    <option value="后勤">后勤</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">职级</label>
+                            <div class="layui-input-block">
+                                <select name="job_level" required lay-verify="required" class="layui-select">
+                                    <option value="">请选择职级</option>
+                                    <option value="经理">经理</option>
+                                    <option value="主管">主管</option>
+                                    <option value="业务员">业务员</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
                             <div class="layui-input-block">
                                 <button class="layui-btn" lay-submit lay-filter="addUserForm">确认添加</button>
                                 <button type="reset" class="layui-btn layui-btn-primary">重置</button>
@@ -1529,7 +1589,9 @@ function addUser() {
                             is_admin: form_data.field.is_admin === 'on' ? 1 : 0,
                             can_delete_cart: form_data.field.can_delete_cart === 'on' ? 1 : 0, // 添加删除购物车权限字段
                             can_process_orders: form_data.field.can_process_orders === 'on' ? 1 : 0, // 添加处理单据权限字段
-                            store: form_data.field.store
+                            store: form_data.field.store,
+                            department: form_data.field.department,  // 板块
+                            job_level: form_data.field.job_level     // 职级
                         })
                     })
                     .then(response => response.json())
@@ -1933,36 +1995,31 @@ window.loadStoreInfo = function() {
                     url: '/api/users',
                     page: true,
                     cols: [[
-                        {field: 'username', title: '用户名', width: 150},
-                        {field: 'is_admin', title: '管理员', width: 50, templet: function(d){
-                            return d.is_admin ? '<span style="color: #FF5722;">是</span>' : '否';
+                        {field: 'username', title: '用户名', width: 100, align: 'center'},
+                        {field: 'department', title: '板块', width: 70, align: 'center', templet: function(d){
+                            return d.department ? d.department : '<span style="color: #999;">-</span>';
                         }},
-                        {field: 'can_delete_cart', title: '删除购物车权限', width: 150, templet: function(d){
-                            return d.can_delete_cart ? '<span style="color: #5FB878;">是</span>' : '否';
+                        {field: 'job_level', title: '职级', width: 70, align: 'center', templet: function(d){
+                            return d.job_level ? d.job_level : '<span style="color: #999;">-</span>';
                         }},
-                        {field: 'can_process_orders', title: '处理单据权限', width: 150, templet: function(d){
-                            return d.can_process_orders ? '<span style="color: #5FB878;">是</span>' : '否';
+                        {field: 'is_admin', title: '管理员', width: 60, align: 'center', templet: function(d){
+                            return d.is_admin ? '<span style="color: #FF5722;">是</span>' : '<span style="color: #999;">否</span>';
                         }},
-                        {field: 'store_name', title: '所属门店', width: 80},
-                        {field: 'ip_records_formatted', title: '登录IP', width: 150},  // 新增IP记录列
-                        {title: '操作', width: 350, templet: function(d) {
-                            // 在这里直接判断是否显示按钮
+                        {field: 'can_delete_cart', title: '删购物车', width: 80, align: 'center', templet: function(d){
+                            return d.can_delete_cart ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
+                        {field: 'can_process_orders', title: '处理单据', width: 80, align: 'center', templet: function(d){
+                            return d.can_process_orders ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
+                        {field: 'store_name', title: '门店', width: 80, align: 'center'},
+                        {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
+                        {title: '操作', width: 150, align: 'center', templet: function(d) {
+                            // 只保留编辑和删除按钮，其他功能移到编辑弹窗内
                             if (currentUser.logged_in && currentUser.is_admin && d.username !== currentUser.username) {
-                                var resetIpBtn = '';
-                                var setAllowedOrgsBtn = '';
-                                // 只有admin和fsbbr账号可以重置IP
-                                if (['admin', 'fsbbr'].includes(currentUser.username) && !['admin', 'fsbbr'].includes(d.username)) {
-                                    resetIpBtn = '<button class="layui-btn layui-btn-xs layui-btn-warm" onclick="resetUserIp(' + d.id + ', \'' + d.username + '\')">重置IP</button>';
-                                }
-                                // 管理员用户可以为任何人设置可切换组织
-                                if (currentUser.is_admin && d.username !== currentUser.username) {
-                                    setAllowedOrgsBtn = '<button class="layui-btn layui-btn-xs layui-btn-primary" onclick="setAllowedOrgs(' + d.id + ', \'' + d.username + '\', \'' + (d.allowed_orgs || 'null') + '\')">设置可切换组织</button>';
-                                }
-                                return '<button class="layui-btn layui-btn-xs" onclick="changeUserPassword(\'' + d.username + '\', ' + d.id + ')">修改密码</button>' +
-                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ')">' +                                     '编辑</button>' +
+                                return '<div class="user-action-btns">' +
+                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ', \'' + (d.department || '') + '\', \'' + (d.job_level || '') + '\')">编辑</button>' +
                                        '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteUser(' + d.id + ', \'' + d.username + '\')">删除</button>' +
-                                       setAllowedOrgsBtn +
-                                       resetIpBtn;
+                                       '</div>';
                             }
                             return '';
                         }}
@@ -1991,13 +2048,25 @@ window.loadStoreInfo = function() {
                     url: '/api/users',
                     page: true,
                     cols: [[
-                        {field: 'username', title: '用户名', width: 150},
-                        {field: 'is_admin', title: '管理员', width: 100, templet: function(d){
-                            return d.is_admin ? '<span style="color: #FF5722;">是</span>' : '否';
+                        {field: 'username', title: '用户名', width: 100, align: 'center'},
+                        {field: 'department', title: '板块', width: 70, align: 'center', templet: function(d){
+                            return d.department ? d.department : '<span style="color: #999;">-</span>';
                         }},
-                        {field: 'store_name', title: '所属门店', width: 150},
-                        {field: 'ip_records_formatted', title: '登录IP', width: 200},  // 新增IP记录列
-                        {title: '操作', width: 150, templet: function(d) {
+                        {field: 'job_level', title: '职级', width: 70, align: 'center', templet: function(d){
+                            return d.job_level ? d.job_level : '<span style="color: #999;">-</span>';
+                        }},
+                        {field: 'is_admin', title: '管理员', width: 60, align: 'center', templet: function(d){
+                            return d.is_admin ? '<span style="color: #FF5722;">是</span>' : '<span style="color: #999;">否</span>';
+                        }},
+                        {field: 'can_delete_cart', title: '删购物车', width: 80, align: 'center', templet: function(d){
+                            return d.can_delete_cart ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
+                        {field: 'can_process_orders', title: '处理单据', width: 80, align: 'center', templet: function(d){
+                            return d.can_process_orders ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
+                        {field: 'store_name', title: '门店', width: 80, align: 'center'},
+                        {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
+                        {title: '操作', width: 150, align: 'center', templet: function(d) {
                             return ''; // 获取用户信息失败时不显示任何按钮
                         }}
                     ]]
@@ -2407,7 +2476,7 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs) {
 }
 
 // 编辑用户功能
-function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders) {
+function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders, admin_flag, department, job_level) {
     layui.use(['layer', 'form'], function(){
         var layer = layui.layer;
         var form = layui.form;
@@ -2457,24 +2526,46 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                                 </select>
                             </div>
                         </div>
-                        <!-- 总是显示设置允许切换组织的按钮 -->
                         <div class="layui-form-item">
-                            <label class="layui-form-label">组织权限</label>
+                            <label class="layui-form-label">板块</label>
                             <div class="layui-input-block">
-                                <button type="button" class="layui-btn layui-btn-primary" onclick="setAllowedOrgsForEditUser(` + userId + `, '` + username + `', null)">设置允许切换的组织</button>
-                                <div style="margin-top: 5px; color: #999; font-size: 12px;">设置该用户可以切换到哪些组织查看数据</div>
+                                <select name="department">
+                                    <option value="">未设置</option>
+                                    <option value="业务" ` + (department === '业务' ? 'selected' : '') + `>业务</option>
+                                    <option value="市场" ` + (department === '市场' ? 'selected' : '') + `>市场</option>
+                                    <option value="后勤" ` + (department === '后勤' ? 'selected' : '') + `>后勤</option>
+                                </select>
                             </div>
                         </div>
                         <div class="layui-form-item">
+                            <label class="layui-form-label">职级</label>
                             <div class="layui-input-block">
-                                <button class="layui-btn" lay-submit lay-filter="editUserForm">确认修改</button>
-                                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                                <select name="job_level">
+                                    <option value="">未设置</option>
+                                    <option value="经理" ` + (job_level === '经理' ? 'selected' : '') + `>经理</option>
+                                    <option value="主管" ` + (job_level === '主管' ? 'selected' : '') + `>主管</option>
+                                    <option value="业务员" ` + (job_level === '业务员' ? 'selected' : '') + `>业务员</option>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- 其他功能按钮区域 -->
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">其他操作</label>
+                            <div class="layui-input-block">
+                                <button type="button" class="layui-btn layui-btn-sm layui-btn-primary" onclick="changeUserPassword('` + username + `', ` + userId + `)">修改密码</button>
+                                <button type="button" class="layui-btn layui-btn-sm layui-btn-primary" onclick="setAllowedOrgsForEditUser(` + userId + `, '` + username + `', null)">设置可切换组织</button>
+                            </div>
+                        </div>
+                        <div class="layui-form-item" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                            <div class="layui-input-block" style="text-align: center;">
+                                <button class="layui-btn layui-btn-normal" lay-submit lay-filter="editUserForm">保存修改</button>
+                                <button type="button" class="layui-btn layui-btn-primary" onclick="layui.layer.closeAll()">取消</button>
                             </div>
                         </div>
                     </form>
                 </div>
             `,
-            area: ['500px', '400px'], // 增加高度以适应新字段
+            area: ['550px', '520px'], // 弹窗高度
             success: function(layero, index){
                 // 检查当前登录用户是否为"admin"，决定是否显示处理单据权限选项
                 if (window.currentUserPermissions && window.currentUserPermissions.username === 'admin') {
@@ -2511,7 +2602,9 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                             is_admin: form_data.field.is_admin === 'on' ? 1 : 0, // 转换开关值
                             can_delete_cart: form_data.field.can_delete_cart === 'on' ? 1 : 0, // 添加删除购物车权限字段
                             can_process_orders: form_data.field.can_process_orders === 'on' ? 1 : 0, // 添加处理单据权限字段
-                            store: form_data.field.store
+                            store: form_data.field.store,
+                            department: form_data.field.department || null,  // 板块
+                            job_level: form_data.field.job_level || null     // 职级
                             // 注意：这里不包含 allowed_orgs，因为它在单独的对话框中设置
                         })
                     })
@@ -2564,37 +2657,6 @@ function deleteUser(userId, username) {
         })
         .catch(error => {
             layer.msg('删除失败: ' + error.message, {icon: 2});
-        });
-    });
-}
-
-// 重置用户IP函数
-function resetUserIp(userId, username) {
-    layer.confirm('确定要重置用户 "' + username + '" 的IP记录吗？重置后该用户将可以从任何IP地址登录。', {
-        icon: 3,
-        title: '重置用户IP'
-    }, function(index) {
-        fetch('/api/reset_user_ip', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token') // 如果使用token验证
-            },
-            body: JSON.stringify({user_id: userId})
-        })
-        .then(response => response.json())
-        .then(result => {
-            layer.close(index);
-            if (result.code === 0) {
-                layer.msg('IP记录重置成功', {icon: 1});
-                // 重新加载用户表格
-                layui.table.reload('usersTable');
-            } else {
-                layer.msg(result.msg, {icon: 2});
-            }
-        })
-        .catch(error => {
-            layer.msg('重置失败: ' + error.message, {icon: 2});
         });
     });
 }
@@ -2980,90 +3042,8 @@ window.loadContent = function(type) {
 
 // 添加导出所有数据的函数
 function exportAllData() {
-    // 获取表格选中的数据
-    var checkStatus = layui.table.checkStatus('beihuoTable');
-    var selectedData = checkStatus.data;
-    
-    if (selectedData && selectedData.length > 0) {
-        // 如果有选中的数据，导出选中的数据
-        exportSelectedData(selectedData);
-    } else {
-        // 如果没有选中数据，导出搜索条件下的所有数据
-        exportSearchedData();
-    }
-}
-
-// 导出选中的数据
-function exportSelectedData(selectedData) {
-    console.log('Debug - 选中的数据:', selectedData); // 调试信息
-
-    // 提取选中数据的OE值
-    var selectedOes = selectedData.map(function(item) {
-        console.log('Debug - 处理的item.oe:', item.oe); // 调试信息
-        return item.oe;
-    });
-
-    console.log('Debug - 提取的OE列表:', selectedOes); // 调试信息
-
-    // 发送请求到后端导出选中的数据
-    fetch('/api/beihuo/export', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            oes: selectedOes
-        })
-    })
-    .then(response => {
-        console.log('Debug - 响应状态:', response.status); // 调试信息
-        if (response.ok) {
-            // 直接处理文件下载
-            return response.blob();
-        } else {
-            return response.json().then(errorData => {
-                console.error('Debug - 后端错误:', errorData); // 调试信息
-                throw new Error(errorData.msg || '导出失败');
-            });
-        }
-    })
-    .then(blob => {
-        var link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        var timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        link.download = '选中备货数据_' + timestamp + '.csv';
-        link.click();
-        URL.revokeObjectURL(link.href);
-        layui.layer.msg('选中数据导出成功', {icon: 1});
-    })
-    .catch(error => {
-        console.error('Debug - 前端错误:', error); // 调试信息
-        layui.layer.msg('导出失败: ' + error.message, {icon: 2});
-    });
-}
-
-// 导出搜索条件下的所有数据
-function exportSearchedData() {
-    // 获取当前搜索表单的值
-    var formData = {};
-    var inputs = document.querySelectorAll('#content input, #content select');
-    inputs.forEach(function(el) {
-        if (el.name && el.value.trim() !== '') {
-            formData[el.name] = el.value.trim();
-        }
-    });
-
-    // 构建查询参数
-    var query = new URLSearchParams(formData).toString();
-    var url = '/api/beihuo/export' + (query ? '?' + query : '');
-
-    // 创建一个隐藏的链接来触发下载
-    var a = document.createElement('a');
-    a.href = url;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // 直接根据搜索条件导出数据
+    exportBeihuoData();
 }
 
 
@@ -5000,6 +4980,9 @@ function showCartPanel(table) {
             area: ['95%', '95%'], // 放大购物车面板
             maxmin: true,
             success: function(layero, index) {
+                // 保存layero引用到全局变量，供导出函数使用
+                window.currentCartLayero = layero;
+                
                 // 初始化搜索事件
                 layero.find('#cartSearchBtn').on('click', function() {
                     var searchParams = {};
@@ -5875,69 +5858,37 @@ function applyColumnFilter(myTable) {
 }
 
 /**
- * 导出选中的数据
- * @param {Array} selectedData 选中的数据
+ * 导出备货数据（根据搜索条件）
  */
-function exportSelectedData(selectedData) {
-    console.log('Debug - 选中的数据:', selectedData); // 调试信息
-
-    // 提取选中数据的OE值
-    var selectedOes = selectedData.map(function(item) {
-        console.log('Debug - 处理的item.oe:', item.oe); // 调试信息
-        return item.oe;
-    });
-
-    console.log('Debug - 提取的OE列表:', selectedOes); // 调试信息
-
-    // 发送请求到后端导出选中的数据
-    fetch('/api/beihuo/export_selected', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            oes: selectedOes
-        })
-    })
-    .then(response => {
-        console.log('Debug - 响应状态:', response.status); // 调试信息
-        if (response.ok) {
-            // 直接处理文件下载
-            return response.blob();
-        } else {
-            return response.json().then(errorData => {
-                console.error('Debug - 后端错误:', errorData); // 调试信息
-                throw new Error(errorData.msg || '导出失败');
-            });
-        }
-    })
-    .then(blob => {
-        var link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        var timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        link.download = '选中备货数据_' + timestamp + '.csv';
-        link.click();
-        URL.revokeObjectURL(link.href);
-        layui.layer.msg('选中数据导出成功', {icon: 1});
-    })
-    .catch(error => {
-        console.error('Debug - 前端错误:', error); // 调试信息
-        layui.layer.msg('导出失败: ' + error.message, {icon: 2});
-    });
-}
-
-
-/**
- * 导出搜索条件下的所有数据
- */
-function exportSearchedData() {
+function exportBeihuoData() {
+    // 获取当前搜索条件
     var formData = collectFormData();
     var query = new URLSearchParams(formData).toString();
-    var url = '/api/beihuo/export' + (query ? '?' + query : '');
+    var url = '/api/export/beihuo' + (query ? '?' + query : '');
 
-    var a = document.createElement('a');
-    a.href = url;
-    a.click();
+    // 使用fetch获取Excel文件
+    fetch(url)
+        .then(response => {
+            if (response.ok) {
+                return response.blob();
+            } else {
+                return response.json().then(errorData => {
+                    throw new Error(errorData.msg || '导出失败');
+                });
+            }
+        })
+        .then(blob => {
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '备货数据_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.xlsx';
+            link.click();
+            URL.revokeObjectURL(link.href);
+            layui.layer.msg('数据导出成功', {icon: 1});
+        })
+        .catch(error => {
+            console.error('导出失败:', error);
+            layui.layer.msg('导出失败: ' + error.message, {icon: 2});
+        });
 }
 
 /**
@@ -6145,76 +6096,54 @@ function importCartData(cartTable) {
 function exportCartData(cartTable) {
     // 获取当前维度
     var currentDimension = window.currentCartDimension || 'product'; // 默认为产品维度
-    
-    // 从服务器获取购物车数据，带维度参数
-    fetch('/api/cart?dimension=' + currentDimension)
-        .then(response => response.json())
-        .then(result => {
-            if (result.code === 0) {
-                var data = result.data;
-                if (!data || data.length === 0) {
-                    layui.layer.msg('购物车中没有数据', {icon: 2});
-                    return;
-                }
-                
-                // 定义表头
-                var headers = ['OE', '供应商', '品牌', '物料名称', '物料条码', '车型品牌', '标签', '近1个月询价量', '近3个月月均询价量', '库存数量', '昨日销量', '本月销量', '今日销量', '全国近1个月询价量', '全国近3个月月均询价量', '内部备注', '品牌号', '库存金额', '成品可卖天数', '成本价', '近12个月月均销量', '近6个月月均销量', '近7天销量', '预警状态', '在途数量', '车型', '数量', '加入时间', '账户名'];
-                
-                // 转换数据为CSV格式
-                var csvContent = headers.join(',') + '\n';
-                data.forEach(function(row) {
-                    var values = [
-                        row.oe || '',
-                        row.supplier || '',
-                        row.brand || '',
-                        row.material_name || '',
-                        row.barcode || '',
-                        row.car_brand || '',
-                        row.tag || '',
-                        row.inquiry_1m || '',
-                        row.inquiry_3m || '',
-                        row.stock || '',
-                        row.sales_yesterday || '',
-                        row.sales_month || '',
-                        row.today_sales || '',
-                        row.national_inquiry_1m || '',
-                        row.national_inquiry_3m || '',
-                        row.internal_remarks || '',
-                        row.brand_code || '',
-                        row.stock_amount || '',
-                        row.sellable_days || '',
-                        row.cost_price || '',
-                        row.avg_sales_12m || '',
-                        row.avg_sales_6m || '',
-                        row.sales_7d || '',
-                        row.warning_status || '',
-                        row.on_way || '',  // 添加在途数量
-                        row.car_model || '',  // 添加车型
-                    ];
-                    // 转义包含逗号或引号的值
-                    values = values.map(function(value) {
-                        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-                            return '"' + value.replace(/"/g, '""') + '"';
-                        }
-                        return value;
-                    });
-                    csvContent += values.join(',') + '\n';
-                });
-                
-                // 创建并下载文件
-                var blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-                var link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                var timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-                link.download = `购物车数据_${currentDimension}_维度_${timestamp}.csv`;
-                link.click();
-                URL.revokeObjectURL(link.href);
-                layui.layer.msg('数据导出成功', {icon: 1});
+
+    // 获取当前搜索条件（从购物车弹层面板中获取）
+    var searchParams = new URLSearchParams();
+    searchParams.append('dimension', currentDimension);
+
+    // 获取购物车搜索框的值（使用layero上下文）
+    var layero = window.currentCartLayero;
+    if (layero) {
+        var cartOe = layero.find('input[name="cart_oe"]').val().trim();
+        var cartBarcode = layero.find('input[name="cart_barcode"]').val().trim();
+        var cartMaterialName = layero.find('input[name="cart_material_name"]').val().trim();
+        var cartBrand = layero.find('input[name="cart_brand"]').val().trim();
+        var cartTag = layero.find('input[name="cart_tag"]').val().trim();
+        var cartCarModel = layero.find('input[name="cart_car_model"]').val().trim();
+
+        if (cartOe) searchParams.append('oe', cartOe);
+        if (cartBarcode) searchParams.append('barcode', cartBarcode);
+        if (cartMaterialName) searchParams.append('material_name', cartMaterialName);
+        if (cartBrand) searchParams.append('brand', cartBrand);
+        if (cartTag) searchParams.append('tag', cartTag);
+        if (cartCarModel) searchParams.append('car_model', cartCarModel);
+    }
+
+    // 构建URL
+    var url = '/api/export/cart?' + searchParams.toString();
+
+    // 使用fetch获取Excel文件
+    fetch(url)
+        .then(response => {
+            if (response.ok) {
+                return response.blob();
             } else {
-                layui.layer.msg('获取购物车数据失败: ' + result.msg, {icon: 2});
+                return response.json().then(errorData => {
+                    throw new Error(errorData.msg || '导出失败');
+                });
             }
         })
+        .then(blob => {
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            var timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            link.download = `购物车_${currentDimension === 'supplier' ? '供应商维度' : '产品维度'}_${timestamp}.xlsx`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+            layui.layer.msg('数据导出成功', {icon: 1});
+        })
         .catch(error => {
+            console.error('导出失败:', error);
             layui.layer.msg('导出失败: ' + error.message, {icon: 2});
         });
 }
