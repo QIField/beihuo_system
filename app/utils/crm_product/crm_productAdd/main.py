@@ -1,123 +1,910 @@
-import pandas as pd
+"""
+CRM 产品添加主程序
+支持三种模式：数据库模式、两列模式、三列模式
+"""
+
 import os
+import sys
+import time
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+
+# 导入配置
+from config import create_crm_session
+
+# 导入统一的 SessionManager
+from app.utils.session_manager import SessionManager, get_session
+
+# 设置 session 工厂函数
+SessionManager.set_session_factory(create_crm_session)
+
+# 保持向后兼容的别名
+get_thread_session = get_session
+
+# 导入 CRM 相关模块 (使用相对导入)
+from .crm_brand_id import get_brand_dict
+from .crm_get_oe_link import get_oe_link
+from .crm_Product_Add import add_product
+from .crm_product_id import get_product_id
+from .crm_updateView import update_product_name_by_oe, update_brand_code_by_oe
+
+# 导入 Excel 数据模块 (使用相对导入)
+from .excel_data_loader import (
+    load_alias_data,
+    load_product_data,
+    find_brand_by_alias,
+    find_product_name_by_oe,
+    find_best_match_product
+)
+
+# 导入数据库模块 (使用相对导入)
+from .db_manager import (
+    get_db_connection,
+    load_data_from_mysql,
+    update_msg_with_processed_result
+)
 
 
-def load_alias_data():
-    """全局加载crm可用别名数据"""
-    try:
-        # 使用基于__file__的绝对路径计算
-        current_file = os.path.abspath(__file__)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
-        alias_file_path = os.path.join(project_root, "static", "excel", "crm可用别名.xlsx")
+# ============================================================================
+# 全局配置
+# ============================================================================
+MAX_WORKERS = 10  # 最大并发数
+
+
+# ============================================================================
+# 初始化函数
+# ============================================================================
+
+def get_brand_id_by_name(session, brand, timeout=30):
+    """
+    根据品牌名称获取品牌ID
+    如果找不到，尝试使用别名匹配
+    """
+    from .crm_brand_id import get_brand_list
+    from config import get_auth_headers
+    
+    headers = get_auth_headers(session)
+    
+    # 首先尝试直接匹配品牌
+    id_params = {'l_name_zh': brand}
+    id_response = session.get('https://crm.gzbbr.com/api/Product.Brand/index', params=id_params, headers=headers, timeout=timeout)
+    
+    if id_response.status_code == 200:
+        id_response_data = id_response.json()
+        brand_list = id_response_data.get("data", {}).get("list", [])
         
-        # 检查文件是否存在
-        if not os.path.exists(alias_file_path):
-            raise FileNotFoundError(f"找不到别名文件: {alias_file_path}")
-            
-        alias_df = pd.read_excel(alias_file_path)
-        print("crm可用别名数据加载完成")
-        return alias_df
-    except Exception as e:
-        print(f"读取crm可用别名.xlsx时发生错误: {e}")
-        return None
-
-
-def load_product_data():
-    """全局加载产品名称数据"""
-    try:
-        # 使用基于__file__的绝对路径计算
-        current_file = os.path.abspath(__file__)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
-        product_file_path = os.path.join(project_root, "static", "excel", "产品名称.xlsx")
+        # 精确匹配l_name_zh与brand
+        for brand_item in brand_list:
+            if brand_item.get("l_name_zh") == brand:
+                brand_id = brand_item.get("brand_id")
+                print(f"品牌 '{brand}' -> ID: {brand_id}, 名称: {brand_item.get('l_name_zh')}, 匹配: 直接匹配")
+                return brand_id
+    
+    # 如果直接匹配失败，尝试使用别名
+    corrected_brand = find_brand_by_alias(brand)
+    if corrected_brand and corrected_brand != brand:
+        # 使用修正后的品牌名再次尝试
+        id_params = {'l_name_zh': corrected_brand}
+        id_response = session.get('https://crm.gzbbr.com/api/Product.Brand/index', params=id_params, headers=headers, timeout=timeout)
         
-        # 检查文件是否存在
-        if not os.path.exists(product_file_path):
-            raise FileNotFoundError(f"找不到产品名称文件: {product_file_path}")
+        if id_response.status_code == 200:
+            id_response_data = id_response.json()
+            brand_list = id_response_data.get("data", {}).get("list", [])
             
-        product_df = pd.read_excel(product_file_path)
-        # 清理cxbianma列的空白字符
-        product_df['cxbianma'] = product_df['cxbianma'].astype(str).str.strip()
-        print("产品名称数据加载完成")
-        return product_df
-    except Exception as e:
-        print(f"读取产品名称.xlsx时发生错误: {e}")
-        return None
+            # 精确匹配l_name_zh与修正后的品牌名
+            for brand_item in brand_list:
+                if brand_item.get("l_name_zh") == corrected_brand:
+                    brand_id = brand_item.get("brand_id")
+                    print(f"品牌 '{brand}' -> ID: {brand_id}, 名称: {brand_item.get('l_name_zh')}, 匹配: 别名匹配({corrected_brand})")
+                    return brand_id
+    
+    print(f"品牌 '{brand}' -> 未找到匹配")
+    return None
 
 
-def find_brand_by_alias(brand, alias_df):
-    """
-    根据别名数据查找正确的品牌名称
-    当找不到brand_id时，将brand与Excel文件中pp_names列数据匹配，
-    如果brand包含在pp_names中，就用对应的pp_name列数据作为新的brand
-    """
-    if alias_df is None:
-        return brand  # 如果没有别名数据，返回原始品牌名
-    
-    # 检查pp_names列，看是否包含当前brand
-    if 'pp_names' in alias_df.columns and 'pp_name' in alias_df.columns:
-        # 遍历pp_names列
-        for idx, pp_name_value in enumerate(alias_df['pp_names']):
-            pp_name_str = str(pp_name_value).strip()
-            # 分割pp_names字符串，因为它是以逗号分隔的多个别名
-            aliases = [alias.strip() for alias in pp_name_str.split(',')]
-            for alias in aliases:
-                if alias in brand or brand in alias:
-                    # 找到匹配项，返回对应的pp_name列数据
-                    correct_brand = str(alias_df.iloc[idx]['pp_name']).strip()
-                    print(f"品牌 '{brand}' 匹配到别名 '{alias}'，使用正确品牌名: '{correct_brand}'")
-                    return correct_brand
-    
-    print(f"品牌 '{brand}' 在别名表中未找到匹配项")
-    return brand  # 没有匹配到任何别名
+# ============================================================================
+# 核心处理函数
+# ============================================================================
 
-
-def find_matching_product(product_oe, product_df):
+def process_single_oe(item, product_df, alias_df, db_manager=None):
     """
-    根据OE码在产品数据中查找匹配的产品
+    处理单个 OE 号码（核心逻辑）
+    
+    Args:
+        item: 数据项 {oe_number, brand, brand_code(可选)}
+        product_df: 产品数据 DataFrame
+        alias_df: 别名数据 DataFrame
+        db_manager: 数据库管理器（数据库模式用）
+    
+    Returns:
+        结果字符串
     """
-    if product_df is None:
-        return None  # 如果没有产品数据，返回None
+    # 使用线程本地的session，避免多线程冲突
+    session = get_thread_session()
     
-    # 精确匹配cxbianma列与当前oe_number
-    product_match = product_df[product_df['cxbianma'] == product_oe]
+    oe_number = item['oe_number']
+    brand = item['brand']
+    brand_code = item.get('brand_code', '')
+    is_three_column = item.get('mode') == 'three_column'
     
-    if not product_match.empty:
-        # 获取第一条匹配记录的mingcheng
-        product_name = product_match.iloc[0]['mingcheng'].strip()
-        print(f"OE: {product_oe}, Product Name: {product_name}")
-        return product_name
+    # 步骤 1: 获取 brand_id（实时查询）
+    brand_id = get_brand_id_by_name(session, brand)
+    if not brand_id:
+        result = f"失败 - 没有匹配到品牌ID: {brand}"
+        print(f"❌ {oe_number}: {result}")
+        _save_result(db_manager, oe_number, brand, result)
+        return result
+    
+    # 步骤 2: 获取 OE 信息（带重试）
+    oe_info = _retry_request(lambda: get_oe_link(oe_number, session), "get_oe_link")
+    if not oe_info:
+        result = f"失败 - 获取 OE 信息失败"
+        print(f"❌ {oe_number}: {result}")
+        _save_result(db_manager, oe_number, brand, result)
+        return result
+    
+    product_name = oe_info.get('product_name', '')
+    vehicle_name = oe_info.get('vehicle_name', '')
+    brand_name = oe_info.get('brand_name', '')
+    
+    # 步骤 3: 处理缺失字段
+    used_excel_name = False
+    
+    if not product_name:
+        # 从 Excel 匹配产品名称
+        if product_df is not None:
+            matched_name = find_product_name_by_oe(oe_number)
+            if matched_name:
+                product_name = matched_name
+                used_excel_name = True
+                print(f"✓ {oe_number}: 从 Excel 匹配到产品名称: {product_name}")
+            else:
+                result = f"失败 - 未找到产品名称"
+                print(f"❌ {oe_number}: {result}")
+                _save_result(db_manager, oe_number, brand, result)
+                return result
+        else:
+            result = f"失败 - 产品数据未加载"
+            print(f"❌ {oe_number}: {result}")
+            _save_result(db_manager, oe_number, brand, result)
+            return result
+    
+    # brand_name 为空则填"其他"
+    if not brand_name:
+        brand_name = "其他"
+    
+    # 步骤 4: 准备产品数据
+    # 注意：vehicle_name 为空时填"暂无"，但如果CRM不接受，会记录失败
+    product_data = {
+        "number": oe_number,
+        "brand_id": brand_id,
+        "l_name_zh": product_name,
+        "l_name_zh_store": product_name,
+        "cass_oebrand_name": brand_name,
+        "l_model_zh": vehicle_name if vehicle_name else "暂无"
+    }
+    
+    # 步骤 5: 发送 crmProductAdd 请求（带重试）
+    add_result = _retry_request(
+        lambda: add_product(product_data, session),
+        "crmProductAdd"
+    )
+    
+    if not add_result:
+        result = f"失败 - 添加产品请求失败"
+        print(f"❌ {oe_number}: {result}")
+        _save_result(db_manager, oe_number, brand, result)
+        return result
+    
+    # 解析响应
+    status = add_result.get('status')
+    msg = add_result.get('msg', '')
+    
+    # 检查车型为空的错误（即使 status 是 201，msg 中也可能包含错误信息）
+    if not vehicle_name or "车型不能为空" in msg or "车型" in msg and "不能为空" in msg:
+        result = f"失败 - 车型不能为空 | 请求: {product_data} | 响应: {add_result}"
+        print(f"❌ {oe_number}: {result}")
+        _save_result(db_manager, oe_number, brand, result)
+        return result
+    
+    if status == 200:
+        product_id = add_result.get('data')
+        result = f"成功 - product_id: {product_id}"
+        print(f"✅ {oe_number}: {result}")
+        
+        # 如果使用了 Excel 匹配的名称，需要更新为最佳匹配
+        if used_excel_name:
+            _update_with_best_match(session, oe_number, brand, product_name)
+        
+    elif status == 201:
+        if "该物料已关联当前组织" in msg:
+            result = f"已存在 - {msg}"
+            print(f"⚠️  {oe_number}: {result}")
+        else:
+            result = f"成功 - {msg}"
+            print(f"✅ {oe_number}: {result}")
+            
+        # 已存在也需要更新最佳匹配名称
+        if used_excel_name:
+            _update_with_best_match(session, oe_number, brand, product_name)
     else:
-        print(f"OE: {product_oe}, 未在产品名称.xlsx中找到匹配记录")
-        return None
+        result = f"失败 - {msg}"
+        print(f"❌ {oe_number}: {result}")
+        _save_result(db_manager, oe_number, brand, result)
+        return result
+    
+    # 步骤 6: 三列模式更新 brand_code
+    if is_three_column and brand_code:
+        update_result = update_brand_code_by_oe(session, oe_number, brand, brand_code)
+        if update_result:
+            result += f" | brand_code更新成功"
+            print(f"✓ {oe_number}: brand_code 更新成功")
+        else:
+            result += f" | brand_code更新失败"
+            print(f"⚠️  {oe_number}: brand_code 更新失败")
+    
+    _save_result(db_manager, oe_number, brand, result)
+    return result
 
 
-def get_full_path(relative_path):
+def _update_with_best_match(session, oe_number, brand, product_name):
     """
-    获取项目中的完整路径
+    使用最佳匹配名称更新产品
     """
-    current_file = os.path.abspath(__file__)
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
-    return os.path.join(project_root, relative_path)
+    try:
+        # 搜索相似产品名称
+        from .crm_brand_id import get_brand_list
+        search_result = get_brand_list({'product_name': product_name}, session)
+        
+        if search_result and search_result.get('status') == 200:
+            name_list = search_result.get('data', {}).get('name_list', [])
+            
+            if name_list:
+                best_match = find_best_match_product(product_name, name_list)
+                if best_match:
+                    matched_name = best_match.get('product_name', '')
+                    print(f"🔄 {oe_number}: 最佳匹配名称: {matched_name}")
+                    
+                    # 更新产品名称
+                    update_result = update_product_name_by_oe(
+                        session, oe_number, brand, matched_name
+                    )
+                    if update_result:
+                        print(f"✓ {oe_number}: 产品名称更新成功")
+                    else:
+                        print(f"⚠️  {oe_number}: 产品名称更新失败")
+    except Exception as e:
+        print(f"⚠️  {oe_number}: 更新最佳匹配名称时出错: {e}")
+
+
+def _retry_request(func, name, max_retries=1):
+    """
+    带重试的请求包装器
+    """
+    for i in range(max_retries + 1):
+        try:
+            return func()
+        except Exception as e:
+            if i < max_retries:
+                print(f"  {name} 请求失败，重试第 {i+1} 次...")
+                time.sleep(1)
+            else:
+                print(f"  {name} 请求失败: {e}")
+                return None
+    return None
+
+
+def _save_result(db_manager, oe_number, brand, result):
+    """
+    保存结果（数据库模式）
+    """
+    if db_manager:
+        update_msg_with_processed_result(db_manager, oe_number, brand, result)
+
+
+# ============================================================================
+# 三种模式处理函数
+# ============================================================================
+
+def process_database_mode(session, product_df, alias_df):
+    """
+    数据库模式处理
+    注意：session参数保留用于兼容性，但实际使用线程本地session
+    """
+    print("\n【数据库模式】")
+    
+    # 获取数据库连接
+    db_manager = get_db_connection()
+    if not db_manager:
+        print("❌ 数据库连接失败")
+        return
+    
+    try:
+        # 加载数据
+        data = load_data_from_mysql()
+        if not data:
+            print("没有数据需要处理")
+            return
+        
+        print(f"开始处理 {len(data)} 条数据...")
+        
+        # 准备处理项
+        items = []
+        for row in data:
+            items.append({
+                'oe_number': str(row['oe_code']).strip(),
+                'brand': row['brand'],
+                'mode': 'database'
+            })
+        
+        # 并发处理（使用线程本地session）
+        _process_with_thread_pool(
+            items, product_df, alias_df, db_manager
+        )
+        
+    finally:
+        db_manager.close()
+        print("数据库连接已关闭")
+
+
+def process_two_column_mode(session, product_df, alias_df, file_path):
+    """
+    两列模式处理（oe + brand）
+    """
+    print("\n【两列模式】")
+    
+    # 读取 Excel
+    try:
+        df = pd.read_excel(file_path) if file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(file_path)
+        print(f"读取到 {len(df)} 行数据")
+    except Exception as e:
+        print(f"❌ 读取文件失败: {e}")
+        return
+    
+    # 识别列
+    oe_col, brand_col = _identify_columns(df)
+    if not oe_col or not brand_col:
+        print("❌ 未能识别必要的列")
+        return
+    
+    # 准备处理项
+    items = []
+    for _, row in df.iterrows():
+        oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
+        brand = str(row[brand_col]).strip() if pd.notna(row[brand_col]) else ''
+        if oe and brand:
+            items.append({
+                'oe_number': oe,
+                'brand': brand,
+                'mode': 'two_column'
+            })
+    
+    print(f"有效数据: {len(items)} 条")
+
+    # 并发处理（使用线程本地session）
+    results = _process_with_thread_pool(
+        items, product_df, alias_df, None
+    )
+
+    # 保存结果
+    _save_excel_results(df, results, oe_col, file_path)
+
+
+def process_three_column_mode(session, product_df, alias_df, file_path):
+    """
+    三列模式处理（oe + brand + brand_code）
+    """
+    print("\n【三列模式】")
+    
+    # 读取 Excel
+    try:
+        df = pd.read_excel(file_path) if file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(file_path)
+        print(f"读取到 {len(df)} 行数据")
+    except Exception as e:
+        print(f"❌ 读取文件失败: {e}")
+        return
+    
+    # 识别列
+    oe_col, brand_col, brand_code_col = _identify_columns_extended(df)
+    if not oe_col or not brand_col or not brand_code_col:
+        print("❌ 未能识别必要的列")
+        return
+    
+    # 准备处理项
+    items = []
+    for _, row in df.iterrows():
+        oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
+        brand = str(row[brand_col]).strip() if pd.notna(row[brand_col]) else ''
+        brand_code = str(row[brand_code_col]).strip() if pd.notna(row[brand_code_col]) else ''
+        if oe and brand:
+            items.append({
+                'oe_number': oe,
+                'brand': brand,
+                'brand_code': brand_code,
+                'mode': 'three_column'
+            })
+    
+    print(f"有效数据: {len(items)} 条")
+
+    # 并发处理（使用线程本地session）
+    results = _process_with_thread_pool(
+        items, product_df, alias_df, None
+    )
+
+    # 保存结果
+    _save_excel_results(df, results, oe_col, file_path)
+
+
+def _process_with_thread_pool(items, product_df, alias_df, db_manager=None):
+    """
+    使用线程池并发处理
+    每个线程使用独立的session，避免多线程冲突
+    """
+    results = {}
+    completed = 0
+    total = len(items)
+    
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        # 提交所有任务（不传递session，每个线程使用自己的session）
+        future_to_item = {
+            executor.submit(
+                process_single_oe, item, product_df, alias_df, db_manager
+            ): item for item in items
+        }
+        
+        # 收集结果
+        for future in as_completed(future_to_item):
+            item = future_to_item[future]
+            oe_number = item['oe_number']
+            
+            try:
+                result = future.result()
+                results[oe_number] = result
+            except Exception as e:
+                result = f"失败 - 处理异常: {e}"
+                results[oe_number] = result
+                print(f"❌ {oe_number}: {result}")
+            
+            completed += 1
+            if completed % 10 == 0 or completed == total:
+                print(f"进度: {completed}/{total}")
+    
+    print(f"\n处理完成: {total} 条")
+    return results
+
+
+def _identify_columns(df):
+    """
+    识别两列模式的列（oe, brand）
+    """
+    oe_columns = ['oe', 'OE', 'barcode', '物料条码']
+    brand_columns = ['brand', '品牌', '品牌名称']
+    
+    columns_lower = [str(col).lower().strip() for col in df.columns]
+    column_mapping = dict(zip(columns_lower, df.columns))
+    
+    oe_col = None
+    brand_col = None
+    
+    for key in oe_columns:
+        if key.lower() in columns_lower:
+            oe_col = column_mapping[key.lower()]
+            break
+    
+    for key in brand_columns:
+        if key.lower() in columns_lower:
+            brand_col = column_mapping[key.lower()]
+            break
+    
+    if oe_col:
+        print(f"识别到 OE 列: {oe_col}")
+    if brand_col:
+        print(f"识别到 Brand 列: {brand_col}")
+    
+    return oe_col, brand_col
+
+
+def _identify_columns_extended(df):
+    """
+    识别三列模式的列（oe, brand, brand_code）
+    """
+    oe_col, brand_col = _identify_columns(df)
+    
+    brand_code_columns = ['brand_code', '条码', '物料条码', '品牌代码']
+    columns_lower = [str(col).lower().strip() for col in df.columns]
+    column_mapping = dict(zip(columns_lower, df.columns))
+    
+    brand_code_col = None
+    for key in brand_code_columns:
+        if key.lower() in columns_lower:
+            brand_code_col = column_mapping[key.lower()]
+            break
+    
+    if brand_code_col:
+        print(f"识别到 Brand_Code 列: {brand_code_col}")
+    
+    return oe_col, brand_col, brand_code_col
+
+
+def _save_excel_results(df, results, oe_col, original_file_path):
+    """
+    保存 Excel 结果
+    """
+    df['新建结果'] = ''
+    
+    for idx, row in df.iterrows():
+        oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
+        if oe in results:
+            df.at[idx, '新建结果'] = results[oe]
+    
+    # 生成输出路径
+    base_name = os.path.splitext(original_file_path)[0]
+    output_path = base_name + '_处理结果.xlsx'
+    
+    df.to_excel(output_path, index=False)
+    print(f"结果已保存: {output_path}")
+
+
+# ============================================================================
+# 主入口
+# ============================================================================
+
+def select_mode():
+    """
+    选择处理模式
+    """
+    print("\n" + "="*50)
+    print("CRM 产品添加工具")
+    print("="*50)
+    print("1. 数据库模式 - 从 MySQL 读取数据")
+    print("2. 两列模式 - 从 Excel 读取 (oe + brand)")
+    print("3. 三列模式 - 从 Excel 读取 (oe + brand + brand_code)")
+    print("="*50)
+    
+    while True:
+        choice = input("请选择模式 (1/2/3): ").strip()
+        if choice in ['1', '2', '3']:
+            return int(choice)
+        print("无效选择，请重新输入")
+
+
+def main():
+    """
+    主函数
+    """
+    # 选择模式
+    mode = select_mode()
+    
+    # 创建 Session
+    print("\n初始化 Session...")
+    session = create_crm_session()
+    print("Session 创建成功")
+    
+    # 加载 Excel 数据（所有模式都需要，用于产品名称匹配）
+    print("加载 Excel 数据...")
+    product_df = load_product_data()
+    alias_df = load_alias_data()
+    
+    # 根据模式处理
+    if mode == 1:
+        process_database_mode(session, product_df, alias_df)
+    elif mode == 2:
+        # 两列模式文件路径
+        file_path = r"E:\work download\project\BBR\flask项目\beihuo_system\static\excel\两列数据.xlsx"
+        if os.path.exists(file_path):
+            process_two_column_mode(session, product_df, alias_df, file_path)
+        else:
+            print(f"❌ 文件不存在: {file_path}")
+    elif mode == 3:
+        # 三列模式文件路径
+        file_path = r"E:\work download\工作文件\锁机已手动处理.xls"
+        if os.path.exists(file_path):
+            process_three_column_mode(session, product_df, alias_df, file_path)
+        else:
+            print(f"❌ 文件不存在: {file_path}")
+    
+    print("\n程序执行完毕")
+
+
+# ============================================================================
+# 外部调用接口
+# ============================================================================
+
+def process_database_mode_api():
+    """
+    数据库模式 API 接口
+    供虚拟库存上传后调用
+    """
+    print("\n=== CRM Product Add - 数据库模式 ===")
+    
+    # 创建 Session
+    session = create_crm_session()
+    print("Session 创建成功")
+    
+    # 加载 Excel 数据
+    product_df = load_product_data()
+    alias_df = load_alias_data()
+    
+    # 处理数据库模式
+    process_database_mode(session, product_df, alias_df)
+    
+    print("\n数据库模式处理完毕")
+    return True
+
+
+def process_excel_two_column_mode_api(file_path):
+    """
+    两列模式 API 接口
+    供前端上传 Excel 后调用
+    
+    Args:
+        file_path: Excel 文件路径
+    
+    Returns:
+        结果文件路径
+    """
+    print(f"\n=== CRM Product Add - 两列模式 ===")
+    print(f"文件: {file_path}")
+    
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在: {file_path}")
+    
+    # 创建 Session
+    session = create_crm_session()
+    print("Session 创建成功")
+    
+    # 加载 Excel 数据
+    product_df = load_product_data()
+    alias_df = load_alias_data()
+    
+    # 处理两列模式
+    result_file_path = process_two_column_mode_with_return(session, product_df, alias_df, file_path)
+    
+    print(f"\n两列模式处理完毕，结果: {result_file_path}")
+    return result_file_path
+
+
+def process_excel_three_column_mode_api(file_path):
+    """
+    三列模式 API 接口
+    供前端上传 Excel 后调用
+    
+    Args:
+        file_path: Excel 文件路径
+    
+    Returns:
+        结果文件路径
+    """
+    print(f"\n=== CRM Product Add - 三列模式 ===")
+    print(f"文件: {file_path}")
+    
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在: {file_path}")
+    
+    # 创建 Session
+    session = create_crm_session()
+    print("Session 创建成功")
+    
+    # 加载 Excel 数据
+    product_df = load_product_data()
+    alias_df = load_alias_data()
+    
+    # 处理三列模式
+    result_file_path = process_three_column_mode_with_return(session, product_df, alias_df, file_path)
+    
+    print(f"\n三列模式处理完毕，结果: {result_file_path}")
+    return result_file_path
+
+
+def process_two_column_mode_with_return(session, product_df, alias_df, file_path):
+    """
+    两列模式处理，支持多工作表，返回结果文件路径
+    """
+    print("\n【两列模式 - 多工作表】")
+    
+    # 读取所有工作表
+    try:
+        if file_path.endswith('.csv'):
+            # CSV 文件只有一个工作表
+            all_sheets = {'Sheet1': pd.read_csv(file_path)}
+            print(f"CSV文件按单个工作表处理")
+        else:
+            # Excel 文件读取所有工作表
+            all_sheets = pd.read_excel(file_path, sheet_name=None)
+            print(f"读取到 {len(all_sheets)} 个工作表: {list(all_sheets.keys())}")
+    except Exception as e:
+        print(f"❌ 读取文件失败: {e}")
+        raise
+    
+    # 筛选符合两列模式的工作表
+    valid_sheets = _filter_sheets_by_mode(all_sheets, 'two_column')
+    
+    if not valid_sheets:
+        raise ValueError("没有找到符合两列模式要求的工作表")
+    
+    print(f"找到 {len(valid_sheets)} 个符合条件的工作表")
+    
+    # 处理每个工作表
+    all_results = {}
+    for sheet_name, sheet_info in valid_sheets.items():
+        print(f"\n处理工作表: {sheet_name}")
+        df = sheet_info['df']
+        oe_col, brand_col = sheet_info['columns']
+        
+        # 准备处理项
+        items = []
+        for _, row in df.iterrows():
+            oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
+            brand = str(row[brand_col]).strip() if pd.notna(row[brand_col]) else ''
+            if oe and brand:
+                items.append({
+                    'oe_number': oe,
+                    'brand': brand,
+                    'mode': 'two_column'
+                })
+        
+        print(f"  有效数据: {len(items)} 条")
+
+        # 并发处理（使用线程本地session）
+        results = _process_with_thread_pool(items, product_df, alias_df, None)
+        all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
+    
+    # 保存所有工作表结果到一个文件
+    result_file_path = _save_multi_sheet_results(all_results, file_path)
+    return result_file_path
+
+
+def process_three_column_mode_with_return(session, product_df, alias_df, file_path):
+    """
+    三列模式处理，支持多工作表，返回结果文件路径
+    """
+    print("\n【三列模式 - 多工作表】")
+    
+    # 读取所有工作表
+    try:
+        if file_path.endswith('.csv'):
+            # CSV 文件只有一个工作表
+            all_sheets = {'Sheet1': pd.read_csv(file_path)}
+            print(f"CSV文件按单个工作表处理")
+        else:
+            # Excel 文件读取所有工作表
+            all_sheets = pd.read_excel(file_path, sheet_name=None)
+            print(f"读取到 {len(all_sheets)} 个工作表: {list(all_sheets.keys())}")
+    except Exception as e:
+        print(f"❌ 读取文件失败: {e}")
+        raise
+    
+    # 筛选符合三列模式的工作表
+    valid_sheets = _filter_sheets_by_mode(all_sheets, 'three_column')
+    
+    if not valid_sheets:
+        raise ValueError("没有找到符合三列模式要求的工作表")
+    
+    print(f"找到 {len(valid_sheets)} 个符合条件的工作表")
+    
+    # 处理每个工作表
+    all_results = {}
+    for sheet_name, sheet_info in valid_sheets.items():
+        print(f"\n处理工作表: {sheet_name}")
+        df = sheet_info['df']
+        oe_col, brand_col, brand_code_col = sheet_info['columns']
+        
+        # 准备处理项
+        items = []
+        for _, row in df.iterrows():
+            oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
+            brand = str(row[brand_col]).strip() if pd.notna(row[brand_col]) else ''
+            brand_code = str(row[brand_code_col]).strip() if pd.notna(row[brand_code_col]) else ''
+            if oe and brand:
+                items.append({
+                    'oe_number': oe,
+                    'brand': brand,
+                    'brand_code': brand_code,
+                    'mode': 'three_column'
+                })
+        
+        print(f"  有效数据: {len(items)} 条")
+
+        # 并发处理（使用线程本地session）
+        results = _process_with_thread_pool(items, product_df, alias_df, None)
+        all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
+
+    # 保存所有工作表结果到一个文件
+    result_file_path = _save_multi_sheet_results(all_results, file_path)
+    return result_file_path
+
+
+def _filter_sheets_by_mode(all_sheets, mode):
+    """
+    根据处理模式筛选符合条件的工作表
+    """
+    valid_sheets = {}
+    for sheet_name, df in all_sheets.items():
+        try:
+            if mode == 'two_column':
+                # 检查是否符合两列模式
+                oe_col, brand_col = _identify_columns(df)
+                if oe_col and brand_col:
+                    valid_sheets[sheet_name] = {
+                        'df': df,
+                        'columns': (oe_col, brand_col)
+                    }
+                    print(f"  工作表 '{sheet_name}' 符合两列模式")
+                else:
+                    print(f"  工作表 '{sheet_name}' 不符合两列模式：缺少必要列")
+            else:  # three_column
+                # 检查是否符合三列模式
+                oe_col, brand_col, brand_code_col = _identify_columns_extended(df)
+                if oe_col and brand_col and brand_code_col:
+                    valid_sheets[sheet_name] = {
+                        'df': df,
+                        'columns': (oe_col, brand_col, brand_code_col)
+                    }
+                    print(f"  工作表 '{sheet_name}' 符合三列模式")
+                else:
+                    print(f"  工作表 '{sheet_name}' 不符合三列模式：缺少必要列")
+        except Exception as e:
+            print(f"  工作表 '{sheet_name}' 处理出错: {e}")
+            continue
+    
+    return valid_sheets
+
+
+def _save_multi_sheet_results(all_results, original_file_path):
+    """
+    保存多工作表结果到一个 Excel 文件
+    """
+    # 生成输出路径
+    base_name = os.path.splitext(original_file_path)[0]
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_path = f"{base_name}_处理结果_{timestamp}.xlsx"
+    
+    # 使用 ExcelWriter 保存多个工作表
+    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+        for sheet_name, sheet_data in all_results.items():
+            df = sheet_data['df'].copy()
+            results = sheet_data['results']
+            oe_col = sheet_data['oe_col']
+            
+            # 添加结果列
+            df['新建结果'] = ''
+            for idx, row in df.iterrows():
+                oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
+                if oe in results:
+                    df.at[idx, '新建结果'] = results[oe]
+            
+            # 写入工作表（限制名称长度）
+            safe_sheet_name = sheet_name[:31]  # Excel 工作表名称最多31个字符
+            df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
+    
+    print(f"\n结果已保存: {output_path}")
+    return output_path
+
+
+def _save_excel_results_with_return(df, results, oe_col, original_file_path):
+    """
+    保存 Excel 结果，返回结果文件路径（单工作表兼容）
+    """
+    df['新建结果'] = ''
+    
+    for idx, row in df.iterrows():
+        oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
+        if oe in results:
+            df.at[idx, '新建结果'] = results[oe]
+    
+    # 生成输出路径
+    base_name = os.path.splitext(original_file_path)[0]
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_path = f"{base_name}_处理结果_{timestamp}.xlsx"
+    
+    df.to_excel(output_path, index=False)
+    print(f"结果已保存: {output_path}")
+    return output_path
 
 
 if __name__ == "__main__":
-    # 示例：如何使用这些函数
-    print("开始加载数据...")
-    
-    # 加载别名数据
-    alias_data = load_alias_data()
-    
-    # 加载产品数据
-    product_data = load_product_data()
-    
-    # 示例：查找别名
-    if alias_data is not None:
-        correct_brand = find_brand_by_alias("SomeAlias", alias_data)
-        print(f"Corrected brand: {correct_brand}")
-    
-    # 示例：根据OE码查找产品
-    if product_data is not None:
-        product_name = find_matching_product("some_oe_code", product_data)
-        print(f"Found product: {product_name}")
-    
-    print("数据加载完成")
+    main()

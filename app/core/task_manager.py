@@ -314,13 +314,26 @@ def init_ks_bill_monitor():
                 get_ks_auto_bill_status,
                 start_ks_auto_bill_process
             )
+            from app.core.process_manager import ks_bill_process_manager
+            from datetime import datetime
             
             status = get_ks_auto_bill_status()
+            current_hour = datetime.now().hour
             
             # 检查是否禁用自动重启（默认启用）
             auto_start = os.environ.get('AUTO_START_KS_BILL', 'true').lower() != 'false'
             
-            if auto_start and status.get('status') != 'running':
+            # 在7点运行时间段开始时，强制重置计数器并启动子进程
+            if current_hour == 7 and status.get('status') != 'running':
+                logger.info("[子进程监控] 早上7点，进入开思自动对单运行时间，强制启动子进程...")
+                # 重置计数器，确保可以启动
+                ks_bill_process_manager.reset_restart_count()
+                success = start_ks_auto_bill_process()
+                if success:
+                    logger.info("[子进程监控] 早上7点子进程启动成功")
+                else:
+                    logger.error("[子进程监控] 早上7点子进程启动失败")
+            elif auto_start and status.get('status') != 'running':
                 logger.info(f"[子进程监控] 检测到开思自动对单进程未运行，状态: {status}")
                 logger.info("[子进程监控] 尝试自动重启...")
                 
@@ -343,7 +356,30 @@ def init_ks_bill_monitor():
         replace_existing=True
     )
     
+    # 注册每天0点重置重启计数器的任务
+    def reset_restart_counter():
+        """每天0点重置子进程重启计数器"""
+        try:
+            from app.core.process_manager import ks_bill_process_manager
+            ks_bill_process_manager.reset_restart_count()
+            logger.info("[子进程监控] 每天0点已重置子进程重启计数器")
+        except Exception as e:
+            logger.error(f"[子进程监控] 重置重启计数器失败: {e}")
+    
+    task_manager.schedule(
+        reset_restart_counter,
+        'cron',
+        'ks_bill_reset_counter',
+        hour=0,
+        minute=0,
+        replace_existing=True
+    )
+    
     logger.info("[子进程监控] 开思自动对单子进程监控已启动（每分钟检查一次）")
+    logger.info("[子进程监控] 已添加每天0点重置重启计数器任务")
+    print("[子进程监控] 开思自动对单子进程监控已启动（每分钟检查一次）")
+    print("[子进程监控] 已添加每天0点重置重启计数器任务")
+    print("[子进程监控] 已添加早上7点强制启动子进程任务")
 
 
 # 全局任务管理器实例

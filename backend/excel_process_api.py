@@ -10,13 +10,10 @@ import importlib.util
 from flask import request, jsonify, send_file
 from datetime import datetime
 
-# 导入必要的函数
-from app.utils.crm_product.crm新建产品 import (
-    prepare_three_column_data,
-    prepare_two_column_data, 
-    get_global_session,
-    process_batch_items,
-    save_results_to_excel
+# 导入新的 API 函数
+from app.utils.crm_product import (
+    process_excel_two_column_mode_api,
+    process_excel_three_column_mode_api
 )
 
 def register_excel_process_routes(app):
@@ -81,13 +78,11 @@ def register_excel_process_routes(app):
             print(f"处理模式: {mode}")
             
             try:
-                # 根据模式选择不同的处理函数
+                # 根据模式选择不同的处理函数（使用新的 API）
                 if mode == 'two_column':
-                    from app.utils.crm_product import process_excel_two_column_mode
-                    result_file_path = process_excel_two_column_mode(temp_file_path)
+                    result_file_path = process_excel_two_column_mode_api(temp_file_path)
                 else:  # three_column
-                    from app.utils.crm_product import process_excel_three_column_mode
-                    result_file_path = process_excel_three_column_mode(temp_file_path)
+                    result_file_path = process_excel_three_column_mode_api(temp_file_path)
                 
                 # 检查结果文件是否成功创建
                 if os.path.exists(result_file_path):

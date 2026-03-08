@@ -5,10 +5,32 @@ import os
 from datetime import datetime
 import re
 import time
+import threading
 import pandas as pd
 import json
 from datetime import datetime, timedelta
 from app.utils.database_connection import get_db_connection as get_pooled_db_connection  # 使用统一的连接池实现
+
+# 导入统一的 SessionManager
+from app.utils.session_manager import SessionManager, get_session
+
+# 设置 session 工厂函数
+def _create_crm_session():
+    """创建CRM session的工厂函数"""
+    session = requests.Session()
+    # 设置连接池参数
+    adapter = requests.adapters.HTTPAdapter(
+        pool_connections=10,
+        pool_maxsize=10,
+        max_retries=3
+    )
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    # 添加认证信息
+    session.headers.update(CRM_HEADERS)
+    return session
+
+SessionManager.set_session_factory(_create_crm_session)
 
 
 # 配置==============================================================================
@@ -66,6 +88,16 @@ MYSQL_CONFIG = {
 PRODUCT_DF = None
 ALIAS_DF = None  # 新增：用于存储别名数据
 PROCESSING_RESULTS = []
+
+# 使用统一的 SessionManager
+def get_thread_session():
+    """
+    获取线程本地的session对象
+    每个线程有独立的session，避免多线程冲突
+    """
+    return get_session()
+
+# 保留GLOBAL_SESSION用于单线程环境（向后兼容）
 GLOBAL_SESSION = requests.Session()
 # 设置连接池参数
 adapter = requests.adapters.HTTPAdapter(
@@ -75,6 +107,7 @@ adapter = requests.adapters.HTTPAdapter(
 )
 GLOBAL_SESSION.mount('http://', adapter)
 GLOBAL_SESSION.mount('https://', adapter)
+GLOBAL_SESSION.headers.update(CRM_HEADERS)
 
 
 class DatabaseManager:
@@ -888,13 +921,12 @@ def process_single_row_with_db_update(db_manager, row):
     处理单行数据并更新数据库中的update_msg列
     """
     global PRODUCT_DF
-    global GLOBAL_SESSION
     
     oe_number = str(row['oe_code']).strip()
     brand = row.get('brand', '')
     
-    # 使用全局session
-    session = GLOBAL_SESSION
+    # 使用线程本地的session，避免多线程冲突
+    session = get_thread_session()
     
     # 处理OE号
     result = process_oe_number_with_timeout(session, oe_number, brand)
@@ -983,13 +1015,12 @@ def process_database_item_batch(db_manager, item):
     批量处理数据库单个项目
     """
     global PRODUCT_DF
-    global GLOBAL_SESSION
     
     oe_number = str(item['oe_code']).strip()
     brand = item['brand']
     
-    # 使用全局session
-    session = GLOBAL_SESSION
+    # 使用线程本地的session，避免多线程冲突
+    session = get_thread_session()
     
     # 处理OE号
     result = process_oe_number_with_timeout(session, oe_number, brand)
@@ -1195,7 +1226,7 @@ def process_excel_two_column_mode(file_path):
     """
     两列模式处理函数：使用线程池并发处理Excel所有工作表
     """
-    global PRODUCT_DF, ALIAS_DF, GLOBAL_SESSION
+    global PRODUCT_DF, ALIAS_DF
     
     try:
         # 读取Excel所有工作表
@@ -1224,8 +1255,7 @@ def process_excel_two_column_mode(file_path):
         if ALIAS_DF is None:
             load_alias_data()
         
-        # 使用全局session
-        session = GLOBAL_SESSION
+        # 注意：不在主线程创建session，每个工作线程会使用自己的session
         
         # 处理每个符合条件的工作表（使用线程池并发处理）
         for sheet_name, sheet_info in valid_sheets.items():
@@ -1251,10 +1281,10 @@ def process_excel_two_column_mode(file_path):
             
             results_dict = {}
             
-            # 提交所有任务
+            # 提交所有任务（不传递session，每个线程使用自己的session）
             futures = []
             for item in processing_items:
-                future = task_manager.submit(process_single_item_batch, session, item)
+                future = task_manager.submit(process_single_item_batch, item)
                 futures.append((future, item))
             
             # 收集结果
@@ -1561,13 +1591,17 @@ def process_oe_number_with_timeout(session, oe_number, brand, timeout=30):
     return f"失败 - 达到最大重试次数({max_retries})"
 
 
-def process_single_item_batch(session, item):
+def process_single_item_batch(item):
     """
     批量处理单个项目 - 改进版
     完善已存在情况的处理和重试机制
+    每个线程使用独立的session，避免多线程冲突
     """
     oe_number = item['oe_number']
     brand = item['brand']
+    
+    # 使用线程本地的session，避免多线程冲突
+    session = get_thread_session()
     
     # 处理基础的OE号新建
     result = process_oe_number_with_timeout(session, oe_number, brand)

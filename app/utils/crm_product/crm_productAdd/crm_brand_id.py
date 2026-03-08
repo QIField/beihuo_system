@@ -3,6 +3,7 @@ CRM 品牌 API 请求模块 - 简化版
 """
 
 import requests
+from config import get_auth_headers
 
 
 def get_brand_list(params=None, session=None):
@@ -18,17 +19,8 @@ def get_brand_list(params=None, session=None):
     """
     url = 'https://crm.gzbbr.com/api/Product.Brand/index'
     
-    # 从 cookie 中获取 authorization
-    auth_token = session.cookies.get('authorization')
-    
-    headers = {
-        'accept': 'application/json, text/plain, */*',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0'
-    }
-    
-    # 如果有 authorization token，添加到 header
-    if auth_token:
-        headers['authorization'] = auth_token
+    # 使用工具函数获取认证 headers
+    headers = get_auth_headers(session)
     
     try:
         # 使用传入的 session（已包含 cookie）

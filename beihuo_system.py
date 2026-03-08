@@ -1,13 +1,19 @@
-from flask import Flask, render_template, jsonify, request, session
+# 强制使用 spawn 模式启动子进程，避免与 uWSGI 多线程冲突
+import multiprocessing
+try:
+    multiprocessing.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass  # 已经设置过，忽略错误
+
+from flask import Flask, render_template, jsonify, request, session, Response, send_file
 import pymysql ,atexit ,schedule ,threading,re,time,os,json, io, csv, math, sys
-from flask import Response
 from datetime import datetime
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from backend.virtual_inventory_api import register_virtual_inventory_routes
-from backend.search_in_crm import search_in_crm_bp 
+from backend.search_in_crm import search_in_crm_bp
 from backend.ks_auto_bill_api import ks_auto_bill_bp
-from backend.excel_process_api import register_excel_process_routes 
+from backend.excel_process_api import register_excel_process_routes
 from urllib.parse import unquote
 import pandas as pd
 from pathlib import Path
@@ -17,13 +23,11 @@ from openpyxl.utils import get_column_letter
 import chardet
 import warnings
 from decimal import Decimal, getcontext
-import threading
 from werkzeug.utils import secure_filename
 import zipfile
 from io import BytesIO
 import tempfile
 import shutil
-from flask import Response, send_file
 import uuid
 from backend.get_order import get_order_bp
 from flask_socketio import SocketIO
@@ -43,26 +47,46 @@ app.register_blueprint(search_in_crm_bp)
 app.register_blueprint(get_order_bp)
 app.register_blueprint(ks_auto_bill_bp)
 # 根据环境选择 async_mode
-# 生产环境（Linux）使用 eventlet，开发环境（Windows）使用 threading
 import platform
-if platform.system() == 'Linux':
-    # Linux 生产环境使用 eventlet
-    socketio = SocketIO(
-        app,
-        cors_allowed_origins="*",
-        async_mode='eventlet',
-        logger=False,  # 关闭详细日志，减少输出
-        engineio_logger=False
-    )
+
+# 检测是否在 uWSGI 环境中运行
+try:
+    import uwsgi
+    IS_UWSGI = True
+except ImportError:
+    IS_UWSGI = False
+
+# 检测 eventlet 是否可用
+try:
+    import eventlet
+    EVENTLET_AVAILABLE = True
+except ImportError:
+    EVENTLET_AVAILABLE = False
+
+# 选择 async_mode 的优先级：
+# 1. 如果在 uWSGI 中运行，必须使用 threading（eventlet/gevent 与 uWSGI 不兼容）
+# 2. 如果不在 uWSGI 中且 eventlet 可用，使用 eventlet（性能更好）
+# 3. 否则使用 threading（保底方案）
+if IS_UWSGI:
+    # uWSGI 环境：必须使用 threading
+    ASYNC_MODE = 'threading'
+    print("[SocketIO] 检测到 uWSGI 环境，使用 threading 模式")
+elif EVENTLET_AVAILABLE and platform.system() == 'Linux':
+    # Linux 独立运行：使用 eventlet（高并发）
+    ASYNC_MODE = 'eventlet'
+    print("[SocketIO] 使用 eventlet 模式")
 else:
-    # Windows 开发环境使用 threading（eventlet 在 Windows 上有兼容性问题）
-    socketio = SocketIO(
-        app,
-        cors_allowed_origins="*",
-        async_mode='threading',
-        logger=False,  # 关闭详细日志，减少输出
-        engineio_logger=False
-    )
+    # Windows 或 eventlet 不可用：使用 threading
+    ASYNC_MODE = 'threading'
+    print(f"[SocketIO] 使用 threading 模式 (平台: {platform.system()})")
+
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode=ASYNC_MODE,
+    logger=False,  # 关闭详细日志，减少输出
+    engineio_logger=False
+)
 # 将socketio实例存储到应用中，供notification_manager使用
 app.socketio = socketio
 
@@ -624,11 +648,11 @@ def run_crm_create_products_task():
     print(f"[{datetime.now()}] 开始执行CRM新建产品任务...")
     
     try:
-        # 使用包导入方式
-        from app.utils.crm_product import main as crm_main
+        # 使用新的 API 调用数据库模式
+        from app.utils.crm_product import process_database_mode_api
         
-        # 直接调用main函数
-        crm_main()
+        # 调用数据库模式处理
+        process_database_mode_api()
             
         print(f"[{datetime.now()}] CRM新建产品任务执行完成！")
         
@@ -1697,52 +1721,6 @@ def delete_user(user_id):
         conn.close()
         return jsonify({'code': 1, 'msg': f'删除用户失败: {str(e)}'}), 500
 
-
-# 修改修改密码API，限制非admin和fsbbr账号对admin和fsbbr账号的操作
-@app.route('/api/users/<int:user_id>/password', methods=['PUT'])
-@login_required
-def update_user_password_duplicate(user_id):
-    """修改用户密码"""
-    current_username = session.get('username')
-    
-    # 获取目标用户信息
-    conn = get_db_connection()
-    cursor = conn.cursor(pymysql.cursors.DictCursor)
-    cursor.execute("SELECT username FROM crmapp_users WHERE id = %s", (user_id,))
-    target_user = cursor.fetchone()
-    
-    if not target_user:
-        conn.close()
-        return jsonify({'code': 1, 'msg': '用户不存在'}), 404
-    
-    target_username = target_user['username']
-    
-    # 检查是否尝试修改admin或fsbbr账号的密码
-    if target_username in ['admin', 'fsbbr']:
-        # 只有admin账号可以修改admin和fsbbr账号的密码
-        if current_username != 'admin':
-            conn.close()
-            return jsonify({'code': 1, 'msg': '权限不足，只有admin账号可以修改管理员账号密码'}), 403
-    
-    data = request.get_json()
-    new_password = data.get('password')
-    
-    if not new_password:
-        conn.close()
-        return jsonify({'code': 1, 'msg': '新密码不能为空'}), 400
-    
-    if len(new_password) < 6:
-        conn.close()
-        return jsonify({'code': 1, 'msg': '密码长度不能少于6个字符'}), 400
-    
-    try:
-        cursor.execute("UPDATE crmapp_users SET password = %s WHERE id = %s", (new_password, user_id))
-        conn.commit()
-        conn.close()
-        return jsonify({'code': 0, 'msg': '密码修改成功'})
-    except Exception as e:
-        conn.close()
-        return jsonify({'code': 1, 'msg': f'修改密码失败: {str(e)}'}), 500
 
 # 添加登出API接口
 @app.route('/api/logout', methods=['POST'])
@@ -4895,13 +4873,9 @@ def init_subprocess_monitor():
         import traceback
         traceback.print_exc()
 
-# 在非 __main__ 模式下初始化（生产环境）
-if __name__ != '__main__':
-    init_subprocess_monitor()
-
 # 应用启动配置
 if __name__ == '__main__':
-    # 开发环境：也初始化监控
+    # 只在主进程中初始化监控和启动子进程
     init_subprocess_monitor()
     
     # 将原来的 app.run() 替换为：
