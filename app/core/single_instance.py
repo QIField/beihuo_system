@@ -25,13 +25,22 @@ def is_first_uwsgi_worker() -> bool:
     检测是否是 uWSGI 的第一个 worker
 
     在 uWSGI 多 worker 环境下，只让第一个 worker 启动定时任务
+    注意：uwsgi.worker_id() 返回 0, 1, 2...（从0开始）
+          但 uWSGI 日志显示 worker 1, 2, 3...（从1开始）
 
     :return: True 表示是第一个 worker 或不在 uWSGI 环境
     """
     try:
         import uwsgi
-        return uwsgi.worker_id() == 1
+        worker_id = uwsgi.worker_id()
+        print(f"[Worker检测] 当前 worker_id: {worker_id}")
+        # worker_id 从 0 开始，所以第一个 worker 是 0
+        return worker_id == 0
     except ImportError:
+        print("[Worker检测] 无法导入 uwsgi 模块，假设为单进程环境")
+        return True
+    except Exception as e:
+        print(f"[Worker检测] 检测失败: {e}，假设为单进程环境")
         return True
 
 

@@ -4841,7 +4841,7 @@ def init_subprocess_monitor():
 
 # 应用启动配置
 if __name__ == '__main__':
-    # 只在主进程中初始化监控和启动子进程
+    # 只在主进程中初始化监控和启动任务
     init_subprocess_monitor()
     
     # 使用纯 Flask 运行，避免 SocketIO threading 模式导致的多进程问题
