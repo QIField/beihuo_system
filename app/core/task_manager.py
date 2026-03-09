@@ -294,92 +294,50 @@ class UnifiedTaskManager:
 
 def init_ks_bill_monitor():
     """
-    初始化开思自动对单子进程监控
-    
-    功能：
-    1. 每分钟检查子进程状态
-    2. 默认自动重启崩溃的子进程
-    3. 记录监控日志
-    
-    使用环境变量 AUTO_START_KS_BILL 控制是否自动重启（默认启用）
+    初始化开思自动对单任务（简化版）
+
+    核心改进：
+    1. 直接调度任务，无需监控器
+    2. 任务自带单实例锁，防止重复执行
+    3. 只在第一个 uWSGI worker 中启动任务
+    4. 异常隔离，不影响主进程
+
+    使用环境变量 AUTO_START_KS_BILL 控制是否自动启动（默认启用）
     如需禁用，设置 AUTO_START_KS_BILL=false
     """
     import os
-    
-    def monitor_ks_bill_process():
-        """监控任务：检查子进程状态并在需要时重启"""
-        try:
-            # 延迟导入，避免循环依赖
-            from backend.ks_auto_bill_api import (
-                get_ks_auto_bill_status,
-                start_ks_auto_bill_process
-            )
-            from app.core.process_manager import ks_bill_process_manager
-            from datetime import datetime
-            
-            status = get_ks_auto_bill_status()
-            current_hour = datetime.now().hour
-            
-            # 检查是否禁用自动重启（默认启用）
-            auto_start = os.environ.get('AUTO_START_KS_BILL', 'true').lower() != 'false'
-            
-            # 在7点运行时间段开始时，强制重置计数器并启动子进程
-            if current_hour == 7 and status.get('status') != 'running':
-                logger.info("[子进程监控] 早上7点，进入开思自动对单运行时间，强制启动子进程...")
-                # 重置计数器，确保可以启动
-                ks_bill_process_manager.reset_restart_count()
-                success = start_ks_auto_bill_process()
-                if success:
-                    logger.info("[子进程监控] 早上7点子进程启动成功")
-                else:
-                    logger.error("[子进程监控] 早上7点子进程启动失败")
-            elif auto_start and status.get('status') != 'running':
-                logger.info(f"[子进程监控] 检测到开思自动对单进程未运行，状态: {status}")
-                logger.info("[子进程监控] 尝试自动重启...")
-                
-                success = start_ks_auto_bill_process()
-                
-                if success:
-                    logger.info("[子进程监控] 子进程重启成功")
-                else:
-                    logger.warning("[子进程监控] 子进程重启失败")
-            
-        except Exception as e:
-            logger.error(f"[子进程监控] 监控任务执行出错: {e}")
-    
-    # 注册监控任务：每分钟执行一次
+    from app.core.single_instance import is_first_uwsgi_worker
+
+    # 只在第一个 worker 中启动任务（防止多 worker 重复）
+    if not is_first_uwsgi_worker():
+        logger.info("[开思自动对单] 非第一个 uWSGI worker，跳过任务启动")
+        print("[开思自动对单] 非第一个 uWSGI worker，跳过任务启动")
+        return
+
+    # 检查是否禁用自动启动（默认启用）
+    auto_start = os.environ.get('AUTO_START_KS_BILL', 'true').lower() != 'false'
+
+    if not auto_start:
+        logger.info("[开思自动对单] AUTO_START_KS_BILL=false，跳过任务启动")
+        print("[开思自动对单] AUTO_START_KS_BILL=false，跳过任务启动")
+        return
+
+    # 导入简化的任务函数
+    from app.ks_auto_bill.task import ks_auto_bill_task
+
+    # 1. 注册开思自动对单任务：每分钟执行一次
     task_manager.schedule(
-        monitor_ks_bill_process,
+        ks_auto_bill_task,
         'interval',
-        'ks_bill_process_monitor',
+        'ks_auto_bill_task',
         minutes=1,
         replace_existing=True
     )
-    
-    # 注册每天0点重置重启计数器的任务
-    def reset_restart_counter():
-        """每天0点重置子进程重启计数器"""
-        try:
-            from app.core.process_manager import ks_bill_process_manager
-            ks_bill_process_manager.reset_restart_count()
-            logger.info("[子进程监控] 每天0点已重置子进程重启计数器")
-        except Exception as e:
-            logger.error(f"[子进程监控] 重置重启计数器失败: {e}")
-    
-    task_manager.schedule(
-        reset_restart_counter,
-        'cron',
-        'ks_bill_reset_counter',
-        hour=0,
-        minute=0,
-        replace_existing=True
-    )
-    
-    logger.info("[子进程监控] 开思自动对单子进程监控已启动（每分钟检查一次）")
-    logger.info("[子进程监控] 已添加每天0点重置重启计数器任务")
-    print("[子进程监控] 开思自动对单子进程监控已启动（每分钟检查一次）")
-    print("[子进程监控] 已添加每天0点重置重启计数器任务")
-    print("[子进程监控] 已添加早上7点强制启动子进程任务")
+
+    logger.info("[开思自动对单] 任务已调度（每分钟执行一次）")
+    print("[开思自动对单] 任务已调度（每分钟执行一次）")
+    print("[开思自动对单] 单实例锁已启用，防止重复执行")
+    print("[开思自动对单] 异常隔离已启用，不影响主进程")
 
 
 # 全局任务管理器实例

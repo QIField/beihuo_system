@@ -31,7 +31,7 @@ def init_virtual_inventory_table():
             id INT AUTO_INCREMENT PRIMARY KEY,
             supplier_name VARCHAR(100) COMMENT '供应商名称',
             oe_code VARCHAR(100) COMMENT 'OE码',
-            brand VARCHAR(255) NOT NULL COMMENT '品牌',
+            brand VARCHAR(255) DEFAULT NULL COMMENT '品牌',
             price DECIMAL(10,2) COMMENT '价格',
             expiry_date DATETIME COMMENT '过期时间',
             warehouse VARCHAR(255) COMMENT '仓库',
@@ -43,7 +43,8 @@ def init_virtual_inventory_table():
             INDEX idx_warehouse (warehouse),
             INDEX idx_expiry_date (expiry_date),
             INDEX idx_fetch_time (fetch_time),
-            UNIQUE KEY uk_brand_warehouse (brand, warehouse)
+            INDEX idx_oe_code (oe_code),
+            INDEX idx_supplier_name (supplier_name)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='虚拟库存表';
         """
         cursor.execute(create_table_sql)

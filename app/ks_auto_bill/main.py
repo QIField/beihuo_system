@@ -275,10 +275,14 @@ def order_processing_worker(order_queue):
     print("[开单模块] 订单处理工作线程已退出")
 
 
-def main():
+def main(stop_event=None, heartbeat_func=None):
     """
     主函数：执行完整的自动开单流程（循环运行）
-    
+
+    参数:
+        stop_event: 外部传入的停止事件，用于接收停止信号
+        heartbeat_func: 外部传入的心跳函数，用于报告任务存活
+
     流程:
         1. 登录开思平台
         2. 检查登录状态（过期则重新登录）
@@ -286,77 +290,103 @@ def main():
         4. 获取开思订单并保存到数据库
         5. 将待处理订单加入队列
         6. 等待1分钟后循环或直到非运行时间
-    
-    修改：添加退出标志检查，支持优雅退出
+
+    修改：支持外部 stop_event 和 heartbeat_func
     """
     global _should_exit
-    
+
+    # 使用外部传入的 stop_event，如果没有则使用内部的全局变量
+    use_external_stop = stop_event is not None
+
     print("=" * 60)
     print("开思订单自动开单系统（循环模式）")
     print("=" * 60)
-    print(f"[主进程] PID: {os.getpid()}")
-    
+    print(f"[主线程] 使用外部停止事件: {use_external_stop}")
+
     # 在程序启动时检查并创建数据库表
     print("【初始化】正在检查数据库表...")
     init_database_table()
     print("【初始化】数据库表检查完成")
-    
+
     session = None
-    
+
     # 创建订单队列
     order_queue = queue.Queue()
-    
+
     # 启动订单处理工作线程
     processing_thread = threading.Thread(target=order_processing_worker, args=(order_queue,))
     processing_thread.start()
-    
+
     print(f"[爬取模块] 系统启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
+
+    def should_stop():
+        """检查是否应该停止"""
+        if use_external_stop:
+            return stop_event.is_set()
+        return _should_exit
+
+    def wait_with_stop_check(seconds):
+        """等待指定秒数，但每秒检查停止标志"""
+        for _ in range(seconds):
+            if should_stop():
+                return False  # 被中断
+            # 报告心跳
+            if heartbeat_func:
+                heartbeat_func()
+            time.sleep(1)
+        return True  # 正常完成
+
     try:
-        while not _should_exit:
+        while not should_stop():
             current_time = datetime.now()
-            
+
+            # 报告心跳
+            if heartbeat_func:
+                heartbeat_func()
+
             # 检查是否在运行时间内
             if not is_running_time():
                 print(f"\n[爬取模块] 当前时间 {current_time.hour} 点，不在运行时间段内，等待至运行时间...")
-                
-                # 等待直到进入运行时间，但每秒检查退出标志
-                while not is_running_time() and not _should_exit:
-                    # 使用 _exit_event 等待，可以被信号唤醒
-                    _exit_event.wait(timeout=60)
+
+                # 等待直到进入运行时间，但每秒检查停止标志
+                while not is_running_time() and not should_stop():
+                    if heartbeat_func:
+                        heartbeat_func()
+                    # 使用外部事件或内部事件等待
+                    if use_external_stop:
+                        stop_event.wait(timeout=60)
+                    else:
+                        _exit_event.wait(timeout=60)
                     current_time = datetime.now()
                     if current_time.hour == 7:  # 如果是早上7点，跳出等待
                         break
-                
-                if _should_exit:
+
+                if should_stop():
                     break
-                
+
                 print(f"[爬取模块] 进入运行时间段，继续执行...")
             else:
                 # 显示当前时间
                 print(f"\n{'=' * 60}")
                 print(f"[爬取模块] {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
                 print(f"{'=' * 60}")
-                
+
                 # 检查登录状态，过期则重新登录
                 print("\n[爬取模块] 检查登录状态...")
                 if not check_login_status(session):
                     print("[爬取模块] 登录已过期或未登录，重新登录...")
                     session = login()
-                    
+
                     if session is None:
                         print("[爬取模块] 登录失败，1分钟后重试")
-                        # 分段等待，检查退出标志
-                        for _ in range(60):
-                            if _should_exit:
-                                break
-                            time.sleep(1)
+                        if not wait_with_stop_check(60):
+                            break
                         continue
-                    
+
                     print("[爬取模块] 登录成功")
                 else:
                     print("[爬取模块] 登录状态有效")
-            
+
             # 获取开思订单并将信息保存到数据库
             print("\n[爬取模块] 获取开思订单并保存到数据库...")
             try:
@@ -366,13 +396,10 @@ def main():
                 print(f"[爬取模块] 找到 {len(pending_confirmation_orders)} 条待处理订单（等待商家确认）")
             except Exception as e:
                 print(f"[爬取模块] 获取订单信息失败: {str(e)}")
-                # 分段等待，检查退出标志
-                for _ in range(60):
-                    if _should_exit:
-                        break
-                    time.sleep(1)
+                if not wait_with_stop_check(60):
+                    break
                 continue
-            
+
             # 将待处理订单加入队列
             print("\n[爬取模块] 将待处理订单加入队列...")
             if pending_confirmation_orders:
@@ -380,47 +407,45 @@ def main():
                 print(f"[爬取模块] 添加 {len(pending_confirmation_orders)} 条订单到处理队列，当前队列中共有 {order_queue.qsize()} 批订单")
             else:
                 print("[爬取模块] 没有待处理的订单，跳过添加到队列")
-            
-            # 等待1分钟后继续爬取，但每秒检查退出标志
+
+            # 等待1分钟后继续爬取，但每秒检查停止标志
             print(f"\n[爬取模块] 1分钟后进行下一次爬取...")
-            for _ in range(60):
-                if _should_exit:
-                    break
-                time.sleep(1)
-    
+            if not wait_with_stop_check(60):
+                break
+
     except KeyboardInterrupt:
-        print("\n[主进程] 收到键盘中断信号")
+        print("\n[主线程] 收到键盘中断信号")
     finally:
         # 优雅退出流程
         print("\n" + "=" * 60)
-        print("[主进程] 开始优雅退出...")
+        print("[主线程] 开始优雅退出...")
         print("=" * 60)
-        
+
         # 设置退出标志
         _should_exit = True
         _exit_event.set()
-        
+
         # 发送 None 到队列，通知处理线程退出
-        print("[主进程] 通知处理线程退出...")
+        print("[主线程] 通知处理线程退出...")
         order_queue.put(None)
-        
+
         # 等待处理线程完成
-        print("[主进程] 等待处理线程完成...")
+        print("[主线程] 等待处理线程完成...")
         processing_thread.join(timeout=30)
-        
+
         if processing_thread.is_alive():
-            print("[主进程] 处理线程未在30秒内退出，强制结束")
+            print("[主线程] 处理线程未在30秒内退出，强制结束")
         else:
-            print("[主进程] 处理线程已正常退出")
-        
+            print("[主线程] 处理线程已正常退出")
+
         # 清空队列
         while not order_queue.empty():
             try:
                 order_queue.get_nowait()
             except queue.Empty:
                 break
-        
-        print("[主进程] 资源清理完成")
+
+        print("[主线程] 资源清理完成")
         print(f"[{datetime.now()}] [开思自动开单] 已优雅退出")
         print("=" * 60)
 

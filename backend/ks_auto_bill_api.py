@@ -16,11 +16,14 @@ from app.utils.ks_auto_bill_model import (
 # 导入权限服务
 from app.utils.permission_service import org_required
 
-# 导入进程管理器
-from app.core.process_manager import ks_bill_process_manager
-
-# 定义main.py的路径
-main_py_path = os.path.join(os.path.dirname(__file__), '..', 'app', 'ks_auto_bill', 'main.py')
+# 导入统一任务管理器和简化任务
+from app.core.task_manager import task_manager
+from app.ks_auto_bill.task import (
+    ks_auto_bill_task,
+    get_ks_auto_bill_task_status,
+    process_orders_once
+)
+from app.core.single_instance import ks_bill_lock
 
 ks_auto_bill_bp = Blueprint('ks_auto_bill', __name__)
 
@@ -45,7 +48,6 @@ def ks_auto_bill_page():
     """
     渲染开思自动对单页面
     """
-    # 检查用户是否已登录
     if 'logged_in' not in session:
         return render_template('login.html')
     return render_template('ks_auto_bill.html')
@@ -60,29 +62,22 @@ def get_ks_auto_bill_data():
     用于前端表格展示
     """
     try:
-        # 获取分页参数
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 200))
         
-        # 获取搜索参数
         ks_order_id = request.args.get('ks_order_id', '')
         crm_order_id = request.args.get('crm_order_id', '')
         
-        # 获取日期范围参数
         start_date = request.args.get('start_date', '')
         end_date = request.args.get('end_date', '')
         
-        # 获取排序参数
         sort_auto_billed_first = request.args.get('sort_auto_billed_first', 'false')
         
-        # 如果提供了日期范围，则使用日期范围；否则使用当天日期
         if start_date and end_date:
-            target_date = None  # 不使用目标日期，而是使用日期范围
+            target_date = None
         else:
-            # 获取今天日期作为默认查询条件
             target_date = datetime.now().strftime('%Y-%m-%d')
         
-        # 使用整合后的函数处理所有情况
         total_count = get_crmapp_ks_auto_bill_count(
             target_date_str=target_date,
             start_date=start_date if start_date and end_date else None,
@@ -101,24 +96,17 @@ def get_ks_auto_bill_data():
             crm_order_id=crm_order_id
         )
         
-        # 处理日期格式化 - 仅在展示时格式化
         processed_records = []
         for record in records:
             processed_record = dict(record)
-            # 使用model中的format_time_only函数只获取时间部分
             from app.utils.ks_auto_bill_model import format_time_only
             processed_record['time_only'] = format_time_only(processed_record['date'])
-            # 将日期字段替换为仅时间格式 HH:MM:SS
             processed_record['date'] = format_time_only(processed_record['date'])
-            # 确保所有字段都被包含，包括新增字段
             processed_records.append(processed_record)
         
-        # 如果需要将已自动开单的数据置顶，则进行排序
         if sort_auto_billed_first == 'true':
-            # 按CRM订单状态排序，"已自动开单"优先
             processed_records.sort(key=lambda x: 0 if x.get('crm_order_status') == '已自动开单' else 1)
         
-        # 返回JSON格式数据
         return jsonify({
             'code': 0,
             'msg': '',
@@ -134,76 +122,103 @@ def get_ks_auto_bill_data():
         })
 
 
-def run_main_function():
-    """
-    在子进程中运行开思自动对单主函数
-    这个函数会在独立的子进程中执行
-    """
-    try:
-        # 导入并运行main模块
-        from app.ks_auto_bill.main import main
-        print("✅ 开思自动开单子进程已启动")
-        # 运行主函数
-        main()
-    except Exception as e:
-        print(f"❌ 开思自动开单子进程出错: {e}")
-        import traceback
-        traceback.print_exc()
-        # 退出子进程，返回错误码
-        sys.exit(1)
-
-
 def start_ks_auto_bill_process():
     """
-    启动开思自动对单子进程
-    
+    立即执行一次开思自动对单任务（手动触发）
+
     :return: 是否成功启动
     """
-    return ks_bill_process_manager.start(run_main_function)
+    try:
+        # 立即提交任务到线程池
+        task_manager.submit(ks_auto_bill_task)
+        print("[开思自动对单] 已提交手动执行任务")
+        return True
+    except Exception as e:
+        print(f"[开思自动对单] 手动执行失败: {e}")
+        return False
 
 
 def stop_ks_auto_bill_process():
     """
-    停止开思自动对单子进程
-    
+    停止开思自动对单（取消调度）
+
     :return: 是否成功停止
     """
-    return ks_bill_process_manager.stop()
+    try:
+        # 从调度器中移除任务（停止定时执行）
+        task_manager._scheduler.remove_job('ks_auto_bill_task')
+        print("[开思自动对单] 已停止定时任务调度")
+        return True
+    except Exception as e:
+        print(f"[开思自动对单] 停止失败: {e}")
+        return False
 
 
 def restart_ks_auto_bill_process():
     """
-    重启开思自动对单子进程
-    
+    重启开思自动对单（重新调度）
+
     :return: 是否成功重启
     """
-    return ks_bill_process_manager.restart(run_main_function)
+    try:
+        # 先停止（如果存在）
+        try:
+            task_manager._scheduler.remove_job('ks_auto_bill_task')
+        except Exception:
+            pass
+        
+        # 重新调度
+        task_manager.schedule(
+            ks_auto_bill_task,
+            'interval',
+            'ks_auto_bill_task',
+            minutes=1,
+            replace_existing=True
+        )
+        print("[开思自动对单] 已重新调度定时任务")
+        
+        # 立即执行一次
+        task_manager.submit(ks_auto_bill_task)
+        return True
+    except Exception as e:
+        print(f"[开思自动对单] 重启失败: {e}")
+        return False
 
 
 def get_ks_auto_bill_status():
     """
-    获取开思自动对单子进程状态
-    
+    获取开思自动对单任务状态
+
     :return: 状态字典
     """
-    return ks_bill_process_manager.get_status()
+    status = get_ks_auto_bill_task_status()
+    
+    # 补充定时任务状态
+    try:
+        job = task_manager._scheduler.get_job('ks_auto_bill_task')
+        status['scheduled'] = True
+        status['next_run_time'] = str(job.next_run_time) if job.next_run_time else None
+    except Exception:
+        status['scheduled'] = False
+        status['next_run_time'] = None
+    
+    return status
 
 
-# API路由：控制子进程
 @ks_auto_bill_bp.route('/api/ks_auto_bill/control', methods=['POST'])
 @login_required
 @org_required(['fsbbr'])
 def control_ks_auto_bill():
     """
-    控制开思自动对单子进程
-    
+    控制开思自动对单任务
+
     请求参数:
-        action: str - 操作类型 (start/stop/restart/status)
-    
+        action: str - 操作类型 (start/stop/restart/status/run_once)
+
     返回:
         code: int - 0表示成功，1表示失败
         msg: str - 提示信息
-        data: dict - 状态信息（当action为status时）
+        data: dict - 状态信息
     """
     try:
         data = request.get_json()
@@ -213,10 +228,23 @@ def control_ks_auto_bill():
         action = data.get('action')
         
         if action == 'start':
-            success = start_ks_auto_bill_process()
+            success = True
+            try:
+                task_manager.schedule(
+                    ks_auto_bill_task,
+                    'interval',
+                    'ks_auto_bill_task',
+                    minutes=1,
+                    replace_existing=True
+                )
+                msg = '定时任务已启动'
+            except Exception as e:
+                success = False
+                msg = f'启动失败: {str(e)}'
+            
             return jsonify({
                 'code': 0 if success else 1,
-                'msg': '启动成功' if success else '启动失败或进程已在运行',
+                'msg': msg,
                 'status': get_ks_auto_bill_status()
             })
         
@@ -236,6 +264,14 @@ def control_ks_auto_bill():
                 'status': get_ks_auto_bill_status()
             })
         
+        elif action == 'run_once':
+            success = start_ks_auto_bill_process()
+            return jsonify({
+                'code': 0 if success else 1,
+                'msg': '已提交执行' if success else '执行失败',
+                'status': get_ks_auto_bill_status()
+            })
+        
         elif action == 'status':
             return jsonify({
                 'code': 0,
@@ -244,19 +280,7 @@ def control_ks_auto_bill():
             })
         
         else:
-            return jsonify({'code': 1, 'msg': f'未知操作: {action}'}), 400
+            return jsonify({'code': 1, 'msg': '无效的操作类型'}), 400
             
     except Exception as e:
-        return jsonify({
-            'code': 1,
-            'msg': f'操作失败: {str(e)}'
-        }), 500
-
-
-# 注意：不再在模块加载时自动启动
-# 子进程将通过以下方式启动：
-# 1. 手动通过API启动
-# 2. 通过APScheduler监控任务自动启动（如果配置了AUTO_START_KS_BILL）
-# 3. 在beihuo_system.py中应用启动后启动
-
-print("✅ 开思自动对单API模块已加载（子进程管理模式）")
+        return jsonify({'code': 1, 'msg': f'操作失败: {str(e)}'}), 500

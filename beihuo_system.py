@@ -1,10 +1,3 @@
-# 强制使用 spawn 模式启动子进程，避免与 uWSGI 多线程冲突
-import multiprocessing
-try:
-    multiprocessing.set_start_method('spawn', force=True)
-except RuntimeError:
-    pass  # 已经设置过，忽略错误
-
 from flask import Flask, render_template, jsonify, request, session, Response, send_file
 import pymysql ,atexit ,schedule ,threading,re,time,os,json, io, csv, math, sys
 from datetime import datetime
@@ -30,6 +23,7 @@ import tempfile
 import shutil
 import uuid
 from backend.get_order import get_order_bp
+from backend.log_viewer_api import register_log_viewer_routes
 from flask_socketio import SocketIO
 from app.sockets import register_socket_events, notification_manager
 from app.utils.database_connection import get_db_connection
@@ -43,9 +37,10 @@ app = Flask(__name__,
 app.secret_key = 'your-very-secret-key' 
 register_virtual_inventory_routes(app)
 register_excel_process_routes(app)  # 注册Excel处理API
-app.register_blueprint(search_in_crm_bp) 
+app.register_blueprint(search_in_crm_bp)
 app.register_blueprint(get_order_bp)
 app.register_blueprint(ks_auto_bill_bp)
+register_log_viewer_routes(app)  # 注册日志查看器路由
 # 根据环境选择 async_mode
 import platform
 
@@ -661,11 +656,6 @@ def run_crm_create_products_task():
 
 def run_virtual_inventory_task():
     """运行虚拟库存任务的函数 - 优化版本，保持串行执行逻辑"""
-    # 检查是否为主进程
-    if os.getpid() != MAIN_PROCESS_ID:
-        print(f"[{datetime.now()}] 非主进程({os.getpid()})，跳过执行定时任务")
-        return
-    
     current_time = datetime.now()
     print(f"[{current_time}] DEBUG: run_virtual_inventory_task 被调用, 进程ID: {os.getpid()}")
     
@@ -709,17 +699,13 @@ def run_virtual_inventory_task():
         
         try:
             # 动态导入virtual_inventory模块
-            import sys
-            supplier_data_path = os.path.join(os.path.dirname(__file__), 'app')
-            supplier_data_path = os.path.abspath(supplier_data_path)
-            if supplier_data_path not in sys.path:
-                sys.path.insert(0, supplier_data_path)
+            # 确保项目根目录在sys.path中
+            project_root = os.path.dirname(os.path.abspath(__file__))
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
             
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("virtual_inventory", 
-                                                         os.path.join(supplier_data_path, "virtual_inventory.py"))
-            virtual_inventory = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(virtual_inventory)
+            # 使用绝对导入方式加载模块
+            from app.utils import virtual_inventory
             
             # 调用主处理函数
             virtual_inventory.main_process()
@@ -760,11 +746,6 @@ task_manager.schedule(
 # 注册每小时购物车高库存清理任务
 def run_cart_cleanup_task():
     """每小时自动清理购物车高库存商品"""
-    # 检查是否为主进程
-    if os.getpid() != MAIN_PROCESS_ID:
-        print(f"[{datetime.now()}] 非主进程({os.getpid()})，跳过执行购物车清理任务")
-        return
-
     print(f"[{datetime.now()}] 🕒 开始执行每小时购物车高库存清理任务...")
 
     try:
@@ -4836,40 +4817,25 @@ notification_manager.init_app(app, socketio)
 from app.sockets.notification_manager import init_global_socketio
 init_global_socketio(app, socketio)
 
-# 初始化子进程监控（生产环境）
+# 初始化后台任务监控（生产环境）
 def init_subprocess_monitor():
     """
-    初始化子进程监控
-    
+    初始化后台任务监控（简化版）
+
     注意：
     1. 只在生产环境（非 __main__）初始化
-    2. 默认自动启动子进程（无需设置环境变量）
-    3. 监控任务使用 APScheduler，每分钟检查一次
+    2. 默认自动启动后台任务（无需设置环境变量）
+    3. 只在第一个 uWSGI worker 中启动任务
     4. 如需禁用自动启动，设置环境变量 AUTO_START_KS_BILL=false
     """
     try:
         from app.core.task_manager import init_ks_bill_monitor
-        from backend.ks_auto_bill_api import start_ks_auto_bill_process
-        
-        # 初始化监控
+
+        # 初始化监控（内部已处理 worker 检测和调度）
         init_ks_bill_monitor()
-        
-        # 检查是否禁用自动启动（默认启用）
-        auto_start = os.environ.get('AUTO_START_KS_BILL', 'true').lower() != 'false'
-        
-        if auto_start:
-            print("[应用启动] 正在自动启动开思自动对单子进程...")
-            success = start_ks_auto_bill_process()
-            if success:
-                print("[应用启动] 开思自动对单子进程启动成功")
-            else:
-                print("[应用启动] 开思自动对单子进程启动失败或已在运行")
-        else:
-            print("[应用启动] AUTO_START_KS_BILL=false，跳过后台子进程自动启动")
-            print("[应用启动] 如需启用自动启动，请移除环境变量 AUTO_START_KS_BILL")
-            
+
     except Exception as e:
-        print(f"[应用启动] 初始化子进程监控失败: {e}")
+        print(f"[应用启动] 初始化后台任务监控失败: {e}")
         import traceback
         traceback.print_exc()
 
@@ -4878,5 +4844,20 @@ if __name__ == '__main__':
     # 只在主进程中初始化监控和启动子进程
     init_subprocess_monitor()
     
-    # 将原来的 app.run() 替换为：
-    socketio.run(app, debug=False, host='0.0.0.0', port=5000)
+    # 使用纯 Flask 运行，避免 SocketIO threading 模式导致的多进程问题
+    app.run(debug=False, host='0.0.0.0', port=5000, threaded=True)
+
+# uWSGI 环境下的初始化（服务器部署时使用）
+# 当使用 uWSGI 部署时，__name__ != '__main__'，但需要在应用加载时初始化
+if IS_UWSGI:
+    print("[uWSGI] 检测到 uWSGI 环境，正在初始化后台任务监控...")
+    # 使用线程延迟初始化，确保 uWSGI 完全加载
+    def delayed_init():
+        # 等待 uWSGI 工作进程完全启动
+        time.sleep(5)
+        init_subprocess_monitor()
+
+    init_thread = threading.Thread(target=delayed_init, name='uwsgi_init_thread')
+    init_thread.daemon = True
+    init_thread.start()
+    print("[uWSGI] 后台任务监控初始化线程已启动（5秒后执行）")

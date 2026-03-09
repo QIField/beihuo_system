@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日志查看器 - 巴博瑞科技</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <style>
+        /* 页面整体样式 */
+        body {
+            background-color: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .log-container {
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* 统计卡片样式 */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        }
+
+        .stat-card .stat-title {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .stat-card.error .stat-value { color: #ff4d4f; }
+        .stat-card.warning .stat-value { color: #faad14; }
+        .stat-card.info .stat-value { color: #1890ff; }
+        .stat-card.success .stat-value { color: #52c41a; }
+
+        /* 搜索栏样式 */
+        .search-bar {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+
+        .search-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .search-form .layui-form-item {
+            margin-bottom: 0;
+        }
+
+        .search-form .layui-input,
+        .search-form .layui-select {
+            width: 180px;
+        }
+
+        /* 日志表格样式 */
+        .log-table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .log-table-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-table-header h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .log-table-header .file-info {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* 日志级别标签样式 */
+        .log-level {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .log-level.ERROR {
+            background: #fff1f0;
+            color: #cf1322;
+            border: 1px solid #ffa39e;
+        }
+
+        .log-level.WARNING {
+            background: #fffbe6;
+            color: #d48806;
+            border: 1px solid #ffe58f;
+        }
+
+        .log-level.INFO {
+            background: #e6f7ff;
+            color: #096dd9;
+            border: 1px solid #91d5ff;
+        }
+
+        .log-level.DEBUG {
+            background: #f6ffed;
+            color: #389e0d;
+            border: 1px solid #b7eb8f;
+        }
+
+        .log-level.UNKNOWN {
+            background: #f5f5f5;
+            color: #666;
+            border: 1px solid #d9d9d9;
+        }
+
+        /* 日志内容样式 */
+        .log-content {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 120px;
+            overflow-y: auto;
+            padding: 8px;
+            background: #fafafa;
+            border-radius: 4px;
+        }
+
+        .log-content.ERROR { background: #fff1f0; }
+        .log-content.WARNING { background: #fffbe6; }
+
+        /* 行号样式 */
+        .line-number {
+            color: #999;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* 时间戳样式 */
+        .timestamp {
+            color: #666;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* 分页样式 */
+        .pagination-container {
+            padding: 15px 20px;
+            border-top: 1px solid #e8e8e8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pagination-info {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* 自动刷新开关 */
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 高亮搜索词 */
+        .highlight {
+            background: #ffeb3b;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .search-form {
+                flex-direction: column;
+            }
+            
+            .search-form .layui-input,
+            .search-form .layui-select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="log-container">
+        <!-- 统计卡片 -->
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-title">总行数</div>
+                <div class="stat-value" id="totalLines">-</div>
+            </div>
+            <div class="stat-card error">
+                <div class="stat-title">错误数</div>
+                <div class="stat-value" id="errorCount">-</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-title">警告数</div>
+                <div class="stat-value" id="warningCount">-</div>
+            </div>
+            <div class="stat-card info">
+                <div class="stat-title">信息数</div>
+                <div class="stat-value" id="infoCount">-</div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-title">文件大小</div>
+                <div class="stat-value" id="fileSize">-</div>
+            </div>
+        </div>
+
+        <!-- 搜索栏 -->
+        <div class="search-bar">
+            <form class="layui-form search-form" id="searchForm">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">关键词</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="keyword" placeholder="搜索日志内容..." autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <label class="layui-form-label">日志级别</label>
+                    <div class="layui-input-block">
+                        <select name="level">
+                            <option value="">全部级别</option>
+                            <option value="ERROR">错误</option>
+                            <option value="WARNING">警告</option>
+                            <option value="INFO">信息</option>
+                            <option value="DEBUG">调试</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <label class="layui-form-label">开始日期</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="start_date" id="startDate" placeholder="选择日期" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <label class="layui-form-label">结束日期</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="end_date" id="endDate" placeholder="选择日期" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+                
+                <div class="layui-form-item">
+                    <button type="button" class="layui-btn layui-btn-normal" id="searchBtn">
+                        <i class="layui-icon layui-icon-search"></i> 搜索
+                    </button>
+                    <button type="button" class="layui-btn layui-btn-primary" id="resetBtn">
+                        <i class="layui-icon layui-icon-refresh"></i> 重置
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 日志表格 -->
+        <div class="log-table-container">
+            <div class="log-table-header">
+                <h3><i class="layui-icon layui-icon-log"></i> 日志内容</h3>
+                <div class="file-info">
+                    <span id="fileInfo">加载中...</span>
+                    <div class="auto-refresh" style="margin-left: 20px; display: inline-flex;">
+                        <input type="checkbox" lay-skin="switch" lay-text="自动刷新|关闭" id="autoRefresh" lay-filter="autoRefresh">
+                        <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="copyPageBtn">
+                            <i class="layui-icon layui-icon-file-b"></i> 复制本页日志
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm layui-btn-primary" id="downloadBtn">
+                            <i class="layui-icon layui-icon-download-circle"></i> 下载日志
+                        </button>
+                        <button type="button" class="layui-btn layui-btn-sm" id="refreshBtn">
+                            <i class="layui-icon layui-icon-refresh"></i> 刷新
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <table class="layui-table" lay-skin="line" lay-size="sm">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">行号</th>
+                        <th style="width: 80px;">级别</th>
+                        <th style="width: 160px;">时间</th>
+                        <th>内容</th>
+                    </tr>
+                </thead>
+                <tbody id="logTableBody">
+                    <tr>
+                        <td colspan="4" class="empty-state">
+                            <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i>
+                            <p>正在加载日志...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    共 <span id="totalCount">0</span> 条记录，
+                    第 <span id="currentPage">1</span> / <span id="totalPages">1</span> 页
+                </div>
+                <div id="pagination"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script>
+        layui.use(['laypage', 'laydate', 'form', 'layer'], function(){
+            var laypage = layui.laypage;
+            var laydate = layui.laydate;
+            var form = layui.form;
+            var layer = layui.layer;
+            
+            // 当前页码和每页数量
+            var currentPage = 1;
+            var pageSize = 50;
+            var currentKeyword = '';
+            var currentLevel = '';
+            var currentStartDate = '';
+            var currentEndDate = '';
+            var autoRefreshTimer = null;
+            
+            // 初始化日期选择器
+            laydate.render({
+                elem: '#startDate',
+                format: 'yyyy-MM-dd'
+            });
+            
+            laydate.render({
+                elem: '#endDate',
+                format: 'yyyy-MM-dd'
+            });
+            
+            // 加载统计数据
+            function loadStats() {
+                fetch('/api/logs/stats')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.code === 0) {
+                            var stats = data.data;
+                            document.getElementById('totalLines').textContent = stats.total_lines.toLocaleString();
+                            document.getElementById('errorCount').textContent = stats.error_count.toLocaleString();
+                            document.getElementById('warningCount').textContent = stats.warning_count.toLocaleString();
+                            document.getElementById('infoCount').textContent = stats.info_count.toLocaleString();
+                            document.getElementById('fileSize').textContent = stats.file_size_readable;
+                            document.getElementById('fileInfo').innerHTML = 
+                                '文件大小: ' + stats.file_size_readable + 
+                                ' | 最后修改: ' + stats.last_modified;
+                        }
+                    })
+                    .catch(err => console.error('加载统计失败:', err));
+            }
+            
+            // 加载日志数据
+            function loadLogs(page, limit) {
+                currentPage = page;
+                pageSize = limit;
+                
+                var params = new URLSearchParams({
+                    page: page,
+                    limit: limit,
+                    keyword: currentKeyword,
+                    level: currentLevel,
+                    start_date: currentStartDate,
+                    end_date: currentEndDate
+                });
+                
+                fetch('/api/logs?' + params.toString())
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.code === 0) {
+                            renderLogs(data.data);
+                            renderPagination(data.count, page, limit);
+                            document.getElementById('totalCount').textContent = data.count.toLocaleString();
+                            document.getElementById('currentPage').textContent = page;
+                            document.getElementById('totalPages').textContent = data.total_pages;
+                        } else {
+                            layer.msg(data.msg, {icon: 2});
+                            renderEmpty(data.msg);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('加载日志失败:', err);
+                        layer.msg('加载日志失败', {icon: 2});
+                        renderEmpty('加载失败，请稍后重试');
+                    });
+            }
+            
+            // 渲染日志表格
+            function renderLogs(logs) {
+                var tbody = document.getElementById('logTableBody');
+                
+                if (!logs || logs.length === 0) {
+                    renderEmpty('暂无匹配的日志记录');
+                    return;
+                }
+                
+                var html = '';
+                logs.forEach(function(log) {
+                    var content = escapeHtml(log.content);
+                    // 高亮搜索词
+                    if (currentKeyword) {
+                        var regex = new RegExp('(' + escapeRegex(currentKeyword) + ')', 'gi');
+                        content = content.replace(regex, '<span class="highlight">$1</span>');
+                    }
+                    
+                    html += '<tr>';
+                    html += '<td class="line-number">' + log.line_num + '</td>';
+                    html += '<td><span class="log-level ' + log.level + '">' + log.level + '</span></td>';
+                    html += '<td class="timestamp">' + (log.timestamp || '-') + '</td>';
+                    html += '<td><div class="log-content ' + log.level + '">' + content + '</div></td>';
+                    html += '</tr>';
+                });
+                
+                tbody.innerHTML = html;
+            }
+            
+            // 渲染空状态
+            function renderEmpty(msg) {
+                document.getElementById('logTableBody').innerHTML = 
+                    '<tr><td colspan="4" class="empty-state">' +
+                    '<i class="layui-icon layui-icon-face-surprised"></i>' +
+                    '<p>' + (msg || '暂无数据') + '</p>' +
+                    '</td></tr>';
+            }
+            
+            // 渲染分页
+            function renderPagination(total, current, limit) {
+                laypage.render({
+                    elem: 'pagination',
+                    count: total,
+                    limit: limit,
+                    curr: current,
+                    limits: [20, 50, 100, 200, 500],
+                    layout: ['count', 'prev', 'page', 'next', 'limit', 'skip'],
+                    jump: function(obj, first) {
+                        if (!first) {
+                            loadLogs(obj.curr, obj.limit);
+                        }
+                    }
+                });
+            }
+            
+            // HTML转义
+            function escapeHtml(text) {
+                var div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            // 正则转义
+            function escapeRegex(string) {
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+            
+            // 搜索按钮事件
+            document.getElementById('searchBtn').addEventListener('click', function() {
+                var formData = form.val('searchForm');
+                currentKeyword = formData.keyword || '';
+                currentLevel = formData.level || '';
+                currentStartDate = formData.start_date || '';
+                currentEndDate = formData.end_date || '';
+                loadLogs(1, pageSize);
+            });
+            
+            // 重置按钮事件
+            document.getElementById('resetBtn').addEventListener('click', function() {
+                document.getElementById('searchForm').reset();
+                currentKeyword = '';
+                currentLevel = '';
+                currentStartDate = '';
+                currentEndDate = '';
+                laydate.render({elem: '#startDate', format: 'yyyy-MM-dd'});
+                laydate.render({elem: '#endDate', format: 'yyyy-MM-dd'});
+                loadLogs(1, pageSize);
+            });
+            
+            // 刷新按钮事件
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                loadLogs(currentPage, pageSize);
+                loadStats();
+                layer.msg('已刷新', {icon: 1, time: 1000});
+            });
+            
+            // 下载按钮事件
+            document.getElementById('downloadBtn').addEventListener('click', function() {
+                layer.confirm('确定要下载完整日志文件吗？', function(index) {
+                    window.location.href = '/api/logs/download';
+                    layer.close(index);
+                });
+            });
+
+            // 复制本页日志按钮事件
+            document.getElementById('copyPageBtn').addEventListener('click', function() {
+                copyCurrentPageLogs();
+            });
+
+            // 复制当前页日志到剪贴板
+            function copyCurrentPageLogs() {
+                var rows = document.querySelectorAll('#logTableBody tr');
+                if (rows.length === 0 || rows[0].querySelector('.empty-state')) {
+                    layer.msg('当前没有可复制的日志', {icon: 0});
+                    return;
+                }
+
+                var logText = '';
+                rows.forEach(function(row) {
+                    var lineNum = row.querySelector('.line-number');
+                    var level = row.querySelector('.log-level');
+                    var timestamp = row.querySelector('.timestamp');
+                    var content = row.querySelector('.log-content');
+
+                    if (lineNum && content) {
+                        var line = '';
+                        if (timestamp && timestamp.textContent !== '-') {
+                            line += '[' + timestamp.textContent + '] ';
+                        }
+                        if (level) {
+                            line += '[' + level.textContent + '] ';
+                        }
+                        line += content.textContent;
+                        logText += line + '\n';
+                    }
+                });
+
+                if (logText) {
+                    copyToClipboard(logText);
+                }
+            }
+
+            // 复制文本到剪贴板
+            function copyToClipboard(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    // 使用现代 Clipboard API
+                    navigator.clipboard.writeText(text).then(function() {
+                        layer.msg('已复制本页日志到剪贴板！', {icon: 1, time: 2000});
+                    }).catch(function(err) {
+                        console.error('复制失败:', err);
+                        fallbackCopyToClipboard(text);
+                    });
+                } else {
+                    // 降级方案
+                    fallbackCopyToClipboard(text);
+                }
+            }
+
+            // 降级复制方案（兼容旧浏览器）
+            function fallbackCopyToClipboard(text) {
+                var textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+
+                try {
+                    var successful = document.execCommand('copy');
+                    if (successful) {
+                        layer.msg('已复制本页日志到剪贴板！', {icon: 1, time: 2000});
+                    } else {
+                        layer.msg('复制失败，请手动复制', {icon: 2});
+                    }
+                } catch (err) {
+                    console.error('复制失败:', err);
+                    layer.msg('复制失败，请手动复制', {icon: 2});
+                }
+
+                document.body.removeChild(textarea);
+            }
+            
+            // 自动刷新开关
+            form.on('switch(autoRefresh)', function(data) {
+                if (data.elem.checked) {
+                    autoRefreshTimer = setInterval(function() {
+                        loadLogs(currentPage, pageSize);
+                        loadStats();
+                    }, 5000); // 每5秒刷新一次
+                    layer.msg('已开启自动刷新 (5秒)', {icon: 1, time: 1500});
+                } else {
+                    if (autoRefreshTimer) {
+                        clearInterval(autoRefreshTimer);
+                        autoRefreshTimer = null;
+                    }
+                    layer.msg('已关闭自动刷新', {icon: 1, time: 1500});
+                }
+            });
+            
+            // 初始化加载
+            loadStats();
+            loadLogs(1, pageSize);
+        });
+    </script>
+</body>
+</html>
