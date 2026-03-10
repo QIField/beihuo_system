@@ -1948,12 +1948,19 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
 
 
 
-def main_process():
-    """主处理流程"""
+def main_process(skip_table_creation=False):
+    """主处理流程
+    
+    参数:
+        skip_table_creation: 是否跳过表创建检查，默认为False
+                            当在应用启动时已创建表，后续定时任务可设为True跳过
+    """
     # 清理当前业务时间范围内的数据
     clean_business_time_data()
     
-    create_tables()
+    # 只在需要时创建表（应用启动时），定时任务可跳过此步骤
+    if not skip_table_creation:
+        create_tables()
     
     # 清空其他表的数据（除了virtual_inventory表）
     clear_all_tables()

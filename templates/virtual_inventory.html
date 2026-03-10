@@ -155,8 +155,8 @@
                 <div class="business-date-item">
                     <div class="layui-input-inline">
                         <select name="business_date_type" id="businessDateTypeSelect" class="layui-select">
-                            <option value="">全部数据</option>
                             <option value="today">今天数据</option>
+                            <option value="">全部数据</option>
                         </select>
                     </div>
                 </div>
@@ -165,6 +165,7 @@
                 <button type="button" class="layui-btn layui-btn-normal" id="summaryBtn">各供应商汇总</button>
                 <button type="submit" class="layui-btn layui-btn-normal" lay-submit lay-filter="search">搜索</button>
                 <button type="button" class="layui-btn layui-btn-normal" id="resetBtn">重置</button>
+                <button type="button" class="layui-btn layui-btn-danger" id="adminRefreshBtn" style="display:none;">刷新状态</button>
             </div>
         </form>
     </div>
@@ -196,18 +197,25 @@
 
     // 定义页面功能
     var app = {
+        // 表格加载开始时间（用于计时）
+        _tableLoadStartTime: null,
+
         // 初始化表格
-        initTable: function(searchParams = {}) {                
+        initTable: function(searchParams = {}) {
             layui.use(['table', 'jquery'], function() {
                 var table = layui.table;
                 var $ = layui.jquery;
-                
+
+                // 记录开始时间
+                app._tableLoadStartTime = performance.now();
+                console.log('[⏱️ 计时] 开始加载表格数据...');
+
                 // 确定API端点 - 保持使用统一的API接口
                 var apiUrl = '/api/virtual_inventory_by_msg_pattern';
-                
+
                 // 创建实际传递给API的参数，保留业务日期类型参数
                 var apiParams = {...searchParams};
-                
+
                 // 渲染表格
                 table.render({
                     elem: '#virtualInventoryTable',
@@ -217,7 +225,7 @@
                     limit: 200,
                     limits: [50, 100, 200],
                     height: 'full-265',
-                    where: apiParams, 
+                    where: apiParams,
                     cols: [[
                         {field: 'supplier_name', title: '供应商名称', width: 120, sort: true},
                         {field: 'oe_code', title: 'OE码', width: 130, sort: true},
@@ -232,7 +240,7 @@
                         {field: 'fetch_time', title: '获取时间', width: 180, sort: true, templet: function(d) {
                             return formatDateTime(d.fetch_time);
                         }},
-                        {field: 'update_msg', title: '更新信息', width: 600, sort: true} 
+                        {field: 'update_msg', title: '更新信息', width: 600, sort: true}
                     ]],
                     // 禁用前端排序，所有排序都通过后端处理，使用fetch_time作为默认排序
                     initSort: {
@@ -241,16 +249,18 @@
                     },
                     // 监听排序事件，通过后端排序
                     done: function(res, curr, count) {
-                        console.log('表格数据加载完成', res);
+                        var endTime = performance.now();
+                        var duration = (endTime - app._tableLoadStartTime).toFixed(2);
+                        console.log(`[⏱️ 计时] 表格数据加载完成，耗时: ${duration}ms`, res);
                         console.log('当前搜索参数:', apiParams);
-                        
+
                         // 如果是业务日期数据，显示业务日期范围
                         if (res.business_time_range) {
                             $('#headerTitle').html(`虚拟库存管理 - ${res.business_time_range}`);
                         } else {
                             $('#headerTitle').html('虚拟库存管理');
                         }
-                        
+
                         // 重新设置表格高度
                         setTimeout(function() {
                             var tableBox = $('.layui-table-box');
@@ -259,6 +269,9 @@
                                 tableBox.css('height', 'calc(100% - 41px)'); // 减去头部高度
                             }
                         }, 100);
+
+                        // 异步加载统计数据（表格先显示，统计后加载）
+                        app.loadStatisticsAsync(apiParams);
                     },
                     error: function(res, msg) {
                         console.error('表格加载失败: ' + msg);
@@ -272,22 +285,28 @@
         loadUpdateMsgOptions: function() {
             layui.use(['jquery'], function() {
                 var $ = layui.jquery;
-                
+                var startTime = performance.now();
+                console.log('[⏱️ 计时] 开始加载更新信息选项...');
+
                 // 获取更新信息选项
                 $.ajax({
                     url: '/api/update_msg_options',
                     type: 'GET',
                     success: function(res) {
+                        var endTime = performance.now();
+                        var duration = (endTime - startTime).toFixed(2);
+                        console.log(`[⏱️ 计时] 更新信息选项加载完成，耗时: ${duration}ms`);
+
                         if(res.code === 0) {
                             var select = $('#updateMsgSelect');
                             select.empty(); // 清空现有选项
                             select.append('<option value="">选择更新信息分类</option>'); // 添加默认选项
-                            
+
                             // 添加获取到的分类选项
                             res.data.forEach(function(category) {
                                 select.append('<option value="' + category + '">' + category + '</option>');
                             });
-                            
+
                             // 重新渲染下拉框
                             if(layui.form) {
                                 layui.form.render('select');
@@ -297,7 +316,9 @@
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.error('获取更新信息选项失败:', error);
+                        var endTime = performance.now();
+                        var duration = (endTime - startTime).toFixed(2);
+                        console.error(`[⏱️ 计时] 更新信息选项加载失败，耗时: ${duration}ms, 错误:`, error);
                     }
                 });
             });
@@ -306,13 +327,17 @@
         getStatistics: function() {
             layui.use(['jquery'], function() {
                 var $ = layui.jquery;
-                
-                console.log('开始请求统计数据...');
+                var startTime = performance.now();
+                console.log('[⏱️ 计时] 开始请求统计数据...');
+
                 $.ajax({
                     url: '/api/virtual_inventory_statistics',
                     type: 'GET',
                     success: function(res) {
-                        console.log('收到统计数据响应:', res);
+                        var endTime = performance.now();
+                        var duration = (endTime - startTime).toFixed(2);
+                        console.log(`[⏱️ 计时] 统计数据加载完成，耗时: ${duration}ms`, res);
+
                         if(res.code === 0) {
                             var data = res.data;
                             console.log('统计数据详情:', data);
@@ -329,24 +354,30 @@
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.error('获取统计数据失败:', error);
+                        var endTime = performance.now();
+                        var duration = (endTime - startTime).toFixed(2);
+                        console.error(`[⏱️ 计时] 统计数据加载失败，耗时: ${duration}ms, 错误:`, error);
                         console.error('错误详情:', xhr, status, error);
                     }
                 });
             });
         },
-        
+
         // 获取今日业务日期统计数据
         getTodayStatistics: function() {
             layui.use(['jquery'], function() {
                 var $ = layui.jquery;
-                
-                console.log('开始请求今日统计数据...');
+                var startTime = performance.now();
+                console.log('[⏱️ 计时] 开始请求今日统计数据...');
+
                 $.ajax({
                     url: '/api/virtual_inventory_statistics_today',
                     type: 'GET',
                     success: function(res) {
-                        console.log('收到今日统计数据响应:', res);
+                        var endTime = performance.now();
+                        var duration = (endTime - startTime).toFixed(2);
+                        console.log(`[⏱️ 计时] 今日统计数据加载完成，耗时: ${duration}ms`, res);
+
                         if(res.code === 0) {
                             var data = res.data;
                             console.log('今日统计数据详情:', data);
@@ -366,32 +397,90 @@
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.error('获取今日统计数据失败:', error);
+                        var endTime = performance.now();
+                        var duration = (endTime - startTime).toFixed(2);
+                        console.error(`[⏱️ 计时] 今日统计数据加载失败，耗时: ${duration}ms, 错误:`, error);
                         console.error('错误详情:', xhr, status, error);
                     }
                 });
             });
         },
-        
+
+        // 异步加载统计数据（表格先显示，统计后加载）
+        loadStatisticsAsync: function(searchParams) {
+            layui.use(['jquery'], function() {
+                var $ = layui.jquery;
+                var startTime = performance.now();
+                console.log('[⏱️ 计时] 开始异步加载统计数据...');
+
+                // 显示加载中提示
+                $('#statisticsInfo').html('<span class="stat-item">统计加载中...</span>');
+
+                // 构建异步统计API参数
+                var asyncParams = {
+                    pattern: searchParams.pattern || '',
+                    business_date_type: searchParams.business_date_type || ''
+                };
+
+                $.ajax({
+                    url: '/api/virtual_inventory_statistics_by_pattern',
+                    type: 'GET',
+                    data: asyncParams,
+                    success: function(res) {
+                        var endTime = performance.now();
+                        var duration = (endTime - startTime).toFixed(2);
+                        console.log(`[⏱️ 计时] 异步统计数据加载完成，耗时: ${duration}ms`, res);
+
+                        if(res.code === 0) {
+                            var data = res.data;
+                            var statsHtml = `
+                                <span class="stat-item">总记录：${data.total_count}条</span>
+                                <span class="stat-item">成功上传：${data.success_count}条</span>
+                                <span class="stat-item">失败：${data.failed_count}条</span>
+                                <span class="stat-item">没有档案：${data.no_record_count}条</span>
+                            `;
+                            $('#statisticsInfo').html(statsHtml);
+                            console.log('异步统计数据已更新到页面');
+                        } else {
+                            $('#statisticsInfo').html('<span class="stat-item">统计加载失败</span>');
+                            console.error('获取异步统计数据失败:', res.msg);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        var endTime = performance.now();
+                        var duration = (endTime - startTime).toFixed(2);
+                        $('#statisticsInfo').html('<span class="stat-item">统计加载失败</span>');
+                        console.error(`[⏱️ 计时] 异步统计数据加载失败，耗时: ${duration}ms, 错误:`, error);
+                    }
+                });
+            });
+        },
+
         // 在app对象中添加获取供应商汇总的方法
         getSupplierSummary: function() {
         layui.use(['jquery', 'table'], function() {
             var $ = layui.jquery;
             var table = layui.table;
-            
+            var startTime = performance.now();
+            console.log('[⏱️ 计时] 开始请求供应商汇总数据...');
+
             // 获取当前业务日期类型
             var currentBusinessDateType = $('#businessDateTypeSelect').val();
-            
+
             // 根据当前业务日期类型选择相应的API
             var apiUrl = '/api/supplier_summary';
             if (currentBusinessDateType === 'today') {
                 apiUrl = '/api/supplier_summary?business_date_type=today';
             }
-            
+
             $.ajax({
                 url: apiUrl,
                 type: 'GET',
                 success: function(res) {
+                    var endTime = performance.now();
+                    var duration = (endTime - startTime).toFixed(2);
+                    console.log(`[⏱️ 计时] 供应商汇总数据加载完成，耗时: ${duration}ms`, res);
+
                     if(res.code === 0) {
                         var summaryData = res.data;
                         
@@ -458,6 +547,9 @@
                     }
                 },
                 error: function(xhr, status, error) {
+                    var endTime = performance.now();
+                    var duration = (endTime - startTime).toFixed(2);
+                    console.error(`[⏱️ 计时] 供应商汇总数据加载失败，耗时: ${duration}ms, 错误:`, error);
                     layer.msg('获取供应商汇总失败', {icon: 2});
                 }
             });
@@ -470,34 +562,49 @@
             layui.use(['jquery', 'form'], function() {
                 var $ = layui.jquery;
                 var form = layui.form;
-                
+
                 // 重置所有搜索输入框
                 $('input[name="supplier_name"]').val('');
                 $('input[name="oe_code"]').val('');
                 $('input[name="brand"]').val('');
                 $('input[name="warehouse"]').val('');
                 $('input[name="remark"]').val('');
-                
-                // 重置下拉选择框为默认值
+
+                // 重置下拉选择框为默认值（业务日期类型保持为"今天数据"）
                 $('#updateMsgSelect')[0].selectedIndex = 0; // 重置为第一个选项
-                $('#businessDateTypeSelect')[0].selectedIndex = 0; // 重置业务日期类型为默认
+                $('#businessDateTypeSelect').val('today'); // 重置业务日期类型为"今天数据"
                 form.render('select'); // 重新渲染下拉框
             });
-            
-            // 刷新表格，不带任何搜索参数
-            app.initTable({});
+
+            // 刷新表格，默认查询今天数据
+            app.getTodayStatistics();
+            app.initTable({business_date_type: 'today'});
         },
+
+        // 页面初始化开始时间
+        _pageInitStartTime: null,
 
         // 在init方法中调用统计数据加载
         init: function() {
+            // 记录页面初始化开始时间
+            app._pageInitStartTime = performance.now();
+            console.log('[⏱️ 计时] ========== 页面初始化开始 ==========');
+
             // 先加载更新信息选项
             app.loadUpdateMsgOptions();
-            
-            // 根据默认业务日期类型加载统计数据
-            app.getStatistics();
-            
-            // 初始化表格
-            app.initTable({});
+
+            // 默认加载今日统计数据
+            app.getTodayStatistics();
+
+            // 初始化表格，默认查询今天数据
+            app.initTable({business_date_type: 'today'});
+
+            // 页面初始化完成后输出总耗时
+            setTimeout(function() {
+                var endTime = performance.now();
+                var totalDuration = (endTime - app._pageInitStartTime).toFixed(2);
+                console.log(`[⏱️ 计时] ========== 页面初始化完成，总耗时: ${totalDuration}ms ==========`);
+            }, 100);
             
             // 使用layui的form模块绑定事件
             layui.use(['form', 'jquery'], function() {
@@ -546,14 +653,14 @@
                 // 监听业务日期类型变化
                 form.on('select(businessDateTypeSelect)', function(data) {
                     var selectedValue = data.value;
-                    
+
                     // 根据选择的业务日期类型更新统计数据
                     if (selectedValue === 'today') {
                         app.getTodayStatistics();
                     } else {
                         app.getStatistics();
                     }
-                    
+
                     // 重新加载表格
                     var searchParams = {};
                     searchParams.supplier_name = $('input[name="supplier_name"]').val();
@@ -563,8 +670,77 @@
                     searchParams.remark = $('input[name="remark"]').val();
                     searchParams.pattern = $('#updateMsgSelect').val();
                     searchParams.business_date_type = selectedValue;
-                    
+
                     app.initTable(searchParams);
+                });
+
+                // 检查是否是管理员，显示刷新状态按钮
+                app.checkAdminAndShowRefreshBtn();
+
+                // 管理员刷新状态按钮点击事件
+                $('#adminRefreshBtn').on('click', function() {
+                    app.refreshUpdateStatus();
+                    return false;
+                });
+            });
+        },
+
+        // 检查是否是管理员并显示刷新按钮
+        checkAdminAndShowRefreshBtn: function() {
+            layui.use(['jquery'], function() {
+                var $ = layui.jquery;
+                $.ajax({
+                    url: '/api/current_user',
+                    type: 'GET',
+                    success: function(res) {
+                        // API直接返回用户信息，不在data字段中
+                        if(res.username === 'admin') {
+                            $('#adminRefreshBtn').show();
+                            console.log('当前用户是管理员，显示刷新状态按钮');
+                        } else {
+                            console.log('当前用户不是管理员:', res.username);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('获取当前用户信息失败:', error);
+                    }
+                });
+            });
+        },
+
+        // 管理员刷新 update_status 字段
+        refreshUpdateStatus: function() {
+            layui.use(['jquery'], function() {
+                var $ = layui.jquery;
+
+                layer.confirm('确定要刷新所有数据的状态分类吗？这可能需要一些时间。', {
+                    btn: ['确定', '取消']
+                }, function(index) {
+                    layer.close(index);
+
+                    var loadIndex = layer.load(2, {shade: 0.3});
+                    console.log('[管理后台] 开始刷新 update_status...');
+
+                    $.ajax({
+                        url: '/api/admin/refresh_update_status',
+                        type: 'POST',
+                        success: function(res) {
+                            layer.close(loadIndex);
+                            console.log('[管理后台] 刷新结果:', res);
+
+                            if(res.code === 0) {
+                                layer.msg(res.msg, {icon: 1, time: 5000});
+                                console.log('刷新详情:', res.details);
+                            } else {
+                                layer.msg('刷新失败: ' + res.msg, {icon: 2});
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            layer.close(loadIndex);
+                            layer.msg('刷新失败: ' + error, {icon: 2});
+                            console.error('[管理后台] 刷新失败:', error);
+                        }
+                    });
                 });
             });
         }

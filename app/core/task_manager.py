@@ -294,25 +294,19 @@ class UnifiedTaskManager:
 
 def init_ks_bill_monitor():
     """
-    初始化开思自动对单任务（简化版）
+    初始化开思自动对单任务（安全版本）
 
     核心改进：
     1. 直接调度任务，无需监控器
     2. 任务自带单实例锁，防止重复执行
-    3. 只在第一个 uWSGI worker 中启动任务
+    3. 延迟 uWSGI worker 检测，避免在导入阶段访问 uWSGI
     4. 异常隔离，不影响主进程
 
     使用环境变量 AUTO_START_KS_BILL 控制是否自动启动（默认启用）
     如需禁用，设置 AUTO_START_KS_BILL=false
     """
     import os
-    from app.core.single_instance import is_first_uwsgi_worker
-
-    # 只在第一个 worker 中启动任务（防止多 worker 重复）
-    if not is_first_uwsgi_worker():
-        logger.info("[开思自动对单] 非第一个 uWSGI worker，跳过任务启动")
-        print("[开思自动对单] 非第一个 uWSGI worker，跳过任务启动")
-        return
+    import time
 
     # 检查是否禁用自动启动（默认启用）
     auto_start = os.environ.get('AUTO_START_KS_BILL', 'true').lower() != 'false'
@@ -322,22 +316,48 @@ def init_ks_bill_monitor():
         print("[开思自动对单] AUTO_START_KS_BILL=false，跳过任务启动")
         return
 
-    # 导入简化的任务函数
-    from app.ks_auto_bill.task import ks_auto_bill_task
+    # 延迟导入和延迟检测：避免在模块导入阶段调用 uWSGI
+    def safe_init():
+        try:
+            from app.core.single_instance import is_first_uwsgi_worker
 
-    # 1. 注册开思自动对单任务：每分钟执行一次
-    task_manager.schedule(
-        ks_auto_bill_task,
-        'interval',
-        'ks_auto_bill_task',
-        minutes=1,
-        replace_existing=True
+            # 只在第一个 worker 中启动任务（防止多 worker 重复）
+            if not is_first_uwsgi_worker():
+                logger.info("[开思自动对单] 非第一个 uWSGI worker，跳过任务启动")
+                print("[开思自动对单] 非第一个 uWSGI worker，跳过任务启动")
+                return
+
+            # 导入简化的任务函数
+            from app.ks_auto_bill.task import ks_auto_bill_task
+
+            # 注册开思自动对单任务：每分钟执行一次
+            task_manager.schedule(
+                ks_auto_bill_task,
+                'interval',
+                'ks_auto_bill_task',
+                minutes=1,
+                replace_existing=True
+            )
+
+            logger.info("[开思自动对单] 任务已调度（每分钟执行一次）")
+            print("[开思自动对单] 任务已调度（每分钟执行一次）")
+            print("[开思自动对单] 单实例锁已启用，防止重复执行")
+            print("[开思自动对单] 异常隔离已启用，不影响主进程")
+
+        except Exception as e:
+            logger.error(f"[开思自动对单] 初始化失败: {e}", exc_info=True)
+            print(f"[开思自动对单] 初始化失败: {e}")
+
+    # 延迟执行：给 uWSGI 一些时间完全初始化
+    # 使用线程延迟启动，避免阻塞主进程
+    import threading
+    init_thread = threading.Thread(
+        target=safe_init,
+        daemon=True,
+        name='ks_bill_init'
     )
-
-    logger.info("[开思自动对单] 任务已调度（每分钟执行一次）")
-    print("[开思自动对单] 任务已调度（每分钟执行一次）")
-    print("[开思自动对单] 单实例锁已启用，防止重复执行")
-    print("[开思自动对单] 异常隔离已启用，不影响主进程")
+    init_thread.start()
+    logger.info("[开思自动对单] 初始化任务已提交（延迟执行）")
 
 
 # 全局任务管理器实例

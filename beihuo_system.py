@@ -707,8 +707,8 @@ def run_virtual_inventory_task():
             # 使用绝对导入方式加载模块
             from app.utils import virtual_inventory
             
-            # 调用主处理函数
-            virtual_inventory.main_process()
+            # 调用主处理函数，跳过表创建（已在应用启动时创建）
+            virtual_inventory.main_process(skip_table_creation=True)
             print(f"[{datetime.now()}] 虚拟库存数据同步任务执行完成！")
             
             # 在虚拟库存任务完成后，立即执行CRM新建产品任务（保持原有串行逻辑）
@@ -4817,6 +4817,30 @@ notification_manager.init_app(app, socketio)
 from app.sockets.notification_manager import init_global_socketio
 init_global_socketio(app, socketio)
 
+# 全局标志：虚拟库存表是否已初始化
+_virtual_inventory_tables_initialized = False
+
+def init_virtual_inventory_tables():
+    """
+    初始化虚拟库存相关数据库表（全局只执行一次）
+    在应用启动时调用，确保所有表已创建
+    """
+    global _virtual_inventory_tables_initialized
+    
+    if _virtual_inventory_tables_initialized:
+        return
+    
+    try:
+        print(f"[{datetime.now()}] 正在初始化虚拟库存数据库表...")
+        from app.utils import virtual_inventory
+        virtual_inventory.create_tables()
+        _virtual_inventory_tables_initialized = True
+        print(f"[{datetime.now()}] 虚拟库存数据库表初始化完成")
+    except Exception as e:
+        print(f"[{datetime.now()}] 初始化虚拟库存数据库表失败: {e}")
+        import traceback
+        traceback.print_exc()
+
 # 初始化后台任务监控（生产环境）
 def init_subprocess_monitor():
     """
@@ -4841,6 +4865,9 @@ def init_subprocess_monitor():
 
 # 应用启动配置
 if __name__ == '__main__':
+    # 先在主进程中初始化数据库表（只执行一次）
+    init_virtual_inventory_tables()
+    
     # 只在主进程中初始化监控和启动任务
     init_subprocess_monitor()
     
@@ -4850,14 +4877,48 @@ if __name__ == '__main__':
 # uWSGI 环境下的初始化（服务器部署时使用）
 # 当使用 uWSGI 部署时，__name__ != '__main__'，但需要在应用加载时初始化
 if IS_UWSGI:
-    print("[uWSGI] 检测到 uWSGI 环境，正在初始化后台任务监控...")
-    # 使用线程延迟初始化，确保 uWSGI 完全加载
-    def delayed_init():
-        # 等待 uWSGI 工作进程完全启动
-        time.sleep(5)
-        init_subprocess_monitor()
+    print("[uWSGI] 检测到 uWSGI 环境，正在初始化...")
+    print(f"[uWSGI] 当前进程ID: {os.getpid()}, 启动时间: {datetime.now()}")
 
+    # 首先初始化数据库表（只执行一次）
+    try:
+        init_virtual_inventory_tables()
+        print("[uWSGI] 数据库表初始化完成")
+    except Exception as e:
+        print(f"[uWSGI] 数据库表初始化失败: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # 使用线程延迟初始化后台任务监控，确保 uWSGI 完全加载
+    def delayed_init():
+        """延迟初始化后台任务，确保 uWSGI 完全就绪"""
+        try:
+            # 等待 uWSGI 工作进程完全启动
+            # 增加等待时间到 10 秒，确保 uWSGI 内部状态完全就绪
+            print(f"[uWSGI延迟初始化] 等待 uWSGI 完全就绪... (PID: {os.getpid()})")
+            time.sleep(10)
+
+            # 再次检查 uWSGI 状态
+            try:
+                import uwsgi
+                worker_id = uwsgi.worker_id()
+                print(f"[uWSGI延迟初始化] Worker {worker_id} 准备就绪，开始初始化后台任务")
+            except Exception as e:
+                print(f"[uWSGI延迟初始化] 警告: 无法获取 worker_id: {e}")
+                print(f"[uWSGI延迟初始化] 继续尝试初始化...")
+
+            # 初始化后台任务监控
+            init_subprocess_monitor()
+            print(f"[uWSGI延迟初始化] 后台任务监控初始化完成 (PID: {os.getpid()})")
+
+        except Exception as e:
+            print(f"[uWSGI延迟初始化] 初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # 创建守护线程进行延迟初始化
     init_thread = threading.Thread(target=delayed_init, name='uwsgi_init_thread')
     init_thread.daemon = True
     init_thread.start()
-    print("[uWSGI] 后台任务监控初始化线程已启动（5秒后执行）")
+    print("[uWSGI] 后台任务监控初始化线程已启动（10秒后执行）")
+    print("[uWSGI] 注意：每个 worker 都会执行此初始化，但只有第一个 worker 会实际启动任务")

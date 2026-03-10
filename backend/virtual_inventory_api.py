@@ -5,6 +5,14 @@ from functools import wraps
 import os
 from datetime import datetime, timedelta
 from app.utils.database_connection import get_db_connection  # 使用统一的连接池实现
+import time
+
+# 计时工具函数
+def log_time_cost(operation_name, start_time):
+    """记录操作耗时"""
+    cost = (time.time() - start_time) * 1000  # 转换为毫秒
+    print(f"[⏱️ 后端计时] {operation_name} 耗时: {cost:.2f}ms")
+    return cost
 
 # 创建蓝图
 virtual_inventory_bp = Blueprint('virtual_inventory', __name__)
@@ -24,7 +32,7 @@ def init_virtual_inventory_table():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         # 创建虚拟库存表
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS virtual_inventory (
@@ -44,12 +52,116 @@ def init_virtual_inventory_table():
             INDEX idx_expiry_date (expiry_date),
             INDEX idx_fetch_time (fetch_time),
             INDEX idx_oe_code (oe_code),
-            INDEX idx_supplier_name (supplier_name)
+            INDEX idx_supplier_name (supplier_name),
+            FULLTEXT INDEX idx_update_msg_fulltext (update_msg)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='虚拟库存表';
         """
         cursor.execute(create_table_sql)
         conn.commit()
+
+        # 检查并添加 update_msg 分类标记字段（用于优化查询）
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM information_schema.COLUMNS
+                WHERE TABLE_NAME = 'virtual_inventory'
+                AND COLUMN_NAME = 'update_status'
+                AND TABLE_SCHEMA = DATABASE()
+            """)
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("""
+                    ALTER TABLE virtual_inventory
+                    ADD COLUMN update_status VARCHAR(20) DEFAULT NULL COMMENT '更新状态分类',
+                    ADD INDEX idx_update_status (update_status)
+                """)
+                conn.commit()
+                print("已添加 update_status 字段和索引")
+        except Exception as e:
+            print(f"添加 update_status 字段失败: {e}")
+
     except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
+
+def get_update_status(update_msg):
+    """
+    根据 update_msg 内容判断更新状态
+    返回: 'success', 'failed', 'new_success', 'new_failed', 'empty'
+    """
+    if not update_msg:
+        return 'empty'
+
+    msg_lower = update_msg.lower()
+
+    # 上传成功：包含 update
+    if 'update' in msg_lower:
+        return 'success'
+
+    # 新建成功
+    if 'oe号【' in update_msg and '】处理结果：成功' in update_msg:
+        return 'new_success'
+
+    # 新建失败
+    if 'oe号【' in update_msg and '】处理结果：失败' in update_msg:
+        return 'new_failed'
+
+    # 其他都归类为失败
+    return 'failed'
+
+def refresh_update_status():
+    """
+    刷新所有记录的 update_status 字段
+    用于初始化或数据迁移后更新状态
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        print("开始刷新 update_status 字段...")
+
+        # 分批更新，避免一次性更新太多数据
+        batch_size = 5000
+        offset = 0
+        total_updated = 0
+
+        while True:
+            # 获取一批需要更新的记录
+            cursor.execute("""
+                SELECT id, update_msg FROM virtual_inventory
+                WHERE update_status IS NULL
+                LIMIT %s OFFSET %s
+            """, (batch_size, offset))
+
+            rows = cursor.fetchall()
+            if not rows:
+                break
+
+            # 更新这批记录
+            for row in rows:
+                status = get_update_status(row[1])
+                cursor.execute("""
+                    UPDATE virtual_inventory
+                    SET update_status = %s
+                    WHERE id = %s
+                """, (status, row[0]))
+
+            conn.commit()
+            total_updated += len(rows)
+            print(f"已更新 {total_updated} 条记录的 update_status")
+
+            if len(rows) < batch_size:
+                break
+
+            offset += batch_size
+
+        print(f"update_status 刷新完成，共更新 {total_updated} 条记录")
+
+    except Exception as e:
+        print(f"刷新 update_status 失败: {e}")
         if 'conn' in locals():
             conn.rollback()
     finally:
@@ -306,9 +418,11 @@ def get_virtual_inventory_search():
         where_clause = " AND ".join(where_conditions)
 
         # 获取总记录数
+        count_start = time.time()
         count_sql = f"SELECT COUNT(*) AS total FROM virtual_inventory WHERE {where_clause}"
         cursor.execute(count_sql, params)
         total = cursor.fetchone()['total']
+        log_time_cost("查询总记录数", count_start)
 
         # 构建排序子句
         order_clause = ""
@@ -326,7 +440,7 @@ def get_virtual_inventory_search():
                 'fetch_time': '`fetch_time`',
                 'update_msg': '`update_msg`'
             }
-            
+
             if field in field_mapping:
                 order_direction = "ASC" if order.lower() == "asc" else "DESC"
                 # 对于价格和库存，使用数值型排序
@@ -340,10 +454,11 @@ def get_virtual_inventory_search():
             order_clause = "ORDER BY `fetch_time` DESC"  # 使用fetch_time作为默认排序
 
         # 查询数据
+        query_start = time.time()
         sql = f"""
-            SELECT `supplier_name`, `oe_code`, `brand`, `price`, `expiry_date`, `warehouse`, `stock`, `remark`, 
+            SELECT `supplier_name`, `oe_code`, `brand`, `price`, `expiry_date`, `warehouse`, `stock`, `remark`,
                    `fetch_time`, `update_msg`
-            FROM virtual_inventory 
+            FROM virtual_inventory
             WHERE {where_clause}
             {order_clause}
             LIMIT %s OFFSET %s
@@ -351,8 +466,10 @@ def get_virtual_inventory_search():
         params.extend([limit, offset])
         cursor.execute(sql, params)
         rows = cursor.fetchall()
+        log_time_cost("查询分页数据", query_start)
 
         # 格式化时间字段
+        format_start = time.time()
         for row in rows:
             if row['fetch_time']:
                 # 将fetch_time转换为字符串格式
@@ -362,6 +479,7 @@ def get_virtual_inventory_search():
                 # 将expiry_date转换为字符串格式
                 if hasattr(row['expiry_date'], 'strftime'):
                     row['expiry_date'] = row['expiry_date'].strftime('%Y-%m-%d %H:%M:%S')
+        log_time_cost("格式化时间字段", format_start)
 
         conn.close()
 
@@ -382,19 +500,25 @@ def get_virtual_inventory_search():
 @login_required
 def get_update_msg_options():
     """获取更新信息的选项列表（按格式分类）"""
+    api_start_time = time.time()
+    print(f"\n[⏱️ 后端计时] ========== API /api/update_msg_options 开始 ==========")
     try:
+        db_connect_start = time.time()
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
+        log_time_cost("数据库连接", db_connect_start)
 
         # 查询所有唯一的更新信息，排除空值
+        query_start = time.time()
         sql = """
-            SELECT update_msg 
-            FROM virtual_inventory 
+            SELECT update_msg
+            FROM virtual_inventory
             WHERE update_msg IS NOT NULL AND update_msg != ''
             ORDER BY update_msg
         """
         cursor.execute(sql)
         rows = cursor.fetchall()
+        log_time_cost("查询更新信息", query_start)
 
         conn.close()
 
@@ -440,6 +564,9 @@ def get_update_msg_options():
         print(f"新建失败: {new_fail_count} 条")
         print(f"总计非空更新信息: {len(update_msgs)} 条")
 
+        total_cost = log_time_cost("API 总耗时", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/update_msg_options 完成，总耗时: {total_cost:.2f}ms ==========\n")
+
         return jsonify({
             'code': 0,
             'msg': '',
@@ -447,6 +574,8 @@ def get_update_msg_options():
         })
 
     except Exception as e:
+        total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/update_msg_options 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取更新信息选项失败: {str(e)}'}), 500
 
 
@@ -545,6 +674,8 @@ def get_virtual_inventory_statistics():
 @login_required
 def get_virtual_inventory_by_msg_pattern():
     """根据更新信息模式获取虚拟库存数据 - 遵循用户选择的业务日期范围"""
+    api_start_time = time.time()
+    print(f"\n[⏱️ 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 开始 ==========")
     try:
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 10))
@@ -565,8 +696,10 @@ def get_virtual_inventory_by_msg_pattern():
         # 获取业务日期范围参数
         business_date_type = request.args.get('business_date_type', '').strip()
 
+        db_connect_start = time.time()
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
+        log_time_cost("数据库连接", db_connect_start)
 
         # 构建查询条件
         where_conditions = ["1=1"]
@@ -700,39 +833,28 @@ def get_virtual_inventory_by_msg_pattern():
                 if hasattr(row['expiry_date'], 'strftime'):
                     row['expiry_date'] = row['expiry_date'].strftime('%Y-%m-%d %H:%M:%S')
 
-        # 分别统计各个类别 - 上传失败统计
-        upload_failed_sql = f"""
-            SELECT COUNT(*) as count FROM virtual_inventory 
-            WHERE (update_msg LIKE %s OR update_msg LIKE %s OR update_msg LIKE %s OR 
-                update_msg LIKE %s OR update_msg LIKE %s OR
-                update_msg IS NULL OR update_msg = '' OR
-                (update_msg IS NOT NULL AND update_msg != '' AND 
-                    update_msg NOT LIKE %s AND update_msg NOT LIKE %s AND 
-                    update_msg NOT LIKE %s AND update_msg NOT LIKE %s AND 
-                    update_msg NOT LIKE %s AND LOWER(update_msg) NOT LIKE %s)) AND {where_clause}
-        """
-        cursor.execute(upload_failed_sql, [
-            "%品牌名称%总部不存在%请核查数据%",
-            "%过期时间%不能小于当前时间%",
-            "%物料所属品牌%OE号%产品数据不存在%请核查数据%",
-            "%OE号【%】处理结果：成功%",         # 新建成功
-            "%OE号【%】处理结果：失败%",         # 新建失败
-            "%品牌名称%总部不存在%请核查数据%",  # 用于NOT LIKE
-            "%过期时间%不能小于当前时间%",      # 用于NOT LIKE
-            "%物料所属品牌%OE号%产品数据不存在%请核查数据%",  # 用于NOT LIKE
-            "%OE号【%】处理结果：成功%",         # 用于NOT LIKE
-            "%OE号【%】处理结果：失败%",         # 用于NOT LIKE
-            "%update%"  # 用于NOT LIKE
-        ] + params[:-2])
-        upload_failed_count = cursor.fetchone()['count']
+        # 使用 update_status 字段进行统计，避免 LIKE 查询
+        stats_start = time.time()
 
-        # 计算统计结果
-        success_count = total - upload_failed_count  # 成功数量 = 总数 - 上传失败数
-        failed_count = upload_failed_count  # 失败数等于上传失败数
-        no_record_count = upload_failed_count  # 没有档案数等于上传失败数
-        new_archive_count = 0  # 新建档案数为0（因为都归类到上传失败了）
+        # 使用索引字段统计成功数量
+        simple_success_sql = f"""
+            SELECT COUNT(*) as count FROM virtual_inventory
+            WHERE update_status = 'success' AND {where_clause}
+        """
+        cursor.execute(simple_success_sql, params[:-2])
+        success_count = cursor.fetchone()['count']
+
+        # 失败数量 = 总数 - 成功数
+        failed_count = total - success_count
+        no_record_count = failed_count
+        new_archive_count = 0
+
+        log_time_cost("统计查询(使用update_status索引)", stats_start)
 
         conn.close()
+
+        total_cost = log_time_cost("API 总耗时", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 完成，总耗时: {total_cost:.2f}ms ==========\n")
 
         return jsonify({
             'code': 0,
@@ -742,33 +864,112 @@ def get_virtual_inventory_by_msg_pattern():
             'statistics': {
                 'success_count': success_count,
                 'failed_count': failed_count,
-                'no_record_count': no_record_count,
-                'new_archive_count': new_archive_count
             }
         })
 
     except Exception as e:
+        total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取数据失败: {str(e)}'}), 500
+
+@virtual_inventory_bp.route('/api/virtual_inventory_statistics_by_pattern', methods=['GET'])
+@login_required
+def get_virtual_inventory_statistics_by_pattern():
+    """根据筛选条件获取统计信息 - 异步加载专用接口"""
+    api_start_time = time.time()
+    print(f"\n[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 开始 ==========")
+    try:
+        pattern = request.args.get('pattern', '').strip()
+        business_date_type = request.args.get('business_date_type', '').strip()
+
+        db_connect_start = time.time()
+        conn = get_db_connection()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        log_time_cost("数据库连接", db_connect_start)
+
+        # 构建查询条件
+        where_conditions = ["1=1"]
+        params = []
+
+        # 根据业务日期范围参数添加时间条件
+        if business_date_type == 'today':
+            start_time, end_time = get_business_date_range()
+            where_conditions.append("fetch_time >= %s AND fetch_time < %s")
+            params.extend([start_time, end_time])
+
+        # 根据模式筛选数据 - 使用 update_status 字段优化查询
+        if pattern:
+            if pattern == "上传失败":
+                where_conditions.append("(update_status != 'success' OR update_status IS NULL)")
+            elif pattern == "上传成功":
+                where_conditions.append("update_status = 'success'")
+            elif pattern == "新建成功":
+                where_conditions.append("update_status = 'new_success'")
+            elif pattern == "新建失败":
+                where_conditions.append("update_status = 'new_failed'")
+
+        where_clause = " AND ".join(where_conditions)
+
+        # 获取总记录数 - 使用索引优化
+        query_start = time.time()
+        count_sql = f"SELECT COUNT(*) AS total FROM virtual_inventory WHERE {where_clause}"
+        cursor.execute(count_sql, params)
+        total = cursor.fetchone()['total']
+
+        # 统计成功数量 - 使用 update_status 字段，避免 LIKE
+        success_sql = f"SELECT COUNT(*) as count FROM virtual_inventory WHERE update_status = 'success' AND {where_clause}"
+        cursor.execute(success_sql, params)
+        success_count = cursor.fetchone()['count']
+        log_time_cost("统计查询(使用update_status索引)", query_start)
+
+        failed_count = total - success_count
+
+        conn.close()
+
+        total_cost = log_time_cost("API 总耗时", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 完成，总耗时: {total_cost:.2f}ms ==========\n")
+
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'data': {
+                'total_count': total,
+                'success_count': success_count,
+                'failed_count': failed_count,
+                'no_record_count': failed_count,
+                'new_archive_count': 0
+            }
+        })
+
+    except Exception as e:
+        total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
+        return jsonify({'code': 1, 'msg': f'获取统计数据失败: {str(e)}'}), 500
 
 @virtual_inventory_bp.route('/api/supplier_summary')
 @login_required
 def get_supplier_summary():
     """获取各供应商上传成功和失败统计 - 始终基于当前业务日期范围"""
+    api_start_time = time.time()
+    print(f"\n[⏱️ 后端计时] ========== API /api/supplier_summary 开始 ==========")
     try:
+        db_connect_start = time.time()
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
+        log_time_cost("数据库连接", db_connect_start)
 
         # 获取当前业务日期范围
         start_time, end_time = get_business_date_range()
 
         # 查询每个供应商的上传成功和失败统计 - 限制为当前业务日期范围
+        query_start = time.time()
         sql = """
-            SELECT 
+            SELECT
                 supplier_name,
                 COUNT(*) as total_count,
                 SUM(CASE WHEN LOWER(update_msg) LIKE %s THEN 1 ELSE 0 END) as success_count,
                 SUM(CASE WHEN LOWER(update_msg) NOT LIKE %s OR update_msg IS NULL OR update_msg = '' THEN 1 ELSE 0 END) as failed_count
-            FROM virtual_inventory 
+            FROM virtual_inventory
             WHERE supplier_name IS NOT NULL AND supplier_name != ''
             AND fetch_time >= %s AND fetch_time < %s
             GROUP BY supplier_name
@@ -776,8 +977,12 @@ def get_supplier_summary():
         """
         cursor.execute(sql, ("%update%", "%update%", start_time, end_time))
         rows = cursor.fetchall()
+        log_time_cost("供应商汇总查询", query_start)
 
         conn.close()
+
+        total_cost = log_time_cost("API 总耗时", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/supplier_summary 完成，总耗时: {total_cost:.2f}ms ==========\n")
 
         return jsonify({
             'code': 0,
@@ -786,6 +991,8 @@ def get_supplier_summary():
         })
 
     except Exception as e:
+        total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/supplier_summary 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取供应商汇总失败: {str(e)}'}), 500
 
 # 新增API路由：根据当前业务日期获取虚拟库存数据
@@ -1053,12 +1260,19 @@ def get_virtual_inventory_by_date():
 @login_required
 def get_virtual_inventory_statistics_today():
     """获取当前业务日的虚拟库存统计信息"""
+    api_start_time = time.time()
+    print(f"\n[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_today 开始 ==========")
     try:
         # 获取业务日期范围
         start_time, end_time = get_business_date_range()
 
+        db_connect_start = time.time()
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
+        log_time_cost("数据库连接", db_connect_start)
+
+        # 使用 update_status 字段优化统计查询
+        query_start = time.time()
 
         # 总记录数
         total_sql = "SELECT COUNT(*) as count FROM virtual_inventory WHERE fetch_time >= %s AND fetch_time < %s"
@@ -1066,56 +1280,57 @@ def get_virtual_inventory_statistics_today():
         total_count = cursor.fetchone()['count']
         print(f"当前业务日总记录数: {total_count}")
 
-        # 成功上传：包含"update"的数据
-        success_sql = "SELECT COUNT(*) as count FROM virtual_inventory WHERE LOWER(update_msg) LIKE %s AND fetch_time >= %s AND fetch_time < %s"
-        cursor.execute(success_sql, ("%update%", start_time, end_time))
+        # 成功上传：使用 update_status 索引
+        success_sql = "SELECT COUNT(*) as count FROM virtual_inventory WHERE update_status = 'success' AND fetch_time >= %s AND fetch_time < %s"
+        cursor.execute(success_sql, (start_time, end_time))
         success_count = cursor.fetchone()['count']
         print(f"当前业务日成功上传数 (update): {success_count}")
-        
-        # 新建成功：包含"OE号【"和"】处理结果：成功"
+
+        # 新建成功：使用 update_status 索引
         new_success_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
-            WHERE update_msg LIKE %s AND update_msg LIKE %s AND fetch_time >= %s AND fetch_time < %s
+            SELECT COUNT(*) as count FROM virtual_inventory
+            WHERE update_status = 'new_success' AND fetch_time >= %s AND fetch_time < %s
         """
-        cursor.execute(new_success_sql, ["%OE号【%", "%】处理结果：成功%", start_time, end_time])
+        cursor.execute(new_success_sql, (start_time, end_time))
         new_success_count = cursor.fetchone()['count']
         print(f"当前业务日新建成功数: {new_success_count}")
-        
-        # 新建失败：包含"OE号【"和"】处理结果：失败"
+
+        # 新建失败：使用 update_status 索引
         new_fail_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
-            WHERE update_msg LIKE %s AND update_msg LIKE %s AND fetch_time >= %s AND fetch_time < %s
+            SELECT COUNT(*) as count FROM virtual_inventory
+            WHERE update_status = 'new_failed' AND fetch_time >= %s AND fetch_time < %s
         """
-        cursor.execute(new_fail_sql, ["%OE号【%", "%】处理结果：失败%", start_time, end_time])
+        cursor.execute(new_fail_sql, (start_time, end_time))
         new_fail_count = cursor.fetchone()['count']
         print(f"当前业务日新建失败数: {new_fail_count}")
-        
-        # 品牌名称总部不存在
+
+        # 品牌名称总部不存在 - 暂时保持LIKE查询（数据量较小）
         brand_not_exist_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
+            SELECT COUNT(*) as count FROM virtual_inventory
             WHERE update_msg LIKE %s AND fetch_time >= %s AND fetch_time < %s
         """
         cursor.execute(brand_not_exist_sql, ["%品牌名称%总部不存在%请核查数据%", start_time, end_time])
         brand_not_exist_count = cursor.fetchone()['count']
         print(f"当前业务日品牌名称总部不存在数: {brand_not_exist_count}")
-        
-        # 物料所属品牌OE号不存在
+
+        # 物料所属品牌OE号不存在 - 暂时保持LIKE查询（数据量较小）
         product_not_exist_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
+            SELECT COUNT(*) as count FROM virtual_inventory
             WHERE update_msg LIKE %s AND fetch_time >= %s AND fetch_time < %s
         """
         cursor.execute(product_not_exist_sql, ["%物料所属品牌%OE号%产品数据不存在%请核查数据%", start_time, end_time])
         product_not_exist_count = cursor.fetchone()['count']
         print(f"当前业务日物料所属品牌OE号不存在数: {product_not_exist_count}")
-        
+        log_time_cost("统计查询(使用update_status索引)", query_start)
+
         # 失败：总记录数 - 成功上传
         failed_count = total_count - success_count
         print(f"当前业务日失败数: {failed_count}")
-        
+
         # 没有档案：新建失败 + 新建成功 + 品牌名称总部不存在 + 物料所属品牌OE号不存在
         no_record_count = new_success_count + new_fail_count + brand_not_exist_count + product_not_exist_count
         print(f"当前业务日没有档案数: {no_record_count}")
-        
+
         # 新建档案：新建成功
         new_archive_count = new_success_count
         print(f"当前业务日新建档案数: {new_archive_count}")
@@ -1136,12 +1351,151 @@ def get_virtual_inventory_statistics_today():
             }
         }
         print(f"当前业务日统计返回结果: {result}")
-        
+
+        total_cost = log_time_cost("API 总耗时", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_today 完成，总耗时: {total_cost:.2f}ms ==========\n")
+
         return jsonify(result)
 
     except Exception as e:
+        total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
+        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_today 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         print(f"获取当前业务日统计数据失败: {str(e)}")
         return jsonify({'code': 1, 'msg': f'获取当前业务日统计数据失败: {str(e)}'}), 500
+
+@virtual_inventory_bp.route('/api/admin/refresh_update_status', methods=['POST'])
+@login_required
+def admin_refresh_update_status():
+    """管理接口：刷新所有记录的 update_status 字段"""
+    try:
+        # 检查是否是管理员（这里简单判断，你可以根据实际需求修改）
+        if session.get('username') != 'admin':
+            return jsonify({'code': 1, 'msg': '只有管理员才能执行此操作'}), 403
+
+        result = refresh_update_status_sync()
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'刷新失败: {str(e)}'}), 500
+
+def refresh_update_status_sync():
+    """
+    同步刷新所有记录的 update_status 字段
+    返回刷新结果统计
+    """
+    start_time = time.time()
+    result = {
+        'code': 0,
+        'msg': '',
+        'total_updated': 0,
+        'details': {
+            'success': 0,
+            'failed': 0,
+            'new_success': 0,
+            'new_failed': 0,
+            'empty': 0
+        }
+    }
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        print("[管理后台] 开始刷新 update_status 字段...")
+
+        # 分批更新，避免一次性更新太多数据
+        batch_size = 5000
+        offset = 0
+
+        while True:
+            # 获取一批需要更新的记录
+            cursor.execute("""
+                SELECT id, update_msg FROM virtual_inventory
+                WHERE update_status IS NULL
+                LIMIT %s OFFSET %s
+            """, (batch_size, offset))
+
+            rows = cursor.fetchall()
+            if not rows:
+                break
+
+            # 更新这批记录
+            for row in rows:
+                status = get_update_status(row[1])
+                cursor.execute("""
+                    UPDATE virtual_inventory
+                    SET update_status = %s
+                    WHERE id = %s
+                """, (status, row[0]))
+
+                result['details'][status] += 1
+
+            conn.commit()
+            result['total_updated'] += len(rows)
+            print(f"[管理后台] 已更新 {result['total_updated']} 条记录")
+
+            if len(rows) < batch_size:
+                break
+
+            offset += batch_size
+
+        cost_time = (time.time() - start_time) * 1000
+        result['msg'] = f"刷新完成，共更新 {result['total_updated']} 条记录，耗时 {cost_time:.2f}ms"
+        print(f"[管理后台] {result['msg']}")
+
+    except Exception as e:
+        result['code'] = 1
+        result['msg'] = f"刷新失败: {str(e)}"
+        print(f"[管理后台] 刷新 update_status 失败: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
+
+    return result
+
+@virtual_inventory_bp.route('/api/admin/check_update_status', methods=['GET'])
+@login_required
+def admin_check_update_status():
+    """管理接口：检查 update_status 字段的统计情况"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+        # 统计各种状态的数量
+        cursor.execute("""
+            SELECT
+                update_status,
+                COUNT(*) as count
+            FROM virtual_inventory
+            GROUP BY update_status
+        """)
+        rows = cursor.fetchall()
+
+        # 统计为空的记录数
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM virtual_inventory
+            WHERE update_status IS NULL
+        """)
+        null_count = cursor.fetchone()['count']
+
+        conn.close()
+
+        # 整理结果
+        status_stats = {row['update_status'] or 'NULL': row['count'] for row in rows}
+        status_stats['未分类(NULL)'] = null_count
+
+        return jsonify({
+            'code': 0,
+            'msg': '查询成功',
+            'data': status_stats
+        })
+
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'查询失败: {str(e)}'}), 500
 
 # 导入到主应用的函数============================================================================================
 def register_virtual_inventory_routes(app):
