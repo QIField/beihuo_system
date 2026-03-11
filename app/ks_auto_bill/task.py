@@ -9,9 +9,11 @@
 4. 异常隔离，不影响主进程
 """
 
+import os
 import time
 import threading
 import queue
+import tempfile
 from datetime import datetime
 from typing import Optional, Tuple, List
 
@@ -24,7 +26,49 @@ from app.ks_auto_bill.main import (
     check_login_status,
     is_running_time
 )
-from app.core.single_instance import SimpleFileLock
+
+
+# 简单文件锁类（内联定义，避免导入问题）
+class SimpleFileLock:
+    """简单文件锁，用于防止任务重复执行"""
+    
+    def __init__(self, lock_name: str, lock_dir: str = None):
+        self.lock_name = lock_name
+        # 使用系统临时目录（兼容 Windows 和 Linux）
+        if lock_dir is None:
+            lock_dir = tempfile.gettempdir()
+        self.lock_path = os.path.join(lock_dir, f"{lock_name}.lock")
+        self._acquired = False
+    
+    def acquire(self) -> bool:
+        """获取锁"""
+        try:
+            fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+            self._acquired = True
+            return True
+        except FileExistsError:
+            return False
+        except Exception:
+            return False
+    
+    def release(self):
+        """释放锁"""
+        if self._acquired:
+            try:
+                if os.path.exists(self.lock_path):
+                    os.unlink(self.lock_path)
+                self._acquired = False
+            except Exception:
+                pass
+    
+    def __enter__(self):
+        return self.acquire()
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()
+        return False
 
 
 # 全局状态：保持登录 session，避免重复登录

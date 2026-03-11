@@ -30,6 +30,9 @@ from app.utils.database_connection import get_db_connection
 from app.utils.search import parse_space, parse_comma
 from app.utils.export_tools import handle_export_request
 
+# 导入轻量级任务管理器（延迟初始化）
+from app.core.task_manager import task_manager
+
 
 app = Flask(__name__, 
             template_folder='./templates',
@@ -731,18 +734,6 @@ def run_virtual_inventory_task():
             task_execution_tracker['task_running'] = False
             print(f"[{datetime.now()}] DEBUG: 任务执行结束，重置task_running标志")
 
-# 导入统一任务管理器
-from app.core.task_manager import task_manager
-
-# 注册定时任务 - 使用 task_manager
-task_manager.schedule(
-    run_virtual_inventory_task,
-    'cron',
-    'virtual_inventory_daily',
-    hour=13,
-    minute=0
-)
-
 # 注册每小时购物车高库存清理任务
 def run_cart_cleanup_task():
     """每小时自动清理购物车高库存商品"""
@@ -768,14 +759,6 @@ def run_cart_cleanup_task():
 
     except Exception as e:
         print(f"❌ 每小时购物车清理任务失败: {str(e)}")
-
-# 每小时执行一次购物车清理（整点执行）
-task_manager.schedule(
-    run_cart_cleanup_task,
-    'cron',
-    'cart_cleanup_hourly',
-    minute=0
-)
 
 def print_task_debug_info():
     """打印任务执行调试信息"""
@@ -1329,25 +1312,16 @@ def insert_or_update_data(data_list, company, gx_date):
 # 配置定时任务 - 使用 task_manager
 def setup_scheduled_tasks():
     """设置定时任务"""
-    # 从早上7:20到晚上22:00，每15分钟执行一次
-    # 使用 interval 触发器更简单
-    
     # 注册间隔任务（每15分钟）
     task_manager.schedule(
         auto_update_and_fetch,
         'interval',
         'auto_update_interval',
-        minutes=15
+        minutes=15,
+        replace_existing=True
     )
     
-    print("⏰ 定时任务已配置完成")
-    print("📋 定时更新时间: 每15分钟运行一次")
-
-
-# 在应用启动时配置并启动定时任务
-setup_scheduled_tasks()
-
-print("⏰ 定时任务调度器已启动")
+    print("[任务初始化] 自动更新任务已注册（每15分钟）")
 
 
 # 清理函数
@@ -4841,84 +4815,91 @@ def init_virtual_inventory_tables():
         import traceback
         traceback.print_exc()
 
-# 初始化后台任务监控（生产环境）
-def init_subprocess_monitor():
+# 初始化后台任务（单 worker 极简版）
+def init_background_tasks():
     """
-    初始化后台任务监控（简化版）
-
-    注意：
-    1. 只在生产环境（非 __main__）初始化
-    2. 默认自动启动后台任务（无需设置环境变量）
-    3. 只在第一个 uWSGI worker 中启动任务
-    4. 如需禁用自动启动，设置环境变量 AUTO_START_KS_BILL=false
+    初始化后台任务 - 单 worker 环境下直接启动
     """
     try:
-        from app.core.task_manager import init_ks_bill_monitor
-
-        # 初始化监控（内部已处理 worker 检测和调度）
+        from app.core.task_manager import task_manager, init_ks_bill_monitor
+        
+        print("[任务初始化] 正在初始化...")
+        task_manager.initialize()
+        
+        # 注册虚拟库存任务
+        task_manager.schedule(
+            run_virtual_inventory_task,
+            'cron',
+            'virtual_inventory_daily',
+            hour=13,
+            minute=0,
+            replace_existing=True
+        )
+        print("[任务] 虚拟库存: 每天13:00")
+        
+        # 注册购物车清理任务
+        task_manager.schedule(
+            run_cart_cleanup_task,
+            'cron',
+            'cart_cleanup_hourly',
+            minute=0,
+            replace_existing=True
+        )
+        print("[任务] 购物车清理: 每小时")
+        
+        # 注册自动更新任务
+        setup_scheduled_tasks()
+        
+        # 初始化开思自动对单
         init_ks_bill_monitor()
-
+        
+        print("[任务初始化] 完成")
+        
     except Exception as e:
-        print(f"[应用启动] 初始化后台任务监控失败: {e}")
+        print(f"[任务初始化] 失败: {e}")
         import traceback
         traceback.print_exc()
 
 # 应用启动配置
 if __name__ == '__main__':
-    # 先在主进程中初始化数据库表（只执行一次）
+    # 先在主进程中初始化数据库表
     init_virtual_inventory_tables()
     
-    # 只在主进程中初始化监控和启动任务
-    init_subprocess_monitor()
+    # 初始化后台任务
+    init_background_tasks()
     
-    # 使用纯 Flask 运行，避免 SocketIO threading 模式导致的多进程问题
+    # 使用纯 Flask 运行
     app.run(debug=False, host='0.0.0.0', port=5000, threaded=True)
 
-# uWSGI 环境下的初始化（服务器部署时使用）
-# 当使用 uWSGI 部署时，__name__ != '__main__'，但需要在应用加载时初始化
-if IS_UWSGI:
-    print("[uWSGI] 检测到 uWSGI 环境，正在初始化...")
-    print(f"[uWSGI] 当前进程ID: {os.getpid()}, 启动时间: {datetime.now()}")
-
-    # 首先初始化数据库表（只执行一次）
+# uWSGI/gunicorn 环境下的初始化
+if IS_UWSGI or not __name__ == '__main__':
+    print(f"[服务器] 检测到生产环境，正在初始化... (PID: {os.getpid()})")
+    
+    # 初始化数据库表
     try:
         init_virtual_inventory_tables()
-        print("[uWSGI] 数据库表初始化完成")
+        print("[服务器] 数据库表初始化完成")
     except Exception as e:
-        print(f"[uWSGI] 数据库表初始化失败: {e}")
+        print(f"[服务器] 数据库表初始化失败: {e}")
         import traceback
         traceback.print_exc()
-
-    # 使用线程延迟初始化后台任务监控，确保 uWSGI 完全加载
+    
+    # 延迟初始化后台任务 - 给服务器一些时间完全启动
     def delayed_init():
-        """延迟初始化后台任务，确保 uWSGI 完全就绪"""
         try:
-            # 等待 uWSGI 工作进程完全启动
-            # 增加等待时间到 10 秒，确保 uWSGI 内部状态完全就绪
-            print(f"[uWSGI延迟初始化] 等待 uWSGI 完全就绪... (PID: {os.getpid()})")
-            time.sleep(10)
-
-            # 再次检查 uWSGI 状态
-            try:
-                import uwsgi
-                worker_id = uwsgi.worker_id()
-                print(f"[uWSGI延迟初始化] Worker {worker_id} 准备就绪，开始初始化后台任务")
-            except Exception as e:
-                print(f"[uWSGI延迟初始化] 警告: 无法获取 worker_id: {e}")
-                print(f"[uWSGI延迟初始化] 继续尝试初始化...")
-
-            # 初始化后台任务监控
-            init_subprocess_monitor()
-            print(f"[uWSGI延迟初始化] 后台任务监控初始化完成 (PID: {os.getpid()})")
-
+            print(f"[服务器] 等待环境就绪... (PID: {os.getpid()})")
+            time.sleep(5)
+            
+            # 初始化后台任务（内部会自动检测是否为主 worker）
+            init_background_tasks()
+            print(f"[服务器] 后台任务初始化完成 (PID: {os.getpid()})")
+            
         except Exception as e:
-            print(f"[uWSGI延迟初始化] 初始化失败: {e}")
+            print(f"[服务器] 初始化失败: {e}")
             import traceback
             traceback.print_exc()
-
-    # 创建守护线程进行延迟初始化
-    init_thread = threading.Thread(target=delayed_init, name='uwsgi_init_thread')
-    init_thread.daemon = True
+    
+    # 启动延迟初始化线程
+    init_thread = threading.Thread(target=delayed_init, daemon=True, name='server_init')
     init_thread.start()
-    print("[uWSGI] 后台任务监控初始化线程已启动（10秒后执行）")
-    print("[uWSGI] 注意：每个 worker 都会执行此初始化，但只有第一个 worker 会实际启动任务")
+    print("[服务器] 初始化线程已启动（5秒后执行）")

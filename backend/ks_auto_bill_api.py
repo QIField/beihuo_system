@@ -23,7 +23,6 @@ from app.ks_auto_bill.task import (
     get_ks_auto_bill_task_status,
     process_orders_once
 )
-from app.core.single_instance import ks_bill_lock
 
 ks_auto_bill_bp = Blueprint('ks_auto_bill', __name__)
 

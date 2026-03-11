@@ -27,6 +27,7 @@ env/
 ENV/
 env.bak/
 ENV.bak/
+.venv/
 
 # IDE
 .vscode/
@@ -43,6 +44,14 @@ config/local_settings.py
 
 # Logs
 *.log
+logs/
 
 # Environment variables
 .env
+
+# Docker
+docker/logs/
+
+# uWSGI
+*.pid
+*.sock
