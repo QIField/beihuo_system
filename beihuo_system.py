@@ -993,23 +993,23 @@ def auto_fetch_data():
 
 
 def schedule_fetch_after_delay():
-    """在当前更新后10分钟安排拉取 - 优化版本"""
+    """在当前更新后15分钟安排拉取"""
     global scheduled_fetch_timer
-    
+
     with fetch_task_lock:  # 确保定时器操作的原子性
         # 如果之前有定时器，取消它
         if scheduled_fetch_timer:
             scheduled_fetch_timer.cancel()
             print("⏰ 已取消之前的延时拉取任务")
-        
-        # 10分钟后执行拉取
+
+        # 15分钟后执行拉取
         def delayed_fetch():
             auto_fetch_data()
-        
-        # 创建定时器，10分钟后执行
-        scheduled_fetch_timer = Timer(10 * 60, delayed_fetch)  # 10分钟 = 600秒
+
+        # 创建定时器，15分钟后执行
+        scheduled_fetch_timer = Timer(15 * 60, delayed_fetch)  # 15分钟 = 900秒
         scheduled_fetch_timer.start()
-        print(f"⏰ 已设定10分钟后自动拉取数据")
+        print(f"⏰ 已设定15分钟后自动拉取数据")
 
 
 def fetch_data_for_company(company):
@@ -1082,12 +1082,6 @@ def fetch_data_for_company(company):
 
                         COLUMNS_STR = ", ".join([f"`{f}`" for f in FIELDS])
                         PLACEHOLDERS_STR = ", ".join(["%s"] * (len(FIELDS) + 1))  # FIELDS数量+1个更新时间
-                        UPDATE_SET = ", ".join([f"`{f}` = VALUES(`{f}`)" for f in FIELDS if f != 'id'])
-                        UPSERT_SQL = f"""
-                        INSERT INTO `crmapp_beihuo` ({COLUMNS_STR}, `更新时间`)
-                        VALUES ({PLACEHOLDERS_STR})
-                        ON DUPLICATE KEY UPDATE {UPDATE_SET}, `更新时间` = VALUES(`更新时间`)
-                        """
 
                         def clean_data(value):
                             if isinstance(value, str):
@@ -1096,27 +1090,40 @@ def fetch_data_for_company(company):
                                     return str(int(match.group(1)) - 3)
                             return value
 
-                        # 建立数据库连接并执行插入
+                        # 建立数据库连接
                         conn = get_db_connection()
                         cursor = conn.cursor()
 
-                        batch_size = 5000
+                        # 优化：增大批次大小，减少commit频率
+                        batch_size = 10000  # 从5000增大到10000
+                        commit_interval = 5  # 每5批次commit一次
                         total = len(data_list)
                         processed = 0
 
                         try:
+                            # 1. 清空当前门店的数据
+                            cursor.execute("DELETE FROM crmapp_beihuo WHERE company = %s", (company,))
+                            print(f"🗑️ 已清空门店 {company} 的现有数据，准备插入 {total} 条记录")
+
+                            # 2. 构造INSERT SQL（不需要ON DUPLICATE KEY UPDATE）
+                            INSERT_SQL = f"""
+                            INSERT INTO `crmapp_beihuo` ({COLUMNS_STR}, `更新时间`)
+                            VALUES ({PLACEHOLDERS_STR})
+                            """
+
+                            batch_count = 0
                             for i in range(0, total, batch_size):
                                 batch = data_list[i:i + batch_size]
                                 values_batch = []
-                                
+
                                 for item in batch:
                                     row = [clean_data(item.get(key)) for key in JSON_KEYS]
                                     row.append(company)
-                                    
+
                                     # 获取当前记录的品牌值和物料条码
                                     current_brand = item.get("品牌", "")
                                     current_barcode = item.get("物料条码", "")
-                                    
+
                                     # 如果品牌是"原厂 SJZX"且物料条码以"P"或"Y"开头，则根据条码前缀修改品牌
                                     if current_brand == "原厂 SJZX":
                                         if current_barcode and current_barcode.startswith("P"):
@@ -1125,13 +1132,13 @@ def fetch_data_for_company(company):
                                         elif current_barcode and current_barcode.startswith("Y"):
                                             brand_index = JSON_KEYS.index("品牌")
                                             row[brand_index] = "原厂"
-                                    
+
                                     # 如果品牌是"菲尔"或者"菲尔 FREY"，将物料条码复制到品牌号
                                     if current_brand in ["菲尔", "菲尔 FREY"]:
                                         barcode_index = JSON_KEYS.index("物料条码")
                                         brand_code_index = JSON_KEYS.index("品牌号")
                                         row[brand_code_index] = row[barcode_index]
-                                    
+
                                     # 添加更新时间到每行数据（最后一个元素）
                                     if gx_date:
                                         try:
@@ -1150,13 +1157,22 @@ def fetch_data_for_company(company):
 
                                     values_batch.append(row)
 
-                                cursor.executemany(UPSERT_SQL, values_batch)
-                                conn.commit()
+                                cursor.executemany(INSERT_SQL, values_batch)
                                 processed += len(values_batch)
+                                batch_count += 1
+
+                                # 优化：每commit_interval批次才commit一次
+                                if batch_count % commit_interval == 0:
+                                    conn.commit()
+                                    print(f"📊 门店 {company} 插入进度: {processed}/{total} ({processed*100//total}%)")
+
+                            # 最后提交剩余数据
+                            conn.commit()
+                            print(f"✅ 门店 {company} 数据插入完成，共 {processed} 条记录")
 
                         except Exception as e:
                             conn.rollback()
-                            print(f"❌ 插入/更新失败 (company={company}): {str(e)}")
+                            print(f"❌ 插入失败 (company={company}): {str(e)}")
                             return -1
                         finally:
                             cursor.close()
@@ -1198,130 +1214,19 @@ def fetch_data_for_company(company):
         print(f"❌ 门店 {company} 拉取时出错: {str(e)}")
         return -1
 
-def insert_or_update_data(data_list, company, gx_date):
-    """插入或更新数据的核心逻辑"""
-    conn = None
-    cursor = None
-    
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # JSON数据键顺序定义
-        JSON_KEYS = [
-            '供应商', '品牌', '物料名称', 'OE', '物料条码', '车型品牌', '标签',
-            '近1个月询价量', '近3个月月均询价量', '库存数量', '昨日销量', '本月销量', '今日销量',
-            '全国近1个月询价量', '全国近3个月月均询价量', '内部备注', '品牌号', '库存金额',
-            '成品可卖天数', '成本价', '近12个月月均销量', '近6个月月均销量', '近7天销量',
-            '预警状态', '在途数量', '车型'
-        ]
-        
-        # UPSERT SQL语句
-        UPSERT_SQL = """
-            INSERT INTO crmapp_beihuo (
-                `供应商`, `品牌`, `物料名称`, `OE`, `物料条码`, `车型品牌`, `标签`,
-                `近1个月询价量`, `近3个月月均询价量`, `库存数量`, `昨日销量`, `本月销量`, `今日销量`,
-                `全国近1个月询价量`, `全国近3个月月均询价量`, `内部备注`, `品牌号`, `库存金额`,
-                `成品可卖天数`, `成本价`, `近12个月月均销量`, `近6个月月均销量`, `近7天销量`,
-                `预警状态`, `在途数量`, `车型`, `company`, `update_time`
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-                      %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                `供应商`=VALUES(`供应商`), `品牌`=VALUES(`品牌`), `物料名称`=VALUES(`物料名称`),
-                `OE`=VALUES(`OE`), `物料条码`=VALUES(`物料条码`), `车型品牌`=VALUES(`车型品牌`),
-                `标签`=VALUES(`标签`), `近1个月询价量`=VALUES(`近1个月询价量`),
-                `近3个月月均询价量`=VALUES(`近3个月月均询价量`), `库存数量`=VALUES(`库存数量`),
-                `昨日销量`=VALUES(`昨日销量`), `本月销量`=VALUES(`本月销量`), `今日销量`=VALUES(`今日销量`),
-                `全国近1个月询价量`=VALUES(`全国近1个月询价量`), `全国近3个月月均询价量`=VALUES(`全国近3个月月均询价量`),
-                `内部备注`=VALUES(`内部备注`), `品牌号`=VALUES(`品牌号`), `库存金额`=VALUES(`库存金额`),
-                `成品可卖天数`=VALUES(`成品可卖天数`), `成本价`=VALUES(`成本价`),
-                `近12个月月均销量`=VALUES(`近12个月月均销量`), `近6个月月均销量`=VALUES(`近6个月月均销量`),
-                `近7天销量`=VALUES(`近7天销量`), `预警状态`=VALUES(`预警状态`), `在途数量`=VALUES(`在途数量`),
-                `车型`=VALUES(`车型`), `company`=VALUES(`company`), `update_time`=VALUES(`update_time`)
-        """
-        
-        batch_size = 5000
-        total = len(data_list)
-        processed = 0
-
-        for i in range(0, total, batch_size):
-            batch = data_list[i:i + batch_size]
-            values_batch = []
-            
-            for item in batch:
-                row = [clean_data_date(item.get(key)) for key in JSON_KEYS]
-                
-                # 添加公司标识和更新时间
-                row.append(company)
-                
-                # 获取当前记录的品牌值和物料条码
-                current_brand = item.get("品牌", "")
-                current_barcode = item.get("物料条码", "")
-                
-                # 如果品牌是"原厂 SJZX"且物料条码以"P"或"Y"开头，则根据条码前缀修改品牌
-                if current_brand == "原厂 SJZX":
-                    if current_barcode and current_barcode.startswith("P"):
-                        brand_index = JSON_KEYS.index("品牌")
-                        row[brand_index] = "原厂国内4s件"
-                    elif current_barcode and current_barcode.startswith("Y"):
-                        brand_index = JSON_KEYS.index("品牌")
-                        row[brand_index] = "原厂"
-                
-                # 如果品牌是"菲尔"或者"菲尔 FREY"，将物料条码复制到品牌号
-                if current_brand in ["菲尔", "菲尔 FREY"]:
-                    barcode_index = JSON_KEYS.index("物料条码")
-                    brand_code_index = JSON_KEYS.index("品牌号")
-                    row[brand_code_index] = row[barcode_index]
-                
-                # 添加更新时间到每行数据
-                if gx_date:
-                    # 尝试解析日期字符串
-                    try:
-                        # 尝试解析日期字符串
-                        if ' ' in gx_date:
-                            parsed_date = datetime.strptime(gx_date, '%Y-%m-%d %H:%M:%S')
-                        else:
-                            parsed_date = datetime.strptime(gx_date, '%Y-%m-%d')
-                        row.append(parsed_date)
-                    except ValueError:
-                        # 如果解析失败，使用当前时间
-                        row.append(datetime.now())
-                else:
-                    # 如果没有更新时间，使用当前时间
-                    row.append(datetime.now())
-
-                values_batch.append(row)
-
-            cursor.executemany(UPSERT_SQL, values_batch)
-            conn.commit()
-            processed += len(values_batch)
-
-        return processed
-        
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        print(f"❌ 插入/更新失败 (company={company}): {str(e)}")
-        return -1
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
 # 配置定时任务 - 使用 task_manager
 def setup_scheduled_tasks():
     """设置定时任务"""
-    # 注册间隔任务（每15分钟）
+    # 注册定时任务（每整点和30分执行，如13:00, 13:30, 14:00）
     task_manager.schedule(
         auto_update_and_fetch,
-        'interval',
-        'auto_update_interval',
-        minutes=15,
+        'cron',
+        'auto_update_cron',
+        minute='0,30',
         replace_existing=True
     )
-    
-    print("[任务初始化] 自动更新任务已注册（每15分钟）")
+
+    print("[任务初始化] 自动更新任务已注册（每整点和30分执行）")
 
 
 # 清理函数
@@ -3689,11 +3594,11 @@ def fetch_data_api():
         
         COLUMNS_STR = ", ".join([f"`{f}`" for f in FIELDS])
         PLACEHOLDERS_STR = ", ".join(["%s"] * (len(FIELDS) + 1))  # FIELDS数量+1个更新时间
-        UPDATE_SET = ", ".join([f"`{f}` = VALUES(`{f}`)" for f in FIELDS if f != 'id'])
-        UPSERT_SQL = f"""
+
+        # 使用INSERT SQL（先DELETE再INSERT，不需要UPSERT）
+        INSERT_SQL = f"""
         INSERT INTO `crmapp_beihuo` ({COLUMNS_STR}, `更新时间`)
         VALUES ({PLACEHOLDERS_STR})
-        ON DUPLICATE KEY UPDATE {UPDATE_SET}, `更新时间` = VALUES(`更新时间`)
         """
 
         def clean_data(value):
@@ -3702,21 +3607,6 @@ def fetch_data_api():
                 if match:
                     return str(int(match.group(1)) - 3)
             return value
-
-        def ensure_unique_index(cursor):
-            try:
-                cursor.execute(f"SHOW INDEX FROM `crmapp_beihuo` WHERE Key_name = 'uk_barcode_company'")
-                if cursor.fetchone():
-                    return True
-
-                cursor.execute(f"""
-                    ALTER TABLE `crmapp_beihuo`
-                    ADD UNIQUE KEY `uk_barcode_company` (`物料条码`(50), `company`(20))
-                """)
-                return True
-            except Exception as e:
-                print(f"⚠️ 创建唯一索引失败: {e}")
-                return False
 
         def fetch_and_save_company(company, cursor, conn):
             try:
@@ -3753,22 +3643,30 @@ def fetch_data_api():
                 print(f"⚠️ company={company} 返回数据格式异常")
                 return 0
 
-            batch_size = 5000
+            # 优化：增大批次大小，减少commit频率
+            batch_size = 10000
+            commit_interval = 5
             total = len(data_list)
             processed = 0
 
             try:
+                # 1. 先清空当前门店的数据
+                cursor.execute("DELETE FROM crmapp_beihuo WHERE company = %s", (company,))
+                print(f"🗑️ 已清空门店 {company} 的现有数据，准备插入 {total} 条记录")
+
+                # 2. 批量插入新数据
+                batch_count = 0
                 for i in range(0, total, batch_size):
                     batch = data_list[i:i + batch_size]
                     values_batch = []
                     for item in batch:
                         row = [clean_data(item.get(key)) for key in JSON_KEYS]
                         row.append(company)
-                        
+
                         # 获取当前记录的品牌值和物料条码
                         current_brand = item.get("品牌", "")
                         current_barcode = item.get("物料条码", "")
-                        
+
                         # 如果品牌是"原厂 SJZX"且物料条码以"P"或"Y"开头，则根据条码前缀修改品牌
                         if current_brand == "原厂 SJZX":
                             if current_barcode and current_barcode.startswith("P"):
@@ -3777,43 +3675,45 @@ def fetch_data_api():
                             elif current_barcode and current_barcode.startswith("Y"):
                                 brand_index = JSON_KEYS.index("品牌")
                                 row[brand_index] = "原厂"
-                        
+
                         # 如果品牌是"菲尔"或者"菲尔 FREY"，将物料条码复制到品牌号
                         if current_brand in ["菲尔", "菲尔 FREY"]:
                             barcode_index = JSON_KEYS.index("物料条码")
                             brand_code_index = JSON_KEYS.index("品牌号")
                             row[brand_code_index] = row[barcode_index]
-                        
-                        # 不需要限制车型字段长度，因为我们已将其改为TEXT类型
-                        # 添加更新时间到每行数据（第28个）
+
+                        # 添加更新时间到每行数据
                         if gx_date:
-                            # 将字符串格式的日期转换为datetime对象
                             from datetime import datetime
                             try:
-                                # 尝试解析日期字符串
                                 if ' ' in gx_date:
                                     parsed_date = datetime.strptime(gx_date, '%Y-%m-%d %H:%M:%S')
                                 else:
                                     parsed_date = datetime.strptime(gx_date, '%Y-%m-%d')
                                 row.append(parsed_date)
                             except ValueError:
-                                # 如果解析失败，使用当前时间
-                                from datetime import datetime
                                 row.append(datetime.now())
                         else:
-                            # 如果没有更新时间，使用当前时间
-                            from datetime import datetime
                             row.append(datetime.now())
 
                         values_batch.append(row)
 
-                    cursor.executemany(UPSERT_SQL, values_batch)
-                    conn.commit()
+                    cursor.executemany(INSERT_SQL, values_batch)
                     processed += len(values_batch)
+                    batch_count += 1
+
+                    # 每commit_interval批次才commit一次
+                    if batch_count % commit_interval == 0:
+                        conn.commit()
+                        print(f"📊 门店 {company} 插入进度: {processed}/{total} ({processed*100//total}%)")
+
+                # 最后提交剩余数据
+                conn.commit()
+                print(f"✅ 门店 {company} 数据插入完成，共 {processed} 条记录")
 
             except Exception as e:
                 conn.rollback()
-                print(f"❌ 插入/更新失败 (company={company}): {e}")
+                print(f"❌ 插入失败 (company={company}): {e}")
                 return 0
 
             return processed
@@ -3821,12 +3721,6 @@ def fetch_data_api():
         # 开始执行拉取数据
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # 确保唯一索引存在
-        if not ensure_unique_index(cursor):
-            cursor.close()
-            conn.close()
-            return jsonify({'code': 1, 'msg': '创建唯一索引失败'})
 
         total = 0
         for company in companies:
@@ -3851,32 +3745,30 @@ def fetch_data_api():
 @app.route('/api/latest_update_time', methods=['GET'])
 @login_required
 def get_latest_update_time():
-    """获取最新更新时间"""
+    """获取当前门店的最新更新时间"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # 如果是管理员，获取所有门店的最新更新时间
-        if session.get('is_admin'):
-            cursor.execute("SELECT MAX(更新时间) FROM crmapp_beihuo")
-        else:
-            # 普通用户只获取自己门店的最新更新时间
-            cursor.execute("SELECT MAX(更新时间) FROM crmapp_beihuo WHERE company = %s", (get_user_store(),))
-        
+
+        # 获取当前用户所在门店的更新时间（不管是谁，都用当前门店）
+        user_store = get_user_store()
+        cursor.execute("SELECT MAX(更新时间) FROM crmapp_beihuo WHERE company = %s", (user_store,))
+
         result = cursor.fetchone()
         latest_time = result[0] if result[0] is not None else None
-        
+
         conn.close()
-        
+
         if latest_time:
             # 格式化时间为字符串
             latest_time_str = latest_time.strftime('%Y-%m-%d %H:%M:%S')
         else:
             latest_time_str = '-'
-        
+
         return jsonify({
             'code': 0,
-            'latest_update_time': latest_time_str
+            'latest_update_time': latest_time_str,
+            'store': user_store
         })
     except Exception as e:
         return jsonify({'code': 1, 'msg': str(e)})

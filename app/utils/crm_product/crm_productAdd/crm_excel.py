@@ -149,18 +149,19 @@ def filter_sheets_by_mode(all_sheets, mode):
 def read_excel_file(file_path):
     """
     读取 Excel 文件，返回所有工作表数据
+    注意：使用 dtype=str 强制将所有列作为字符串读取，保留前导零
     """
     try:
         print(f"正在读取文件：{file_path}")
-        
+
         if file_path.endswith('.csv'):
             # CSV 文件处理（单个工作表）
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(file_path, dtype=str)
             all_sheets = {'Sheet1': df}
             print("CSV 文件按单个工作表处理")
         elif file_path.endswith(('.xlsx', '.xls')):
             # Excel 文件处理（多个工作表）
-            all_sheets = pd.read_excel(file_path, sheet_name=None)
+            all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str)
             print(f"读取到 {len(all_sheets)} 个工作表：{list(all_sheets.keys())}")
         else:
             raise ValueError(f"不支持的文件格式：{file_path}")
@@ -241,8 +242,8 @@ def save_results_to_excel(results, original_file_path):
     将处理结果保存到 Excel 文件
     """
     try:
-        # 读取原始文件
-        all_sheets = pd.read_excel(original_file_path, sheet_name=None)
+        # 读取原始文件，使用 dtype=str 保留前导零
+        all_sheets = pd.read_excel(original_file_path, sheet_name=None, dtype=str)
         
         # 为每个工作表添加结果列
         for sheet_name, df in all_sheets.items():

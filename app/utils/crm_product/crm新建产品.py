@@ -213,7 +213,7 @@ def load_alias_data():
         if not os.path.exists(alias_file_path):
             raise FileNotFoundError(f"找不到别名文件: {alias_file_path}")
             
-        ALIAS_DF = pd.read_excel(alias_file_path)
+        ALIAS_DF = pd.read_excel(alias_file_path, dtype=str)
         print("crm可用别名数据加载完成")
     except Exception as e:
         print(f"读取crm可用别名.xlsx时发生错误: {e}")
@@ -233,9 +233,9 @@ def load_product_data():
         if not os.path.exists(product_file_path):
             raise FileNotFoundError(f"找不到产品名称文件: {product_file_path}")
             
-        PRODUCT_DF = pd.read_excel(product_file_path)
+        PRODUCT_DF = pd.read_excel(product_file_path, dtype=str)
         # 清理cxbianma列的空白字符
-        PRODUCT_DF['cxbianma'] = PRODUCT_DF['cxbianma'].astype(str).str.strip()
+        PRODUCT_DF['cxbianma'] = PRODUCT_DF['cxbianma'].str.strip()
         print("产品名称数据加载完成")
     except Exception as e:
         print(f"读取产品名称.xlsx时发生错误: {e}")
@@ -1229,18 +1229,18 @@ def process_excel_two_column_mode(file_path):
     global PRODUCT_DF, ALIAS_DF
     
     try:
-        # 读取Excel所有工作表
+        # 读取Excel所有工作表，使用 dtype=str 保留前导零
         print(f"正在读取文件: {file_path}")
-        all_sheets = pd.read_excel(file_path, sheet_name=None) if file_path.endswith(('.xlsx', '.xls')) else None
-        
+        all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str) if file_path.endswith(('.xlsx', '.xls')) else None
+
         if all_sheets is None:
             # CSV文件处理（单个工作表）
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(file_path, dtype=str)
             all_sheets = {'Sheet1': df}
             print("CSV文件按单个工作表处理")
         else:
             print(f"读取到 {len(all_sheets)} 个工作表: {list(all_sheets.keys())}")
-        
+
         # 筛选符合两列模式的工作表
         valid_sheets = filter_sheets_by_mode(all_sheets, 'two_column')
         
@@ -1334,18 +1334,18 @@ def process_excel_three_column_mode(file_path):
     global PRODUCT_DF, ALIAS_DF, GLOBAL_SESSION
     
     try:
-        # 读取Excel所有工作表
+        # 读取Excel所有工作表，使用 dtype=str 保留前导零
         print(f"正在读取文件: {file_path}")
-        all_sheets = pd.read_excel(file_path, sheet_name=None) if file_path.endswith(('.xlsx', '.xls')) else None
-        
+        all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str) if file_path.endswith(('.xlsx', '.xls')) else None
+
         if all_sheets is None:
             # CSV文件处理（单个工作表）
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(file_path, dtype=str)
             all_sheets = {'Sheet1': df}
             print("CSV文件按单个工作表处理")
         else:
             print(f"读取到 {len(all_sheets)} 个工作表: {list(all_sheets.keys())}")
-        
+
         # 筛选符合三列模式的工作表
         valid_sheets = filter_sheets_by_mode(all_sheets, 'three_column')
         
@@ -1807,8 +1807,8 @@ def save_results_to_excel(results, original_file_path):
     将处理结果保存到Excel文件
     """
     try:
-        # 读取原始文件
-        all_sheets = pd.read_excel(original_file_path, sheet_name=None)
+        # 读取原始文件，使用 dtype=str 保留前导零
+        all_sheets = pd.read_excel(original_file_path, sheet_name=None, dtype=str)
         
         # 为每个工作表添加结果列
         for sheet_name, df in all_sheets.items():
@@ -1903,8 +1903,11 @@ def process_excel_file_mode(file_path):
     global PRODUCT_DF, ALIAS_DF, GLOBAL_SESSION
     
     try:
-        # 读取Excel文件
-        df = pd.read_excel(file_path) if file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(file_path)
+        # 读取Excel文件，使用 dtype=str 保留前导零
+        if file_path.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(file_path, dtype=str)
+        else:
+            df = pd.read_csv(file_path, dtype=str)
         print(f"读取文件成功，共 {len(df)} 行数据")
         
         # 识别关键列（扩展版本，支持brand_code）

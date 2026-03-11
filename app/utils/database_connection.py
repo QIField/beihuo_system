@@ -44,13 +44,19 @@ def get_db_connection():
     connection = POOL.connection()
     
     # 设置字符集以确保正确处理 utf8mb4
+    # 注意：这里不能使用 with 语句，因为 with 会关闭游标但连接需要保持打开
+    cursor = None
     try:
-        with connection.cursor() as cursor:
-            cursor.execute("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci")
-            cursor.execute("SET CHARACTER SET utf8mb4")
-            cursor.execute("SET character_set_connection=utf8mb4")
+        cursor = connection.cursor()
+        cursor.execute("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci")
+        cursor.execute("SET CHARACTER SET utf8mb4")
+        cursor.execute("SET character_set_connection=utf8mb4")
     except Exception as e:
         print(f"设置字符集时出错: {e}")
+    finally:
+        # 确保游标被关闭，但连接保持打开
+        if cursor:
+            cursor.close()
     
     return connection
 

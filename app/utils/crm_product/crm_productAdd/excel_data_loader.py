@@ -60,7 +60,7 @@ def load_alias_data():
         if not os.path.exists(alias_file_path):
             raise FileNotFoundError(f"找不到别名文件: {alias_file_path}")
         
-        _alias_df = pd.read_excel(alias_file_path)
+        _alias_df = pd.read_excel(alias_file_path, dtype=str)
         print("crm可用别名数据加载完成")
         return _alias_df
     except Exception as e:
@@ -85,8 +85,8 @@ def load_product_data():
         if not os.path.exists(product_file_path):
             raise FileNotFoundError(f"找不到产品名称文件: {product_file_path}")
         
-        _product_df = pd.read_excel(product_file_path)
-        _product_df['cxbianma'] = _product_df['cxbianma'].astype(str).str.strip()
+        _product_df = pd.read_excel(product_file_path, dtype=str)
+        _product_df['cxbianma'] = _product_df['cxbianma'].str.strip()
         print("产品名称数据加载完成")
         return _product_df
     except Exception as e:

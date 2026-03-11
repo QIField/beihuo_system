@@ -356,10 +356,13 @@ def process_two_column_mode(session, product_df, alias_df, file_path):
     两列模式处理（oe + brand）
     """
     print("\n【两列模式】")
-    
-    # 读取 Excel
+
+    # 读取 Excel，使用 dtype=str 保留前导零
     try:
-        df = pd.read_excel(file_path) if file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(file_path)
+        if file_path.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(file_path, dtype=str)
+        else:
+            df = pd.read_csv(file_path, dtype=str)
         print(f"读取到 {len(df)} 行数据")
     except Exception as e:
         print(f"❌ 读取文件失败: {e}")
@@ -399,10 +402,13 @@ def process_three_column_mode(session, product_df, alias_df, file_path):
     三列模式处理（oe + brand + brand_code）
     """
     print("\n【三列模式】")
-    
-    # 读取 Excel
+
+    # 读取 Excel，使用 dtype=str 保留前导零
     try:
-        df = pd.read_excel(file_path) if file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(file_path)
+        if file_path.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(file_path, dtype=str)
+        else:
+            df = pd.read_csv(file_path, dtype=str)
         print(f"读取到 {len(df)} 行数据")
     except Exception as e:
         print(f"❌ 读取文件失败: {e}")
@@ -706,15 +712,15 @@ def process_two_column_mode_with_return(session, product_df, alias_df, file_path
     """
     print("\n【两列模式 - 多工作表】")
     
-    # 读取所有工作表
+    # 读取所有工作表，使用 dtype=str 保留前导零
     try:
         if file_path.endswith('.csv'):
             # CSV 文件只有一个工作表
-            all_sheets = {'Sheet1': pd.read_csv(file_path)}
+            all_sheets = {'Sheet1': pd.read_csv(file_path, dtype=str)}
             print(f"CSV文件按单个工作表处理")
         else:
             # Excel 文件读取所有工作表
-            all_sheets = pd.read_excel(file_path, sheet_name=None)
+            all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str)
             print(f"读取到 {len(all_sheets)} 个工作表: {list(all_sheets.keys())}")
     except Exception as e:
         print(f"❌ 读取文件失败: {e}")
@@ -763,16 +769,16 @@ def process_three_column_mode_with_return(session, product_df, alias_df, file_pa
     三列模式处理，支持多工作表，返回结果文件路径
     """
     print("\n【三列模式 - 多工作表】")
-    
-    # 读取所有工作表
+
+    # 读取所有工作表，使用 dtype=str 保留前导零
     try:
         if file_path.endswith('.csv'):
             # CSV 文件只有一个工作表
-            all_sheets = {'Sheet1': pd.read_csv(file_path)}
+            all_sheets = {'Sheet1': pd.read_csv(file_path, dtype=str)}
             print(f"CSV文件按单个工作表处理")
         else:
             # Excel 文件读取所有工作表
-            all_sheets = pd.read_excel(file_path, sheet_name=None)
+            all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str)
             print(f"读取到 {len(all_sheets)} 个工作表: {list(all_sheets.keys())}")
     except Exception as e:
         print(f"❌ 读取文件失败: {e}")
