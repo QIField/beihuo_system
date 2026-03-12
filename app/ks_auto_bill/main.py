@@ -62,116 +62,16 @@ from app.ks_auto_bill.ks_login import login
 from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info
 from app.ks_auto_bill.crm_auto_bill import send_orders_to_crm
 from app.utils.database_connection import get_db_connection
+from app.utils.database.table_manager import init_ks_auto_bill_table
 
 
 def init_database_table():
-    """初始化数据库表，检查是否存在crmapp_ks_auto_bill表，不存在则创建"""
-    connection = get_db_connection()
+    """初始化数据库表，调用统一的表管理工具"""
     try:
-        with connection.cursor(pymysql.cursors.DictCursor) as cursor: 
-            # 检查表是否已存在
-            check_table_sql = """
-            SELECT COUNT(*) AS count 
-            FROM information_schema.tables 
-            WHERE table_schema = DATABASE() 
-            AND table_name = 'crmapp_ks_auto_bill'
-            """
-            cursor.execute(check_table_sql)
-            result = cursor.fetchone()
-            
-            if result['count'] == 0:
-                # 创建表
-                create_table_sql = """
-                CREATE TABLE crmapp_ks_auto_bill (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    日期 DATETIME,
-                    开思订单号 VARCHAR(255),
-                    crm订单号 VARCHAR(255),
-                    crm订单链接 VARCHAR(500),
-                    客户 VARCHAR(255),
-                    执行日志 VARCHAR(255),
-                    crm订单状态 VARCHAR(100),
-                    开单时间 DATETIME,
-                    数量 INT DEFAULT NULL,
-                    金额 DECIMAL(10,2) DEFAULT NULL
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-                """
-                cursor.execute(create_table_sql)
-                print("[OK] 成功创建表 crmapp_ks_auto_bill")
-                
-                # 为所有字段添加索引
-                create_index_date = "CREATE INDEX idx_date ON crmapp_ks_auto_bill(日期);"
-                create_index_kaisi_order = "CREATE INDEX idx_kaisi_order ON crmapp_ks_auto_bill(开思订单号);"
-                create_index_crm_order = "CREATE INDEX idx_crm_order ON crmapp_ks_auto_bill(crm订单号);"
-                create_index_crm_link = "CREATE INDEX idx_crm_link ON crmapp_ks_auto_bill(crm订单链接);"
-                create_index_customer = "CREATE INDEX idx_customer ON crmapp_ks_auto_bill(客户);"
-                create_index_log = "CREATE INDEX idx_log ON crmapp_ks_auto_bill(执行日志);"
-                create_index_status = "CREATE INDEX idx_status ON crmapp_ks_auto_bill(crm订单状态);"
-                create_index_submit_time = "CREATE INDEX idx_submit_time ON crmapp_ks_auto_bill(开单时间);"
-                create_index_quantity = "CREATE INDEX idx_quantity ON crmapp_ks_auto_bill(数量);"
-                create_index_amount = "CREATE INDEX idx_amount ON crmapp_ks_auto_bill(金额);"
-                
-                cursor.execute(create_index_date)
-                print("[OK] 为 日期 字段创建索引完成")
-                cursor.execute(create_index_kaisi_order)
-                print("[OK] 为 开思订单号 字段创建索引完成")
-                cursor.execute(create_index_crm_order)
-                print("[OK] 为 crm订单号 字段创建索引完成")
-                cursor.execute(create_index_crm_link)
-                print("[OK] 为 crm订单链接 字段创建索引完成")
-                cursor.execute(create_index_customer)
-                print("[OK] 为 客户 字段创建索引完成")
-                cursor.execute(create_index_log)
-                print("[OK] 为 执行日志 字段创建索引完成")
-                cursor.execute(create_index_status)
-                print("[OK] 为 crm订单状态 字段创建索引完成")
-                cursor.execute(create_index_submit_time)
-                print("[OK] 为 开单时间 字段创建索引完成")
-                cursor.execute(create_index_quantity)
-                print("[OK] 为 数量 字段创建索引完成")
-                cursor.execute(create_index_amount)
-                print("[OK] 为 金额 字段创建索引完成")
-            else:
-                print("[OK] 表 crmapp_ks_auto_bill 已存在，正在检查是否需要添加额外字段...")
-                
-                # 检查并添加'客户'、'数量'、'金额'字段（如果不存在）
-                columns_to_check = [
-                    ('客户', 'VARCHAR(255)', '开思订单号'),  # 在开思订单号之后
-                    ('数量', 'INT DEFAULT NULL', '开单时间'),  # 在开单时间之后
-                    ('金额', 'DECIMAL(10,2) DEFAULT NULL', '数量')  # 在数量之后
-                ]
-                
-                for col_name, col_type, after_col in columns_to_check:
-                    # 检查表中是否已存在该字段
-                    check_column_sql = f"""
-                    SELECT COUNT(*) AS count
-                    FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
-                    AND table_name = 'crmapp_ks_auto_bill'
-                    AND column_name = '{col_name}'
-                    """
-                    cursor.execute(check_column_sql)
-                    column_exists = cursor.fetchone()['count']
-                    
-                    if column_exists == 0:
-                        # 添加字段
-                        alter_table_sql = f"ALTER TABLE crmapp_ks_auto_bill ADD COLUMN `{col_name}` {col_type} AFTER `{after_col}`"
-                        cursor.execute(alter_table_sql)
-                        print(f"[OK] 已成功为表 crmapp_ks_auto_bill 添加'{col_name}'字段")
-                        
-                        # 为新字段创建索引
-                        create_index_sql = f"CREATE INDEX idx_{col_name} ON crmapp_ks_auto_bill(`{col_name}`);"
-                        cursor.execute(create_index_sql)
-                        print(f"[OK] 已成功为'{col_name}'字段创建索引")
-                    else:
-                        pass
-                
-        connection.commit()
+        init_ks_auto_bill_table()
+        print("[OK] 成功初始化 crmapp_ks_auto_bill 表")
     except Exception as e:
         print(f"[ERROR] 初始化数据库表时出错: {str(e)}")
-        connection.rollback()
-    finally:
-        connection.close()
 
 
 def check_login_status(session):

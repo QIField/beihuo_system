@@ -37,11 +37,24 @@
             padding: 10px 5px;
         }
         #usersTable + .layui-table-view td {
-            padding: 8px 5px;
+            padding: 6px 5px;
             font-size: 13px;
+            height: 36px;
+            line-height: 1.5;
         }
         #usersTable + .layui-table-view tr:hover {
             background-color: #f5f7fa;
+        }
+        /* 用户表格行高控制 - 1.5行文字高度 */
+        #usersTable + .layui-table-view .layui-table-cell {
+            height: auto;
+            min-height: 24px;
+            line-height: 1.5;
+            white-space: normal;
+            overflow: visible;
+        }
+        #usersTable + .layui-table-view .layui-table-body .layui-table-cell {
+            max-height: 36px;
         }
         
         /* 优化折叠过渡动画 */
@@ -1353,7 +1366,10 @@ window.loadStoreInfo = function() {
                 table.render({
                     elem: '#usersTable',
                     url: '/api/users',
-                    page: true,
+                    page: {
+                        limit: 100,
+                        limits: [100, 200, 500]
+                    },
                     cols: [[
                         {field: 'username', title: '用户名', width: 100, align: 'center'},
                         {field: 'department', title: '板块', width: 70, align: 'center', templet: function(d){
@@ -1406,7 +1422,10 @@ window.loadStoreInfo = function() {
                 table.render({
                     elem: '#usersTable',
                     url: '/api/users',
-                    page: true,
+                    page: {
+                        limit: 100,
+                        limits: [100, 200, 500]
+                    },
                     cols: [[
                         {field: 'username', title: '用户名', width: 100, align: 'center'},
                         {field: 'department', title: '板块', width: 70, align: 'center', templet: function(d){
@@ -1617,6 +1636,28 @@ function addUser() {
                             </div>
                         </div>
                         <div class="layui-form-item">
+                            <label class="layui-form-label">板块</label>
+                            <div class="layui-input-block">
+                                <select name="department" lay-search>
+                                    <option value="">请选择板块</option>
+                                    <option value="业务">业务</option>
+                                    <option value="市场">市场</option>
+                                    <option value="后勤">后勤</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">职级</label>
+                            <div class="layui-input-block">
+                                <select name="job_level" lay-search>
+                                    <option value="">请选择职级</option>
+                                    <option value="经理">经理</option>
+                                    <option value="主管">主管</option>
+                                    <option value="业务员">业务员</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="layui-form-item">
                             <div class="layui-input-block">
                                 <button class="layui-btn" lay-submit lay-filter="addUserForm">确认添加</button>
                                 <button type="reset" class="layui-btn layui-btn-primary">重置</button>
@@ -1656,7 +1697,9 @@ function addUser() {
                             is_admin: form_data.field.is_admin === 'on' ? 1 : 0,
                             can_delete_cart: form_data.field.can_delete_cart === 'on' ? 1 : 0, // 添加删除购物车权限字段
                             can_process_orders: form_data.field.can_process_orders === 'on' ? 1 : 0, // 添加处理单据权限字段
-                            store: form_data.field.store
+                            store: form_data.field.store,
+                            department: form_data.field.department || null,  // 板块
+                            job_level: form_data.field.job_level || null     // 职级
                         })
                     })
                     .then(response => response.json())
