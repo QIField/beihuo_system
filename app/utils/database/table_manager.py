@@ -170,6 +170,14 @@ def init_user_table():
         {
             'name': 'job_level',
             'definition': "VARCHAR(20) DEFAULT NULL COMMENT '职级:经理/主管/业务员'"
+        },
+        {
+            'name': 'can_inquiry_module',
+            'definition': "TINYINT(1) DEFAULT 0 COMMENT '是否有权限访问询价模块 0-否 1-是'"
+        },
+        {
+            'name': 'can_compare_module',
+            'definition': "TINYINT(1) DEFAULT 0 COMMENT '是否有权限访问比价模块 0-否 1-是'"
         }
     ]
     check_and_add_fields('crmapp_users', user_fields_to_check)
@@ -304,9 +312,9 @@ def init_ks_auto_bill_table():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # 创建开思自动账单表
+            # 创建开思自动账单表（如果不存在）
             create_table_sql = """
-            CREATE TABLE crmapp_ks_auto_bill (
+            CREATE TABLE IF NOT EXISTS crmapp_ks_auto_bill (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 日期 DATETIME NOT NULL,
                 开思订单号 VARCHAR(50) NOT NULL UNIQUE,
@@ -429,6 +437,167 @@ def check_and_create_default_users():
         create_default_users()
 
 
+def init_price_inquiry_table():
+    """初始化询价比价表"""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS crmapp_price_inquiry (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                oe VARCHAR(100) NOT NULL COMMENT 'OE号',
+                brand VARCHAR(50) COMMENT '品牌',
+                price DECIMAL(10,2) DEFAULT 0.00 COMMENT '单价',
+                supplier VARCHAR(50) COMMENT '供应商',
+                creator VARCHAR(100) COMMENT '创建人',
+                created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                warehouse VARCHAR(255) COMMENT '仓库',
+                expire_time DATETIME COMMENT '失效时间',
+                remark TEXT COMMENT '备注',
+                stock_quantity INT DEFAULT 0 COMMENT '库存数量',
+                common_number VARCHAR(255) COMMENT '通用号',
+                ks_sync TINYINT(1) DEFAULT 0 COMMENT '开思是否同步，0=未同步，1=已同步',
+                company VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码',
+                INDEX idx_oe (oe),
+                INDEX idx_brand (brand),
+                INDEX idx_supplier (supplier),
+                INDEX idx_creator (creator),
+                INDEX idx_company (company),
+                INDEX idx_oe_brand (oe, brand),
+                INDEX idx_oe_brand_company (oe, brand, company),
+                UNIQUE INDEX uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='询价比价表';
+            """
+            cursor.execute(create_table_sql)
+            
+            # 检查并添加缺失的字段（兼容旧表）
+            alter_columns = [
+                ("warehouse", "VARCHAR(255) COMMENT '仓库'"),
+                ("expire_time", "DATETIME COMMENT '失效时间'"),
+                ("remark", "TEXT COMMENT '备注'"),
+                ("stock_quantity", "INT DEFAULT 0 COMMENT '库存数量'"),
+                ("common_number", "VARCHAR(255) COMMENT '通用号'"),
+                ("ks_sync", "TINYINT(1) DEFAULT 0 COMMENT '开思是否同步，0=未同步，1=已同步'"),
+                ("company", "VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码'")
+            ]
+            
+            for col_name, col_def in alter_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE crmapp_price_inquiry ADD COLUMN {col_name} {col_def}")
+                except Exception as e:
+                    if "Duplicate column name" not in str(e):
+                        print(f"添加字段 {col_name} 时出错: {str(e)}")
+            
+            # 检查并修改字段长度（兼容旧表）
+            try:
+                cursor.execute("ALTER TABLE crmapp_price_inquiry MODIFY oe VARCHAR(100) NOT NULL COMMENT 'OE号'")
+                cursor.execute("ALTER TABLE crmapp_price_inquiry MODIFY brand VARCHAR(50) COMMENT '品牌'")
+                cursor.execute("ALTER TABLE crmapp_price_inquiry MODIFY supplier VARCHAR(50) COMMENT '供应商'")
+                print("已更新字段长度")
+            except Exception as e:
+                print(f"更新字段长度时出错: {str(e)}")
+            
+            # 检查并添加索引（兼容旧表）
+            index_list = [
+                ("idx_company", "company"),
+                ("idx_oe_brand_company", "oe, brand, company"),
+            ]
+            
+            for idx_name, idx_cols in index_list:
+                try:
+                    cursor.execute(f"ALTER TABLE crmapp_price_inquiry ADD INDEX {idx_name} ({idx_cols})")
+                    print(f"已添加索引 {idx_name}")
+                except Exception as e:
+                    if "Duplicate key name" not in str(e):
+                        print(f"添加索引 {idx_name} 时出错: {str(e)}")
+            
+            # 检查并添加唯一索引（用于导入时去重）
+            try:
+                cursor.execute("""
+                    ALTER TABLE crmapp_price_inquiry 
+                    ADD UNIQUE INDEX uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)
+                """)
+                print("已添加唯一索引 uk_oe_brand_supplier_price_company")
+            except Exception as e:
+                if "Duplicate key name" not in str(e) and "Duplicate entry" not in str(e):
+                    print(f"添加唯一索引时出错: {str(e)}")
+            
+            print("询价比价表初始化完成")
+    except Exception as e:
+        print(f"初始化询价比价表时出错: {str(e)}")
+    finally:
+        conn.close()
+
+
+def init_compare_summary_table():
+    """
+    初始化比价数据汇总表
+    用于存储比价模块的汇总数据，包含销量统计、价格区间等信息
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS crmapp_compare_summary (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                oe VARCHAR(255) NOT NULL COMMENT 'OE号',
+                brand VARCHAR(255) COMMENT '品牌',
+                company VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码',
+                product_name VARCHAR(500) COMMENT '产品名称',
+                vehicle_brand VARCHAR(255) COMMENT '车辆品牌',
+                replace_number VARCHAR(255) COMMENT '替换号',
+                brand_code VARCHAR(255) COMMENT '品牌编码',
+                inquiry_count INT DEFAULT 0 COMMENT '询价次数',
+                product_level VARCHAR(50) COMMENT '产品等级',
+                best_sales_month VARCHAR(20) COMMENT '销量最好的月份',
+                best_sales_season VARCHAR(20) COMMENT '销量最好的季节',
+                max_price DECIMAL(10,2) DEFAULT 0.00 COMMENT '最高价',
+                min_price DECIMAL(10,2) DEFAULT 0.00 COMMENT '最低价',
+                supplier_price DECIMAL(10,2) DEFAULT 0.00 COMMENT '供应商价格',
+                dealer_purchase_price DECIMAL(10,2) DEFAULT 0.00 COMMENT '4S含税进价',
+                dealer_sale_price DECIMAL(10,2) DEFAULT 0.00 COMMENT '4S含税售价',
+                price_update_time DATETIME COMMENT '更新价格时间',
+                today_sales INT DEFAULT 0 COMMENT '今日销量',
+                yesterday_sales INT DEFAULT 0 COMMENT '昨日销量',
+                month_sales INT DEFAULT 0 COMMENT '本月销量',
+                avg_sales_12m DECIMAL(10,2) DEFAULT 0.00 COMMENT '近12个月月均销量',
+                avg_sales_6m DECIMAL(10,2) DEFAULT 0.00 COMMENT '近6个月月均销量',
+                sales_7d INT DEFAULT 0 COMMENT '近7天销量',
+                product_remark TEXT COMMENT '系统产品备注',
+                created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                INDEX idx_oe (oe),
+                INDEX idx_brand (brand),
+                INDEX idx_company (company),
+                INDEX idx_product_name (product_name),
+                INDEX idx_vehicle_brand (vehicle_brand),
+                INDEX idx_brand_code (brand_code),
+                INDEX idx_oe_brand (oe, brand),
+                INDEX idx_oe_brand_company (oe, brand, company),
+                INDEX idx_updated_time (updated_time),
+                UNIQUE INDEX uk_oe_brand_company (oe, brand, company)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='比价数据汇总表';
+            """
+            cursor.execute(create_table_sql)
+            
+            # 检查并添加唯一索引（兼容旧表）
+            try:
+                cursor.execute("""
+                    ALTER TABLE crmapp_compare_summary 
+                    ADD UNIQUE INDEX uk_oe_brand_company (oe, brand, company)
+                """)
+                print("已添加唯一索引 uk_oe_brand_company 到 crmapp_compare_summary 表")
+            except Exception as e:
+                if "Duplicate key name" not in str(e) and "Duplicate entry" not in str(e):
+                    print(f"添加唯一索引时出错: {str(e)}")
+            
+            print("比价数据汇总表(crmapp_compare_summary)初始化完成")
+    except Exception as e:
+        print(f"初始化比价数据汇总表时出错: {str(e)}")
+    finally:
+        conn.close()
+
+
 def init_all_tables():
     """初始化所有数据库表"""
     init_beihuo_table()
@@ -436,6 +605,8 @@ def init_all_tables():
     init_user_table()
     init_date_search_table()
     init_ks_auto_bill_table()
+    init_price_inquiry_table()
+    init_compare_summary_table()
     ensure_table_structure()
     ensure_cart_indexes()
     check_and_create_default_users()

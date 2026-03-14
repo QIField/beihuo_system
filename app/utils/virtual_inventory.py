@@ -1849,6 +1849,19 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         print("没有数据需要上传")
         return
     
+    # 👇 新增: 黑名单过滤
+    print("开始黑名单过滤...")
+    from .inventory_tasks import filter_by_blacklist
+    rows_before_filter = len(rows)
+    rows = filter_by_blacklist(rows)
+    rows_after_filter = len(rows)
+    removed_count = rows_before_filter - rows_after_filter
+    print(f"黑名单过滤完成: 原始 {rows_before_filter} 条, 剔除 {removed_count} 条, 剩余 {rows_after_filter} 条")
+    
+    if not rows:
+        print("过滤后没有数据需要上传")
+        return
+    
     print(f"准备上传 {len(rows)} 条{'当天' if today_only else '全部'}数据")
     
     # 构建DataFrame并立即释放原始数据

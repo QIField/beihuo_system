@@ -138,19 +138,116 @@ def get_log_stats():
                 'code': 1,
                 'msg': f'日志文件不存在: {LOG_FILE_PATH}'
             })
-        
+
         stats = analyze_log_stats()
-        
+
         return jsonify({
             'code': 0,
             'msg': 'success',
             'data': stats
         })
-        
+
     except Exception as e:
         return jsonify({
             'code': 1,
             'msg': f'获取统计信息失败: {str(e)}'
+        })
+
+
+@log_viewer_bp.route('/api/logs/context')
+@login_required
+def get_log_context():
+    """
+    获取指定行号的上下文日志
+
+    查询参数:
+    - line_num: 目标行号 (必填)
+    - context_lines: 上下文行数 (默认 10, 即前后各10行)
+    """
+    try:
+        line_num = request.args.get('line_num', type=int)
+        context_lines = request.args.get('context_lines', 10, type=int)
+
+        if line_num is None or line_num < 1:
+            return jsonify({
+                'code': 1,
+                'msg': '请提供有效的行号'
+            })
+
+        # 限制上下文行数，防止内存溢出
+        if context_lines < 1:
+            context_lines = 10
+        if context_lines > 100:
+            context_lines = 100
+
+        if not os.path.exists(LOG_FILE_PATH):
+            return jsonify({
+                'code': 1,
+                'msg': f'日志文件不存在: {LOG_FILE_PATH}'
+            })
+
+        context_data = read_log_context(line_num, context_lines)
+
+        return jsonify({
+            'code': 0,
+            'msg': 'success',
+            'data': context_data
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'获取上下文失败: {str(e)}'
+        })
+
+
+@log_viewer_bp.route('/api/logs/line-position')
+@login_required
+def get_line_position():
+    """
+    获取指定行号在完整日志中的位置信息（用于跳转）
+
+    查询参数:
+    - line_num: 目标行号 (必填)
+    - limit: 每页行数 (默认 50)
+
+    返回:
+    - 该行所在的页码、在页内的索引等信息
+    """
+    try:
+        target_line_num = request.args.get('line_num', type=int)
+        limit = request.args.get('limit', 50, type=int)
+
+        if target_line_num is None or target_line_num < 1:
+            return jsonify({
+                'code': 1,
+                'msg': '请提供有效的行号'
+            })
+
+        if limit < 1:
+            limit = 50
+        if limit > 500:
+            limit = 500
+
+        if not os.path.exists(LOG_FILE_PATH):
+            return jsonify({
+                'code': 1,
+                'msg': f'日志文件不存在: {LOG_FILE_PATH}'
+            })
+
+        # 计算目标行在完整日志中的位置
+        position_data = calculate_line_position(target_line_num, limit)
+
+        return jsonify({
+            'code': 0,
+            'msg': 'success',
+            'data': position_data
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'获取行位置失败: {str(e)}'
         })
 
 
@@ -382,6 +479,97 @@ def analyze_log_stats():
                 stats['debug_count'] += 1
     
     return stats
+
+
+def read_log_context(target_line_num, context_lines=10):
+    """
+    读取指定行号的上下文日志
+
+    参数:
+    - target_line_num: 目标行号 (1-based)
+    - context_lines: 上下文行数 (前后各多少行)
+
+    返回:
+    - 包含上下文日志信息的字典
+    """
+    level_pattern = re.compile(r'\b(ERROR|WARNING|WARN|INFO|DEBUG|CRITICAL)\b', re.IGNORECASE)
+
+    # 计算读取范围
+    start_line = max(1, target_line_num - context_lines)
+    end_line = target_line_num + context_lines
+
+    context_logs = []
+    total_file_lines = 0
+
+    with open(LOG_FILE_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+        all_lines = f.readlines()
+        total_file_lines = len(all_lines)
+
+        # 调整结束行号，不超过文件总行数
+        end_line = min(end_line, total_file_lines)
+
+        # 提取上下文行
+        for line_idx in range(start_line - 1, end_line):  # 转换为 0-based 索引
+            line_num = line_idx + 1  # 转回 1-based 行号
+            line = all_lines[line_idx].rstrip('\n\r')
+
+            # 检测日志级别
+            line_level = detect_log_level(line, level_pattern)
+
+            context_logs.append({
+                'line_num': line_num,
+                'content': line,
+                'level': line_level,
+                'is_target': line_num == target_line_num  # 标记是否为目标行
+            })
+
+    return {
+        'target_line': target_line_num,
+        'context_lines': context_logs,
+        'start_line': start_line,
+        'end_line': end_line,
+        'total_file_lines': total_file_lines
+    }
+
+
+def calculate_line_position(target_line_num, limit=50):
+    """
+    计算指定行号在完整日志（无过滤）中的位置信息
+
+    参数:
+    - target_line_num: 目标行号 (1-based)
+    - limit: 每页行数
+
+    返回:
+    - 包含页码、索引等位置信息的字典
+    """
+    total_lines = 0
+
+    with open(LOG_FILE_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+        all_lines = f.readlines()
+        total_lines = len(all_lines)
+
+    # 确保目标行号在有效范围内
+    if target_line_num > total_lines:
+        target_line_num = total_lines
+
+    # 计算目标行所在的页码 (1-based)
+    target_page = (target_line_num - 1) // limit + 1
+
+    # 计算目标行在页内的索引 (0-based)
+    index_in_page = (target_line_num - 1) % limit
+
+    # 计算总页数
+    total_pages = (total_lines + limit - 1) // limit if total_lines > 0 else 1
+
+    return {
+        'target_line': target_line_num,
+        'target_page': target_page,
+        'index_in_page': index_in_page,
+        'total_lines': total_lines,
+        'total_pages': total_pages,
+        'limit': limit
+    }
 
 
 def register_log_viewer_routes(app):

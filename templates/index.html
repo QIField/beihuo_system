@@ -47,14 +47,19 @@
         }
         /* 用户表格行高控制 - 1.5行文字高度 */
         #usersTable + .layui-table-view .layui-table-cell {
-            height: auto;
-            min-height: 24px;
-            line-height: 1.5;
-            white-space: normal;
-            overflow: visible;
+            height: 36px;
+            line-height: 36px;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
         }
-        #usersTable + .layui-table-view .layui-table-body .layui-table-cell {
-            max-height: 36px;
+        /* 用户表格所有内容垂直居中 */
+        #usersTable + .layui-table-view td {
+            vertical-align: middle !important;
+        }
+        #usersTable + .layui-table-view .layui-table-cell {
+            display: flex;
+            align-items: center;
         }
         
         /* 优化折叠过渡动画 */
@@ -112,6 +117,78 @@
             background-color: #2a2a2a !important;
             left: 0;
             right: 0;
+        }
+
+        /* 头部用户信息区域样式 - 简约统一风格 */
+        .header-user-area {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            height: 60px;
+            padding: 0 20px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .header-user-area .user-greeting {
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            line-height: 32px;
+        }
+
+        .header-user-area .org-switch-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .header-user-area .org-switch-wrapper select {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            padding: 0 28px 0 12px;
+            font-size: 13px;
+            height: 32px;
+            line-height: 32px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' fill-opacity='0.7' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            transition: all 0.2s ease;
+            margin: 0;
+        }
+
+        .header-user-area .org-switch-wrapper select:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .header-user-area .org-switch-wrapper select option {
+            background-color: #fff;
+            color: #333;
+        }
+
+        .header-user-area .logout-btn {
+            background-color: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.9);
+            padding: 0 16px;
+            font-size: 13px;
+            height: 32px;
+            line-height: 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin: 0;
+        }
+
+        .header-user-area .logout-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.5);
         }
 
         .layui-layout-admin .layui-side {
@@ -631,15 +708,15 @@
                 </button>
             </div>
             <!-- 用户信息和登出按钮 -->
-            <div class="layui-layout-right" style="position: absolute; right: 20px; top: 0; color: #fff; line-height: 60px;">
-                <span id="userInfo">欢迎您</span>
+            <div class="layui-layout-right header-user-area">
+                <span id="userInfo" class="user-greeting">欢迎您</span>
                 <!-- 管理员组织切换下拉框 -->
-                <div id="orgSwitchContainer" style="display: none; margin: 0 10px; display: inline-block;">
-                    <select id="orgSwitchSelect" lay-filter="orgSwitch" style="color: #333; background: #fff; border-radius: 4px; padding: 2px 5px; height: 30px; line-height: 30px; margin: 0 5px;">
+                <div id="orgSwitchContainer" class="org-switch-wrapper" style="display: none;">
+                    <select id="orgSwitchSelect" lay-filter="orgSwitch">
                         <option value="">切换组织</option>
                     </select>
                 </div>
-                <button class="layui-btn layui-btn-primary layui-btn-xs" id="logoutBtn" style="margin-left: 10px;">退出</button>
+                <button class="logout-btn" id="logoutBtn">退出</button>
             </div>
         </div>
 
@@ -653,6 +730,13 @@
                             <dd id="ksAutoBillMenuItem"><a href="javascript:void(0);" onclick="openKsAutoBillInNewTab()">开思自动开单</a></dd>
                             <dd><a href="javascript:void(0);" onclick="openVirtualInventoryInNewTab()">虚拟库存</a></dd>
                             <dd><a href="javascript:;" onclick="openSearchInCrmInNewTab()">搜索产品（待完善）</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed" id="purchasePlanMenu" style="display: none;">
+                        <a href="javascript:;">采购计划</a>
+                        <dl class="layui-nav-child">
+                            <dd id="inquiryModuleMenuItem" style="display: none;"><a href="javascript:void(0);" onclick="openInquiryModule()">询价模块</a></dd>
+                            <dd id="compareModuleMenuItem" style="display: none;"><a href="javascript:void(0);" onclick="openCompareModule()">比价模块</a></dd>
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed" id="permissionManagement" style="display: none;">
@@ -891,6 +975,18 @@ function addUser() {
                                 <input type="checkbox" name="can_process_orders" lay-skin="switch" lay-text="是|否">
                             </div>
                         </div>
+                        <div class="layui-form-item" id="inquiryModulePermissionItemAdd" style="display: none;">
+                            <label class="layui-form-label">询价模块权限</label>
+                            <div class="layui-input-block">
+                                <input type="checkbox" name="can_inquiry_module" lay-skin="switch" lay-text="是|否">
+                            </div>
+                        </div>
+                        <div class="layui-form-item" id="compareModulePermissionItemAdd" style="display: none;">
+                            <label class="layui-form-label">比价模块权限</label>
+                            <div class="layui-input-block">
+                                <input type="checkbox" name="can_compare_module" lay-skin="switch" lay-text="是|否">
+                            </div>
+                        </div>
                         <div class="layui-form-item">
                             <label class="layui-form-label">所属门店</label>
                             <div class="layui-input-block">
@@ -997,17 +1093,17 @@ layui.use(['layer'], function(){
         .then(response => response.json())
         .then(result => {
             if (result.logged_in) {
-                // 显示用户信息和当前组织
-                if (result.is_admin) {
-                    // 管理员显示当前切换的组织
-                    document.getElementById('userInfo').innerText = '欢迎您，' + result.username + ' (' + result.current_org_name + ')';
-                    // 显示组织切换下拉框
+                // 显示用户信息
+                document.getElementById('userInfo').innerText = '欢迎您，' + result.username;
+                
+                // 保存用户权限信息到全局变量
+                window.currentUserPermissions = result;
+                
+                // 加载组织切换下拉框（管理员或有allowed_orgs的普通用户）
+                if (result.is_admin || (result.allowed_orgs && result.allowed_orgs.length > 1)) {
                     document.getElementById('orgSwitchContainer').style.display = 'inline-block';
                     // 加载组织选项
                     loadOrgOptions(result);
-                } else {
-                    // 普通用户只显示自己的门店
-                    document.getElementById('userInfo').innerText = '欢迎您，' + result.username + ' (' + result.store_name + ')';
                 }
             } else {
                 // 如果未登录，跳转到登录页
@@ -1022,10 +1118,11 @@ layui.use(['layer'], function(){
 // 加载组织选项到下拉框
 function loadOrgOptions(userInfo) {
     const selectElement = document.getElementById('orgSwitchSelect');
+    
     // 清空现有选项
     selectElement.innerHTML = '<option value="">切换组织</option>';
     
-    // 添加门店选项
+    // 定义所有门店
     const stores = {
         'fsbbr': '佛山门店',
         'zsbbr': '中山门店',
@@ -1034,15 +1131,47 @@ function loadOrgOptions(userInfo) {
         'dghf': '合峰门店'
     };
     
-    for (const [code, name] of Object.entries(stores)) {
-        const option = document.createElement('option');
-        option.value = code;
-        option.textContent = name;
-        // 如果是当前组织，设置为选中状态
-        if (code === userInfo.current_org) {
-            option.selected = true;
+    // 确定用户可以切换哪些组织
+    let allowedOrgs = [];
+    if (userInfo.is_admin) {
+        // 管理员可以切换所有组织
+        allowedOrgs = Object.keys(stores);
+    } else if (userInfo.allowed_orgs && userInfo.allowed_orgs.length > 0) {
+        // 普通用户只能切换被允许的组织
+        // 如果allowed_orgs是字符串（JSON格式），需要解析
+        if (typeof userInfo.allowed_orgs === 'string') {
+            try {
+                allowedOrgs = JSON.parse(userInfo.allowed_orgs);
+            } catch (e) {
+                allowedOrgs = [];
+            }
+        } else {
+            allowedOrgs = userInfo.allowed_orgs;
         }
-        selectElement.appendChild(option);
+    } else {
+        // 没有可切换的组织，隐藏切换按钮
+        document.getElementById('orgSwitchContainer').style.display = 'none';
+        return;
+    }
+    
+    // 只添加用户有权限切换的组织
+    allowedOrgs.forEach(function(code) {
+        if (stores[code]) {
+            const option = document.createElement('option');
+            option.value = code;
+            option.textContent = stores[code];
+            // 如果是当前组织，设置为选中状态
+            if (code === userInfo.current_org) {
+                option.selected = true;
+            }
+            selectElement.appendChild(option);
+        }
+    });
+    
+    // 如果只有一个可切换的组织，隐藏切换按钮
+    if (allowedOrgs.length <= 1) {
+        document.getElementById('orgSwitchContainer').style.display = 'none';
+        return;
     }
     
     // 重新渲染下拉框
@@ -1066,10 +1195,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if(orgSelect) {
                 orgSelect.addEventListener('change', function(e) {
                     const newOrg = this.value;
-                    console.log('Debug - 组织切换前的值:', newOrg); // 调试信息
                     if (!newOrg) return; // 如果选择的是默认选项，不执行切换
-
-                    console.log('Debug - 开始发送组织切换请求，新组织:', newOrg); // 调试信息
                     
                     // 发送切换组织请求
                     fetch('/api/switch_org', {
@@ -1079,24 +1205,29 @@ document.addEventListener('DOMContentLoaded', function() {
                         },
                         body: JSON.stringify({org: newOrg})
                     })
-                    .then(response => {
-                        console.log('Debug - 收到组织切换响应，状态码:', response.status); // 调试信息
-                        return response.json();
-                    })
+                    .then(response => response.json())
                     .then(result => {
-                        console.log('Debug - 切换组织响应结果:', result); // 调试信息
                         if (result.code === 0) {
-                            console.log('Debug - 组织切换成功，开始获取当前用户信息'); // 调试信息
                             // 立即更新UI显示，使用响应中的组织信息
                             fetch('/api/current_user')
                                 .then(response => response.json())
                                 .then(userInfo => {
-                                    console.log('Debug - 当前用户信息:', userInfo); // 调试信息
                                     if (userInfo.logged_in) {
-                                        document.getElementById('userInfo').innerText = '欢迎您，' + userInfo.username + ' (' + userInfo.current_org_name + ')';
+                                        document.getElementById('userInfo').innerText = '欢迎您，' + userInfo.username;
+                                        
+                                        // 更新全局用户权限信息
+                                        window.currentUserPermissions = userInfo;
+                                        
+                                        // 重新加载组织切换下拉框选项
+                                        if (userInfo.is_admin || (userInfo.allowed_orgs && userInfo.allowed_orgs.length > 1)) {
+                                            loadOrgOptions(userInfo);
+                                        } else {
+                                            // 如果没有多个可切换组织，隐藏切换按钮
+                                            document.getElementById('orgSwitchContainer').style.display = 'none';
+                                        }
+                                        
                                         layui.layer.msg('组织切换成功', {icon: 1});
                                         
-                                        console.log('Debug - 开始重新加载表格数据'); // 调试信息
                                         // 重新加载表格数据
                                         if (window.myTable && typeof window.myTable.reload === 'function') {
                                             // 保存当前滚动位置
@@ -1111,22 +1242,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 where: {} // 重置搜索条件以确保获取新的组织数据
                                                 // 不传递任何排序相关参数，避免 undefined 问题
                                             });
-                                            console.log('Debug - 已重新加载myTable表格'); // 调试信息
                                         } else if (window.beihuoTableInstance && typeof window.beihuoTableInstance.reload === 'function') {
                                             window.beihuoTableInstance.reload({
                                                 page: {curr: 1},
                                                 where: {}
                                             });
-                                            console.log('Debug - 已重新加载beihuoTableInstance表格'); // 调试信息
                                         } else {
-                                            console.log('Debug - 重新加载整个页面内容'); // 调试信息
                                             // 如果表格实例都不存在，重新加载整个页面内容
                                             loadContent('db-table');
                                         }
                                         
                                         // 重新加载购物车数据
                                         updateCartCount();
-                                        console.log('Debug - 已更新购物车数据'); // 调试信息
                                         
                                         // 如果有日期查询表格，也需要重新加载
                                         if (window.dateQueryTableInstance && typeof window.dateQueryTableInstance.reload === 'function') {
@@ -1134,7 +1261,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 page: {curr: 1},
                                                 where: {}
                                             });
-                                            console.log('Debug - 已重新加载日期查询表格'); // 调试信息
                                         }
                                         
                                         // 刷新更新时间显示
@@ -1177,7 +1303,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                     updateCartCount();
                                 });
                         } else {
-                            console.log('Debug - 组织切换失败:', result.msg); // 调试信息
                             layui.layer.msg(result.msg, {icon: 2});
                             // 恢复之前的选择
                             document.getElementById('orgSwitchSelect').value = '';
@@ -1229,15 +1354,30 @@ fetch('/api/current_user')
             }
             
             // 控制开思自动开单菜单项的显示，只有fsbbr组织的用户可见
-            document.getElementById('ksAutoBillMenuItem').style.display = 
+            document.getElementById('ksAutoBillMenuItem').style.display =
                 (result.current_org === 'fsbbr') ? 'block' : 'none';
-            
+
+            // 控制采购计划菜单的显示（有任一权限即显示）
+            const hasPurchasePlanPermission = result.can_inquiry_module || result.can_compare_module;
+            document.getElementById('purchasePlanMenu').style.display =
+                hasPurchasePlanPermission ? 'block' : 'none';
+
+            // 控制询价模块菜单项的显示
+            document.getElementById('inquiryModuleMenuItem').style.display =
+                result.can_inquiry_module ? 'block' : 'none';
+
+            // 控制比价模块菜单项的显示
+            document.getElementById('compareModuleMenuItem').style.display =
+                result.can_compare_module ? 'block' : 'none';
+
             // 将用户权限存储到全局变量中
             window.currentUserPermissions = {
                 username: result.username,
                 is_admin: result.is_admin,
                 can_delete_cart: result.can_delete_cart,
                 can_process_orders: result.can_process_orders || false,
+                can_inquiry_module: result.can_inquiry_module || false,  // 询价模块权限
+                can_compare_module: result.can_compare_module || false,  // 比价模块权限
                 store: result.store,
                 current_org: result.current_org,
                 allowed_orgs: result.allowed_orgs || []  // 允许切换的组织列表
@@ -1271,6 +1411,28 @@ function openSearchInCrmInNewTab() {
     window.open('/search_in_crm', '_blank');
 }
 
+// 添加打开询价模块的函数
+function openInquiryModule() {
+    // 检查用户是否有权限访问询价模块
+    if (!window.currentUserPermissions || !window.currentUserPermissions.can_inquiry_module) {
+        layui.layer.msg('您没有权限访问询价模块', {icon: 2});
+        return;
+    }
+    // 在新标签页中打开询价模块页面
+    window.open('/api/purchase_plan/inquiry/inquiry_module', '_blank');
+}
+
+// 添加打开比价模块的函数
+function openCompareModule() {
+    // 检查用户是否有权限访问比价模块
+    if (!window.currentUserPermissions || !window.currentUserPermissions.can_compare_module) {
+        layui.layer.msg('您没有权限访问比价模块', {icon: 2});
+        return;
+    }
+    // 在新标签页中打开比价模块页面
+    window.open('/api/purchase_plan/compare/compare_module', '_blank');
+}
+
 // 专门用于加载使用说明书的函数
 function loadInstructions() {
     var contentDiv = document.getElementById('content');
@@ -1289,39 +1451,6 @@ function loadInstructions() {
             console.error('加载使用说明书失败:', error);
             contentDiv.innerHTML = '<div class="layui-elem-quote">加载使用说明书失败，请稍后重试</div>';
         });
-}
-
-// 加载组织选项到下拉框
-function loadOrgOptions(userInfo) {
-    const selectElement = document.getElementById('orgSwitchSelect');
-    // 清空现有选项
-    selectElement.innerHTML = '<option value="">切换组织</option>';
-    
-    // 添加门店选项
-    const stores = {
-        'fsbbr': '佛山门店',
-        'zsbbr': '中山门店',
-        'zhbbr': '珠海门店',
-        'dgby': '百业门店',
-        'dghf': '合峰门店'
-    };
-    
-    for (const [code, name] of Object.entries(stores)) {
-        const option = document.createElement('option');
-        option.value = code;
-        option.textContent = name;
-        // 如果是当前组织，设置为选中状态
-        if (code === userInfo.current_org) {
-            option.selected = true;
-        }
-        selectElement.appendChild(option);
-    }
-    
-    // 重新渲染下拉框
-    layui.use(['form'], function(){
-        var form = layui.form;
-        form.render('select');
-    });
 }
 
 /**
@@ -1387,13 +1516,19 @@ window.loadStoreInfo = function() {
                         {field: 'can_process_orders', title: '处理单据', width: 80, align: 'center', templet: function(d){
                             return d.can_process_orders ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
                         }},
+                        {field: 'can_inquiry_module', title: '询价模块', width: 80, align: 'center', templet: function(d){
+                            return d.can_inquiry_module ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
+                        {field: 'can_compare_module', title: '比价模块', width: 80, align: 'center', templet: function(d){
+                            return d.can_compare_module ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
                         {field: 'store_name', title: '门店', width: 80, align: 'center'},
                         {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
                         {title: '操作', width: 150, align: 'center', templet: function(d) {
                             // 只保留编辑和删除按钮，其他功能移到编辑弹窗内
                             if (currentUser.logged_in && currentUser.is_admin && d.username !== currentUser.username) {
                                 return '<div class="user-action-btns">' +
-                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ', \'' + (d.department || '') + '\', \'' + (d.job_level || '') + '\')">编辑</button>' +
+                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ', \'' + (d.department || '') + '\', \'' + (d.job_level || '') + '\', ' + (d.allowed_orgs ? '\'' + btoa(JSON.stringify(d.allowed_orgs)) + '\'' : 'null') + ', ' + (d.can_inquiry_module || 0) + ', ' + (d.can_compare_module || 0) + ')">编辑</button>' +
                                        '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteUser(' + d.id + ', \'' + d.username + '\')">删除</button>' +
                                        '</div>';
                             }
@@ -1442,6 +1577,12 @@ window.loadStoreInfo = function() {
                         }},
                         {field: 'can_process_orders', title: '处理单据', width: 80, align: 'center', templet: function(d){
                             return d.can_process_orders ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
+                        {field: 'can_inquiry_module', title: '询价模块', width: 80, align: 'center', templet: function(d){
+                            return d.can_inquiry_module ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
+                        {field: 'can_compare_module', title: '比价模块', width: 80, align: 'center', templet: function(d){
+                            return d.can_compare_module ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
                         }},
                         {field: 'store_name', title: '门店', width: 80, align: 'center'},
                         {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
@@ -1626,6 +1767,7 @@ function addUser() {
                             <label class="layui-form-label">所属门店</label>
                             <div class="layui-input-block">
                                 <select name="store" id="addUserStore" class="layui-select">
+                                    <option value="">请选择门店</option>
                                     <option value="fsbbr">佛山门店</option>
                                     <option value="zsbbr">中山门店</option>
                                     <option value="zhbbr">珠海门店</option>
@@ -1666,21 +1808,29 @@ function addUser() {
                     </form>
                 </div>
             `,
-            area: ['500px', '450px'],
+            area: ['500px', '530px'],
             success: function(layero, index){
                 // 检查当前用户是否为管理员，决定是否显示处理单据权限选项
                 if (window.currentUserPermissions && window.currentUserPermissions.is_admin) {
                     var permItem1 = layero.find('#processOrdersPermissionItemAdd')[0];
                     var permItem2 = layero.find('#processOrdersPermissionItemAdd2')[0];
+                    var permItem3 = layero.find('#inquiryModulePermissionItemAdd')[0];
+                    var permItem4 = layero.find('#compareModulePermissionItemAdd')[0];
                     if (permItem1) permItem1.style.display = 'block';
                     if (permItem2) permItem2.style.display = 'block';
+                    if (permItem3) permItem3.style.display = 'block';
+                    if (permItem4) permItem4.style.display = 'block';
                 } else {
                     var permItem1 = layero.find('#processOrdersPermissionItemAdd')[0];
                     var permItem2 = layero.find('#processOrdersPermissionItemAdd2')[0];
+                    var permItem3 = layero.find('#inquiryModulePermissionItemAdd')[0];
+                    var permItem4 = layero.find('#compareModulePermissionItemAdd')[0];
                     if (permItem1) permItem1.style.display = 'none';
                     if (permItem2) permItem2.style.display = 'none';
+                    if (permItem3) permItem3.style.display = 'none';
+                    if (permItem4) permItem4.style.display = 'none';
                 }
-                
+
                 form.render(); // 渲染表单元素
                 
                 // 绑定表单提交事件
@@ -1697,6 +1847,8 @@ function addUser() {
                             is_admin: form_data.field.is_admin === 'on' ? 1 : 0,
                             can_delete_cart: form_data.field.can_delete_cart === 'on' ? 1 : 0, // 添加删除购物车权限字段
                             can_process_orders: form_data.field.can_process_orders === 'on' ? 1 : 0, // 添加处理单据权限字段
+                            can_inquiry_module: form_data.field.can_inquiry_module === 'on' ? 1 : 0, // 添加询价模块权限字段
+                            can_compare_module: form_data.field.can_compare_module === 'on' ? 1 : 0, // 添加比价模块权限字段
                             store: form_data.field.store,
                             department: form_data.field.department || null,  // 板块
                             job_level: form_data.field.job_level || null     // 职级
@@ -1726,19 +1878,29 @@ function addUser() {
 
 
 // 编辑用户时设置允许切换组织的函数
-function setAllowedOrgsForEditUser(userId, username, currentAllowedOrgs) {
-    // 重用上面定义的setAllowedOrgs函数，因为逻辑是相同的
-    setAllowedOrgs(userId, username, currentAllowedOrgs);
+function setAllowedOrgsForEditUser(userId, username, currentAllowedOrgs, userStore) {
+    // 解码Base64编码的JSON字符串
+    var decodedJson = currentAllowedOrgs;
+    if (currentAllowedOrgs && currentAllowedOrgs !== 'null') {
+        try {
+            decodedJson = atob(currentAllowedOrgs);
+        } catch (e) {
+            console.error('Base64解码失败:', e);
+            decodedJson = 'null';
+        }
+    }
+    // 重用上面定义的setAllowedOrgs函数，传入用户的store
+    setAllowedOrgs(userId, username, decodedJson, userStore);
 }
 
 // 设置用户允许切换组织功能
-function setAllowedOrgs(userId, username, currentAllowedOrgs) {
+function setAllowedOrgs(userId, username, currentAllowedOrgs, userStore) {
     layui.use(['layer', 'form'], function(){
         var layer = layui.layer;
         var form = layui.form;
         var $ = layui.$;
         
-        // 解析当前允许的组织
+        // 解析当前允许的组织（该用户可以切换的组织）
         var allowedOrgsArray = [];
         if (currentAllowedOrgs !== 'null' && currentAllowedOrgs) {
             try {
@@ -1747,9 +1909,28 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs) {
                 console.error('解析允许的组织列表失败:', e);
             }
         }
-        console.log('当前允许的组织:', allowedOrgsArray);
+        console.log('该用户当前可切换的组织:', allowedOrgsArray);
         
-        // 构建门店选择HTML
+        // 获取当前登录用户可切换的组织列表（用于权限控制）
+        var currentUserAllowedOrgs = [];
+        if (window.currentUserPermissions) {
+            if (window.currentUserPermissions.is_admin) {
+                // 管理员可以设置所有组织
+                currentUserAllowedOrgs = ['fsbbr', 'zsbbr', 'zhbbr', 'dgby', 'dghf'];
+            } else if (window.currentUserPermissions.allowed_orgs && window.currentUserPermissions.allowed_orgs.length > 0) {
+                // 普通用户只能设置自己有权限的组织
+                currentUserAllowedOrgs = window.currentUserPermissions.allowed_orgs;
+            }
+        }
+        
+        // 如果没有可设置的权限，提示错误
+        if (currentUserAllowedOrgs.length === 0) {
+            layer.msg('您没有设置组织权限的权限', {icon: 2});
+            return;
+        }
+        
+        // 构建门店选择HTML - 显示所有组织，该用户可切换的勾选，不可切换的不勾选
+        // 所属门店默认勾选且不能取消
         var storeOptions = '';
         var stores = [
             {code: 'fsbbr', name: '佛山门店'},
@@ -1760,29 +1941,24 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs) {
         ];
         
         stores.forEach(function(store) {
-            var checked = allowedOrgsArray.includes(store.code) ? 'checked' : '';
+            // 检查是否是所属门店（默认必须勾选且不能取消）
+            var isDefaultStore = (store.code === userStore);
+            // 检查该用户是否可以切换到这个组织（决定是否勾选）
+            var isChecked = isDefaultStore || allowedOrgsArray.includes(store.code);
+            // 检查当前登录用户是否有权限设置这个组织（决定是否可编辑）
+            var canEdit = currentUserAllowedOrgs.includes(store.code);
+            // 所属门店不能取消勾选
+            var disabledAttr = (isDefaultStore || !canEdit) ? 'disabled' : '';
+            var checkedAttr = isChecked ? 'checked' : '';
+            
             storeOptions += `
                 <div class="layui-form-item">
                     <div class="layui-input-block">
-                        <input type="checkbox" name="allowed_org_${store.code}" title="${store.name}" value="${store.code}" ${checked}>
+                        <input type="checkbox" name="allowed_org_${store.code}" title="${store.name}${isDefaultStore ? ' (默认)' : ''}" value="${store.code}" ${checkedAttr} ${disabledAttr}>
                     </div>
                 </div>
             `;
         });
-        
-        // 添加"所有组织"的选项
-        var allChecked = allowedOrgsArray.length === 0 ? 'checked' : '';
-        var allOrgsOption = `
-            <div class="layui-form-item" style="margin-bottom: 10px;">
-                <div class="layui-input-block" style="margin-left: 20px;">
-                    <input type="checkbox" name="all_orgs" title="所有组织" ${allChecked} id="all_orgs_checkbox">
-                </div>
-            </div>
-            <hr style="margin: 10px 0;">
-            <div style="max-height: 300px; overflow-y: auto;">
-                ${storeOptions}
-            </div>
-        `;
         
         // 弹出设置对话框
         layer.open({
@@ -1794,7 +1970,12 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs) {
                         <div class="layui-form-item">
                             <label class="layui-form-label">组织权限</label>
                             <div class="layui-input-block">
-                                ${allOrgsOption}
+                                <div style="color: #999; font-size: 12px; margin-bottom: 10px; margin-left: 20px;">
+                                    默认门店自动勾选且不可取消，其他组织可自由选择
+                                </div>
+                                <div style="max-height: 300px; overflow-y: auto;">
+                                    ${storeOptions}
+                                </div>
                             </div>
                         </div>
                         <div class="layui-form-item">
@@ -1806,24 +1987,9 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs) {
                     </form>
                 </div>
             `,
-            area: ['500px', '500px'],
+            area: ['500px', '450px'],
             success: function(layero, index){
                 form.render(); // 渲染表单元素
-                
-                // 绑定全选/取消全选事件
-                layero.find('#all_orgs_checkbox').on('click', function() {
-                    var isChecked = $(this).prop('checked');
-                    // 设置所有门店选项的状态
-                    layero.find('[name^="allowed_org_"]').prop('checked', isChecked);
-                    form.render('checkbox');
-                });
-                
-                // 绑定门店选项变化事件
-                layero.find('[name^="allowed_org_"]').on('click', function() {
-                    var allChecked = layero.find('[name^="allowed_org_"]').length === layero.find('[name^="allowed_org_"]:checked').length;
-                    layero.find('#all_orgs_checkbox').prop('checked', allChecked);
-                    form.render('checkbox');
-                });
                 
                 // 绑定取消按钮事件
                 layero.find('#cancelSetAllowedOrgs').on('click', function() {
@@ -1838,9 +2004,9 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs) {
                         selectedOrgs.push($(this).val());
                     });
                     
-                    // 如果"所有组织"被选中，则发送空数组（表示所有组织）
-                    if (layero.find('#all_orgs_checkbox').prop('checked')) {
-                        selectedOrgs = []; // 空数组表示所有组织
+                    // 确保所属门店始终包含在列表中（即使用户尝试取消，但它是disabled的，所以应该已经在列表中）
+                    if (userStore && !selectedOrgs.includes(userStore)) {
+                        selectedOrgs.push(userStore);
                     }
                     
                     console.log('提交的允许组织:', selectedOrgs);
@@ -1879,11 +2045,25 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs) {
 }
 
 // 编辑用户功能
-function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders, admin_flag, department, job_level) {
+function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders, admin_flag, department, job_level, allowed_orgs, can_inquiry_module, can_compare_module) {
     layui.use(['layer', 'form'], function(){
         var layer = layui.layer;
         var form = layui.form;
         var $ = layui.$;
+        
+        // 解码allowed_orgs参数（Base64编码）
+        var decodedAllowedOrgs = null;
+        if (allowed_orgs && allowed_orgs !== 'null') {
+            try {
+                decodedAllowedOrgs = JSON.parse(atob(allowed_orgs));
+            } catch (e) {
+                console.error('解析allowed_orgs失败:', e);
+                decodedAllowedOrgs = null;
+            }
+        }
+        
+        // 将allowed_orgs转换为Base64编码的JSON字符串传递给设置函数
+        var allowedOrgsJson = decodedAllowedOrgs ? btoa(JSON.stringify(decodedAllowedOrgs)) : 'null';
         
         // 弹出编辑用户对话框
         layer.open({
@@ -1914,6 +2094,18 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                             <label class="layui-form-label">处理单据权限</label>
                             <div class="layui-input-block">
                                 <input type="checkbox" name="can_process_orders" lay-skin="switch" lay-text="是|否">
+                            </div>
+                        </div>
+                        <div class="layui-form-item" id="inquiryModulePermissionItem" style="display: none;">
+                            <label class="layui-form-label">询价模块权限</label>
+                            <div class="layui-input-block">
+                                <input type="checkbox" name="can_inquiry_module" lay-skin="switch" lay-text="是|否">
+                            </div>
+                        </div>
+                        <div class="layui-form-item" id="compareModulePermissionItem" style="display: none;">
+                            <label class="layui-form-label">比价模块权限</label>
+                            <div class="layui-input-block">
+                                <input type="checkbox" name="can_compare_module" lay-skin="switch" lay-text="是|否">
                             </div>
                         </div>
                         <div class="layui-form-item">
@@ -1956,7 +2148,7 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                             <label class="layui-form-label">其他操作</label>
                             <div class="layui-input-block">
                                 <button type="button" class="layui-btn layui-btn-sm layui-btn-primary" onclick="changeUserPassword('` + username + `', ` + userId + `)">修改密码</button>
-                                <button type="button" class="layui-btn layui-btn-sm layui-btn-primary" onclick="setAllowedOrgsForEditUser(` + userId + `, '` + username + `', null)">设置可切换组织</button>
+                                <button type="button" class="layui-btn layui-btn-sm layui-btn-primary" onclick="setAllowedOrgsForEditUser(` + userId + `, '` + username + `', '` + allowedOrgsJson + `', '` + store + `')">设置可切换组织</button>
                             </div>
                         </div>
                         <div class="layui-form-item" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
@@ -1968,28 +2160,38 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                     </form>
                 </div>
             `,
-            area: ['550px', '520px'], // 弹窗高度
+            area: ['550px', '600px'], // 弹窗高度
             success: function(layero, index){
                 // 检查当前登录用户是否为"admin"，决定是否显示处理单据权限选项
                 if (window.currentUserPermissions && window.currentUserPermissions.username === 'admin') {
                     var permItem1 = layero.find('#processOrdersPermissionItem')[0];
                     var permItem2 = layero.find('#processOrdersPermissionItemAdd')[0];
+                    var permItem3 = layero.find('#inquiryModulePermissionItem')[0];
+                    var permItem4 = layero.find('#compareModulePermissionItem')[0];
                     if (permItem1) permItem1.style.display = 'block';
                     if (permItem2) permItem2.style.display = 'block';
+                    if (permItem3) permItem3.style.display = 'block';
+                    if (permItem4) permItem4.style.display = 'block';
                 } else {
                     var permItem1 = layero.find('#processOrdersPermissionItem')[0];
                     var permItem2 = layero.find('#processOrdersPermissionItemAdd')[0];
+                    var permItem3 = layero.find('#inquiryModulePermissionItem')[0];
+                    var permItem4 = layero.find('#compareModulePermissionItem')[0];
                     if (permItem1) permItem1.style.display = 'none';
                     if (permItem2) permItem2.style.display = 'none';
+                    if (permItem3) permItem3.style.display = 'none';
+                    if (permItem4) permItem4.style.display = 'none';
                 }
-                
+
                 form.render(); // 渲染表单元素
-                
+
                 // 设置初始值
                 form.val('editUserForm', {
                     'is_admin': is_admin ? 'on' : '',
                     'can_delete_cart': can_delete_cart ? 'on' : '', // 添加删除购物车权限开关
                     'can_process_orders': can_process_orders ? 'on' : '', // 添加处理单据权限开关
+                    'can_inquiry_module': can_inquiry_module ? 'on' : '', // 添加询价模块权限开关
+                    'can_compare_module': can_compare_module ? 'on' : '', // 添加比价模块权限开关
                     'store': store
                 });
                 
@@ -2005,6 +2207,8 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                             is_admin: form_data.field.is_admin === 'on' ? 1 : 0, // 转换开关值
                             can_delete_cart: form_data.field.can_delete_cart === 'on' ? 1 : 0, // 添加删除购物车权限字段
                             can_process_orders: form_data.field.can_process_orders === 'on' ? 1 : 0, // 添加处理单据权限字段
+                            can_inquiry_module: form_data.field.can_inquiry_module === 'on' ? 1 : 0, // 添加询价模块权限字段
+                            can_compare_module: form_data.field.can_compare_module === 'on' ? 1 : 0, // 添加比价模块权限字段
                             store: form_data.field.store,
                             department: form_data.field.department || null,  // 板块
                             job_level: form_data.field.job_level || null     // 职级

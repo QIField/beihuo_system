@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>询价模块 - 采购计划</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/handsontable/handsontable.full.min.css') }}">
+    <script src="{{ url_for('static', filename='js/handsontable/handsontable.full.min.js') }}"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .toolbar {
+            background-color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .toolbar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .toolbar-header h3 {
+            margin: 0;
+            color: #333;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #1890ff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #40a9ff;
+        }
+
+        .btn-default {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-default:hover {
+            background-color: #d9d9d9;
+        }
+
+        .upload-area {
+            border: 2px dashed #d9d9d9;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            background-color: #fafafa;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #1890ff;
+            background-color: #e6f7ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #1890ff;
+            background-color: #e6f7ff;
+        }
+
+        .upload-icon {
+            font-size: 32px;
+            color: #999;
+            margin-bottom: 8px;
+        }
+
+        .upload-text {
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .result-info {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 4px;
+        }
+
+        .result-success {
+            background-color: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #52c41a;
+        }
+
+        .result-error {
+            background-color: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #ff4d4f;
+        }
+
+        .data-container {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 320px);
+            min-height: 400px;
+        }
+
+        .data-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            flex-shrink: 0;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 200px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        #handsontable-container {
+            flex: 1;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        /* Handsontable 自定义样式 */
+        .handsontable .htCore td {
+            border: 1px solid #e8e8e8;
+            color: #000 !important;
+        }
+
+        .handsontable .htCore th {
+            background-color: #fafafa;
+            border: 1px solid #e8e8e8;
+            color: #000 !important;
+        }
+
+        .oe-cell {
+            background-color: #f0f5ff !important;
+            font-weight: 600;
+            text-align: center;
+            vertical-align: middle !important;
+            color: #000 !important;
+        }
+
+        .brand-cell {
+            background-color: #fff7e6 !important;
+            font-weight: 500;
+            text-align: center;
+            vertical-align: middle !important;
+            color: #000 !important;
+        }
+
+        .price-cell {
+            color: #ff4d4f !important;
+            font-weight: 500;
+        }
+
+        .row-number-cell {
+            background-color: #f5f5f5 !important;
+            text-align: center;
+            font-weight: 500;
+            color: #000 !important;
+        }
+
+        .oe-divider {
+            border-bottom: 3px solid #1890ff !important;
+        }
+
+        .loading-overlay {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 16px;
+            color: #666;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 20px;
+            border-top: 1px solid #e8e8e8;
+            flex-shrink: 0;
+        }
+
+        .pagination-info {
+            color: #000;
+            font-size: 14px;
+        }
+
+        .pagination select {
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>询价模块</h2>
+
+        <div class="toolbar">
+            <div class="toolbar-header">
+                <h3>导入数据</h3>
+                <button type="button" class="btn btn-primary" id="downloadTemplateBtn">下载模板</button>
+            </div>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <p class="upload-text">点击或拖拽文件到此处上传</p>
+                <p class="upload-hint">支持 Excel (.xls, .xlsx) 或 CSV 格式</p>
+            </div>
+            <input type="file" class="file-input" id="fileInput" accept=".csv,.xls,.xlsx">
+            <div id="uploadResult"></div>
+        </div>
+
+        <div class="data-container">
+            <div class="data-header">
+                <span>询价比价数据</span>
+                <div class="search-bar">
+                    <input type="text" class="search-input" id="searchOe" placeholder="搜索OE号">
+                    <input type="text" class="search-input" id="searchBrand" placeholder="搜索品牌">
+                    <input type="text" class="search-input" id="searchSupplier" placeholder="搜索供应商">
+                    <button class="btn btn-default" id="searchBtn">搜索</button>
+                    <button class="btn btn-default" id="refreshBtn">刷新</button>
+                </div>
+            </div>
+            <div id="handsontable-container"></div>
+            <div class="pagination" id="pagination">
+                <button class="btn btn-default" id="prevBtn">上一页</button>
+                <span class="pagination-info" id="pageInfo">第 1 页 / 共 1 页</span>
+                <button class="btn btn-default" id="nextBtn">下一页</button>
+                <span style="color: #000; font-size: 14px;">跳转到</span>
+                <input type="number" id="pageJumpInput" min="1" style="width: 60px; padding: 6px; border: 1px solid #d9d9d9; border-radius: 4px; text-align: center;">
+                <span style="color: #000; font-size: 14px;">页</span>
+                <button class="btn btn-default" id="pageJumpBtn">跳转</button>
+                <select id="pageSizeSelect" class="btn btn-default" style="padding: 6px 10px;">
+                    <option value="50">50条/页</option>
+                    <option value="100" selected>100条/页</option>
+                    <option value="200">200条/页</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let hot;
+        let allData = [];
+        let currentPage = 1;
+        let pageSize = 100;
+        let totalPages = 1;
+
+        // 空值处理函数
+        function formatEmptyValue(value) {
+            if (value === null || value === undefined || value === '' || 
+                value === 'nan' || value === 'NaN' || value === 'nane' || value === 'NANE') {
+                return '';
+            }
+            return value;
+        }
+
+        // 处理数据并计算合并单元格（支持分页）
+        function processDataWithMerge(data, page = 1, limit = 100) {
+            const processedData = [];
+            const mergeCells = [];
+            let currentRow = 0;
+
+            // 按OE分组
+            const oeGroups = {};
+            data.forEach(item => {
+                if (!oeGroups[item.oe]) {
+                    oeGroups[item.oe] = [];
+                }
+                oeGroups[item.oe].push(item);
+            });
+
+            // 将OE组转换为数组并按原始顺序排序
+            const oeGroupArray = Object.entries(oeGroups);
+            
+            // 计算分页
+            const totalItems = data.length;
+            totalPages = Math.ceil(totalItems / limit);
+            const startIndex = (page - 1) * limit;
+            const endIndex = Math.min(startIndex + limit, totalItems);
+            
+            // 收集当前页需要显示的数据
+            let itemCount = 0;
+            let pageData = [];
+            
+            for (const [oe, oeItems] of oeGroupArray) {
+                for (const item of oeItems) {
+                    if (itemCount >= startIndex && itemCount < endIndex) {
+                        pageData.push(item);
+                    }
+                    itemCount++;
+                }
+            }
+            
+            // 重新按OE分组当前页数据
+            const pageOeGroups = {};
+            pageData.forEach(item => {
+                if (!pageOeGroups[item.oe]) {
+                    pageOeGroups[item.oe] = [];
+                }
+                pageOeGroups[item.oe].push(item);
+            });
+
+            // 处理每个OE组
+            for (const [oe, oeItems] of Object.entries(pageOeGroups)) {
+                const oeStartRow = currentRow;
+                const oeRowCount = oeItems.length;
+
+                // 按品牌分组
+                const brandGroups = {};
+                oeItems.forEach(item => {
+                    const brand = item.brand || '未知品牌';
+                    if (!brandGroups[brand]) {
+                        brandGroups[brand] = [];
+                    }
+                    brandGroups[brand].push(item);
+                });
+
+                // 处理每个品牌组
+                for (const [brand, brandItems] of Object.entries(brandGroups)) {
+                    const brandStartRow = currentRow;
+                    const brandRowCount = brandItems.length;
+
+                    // 添加每一行数据
+                    brandItems.forEach((item, index) => {
+                        processedData.push({
+                            rowNumber: startIndex + currentRow + 1,
+                            oe: index === 0 ? formatEmptyValue(item.oe) : '',
+                            brand: index === 0 ? formatEmptyValue(item.brand) : '',
+                            supplier: formatEmptyValue(item.supplier),
+                            price: item.price ? '¥' + parseFloat(item.price).toFixed(2) : '',
+                            warehouse: formatEmptyValue(item.warehouse),
+                            expire_time: formatEmptyValue(item.expire_time),
+                            remark: formatEmptyValue(item.remark),
+                            stock_quantity: formatEmptyValue(item.stock_quantity),
+                            common_number: formatEmptyValue(item.common_number),
+                            ks_sync: item.ks_sync ? '是' : '否',
+                            _oeGroup: oe,
+                            _brandGroup: brand
+                        });
+                        currentRow++;
+                    });
+
+                    // 添加品牌合并
+                    if (brandRowCount > 1) {
+                        mergeCells.push({
+                            row: brandStartRow,
+                            col: 2,
+                            rowspan: brandRowCount,
+                            colspan: 1
+                        });
+                    }
+                }
+
+                // 添加OE合并
+                if (oeRowCount > 1) {
+                    mergeCells.push({
+                        row: oeStartRow,
+                        col: 1,
+                        rowspan: oeRowCount,
+                        colspan: 1
+                    });
+                }
+            }
+
+            return { data: processedData, mergeCells, totalItems };
+        }
+
+        // 更新分页信息
+        function updatePagination() {
+            document.getElementById('pageInfo').textContent = `第 ${currentPage} 页 / 共 ${totalPages} 页 (共 ${allData.length} 条)`;
+            document.getElementById('prevBtn').disabled = currentPage <= 1;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+        }
+
+        // 渲染当前页
+        function renderCurrentPage() {
+            const { data, mergeCells } = processDataWithMerge(allData, currentPage, pageSize);
+            initHandsontable(data, mergeCells);
+            updatePagination();
+        }
+
+        function initHandsontable(data, mergeCells) {
+            const container = document.getElementById('handsontable-container');
+            
+            if (hot) {
+                hot.destroy();
+            }
+
+            hot = new Handsontable(container, {
+                data: data,
+                columns: [
+                    { data: 'rowNumber', title: '行号', width: 70, className: 'row-number-cell', readOnly: true },
+                    { data: 'oe', title: 'OE号', width: 150, className: 'oe-cell', readOnly: true },
+                    { data: 'brand', title: '品牌', width: 120, className: 'brand-cell', readOnly: true },
+                    { data: 'supplier', title: '供应商', width: 150, readOnly: true },
+                    { data: 'price', title: '单价', width: 100, className: 'price-cell', readOnly: true },
+                    { data: 'warehouse', title: '仓库', width: 120, readOnly: true },
+                    { data: 'expire_time', title: '失效时间', width: 160, readOnly: true },
+                    { data: 'remark', title: '备注', width: 150, readOnly: true },
+                    { data: 'stock_quantity', title: '库存数量', width: 100, readOnly: true },
+                    { data: 'common_number', title: '通用号', width: 150, readOnly: true },
+                    { data: 'ks_sync', title: '开思是否同步', width: 120, readOnly: true }
+                ],
+                mergeCells: mergeCells,
+                rowHeaders: false,
+                colHeaders: true,
+                height: '100%',
+                width: '100%',
+                stretchH: 'all',
+                licenseKey: 'non-commercial-and-evaluation',
+                
+                // 只读模式 - 禁止编辑
+                readOnly: true,
+                disableVisualSelection: false,
+                
+                // 选中复制功能
+                selectionMode: 'multiple',
+                copyPaste: true,
+                contextMenu: false,
+                
+                // 其他配置
+                manualColumnResize: true,
+                manualRowResize: false,
+                columnSorting: true,
+                sortIndicator: true,
+                
+                // 禁用筛选和下拉菜单
+                filters: false,
+                dropdownMenu: false
+            });
+        }
+
+        async function loadData(oe = '', brand = '', supplier = '') {
+            try {
+                const container = document.getElementById('handsontable-container');
+                container.innerHTML = '<div class="loading-overlay">加载中...</div>';
+
+                let url = '/api/purchase_plan/inquiry/list';
+                const params = new URLSearchParams();
+                if (oe) params.append('oe', oe);
+                if (brand) params.append('brand', brand);
+                if (supplier) params.append('supplier', supplier);
+                if (params.toString()) url += '?' + params.toString();
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.code === 0) {
+                    allData = result.data;
+                    currentPage = 1;
+                    console.log('数据条数:', allData.length);
+                    
+                    renderCurrentPage();
+                } else {
+                    container.innerHTML = '<div class="loading-overlay">加载失败: ' + result.msg + '</div>';
+                }
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                const container = document.getElementById('handsontable-container');
+                container.innerHTML = '<div class="loading-overlay">加载失败: ' + error.message + '</div>';
+            }
+        }
+
+        // 分页事件监听
+        function initPagination() {
+            document.getElementById('prevBtn').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderCurrentPage();
+                }
+            });
+
+            document.getElementById('nextBtn').addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderCurrentPage();
+                }
+            });
+
+            document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
+                pageSize = parseInt(e.target.value);
+                currentPage = 1;
+                renderCurrentPage();
+            });
+
+            // 页数跳转功能
+            const pageJumpInput = document.getElementById('pageJumpInput');
+            const pageJumpBtn = document.getElementById('pageJumpBtn');
+
+            pageJumpBtn.addEventListener('click', () => {
+                const targetPage = parseInt(pageJumpInput.value);
+                if (targetPage && targetPage >= 1 && targetPage <= totalPages) {
+                    currentPage = targetPage;
+                    renderCurrentPage();
+                    pageJumpInput.value = '';
+                } else if (targetPage > totalPages) {
+                    alert('页数超出范围，最大页数为 ' + totalPages);
+                }
+            });
+
+            pageJumpInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    pageJumpBtn.click();
+                }
+            });
+        }
+
+        function initUpload() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const uploadResult = document.getElementById('uploadResult');
+
+            uploadArea.addEventListener('click', () => fileInput.click());
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    handleFileUpload(fileInput.files[0]);
+                }
+            });
+
+            async function handleFileUpload(file) {
+                const validTypes = ['.csv', '.xls', '.xlsx'];
+                const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+                if (validTypes.indexOf(fileExt) === -1) {
+                    alert('请上传 Excel 或 CSV 文件');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">上传中...</div>';
+
+                try {
+                    const response = await fetch('/api/purchase_plan/inquiry/import', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+
+                    if (result.code === 0) {
+                        let html = '<div class="result-info result-success">' +
+                                   '<strong>导入成功！</strong><br>' +
+                                   '成功：' + result.data.success_count + ' 条';
+                        if (result.data.error_count > 0) {
+                            html += '，失败：' + result.data.error_count + ' 条';
+                        }
+                        html += '</div>';
+
+                        if (result.data.errors && result.data.errors.length > 0) {
+                            html += '<div class="result-info result-error" style="margin-top: 10px;">' +
+                                    '<strong>错误信息：</strong><br>' +
+                                    result.data.errors.join('<br>') +
+                                    '</div>';
+                        }
+
+                        uploadResult.innerHTML = html;
+                        loadData();
+                    } else {
+                        uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                                 '<strong>导入失败：</strong>' + result.msg +
+                                                 '</div>';
+                    }
+                } catch (error) {
+                    uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                             '<strong>导入失败：</strong>' + error.message +
+                                             '</div>';
+                }
+
+                fileInput.value = '';
+            }
+        }
+
+        function initSearch() {
+            document.getElementById('searchBtn').addEventListener('click', () => {
+                const oe = document.getElementById('searchOe').value;
+                const brand = document.getElementById('searchBrand').value;
+                const supplier = document.getElementById('searchSupplier').value;
+                loadData(oe, brand, supplier);
+            });
+
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+                document.getElementById('searchOe').value = '';
+                document.getElementById('searchBrand').value = '';
+                document.getElementById('searchSupplier').value = '';
+                loadData();
+            });
+
+            ['searchOe', 'searchBrand', 'searchSupplier'].forEach(id => {
+                document.getElementById(id).addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        document.getElementById('searchBtn').click();
+                    }
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initUpload();
+            initSearch();
+            initPagination();
+            loadData();
+        });
+
+        document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.href = "{{ url_for('static', filename='excel/virtual_inventory.xlsx') }}";
+            link.download = 'inquiry_template.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    </script>
+</body>
+</html>

@@ -163,6 +163,9 @@
             </div>
             <div class="search-buttons">
                 <button type="button" class="layui-btn layui-btn-normal" id="summaryBtn">各供应商汇总</button>
+                <button type="button" class="layui-btn layui-btn-warm" id="blacklistBtn">
+                    <i class="layui-icon layui-icon-senior"></i> 黑名单管理
+                </button>
                 <button type="submit" class="layui-btn layui-btn-normal" lay-submit lay-filter="search">搜索</button>
                 <button type="button" class="layui-btn layui-btn-normal" id="resetBtn">重置</button>
                 <button type="button" class="layui-btn layui-btn-danger" id="adminRefreshBtn" style="display:none;">刷新状态</button>
@@ -174,6 +177,11 @@
     <div class="table-container">
         <table class="layui-table" id="virtualInventoryTable" lay-filter="virtualInventoryTable"></table>
     </div>
+
+    <!-- 黑名单工具条模板 -->
+    <script type="text/html" id="blacklistToolbar">
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="delete">删除</a>
+    </script>
 
 <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
 <script>
@@ -650,6 +658,12 @@
                     return false;
                 });
                 
+                // 黑名单管理按钮点击事件
+                $('#blacklistBtn').on('click', function() {
+                    app.openBlacklistModal();
+                    return false;
+                });
+                
                 // 监听业务日期类型变化
                 form.on('select(businessDateTypeSelect)', function(data) {
                     var selectedValue = data.value;
@@ -741,6 +755,228 @@
                             console.error('[管理后台] 刷新失败:', error);
                         }
                     });
+                });
+            });
+        },
+
+        // ==================== 黑名单管理功能 ====================
+        
+        // 打开黑名单管理弹窗
+        openBlacklistModal: function() {
+            layui.use(['layer', 'table', 'jquery', 'form'], function() {
+                var layer = layui.layer;
+                var table = layui.table;
+                var $ = layui.jquery;
+                var form = layui.form;
+
+                // 弹窗内容HTML
+                var contentHtml = `
+                    <div style="padding: 20px;">
+                        <!-- 添加黑名单表单 -->
+                        <div class="layui-form" style="margin-bottom: 20px;">
+                            <div class="layui-form-item">
+                                <div class="layui-inline">
+                                    <label class="layui-form-label">供应商</label>
+                                    <div class="layui-input-inline" style="width: 150px;">
+                                        <input type="text" id="blSupplier" placeholder="供应商名称" class="layui-input">
+                                    </div>
+                                </div>
+                                <div class="layui-inline">
+                                    <label class="layui-form-label">OE码</label>
+                                    <div class="layui-input-inline" style="width: 150px;">
+                                        <input type="text" id="blOeCode" placeholder="OE码" class="layui-input">
+                                    </div>
+                                </div>
+                                <div class="layui-inline">
+                                    <label class="layui-form-label">品牌</label>
+                                    <div class="layui-input-inline" style="width: 120px;">
+                                        <input type="text" id="blBrand" placeholder="品牌" class="layui-input">
+                                    </div>
+                                </div>
+                                <div class="layui-inline">
+                                    <button type="button" class="layui-btn layui-btn-normal" id="addBlacklistBtn">
+                                        <i class="layui-icon layui-icon-add-1"></i> 添加
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 黑名单表格 -->
+                        <table class="layui-table" id="blacklistTable" lay-filter="blacklistTable"></table>
+                        
+                        <!-- 底部统计 -->
+                        <div style="margin-top: 10px; color: #666; font-size: 12px;">
+                            <span id="blacklistStats">加载中...</span>
+                        </div>
+                    </div>
+                `;
+
+                // 打开弹窗
+                var modalIndex = layer.open({
+                    type: 1,
+                    title: '黑名单管理',
+                    area: ['900px', '600px'],
+                    content: contentHtml,
+                    shade: 0.3,
+                    success: function(layero, index) {
+                        // 渲染黑名单表格
+                        app.renderBlacklistTable();
+                        
+                        // 加载统计信息
+                        app.loadBlacklistStats();
+                        
+                        // 绑定添加按钮事件
+                        $('#addBlacklistBtn').on('click', function() {
+                            app.addBlacklistItem();
+                        });
+                        
+                        // 绑定回车事件
+                        $('#blSupplier, #blOeCode, #blBrand').on('keypress', function(e) {
+                            if (e.which === 13) {
+                                app.addBlacklistItem();
+                            }
+                        });
+                    }
+                });
+
+                // 保存弹窗索引到全局,方便后续操作
+                window.blacklistModalIndex = modalIndex;
+            });
+        },
+
+        // 渲染黑名单表格
+        renderBlacklistTable: function() {
+            layui.use(['table', 'jquery'], function() {
+                var table = layui.table;
+                var $ = layui.jquery;
+
+                table.render({
+                    elem: '#blacklistTable',
+                    url: '/api/blacklist',
+                    method: 'get',
+                    page: true,
+                    limit: 10,
+                    limits: [10, 20, 50],
+                    height: 380,
+                    cols: [[
+                        {field: 'supplier_name', title: '供应商名称', width: 200},
+                        {field: 'oe_code', title: 'OE码', width: 200},
+                        {field: 'brand', title: '品牌', width: 150},
+                        {field: 'created_at', title: '添加时间', width: 160, templet: function(d) {
+                            return formatDateTime(d.created_at);
+                        }},
+                        {title: '操作', width: 100, toolbar: '#blacklistToolbar'}
+                    ]]
+                });
+
+                // 监听工具条事件
+                table.on('tool(blacklistTable)', function(obj) {
+                    var data = obj.data;
+                    if (obj.event === 'delete') {
+                        layer.confirm('确定要删除这条黑名单记录吗？', function(index) {
+                            app.deleteBlacklistItem(data.supplier_name, data.oe_code, data.brand);
+                            layer.close(index);
+                        });
+                    }
+                });
+            });
+        },
+
+        // 添加黑名单记录
+        addBlacklistItem: function() {
+            layui.use(['jquery', 'layer'], function() {
+                var $ = layui.jquery;
+                var layer = layui.layer;
+
+                var supplier = $('#blSupplier').val().trim();
+                var oeCode = $('#blOeCode').val().trim();
+                var brand = $('#blBrand').val().trim();
+
+                if (!supplier || !oeCode || !brand) {
+                    layer.msg('请填写完整的供应商、OE码和品牌信息', {icon: 2});
+                    return;
+                }
+
+                $.ajax({
+                    url: '/api/blacklist',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        supplier_name: supplier,
+                        oe_code: oeCode,
+                        brand: brand
+                    }),
+                    success: function(res) {
+                        if (res.success) {
+                            layer.msg('添加成功', {icon: 1});
+                            // 清空输入框
+                            $('#blSupplier, #blOeCode, #blBrand').val('');
+                            // 刷新表格
+                            layui.table.reload('blacklistTable');
+                            // 刷新统计
+                            app.loadBlacklistStats();
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    },
+                    error: function() {
+                        layer.msg('添加失败,请重试', {icon: 2});
+                    }
+                });
+            });
+        },
+
+        // 删除黑名单记录
+        deleteBlacklistItem: function(supplier, oeCode, brand) {
+            layui.use(['jquery', 'layer'], function() {
+                var $ = layui.jquery;
+                var layer = layui.layer;
+
+                $.ajax({
+                    url: '/api/blacklist',
+                    type: 'DELETE',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        supplier_name: supplier,
+                        oe_code: oeCode,
+                        brand: brand
+                    }),
+                    success: function(res) {
+                        if (res.success) {
+                            layer.msg('删除成功', {icon: 1});
+                            // 刷新表格
+                            layui.table.reload('blacklistTable');
+                            // 刷新统计
+                            app.loadBlacklistStats();
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    },
+                    error: function() {
+                        layer.msg('删除失败,请重试', {icon: 2});
+                    }
+                });
+            });
+        },
+
+        // 加载黑名单统计信息
+        loadBlacklistStats: function() {
+            layui.use(['jquery'], function() {
+                var $ = layui.jquery;
+
+                $.ajax({
+                    url: '/api/blacklist/stats',
+                    type: 'GET',
+                    success: function(res) {
+                        if (res.code === 0) {
+                            var stats = res.data;
+                            var html = `当前黑名单共 <strong>${stats.blacklist_count}</strong> 条记录`;
+                            if (stats.blacklist_count > 0) {
+                                html += ' <span style="color: #999;">(上传时将自动过滤这些记录)</span>';
+                            }
+                            $('#blacklistStats').html(html);
+                        }
+                    }
                 });
             });
         }

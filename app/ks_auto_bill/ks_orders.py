@@ -16,36 +16,37 @@ from app.utils.audio_player import play_notification_sound
 from app.utils.database_connection import get_db_connection
 
 
-# 全局变量：缓存日期范围，避免重复计算和打印
-_date_range_cache = None
-
 def _get_date_range():
     """
-    获取查询日期范围，只在第一次调用时计算和打印
-    
+    获取查询日期范围
+
     返回:
         tuple: (start_date, end_date)
     """
-    global _date_range_cache
-    
-    if _date_range_cache is not None:
-        return _date_range_cache
-    
     # 判断运行环境，设置日期
     current_path = os.getcwd()
     if r"E:\work download\project\BBR" in current_path:
-        today = "2026-03-01"
-        print(f"【本地环境】使用固定日期: {today}")
+        today = "2026-03-14"
         start_date = f"{today} 00:00:00"
         end_date = f"{today} 23:59:59"
     else:
         # 线上环境使用最近一周的日期
         end_date = datetime.now().strftime("%Y-%m-%d") + " 23:59:59"
         start_date = (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d") + " 00:00:00"
+
+    return (start_date, end_date)
+
+
+def print_date_range():
+    """
+    打印本次爬取的时间范围（在每次爬取开始时调用一次）
+    """
+    start_date, end_date = _get_date_range()
+    current_path = os.getcwd()
+    if r"E:\work download\project\BBR" in current_path:
+        print(f"【本地环境】使用固定日期: {start_date[:10]}")
+    else:
         print(f"【生产环境】查询日期范围: {start_date} 至 {end_date}")
-    
-    _date_range_cache = (start_date, end_date)
-    return _date_range_cache
 
 def get_orders(session, status="", page_num=1, page_size=20):
     """
@@ -62,7 +63,7 @@ def get_orders(session, status="", page_num=1, page_size=20):
         None: 请求失败
     
     说明:
-        - 本地环境（E:\work download\project\BBR）使用固定日期 2026-03-01
+        - 本地环境（E:\work download\project\BBR）使用固定日期 2026-03-14
         - 其他环境使用最近一周的日期
     """
     if session is None:

@@ -1497,6 +1497,143 @@ def admin_check_update_status():
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'查询失败: {str(e)}'}), 500
 
+# ==================== 黑名单管理 API ====================
+
+@virtual_inventory_bp.route('/api/blacklist', methods=['GET'])
+@login_required
+def get_blacklist_api():
+    """获取黑名单列表"""
+    try:
+        from app.utils.inventory_tasks import get_blacklist
+        blacklist = get_blacklist()
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'count': len(blacklist),
+            'data': blacklist
+        })
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取黑名单失败: {str(e)}'}), 500
+
+
+@virtual_inventory_bp.route('/api/blacklist', methods=['POST'])
+@login_required
+def add_blacklist_api():
+    """添加黑名单记录"""
+    try:
+        data = request.get_json()
+        supplier_name = data.get('supplier_name', '').strip()
+        oe_code = data.get('oe_code', '').strip()
+        brand = data.get('brand', '').strip()
+        
+        if not all([supplier_name, oe_code, brand]):
+            return jsonify({'code': 1, 'msg': '供应商名称、OE码和品牌不能为空'}), 400
+        
+        from app.utils.inventory_tasks import add_to_blacklist, refresh_blacklist_cache
+        result = add_to_blacklist(supplier_name, oe_code, brand)
+        
+        # 添加成功后刷新缓存
+        if result['success']:
+            refresh_blacklist_cache()
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'添加黑名单失败: {str(e)}'}), 500
+
+
+@virtual_inventory_bp.route('/api/blacklist', methods=['DELETE'])
+@login_required
+def delete_blacklist_api():
+    """删除黑名单记录"""
+    try:
+        data = request.get_json()
+        supplier_name = data.get('supplier_name', '').strip()
+        oe_code = data.get('oe_code', '').strip()
+        brand = data.get('brand', '').strip()
+        
+        if not all([supplier_name, oe_code, brand]):
+            return jsonify({'code': 1, 'msg': '供应商名称、OE码和品牌不能为空'}), 400
+        
+        from app.utils.inventory_tasks import remove_from_blacklist, refresh_blacklist_cache
+        result = remove_from_blacklist(supplier_name, oe_code, brand)
+        
+        # 删除成功后刷新缓存
+        if result['success']:
+            refresh_blacklist_cache()
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'删除黑名单失败: {str(e)}'}), 500
+
+
+@virtual_inventory_bp.route('/api/blacklist/batch', methods=['POST'])
+@login_required
+def batch_add_blacklist_api():
+    """批量添加黑名单记录"""
+    try:
+        data = request.get_json()
+        records = data.get('records', [])
+        
+        if not records:
+            return jsonify({'code': 1, 'msg': '没有需要添加的记录'}), 400
+        
+        # 转换为元组列表
+        tuple_records = [(r['supplier_name'], r['oe_code'], r['brand']) for r in records]
+        
+        from app.utils.inventory_tasks import batch_add_to_blacklist, refresh_blacklist_cache
+        result = batch_add_to_blacklist(tuple_records)
+        
+        # 添加成功后刷新缓存
+        if result['success']:
+            refresh_blacklist_cache()
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'批量添加黑名单失败: {str(e)}'}), 500
+
+
+@virtual_inventory_bp.route('/api/blacklist/clear', methods=['POST'])
+@login_required
+def clear_blacklist_api():
+    """清空所有黑名单记录"""
+    try:
+        from app.utils.inventory_tasks import clear_blacklist, refresh_blacklist_cache
+        result = clear_blacklist()
+        
+        # 清空成功后刷新缓存
+        if result['success']:
+            refresh_blacklist_cache()
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'清空黑名单失败: {str(e)}'}), 500
+
+
+@virtual_inventory_bp.route('/api/blacklist/stats', methods=['GET'])
+@login_required
+def get_blacklist_stats_api():
+    """获取黑名单统计信息"""
+    try:
+        from app.utils.inventory_tasks import get_filter_stats
+        stats = get_filter_stats()
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'data': stats
+        })
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取统计信息失败: {str(e)}'}), 500
+
+
 # 导入到主应用的函数============================================================================================
 def register_virtual_inventory_routes(app):
+    # 注册蓝图
     app.register_blueprint(virtual_inventory_bp)
+    
+    # 初始化黑名单表
+    try:
+        from app.utils.inventory_tasks import init_blacklist_table
+        init_blacklist_table()
+        print("[黑名单] 路由注册完成,黑名单表已初始化")
+    except Exception as e:
+        print(f"[黑名单] 初始化失败: {e}")

@@ -59,7 +59,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
 from app.ks_auto_bill.ks_login import login
-from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info
+from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info, print_date_range
 from app.ks_auto_bill.crm_auto_bill import send_orders_to_crm
 from app.utils.database_connection import get_db_connection
 from app.utils.database.table_manager import init_ks_auto_bill_table
@@ -289,6 +289,8 @@ def main(stop_event=None, heartbeat_func=None):
 
             # 获取开思订单并将信息保存到数据库
             print("\n[爬取模块] 获取开思订单并保存到数据库...")
+            # 打印本次爬取的时间范围（只打印一次）
+            print_date_range()
             try:
                 # 获取订单信息和待处理订单ID列表
                 all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session)

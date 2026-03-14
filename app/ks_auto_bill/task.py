@@ -19,7 +19,7 @@ from typing import Optional, Tuple, List
 
 # 导入开思自动对单的核心模块
 from app.ks_auto_bill.ks_login import login
-from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info
+from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info, print_date_range
 from app.ks_auto_bill.crm_auto_bill import send_orders_to_crm
 from app.ks_auto_bill.main import (
     init_database_table,
@@ -30,18 +30,96 @@ from app.ks_auto_bill.main import (
 
 # 简单文件锁类（内联定义，避免导入问题）
 class SimpleFileLock:
-    """简单文件锁，用于防止任务重复执行"""
+    """
+    简单文件锁，用于防止任务重复执行
     
-    def __init__(self, lock_name: str, lock_dir: str = None):
+    特性：
+    1. 支持 PID 检测 - 如果锁文件中的进程已不存在，自动清理僵尸锁
+    2. 支持超时机制 - 锁文件超过指定时间自动视为失效（默认10分钟）
+    """
+    
+    def __init__(self, lock_name: str, lock_dir: str = None, timeout_seconds: int = 600):
         self.lock_name = lock_name
+        self.timeout_seconds = timeout_seconds  # 锁超时时间，默认10分钟
         # 使用系统临时目录（兼容 Windows 和 Linux）
         if lock_dir is None:
             lock_dir = tempfile.gettempdir()
         self.lock_path = os.path.join(lock_dir, f"{lock_name}.lock")
         self._acquired = False
     
+    def _is_process_running(self, pid: int) -> bool:
+        """检查指定 PID 的进程是否仍在运行"""
+        try:
+            if os.name == 'nt':  # Windows
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                handle = kernel32.OpenProcess(1, False, pid)  # PROCESS_TERMINATE = 1
+                if handle:
+                    kernel32.CloseHandle(handle)
+                    return True
+                return False
+            else:  # Linux/Mac
+                os.kill(pid, 0)
+                return True
+        except (OSError, ImportError):
+            return False
+    
+    def _is_lock_expired(self) -> bool:
+        """检查锁是否已过期（超时）"""
+        try:
+            stat = os.stat(self.lock_path)
+            file_age = time.time() - stat.st_mtime
+            return file_age > self.timeout_seconds
+        except Exception:
+            return True  # 如果无法获取文件信息，视为已过期
+    
+    def _read_lock_pid(self) -> int:
+        """读取锁文件中的 PID"""
+        try:
+            with open(self.lock_path, 'r') as f:
+                return int(f.read().strip())
+        except Exception:
+            return -1
+    
+    def _break_stale_lock(self) -> bool:
+        """尝试打破僵尸锁，返回是否成功"""
+        try:
+            lock_pid = self._read_lock_pid()
+            current_pid = os.getpid()
+            
+            # 情况1: 锁是我们自己持有的（当前进程）
+            if lock_pid == current_pid:
+                print(f"[SimpleFileLock] 检测到本进程持有的旧锁，清理中...")
+                os.unlink(self.lock_path)
+                return True
+            
+            # 情况2: 持有锁的进程已不存在
+            if lock_pid > 0 and not self._is_process_running(lock_pid):
+                print(f"[SimpleFileLock] 检测到僵尸锁 (PID {lock_pid} 已不存在)，清理中...")
+                os.unlink(self.lock_path)
+                return True
+            
+            # 情况3: 锁已超时
+            if self._is_lock_expired():
+                print(f"[SimpleFileLock] 检测到超时锁，清理中...")
+                os.unlink(self.lock_path)
+                return True
+            
+            return False
+        except Exception as e:
+            print(f"[SimpleFileLock] 清理僵尸锁失败: {e}")
+            return False
+    
     def acquire(self) -> bool:
-        """获取锁"""
+        """
+        获取锁
+        
+        逻辑：
+        1. 先尝试创建锁文件
+        2. 如果失败，检查是否是僵尸锁（进程不存在或已超时）
+        3. 如果是僵尸锁，清理后重试
+        """
+        # 第一次尝试获取锁
         try:
             fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             os.write(fd, str(os.getpid()).encode())
@@ -49,16 +127,35 @@ class SimpleFileLock:
             self._acquired = True
             return True
         except FileExistsError:
-            return False
+            # 锁文件已存在，检查是否是僵尸锁
+            pass
         except Exception:
             return False
+        
+        # 尝试清理僵尸锁
+        if self._break_stale_lock():
+            # 清理成功后，再次尝试获取锁
+            try:
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                self._acquired = True
+                return True
+            except Exception:
+                return False
+        
+        # 锁确实被其他活跃进程持有
+        return False
     
     def release(self):
         """释放锁"""
         if self._acquired:
             try:
                 if os.path.exists(self.lock_path):
-                    os.unlink(self.lock_path)
+                    # 安全检查：确保只删除自己创建的锁
+                    lock_pid = self._read_lock_pid()
+                    if lock_pid == os.getpid():
+                        os.unlink(self.lock_path)
                 self._acquired = False
             except Exception:
                 pass
@@ -153,6 +250,8 @@ def process_orders_once():
 
     # 4. 获取订单并保存到数据库
     print("\n[开思自动对单] 获取开思订单并保存到数据库...")
+    # 打印本次爬取的时间范围（只打印一次）
+    print_date_range()
     try:
         all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session)
         print(f"[开思自动对单] 成功获取并保存 {len(all_order_info_list)} 条订单信息")
