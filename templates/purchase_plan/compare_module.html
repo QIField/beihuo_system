@@ -29,26 +29,6 @@
             color: #333;
         }
 
-        .toolbar {
-            background-color: #fff;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-        }
-
-        .toolbar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .toolbar-header h3 {
-            margin: 0;
-            color: #333;
-        }
-
         .btn {
             padding: 8px 16px;
             border: none;
@@ -76,46 +56,6 @@
             background-color: #d9d9d9;
         }
 
-        .upload-area {
-            border: 2px dashed #d9d9d9;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            background-color: #fafafa;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .upload-area:hover {
-            border-color: #1890ff;
-            background-color: #e6f7ff;
-        }
-
-        .upload-area.dragover {
-            border-color: #1890ff;
-            background-color: #e6f7ff;
-        }
-
-        .upload-icon {
-            font-size: 32px;
-            color: #999;
-            margin-bottom: 8px;
-        }
-
-        .upload-text {
-            color: #666;
-            margin-bottom: 5px;
-        }
-
-        .upload-hint {
-            font-size: 12px;
-            color: #999;
-        }
-
-        .file-input {
-            display: none;
-        }
-
         .result-info {
             margin-top: 15px;
             padding: 12px;
@@ -134,6 +74,55 @@
             color: #ff4d4f;
         }
 
+        /* 自定义浮窗样式 */
+        .price-tooltip {
+            position: absolute;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .price-tooltip.show {
+            opacity: 1;
+        }
+
+        .price-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: #764ba2 transparent transparent transparent;
+        }
+
+        .price-tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .price-tooltip-label {
+            opacity: 0.9;
+            font-size: 12px;
+        }
+
+        .price-tooltip-value {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
         .data-container {
             background-color: #fff;
             border-radius: 8px;
@@ -141,8 +130,8 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 320px);
-            min-height: 400px;
+            height: calc(100vh - 120px);
+            min-height: 500px;
         }
 
         .data-header {
@@ -296,20 +285,6 @@
     <div class="container">
         <h2>比价模块</h2>
 
-        <div class="toolbar">
-            <div class="toolbar-header">
-                <h3>导入数据</h3>
-                <button type="button" class="btn btn-primary" id="downloadTemplateBtn">下载模板</button>
-            </div>
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">📁</div>
-                <p class="upload-text">点击或拖拽文件到此处上传</p>
-                <p class="upload-hint">支持 Excel (.xls, .xlsx) 或 CSV 格式</p>
-            </div>
-            <input type="file" class="file-input" id="fileInput" accept=".csv,.xls,.xlsx">
-            <div id="uploadResult"></div>
-        </div>
-
         <div class="data-container">
             <div class="data-header">
                 <span>询价比价数据</span>
@@ -374,78 +349,98 @@
             return num.toLocaleString();
         }
 
-        // 处理数据并计算合并单元格（支持分页）
-        function processDataWithMerge(data, page = 1, limit = 100) {
+        // 价格浮窗相关函数
+        let priceTooltip = null;
+
+        function createPriceTooltip() {
+            if (!priceTooltip) {
+                priceTooltip = document.createElement('div');
+                priceTooltip.className = 'price-tooltip';
+                document.body.appendChild(priceTooltip);
+            }
+        }
+
+        function showPriceTooltip(event, maxPrice, minPrice) {
+            createPriceTooltip();
+
+            priceTooltip.innerHTML = `
+                <div class="price-tooltip-row">
+                    <span class="price-tooltip-label">最高价:</span>
+                    <span class="price-tooltip-value">${maxPrice}</span>
+                </div>
+                <div class="price-tooltip-row">
+                    <span class="price-tooltip-label">最低价:</span>
+                    <span class="price-tooltip-value">${minPrice}</span>
+                </div>
+            `;
+
+            // 计算位置
+            const rect = event.target.getBoundingClientRect();
+            const tooltipRect = priceTooltip.getBoundingClientRect();
+
+            let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+            let top = rect.top - tooltipRect.height - 10;
+
+            // 边界检查
+            if (left < 10) left = 10;
+            if (left + tooltipRect.width > window.innerWidth - 10) {
+                left = window.innerWidth - tooltipRect.width - 10;
+            }
+            if (top < 10) {
+                top = rect.bottom + 10;
+            }
+
+            priceTooltip.style.left = left + 'px';
+            priceTooltip.style.top = top + 'px';
+            priceTooltip.classList.add('show');
+        }
+
+        function hidePriceTooltip() {
+            if (priceTooltip) {
+                priceTooltip.classList.remove('show');
+            }
+        }
+
+        // 处理数据并计算合并单元格（服务端分页版本 - 保持后端排序顺序）
+        function processDataWithMerge(data) {
             const processedData = [];
             const mergeCells = [];
             let currentRow = 0;
 
-            // 按OE分组
-            const oeGroups = {};
+            // 按OE分组，但保持原始顺序（使用Map保持插入顺序）
+            const oeGroups = new Map();
             data.forEach(item => {
                 const oe = item.oe || item.OE || item.oE || '';
-                if (!oeGroups[oe]) {
-                    oeGroups[oe] = [];
+                if (!oeGroups.has(oe)) {
+                    oeGroups.set(oe, []);
                 }
-                oeGroups[oe].push(item);
+                oeGroups.get(oe).push(item);
             });
 
-            // 将OE组转换为数组
-            const oeGroupArray = Object.entries(oeGroups);
-            
-            // 计算分页
-            const totalItems = data.length;
-            totalPages = Math.ceil(totalItems / limit);
-            const startIndex = (page - 1) * limit;
-            const endIndex = Math.min(startIndex + limit, totalItems);
-            
-            // 收集当前页需要显示的数据
-            let itemCount = 0;
-            let pageData = [];
-            
-            for (const [oe, oeItems] of oeGroupArray) {
-                for (const item of oeItems) {
-                    if (itemCount >= startIndex && itemCount < endIndex) {
-                        pageData.push(item);
-                    }
-                    itemCount++;
-                }
-            }
-            
-            // 重新按OE分组当前页数据
-            const pageOeGroups = {};
-            pageData.forEach(item => {
-                const oe = item.oe || item.OE || item.oE || '';
-                if (!pageOeGroups[oe]) {
-                    pageOeGroups[oe] = [];
-                }
-                pageOeGroups[oe].push(item);
-            });
-
-            // 处理每个OE组
-            for (const [oe, oeItems] of Object.entries(pageOeGroups)) {
+            // 处理每个OE组（按Map的插入顺序遍历）
+            for (const [oe, oeItems] of oeGroups) {
                 const oeStartRow = currentRow;
                 const oeRowCount = oeItems.length;
 
-                // 按品牌分组
-                const brandGroups = {};
+                // 按品牌分组，保持原始顺序
+                const brandGroups = new Map();
                 oeItems.forEach(item => {
                     const brand = item.brand || item.品牌 || '未知品牌';
-                    if (!brandGroups[brand]) {
-                        brandGroups[brand] = [];
+                    if (!brandGroups.has(brand)) {
+                        brandGroups.set(brand, []);
                     }
-                    brandGroups[brand].push(item);
+                    brandGroups.get(brand).push(item);
                 });
 
-                // 处理每个品牌组
-                for (const [brand, brandItems] of Object.entries(brandGroups)) {
+                // 处理每个品牌组（按Map的插入顺序遍历）
+                for (const [brand, brandItems] of brandGroups) {
                     const brandStartRow = currentRow;
                     const brandRowCount = brandItems.length;
 
                     // 添加每一行数据
                     brandItems.forEach((item, index) => {
                         processedData.push({
-                            rowNumber: startIndex + currentRow + 1,
+                            rowNumber: (currentPage - 1) * pageSize + currentRow + 1,
                             oe: index === 0 ? formatEmptyValue(item.oe || item.OE || item.oE) : '',
                             brand: index === 0 ? formatEmptyValue(item.brand || item.品牌) : '',
                             productName: formatEmptyValue(item.product_name || item.产品名称 || item.productName),
@@ -453,6 +448,8 @@
                             replaceNumber: formatEmptyValue(item.replace_number || item.替换号 || item.replaceNumber),
                             productLevel: formatEmptyValue(item.product_level || item.产品等级 || item.productLevel),
                             supplierPrice: formatPrice(item.supplier_price || item.供应商价格 || item.supplierPrice),
+                            maxPrice: formatPrice(item.max_price || item.最高价 || item.maxPrice),
+                            minPrice: formatPrice(item.min_price || item.最低价 || item.minPrice),
                             dealerPurchasePrice: formatPrice(item.dealer_purchase_price || item['4S含税进价'] || item.dealerPurchasePrice),
                             dealerSalePrice: formatPrice(item.dealer_sale_price || item['4S含税售价'] || item.dealerSalePrice),
                             priceUpdateTime: formatEmptyValue(item.price_update_time || item.更新价格时间 || item.priceUpdateTime),
@@ -492,7 +489,7 @@
                 }
             }
 
-            return { data: processedData, mergeCells, totalItems };
+            return { data: processedData, mergeCells };
         }
 
         // 更新分页信息
@@ -504,7 +501,7 @@
 
         // 渲染当前页
         function renderCurrentPage() {
-            const { data, mergeCells } = processDataWithMerge(allData, currentPage, pageSize);
+            const { data, mergeCells } = processDataWithMerge(allData);
             initHandsontable(data, mergeCells);
             updatePagination();
         }
@@ -541,8 +538,40 @@
                     { data: 'replaceNumber', title: '替换号', width: 120, readOnly: true },
                     // 产品等级
                     { data: 'productLevel', title: '产品等级', width: 100, className: 'level-cell', readOnly: true },
-                    // 供应商价格
-                    { data: 'supplierPrice', title: '供应商价格', width: 110, className: 'price-cell', readOnly: true },
+                    // 供应商价格（带最高价最低价浮窗）
+                    {
+                        data: 'supplierPrice',
+                        title: '供应商价格',
+                        width: 110,
+                        className: 'price-cell',
+                        readOnly: true,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            const data = instance.getSourceDataAtRow(row);
+                            td.innerHTML = value || '';
+                            td.style.textAlign = 'right';
+                            td.style.color = '#ff4d4f';
+                            td.style.fontWeight = '500';
+
+                            // 添加自定义浮窗事件
+                            if (data.maxPrice || data.minPrice) {
+                                td.style.cursor = 'pointer';
+                                td.dataset.maxPrice = data.maxPrice || '-';
+                                td.dataset.minPrice = data.minPrice || '-';
+
+                                // 鼠标进入显示浮窗
+                                td.addEventListener('mouseenter', function(e) {
+                                    showPriceTooltip(e, this.dataset.maxPrice, this.dataset.minPrice);
+                                });
+
+                                // 鼠标离开隐藏浮窗
+                                td.addEventListener('mouseleave', function() {
+                                    hidePriceTooltip();
+                                });
+                            }
+
+                            return td;
+                        }
+                    },
                     // 4S含税进价
                     { data: 'dealerPurchasePrice', title: '4S含税进价', width: 110, className: 'price-cell', readOnly: true },
                     // 4S含税售价
@@ -599,36 +628,116 @@
                 // 其他配置
                 manualColumnResize: true,
                 manualRowResize: false,
-                columnSorting: true,
-                sortIndicator: true,
-                
+                columnSorting: false,  // 禁用前端排序，使用服务端排序
+                sortIndicator: false,
+
                 // 禁用筛选和下拉菜单
                 filters: false,
-                dropdownMenu: false
+                dropdownMenu: false,
+
+                // 添加点击表头排序事件
+                afterOnCellMouseDown: function(event, coords, TD) {
+                    // 检查是否点击了表头（第一行）
+                    if (coords.row === -1 && coords.col >= 0) {
+                        const colHeaders = ['行号', 'OE', '品牌', '产品名称', '车辆品牌', '替换号', '产品等级',
+                                          '供应商价格', '4S含税进价', '4S含税售价', '更新价格时间',
+                                          '销量及月均销量', '系统产品备注', '品牌编码'];
+                        const headerText = colHeaders[coords.col];
+
+                        // 检查该列是否支持排序
+                        if (fieldMapping[headerText]) {
+                            const fieldName = fieldMapping[headerText];
+
+                            // 切换排序状态
+                            if (currentSort.field === fieldName) {
+                                // 同一字段，切换排序方向
+                                currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+                            } else {
+                                // 新字段，默认升序
+                                currentSort.field = fieldName;
+                                currentSort.order = 'asc';
+                            }
+
+                            console.log('服务端排序:', currentSort.field, currentSort.order);
+
+                            // 重新加载数据（带排序参数）
+                            loadData(
+                                currentSearchParams.oe,
+                                currentSearchParams.brand,
+                                currentSearchParams.productName,
+                                currentSearchParams.vehicleBrand,
+                                1,  // 排序后回到第一页
+                                pageSize
+                            );
+                        }
+                    }
+                }
             });
         }
 
-        async function loadData(oe = '', brand = '', productName = '', vehicleBrand = '') {
+        // 搜索条件缓存
+        let currentSearchParams = {
+            oe: '',
+            brand: '',
+            productName: '',
+            vehicleBrand: ''
+        };
+
+        // 排序状态缓存
+        let currentSort = {
+            field: '',
+            order: 'asc'  // 'asc' 或 'desc'
+        };
+
+        // 字段映射：前端显示名 -> 后端字段名
+        const fieldMapping = {
+            'OE': 'oe',
+            '品牌': 'brand',
+            '产品名称': 'product_name',
+            '车辆品牌': 'vehicle_brand',
+            '替换号': 'replace_number',
+            '产品等级': 'product_level',
+            '供应商价格': 'supplier_price',
+            '4S含税进价': 'dealer_purchase_price',
+            '4S含税售价': 'dealer_sale_price',
+            '更新价格时间': 'price_update_time'
+        };
+
+        async function loadData(oe = '', brand = '', productName = '', vehicleBrand = '', page = 1, limit = pageSize) {
             try {
                 const container = document.getElementById('handsontable-container');
                 container.innerHTML = '<div class="loading-overlay">加载中...</div>';
 
+                // 保存搜索条件
+                currentSearchParams = { oe, brand, productName, vehicleBrand };
+                currentPage = page;
+                pageSize = limit;
+
                 let url = '/api/purchase_plan/compare/list';
                 const params = new URLSearchParams();
+                params.append('page', page);
+                params.append('limit', limit);
                 if (oe) params.append('oe', oe);
                 if (brand) params.append('brand', brand);
                 if (productName) params.append('product_name', productName);
                 if (vehicleBrand) params.append('vehicle_brand', vehicleBrand);
-                if (params.toString()) url += '?' + params.toString();
+
+                // 添加排序参数
+                if (currentSort.field) {
+                    params.append('sort_field', currentSort.field);
+                    params.append('sort_order', currentSort.order);
+                }
+
+                url += '?' + params.toString();
 
                 const response = await fetch(url);
                 const result = await response.json();
 
                 if (result.code === 0) {
                     allData = result.data;
-                    currentPage = 1;
-                    console.log('数据条数:', allData.length);
-                    
+                    totalPages = Math.ceil(result.count / pageSize);
+                    console.log('当前页数据条数:', allData.length, '总条数:', result.count, '总页数:', totalPages);
+
                     renderCurrentPage();
                 } else {
                     container.innerHTML = '<div class="loading-overlay">加载失败: ' + result.msg + '</div>';
@@ -640,26 +749,44 @@
             }
         }
 
-        // 分页事件监听
+        // 分页事件监听（服务端分页版本）
         function initPagination() {
             document.getElementById('prevBtn').addEventListener('click', () => {
                 if (currentPage > 1) {
-                    currentPage--;
-                    renderCurrentPage();
+                    loadData(
+                        currentSearchParams.oe,
+                        currentSearchParams.brand,
+                        currentSearchParams.productName,
+                        currentSearchParams.vehicleBrand,
+                        currentPage - 1,
+                        pageSize
+                    );
                 }
             });
 
             document.getElementById('nextBtn').addEventListener('click', () => {
                 if (currentPage < totalPages) {
-                    currentPage++;
-                    renderCurrentPage();
+                    loadData(
+                        currentSearchParams.oe,
+                        currentSearchParams.brand,
+                        currentSearchParams.productName,
+                        currentSearchParams.vehicleBrand,
+                        currentPage + 1,
+                        pageSize
+                    );
                 }
             });
 
             document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
                 pageSize = parseInt(e.target.value);
-                currentPage = 1;
-                renderCurrentPage();
+                loadData(
+                    currentSearchParams.oe,
+                    currentSearchParams.brand,
+                    currentSearchParams.productName,
+                    currentSearchParams.vehicleBrand,
+                    1,
+                    pageSize
+                );
             });
 
             // 页数跳转功能
@@ -669,8 +796,14 @@
             pageJumpBtn.addEventListener('click', () => {
                 const targetPage = parseInt(pageJumpInput.value);
                 if (targetPage && targetPage >= 1 && targetPage <= totalPages) {
-                    currentPage = targetPage;
-                    renderCurrentPage();
+                    loadData(
+                        currentSearchParams.oe,
+                        currentSearchParams.brand,
+                        currentSearchParams.productName,
+                        currentSearchParams.vehicleBrand,
+                        targetPage,
+                        pageSize
+                    );
                     pageJumpInput.value = '';
                 } else if (targetPage > totalPages) {
                     alert('页数超出范围，最大页数为 ' + totalPages);
@@ -682,89 +815,6 @@
                     pageJumpBtn.click();
                 }
             });
-        }
-
-        function initUpload() {
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
-            const uploadResult = document.getElementById('uploadResult');
-
-            uploadArea.addEventListener('click', () => fileInput.click());
-
-            uploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadArea.classList.add('dragover');
-            });
-
-            uploadArea.addEventListener('dragleave', () => {
-                uploadArea.classList.remove('dragover');
-            });
-
-            uploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                if (e.dataTransfer.files.length > 0) {
-                    handleFileUpload(e.dataTransfer.files[0]);
-                }
-            });
-
-            fileInput.addEventListener('change', () => {
-                if (fileInput.files.length > 0) {
-                    handleFileUpload(fileInput.files[0]);
-                }
-            });
-
-            async function handleFileUpload(file) {
-                const validTypes = ['.csv', '.xls', '.xlsx'];
-                const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-                if (validTypes.indexOf(fileExt) === -1) {
-                    alert('请上传 Excel 或 CSV 文件');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('file', file);
-
-                uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">上传中...</div>';
-
-                try {
-                    const response = await fetch('/api/purchase_plan/compare/import', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const result = await response.json();
-
-                    if (result.code === 0) {
-                        let html = '<div class="result-info result-success">' +
-                                   '<strong>导入成功！</strong><br>' +
-                                   '成功：' + result.data.success_count + ' 条';
-                        if (result.data.error_count > 0) {
-                            html += '，失败：' + result.data.error_count + ' 条';
-                        }
-                        html += '</div>';
-
-                        if (result.data.errors && result.data.errors.length > 0) {
-                            html += '<div class="result-info result-error" style="margin-top: 10px;">' +
-                                    '<strong>错误信息：</strong><br>' +
-                                    result.data.errors.join('<br>') +
-                                    '</div>';
-                        }
-
-                        uploadResult.innerHTML = html;
-                        loadData();
-                    } else {
-                        uploadResult.innerHTML = '<div class="result-info result-error">' +
-                                                 '<strong>导入失败：</strong>' + result.msg +
-                                                 '</div>';
-                    }
-                } catch (error) {
-                    uploadResult.innerHTML = '<div class="result-info result-error">' +
-                                             '<strong>导入失败：</strong>' + error.message +
-                                             '</div>';
-                }
-
-                fileInput.value = '';
-            }
         }
 
         function initSearch() {
@@ -853,20 +903,10 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            initUpload();
             initSearch();
             initPagination();
             initExport();
             loadData();
-        });
-
-        document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.href = "{{ url_for('static', filename='excel/compare_template.xlsx') }}";
-            link.download = 'compare_template.xlsx';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         });
     </script>
 </body>

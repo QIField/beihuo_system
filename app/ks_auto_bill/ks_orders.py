@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import requests  # 新增导入request库用于发送HTTP请求
 import sys
 from pathlib import Path
+import threading
 
 # 添加项目根目录到Python路径
 current_dir = Path(__file__).parent
@@ -14,6 +15,35 @@ sys.path.insert(0, str(project_root))
 
 from app.utils.audio_player import play_notification_sound
 from app.utils.database_connection import get_db_connection
+
+# 线程本地存储，每个线程有独立的session
+_thread_local = threading.local()
+
+
+def _get_thread_session():
+    """
+    获取线程本地的session对象
+    每个线程有独立的session，避免多线程冲突导致的段错误
+    """
+    if not hasattr(_thread_local, 'session') or _thread_local.session is None:
+        # 导入login函数创建新的session
+        from app.ks_auto_bill.ks_login import login
+        _thread_local.session = login()
+        print(f"【线程 {threading.current_thread().ident}】创建新的session")
+    return _thread_local.session
+
+
+def _close_thread_session():
+    """
+    关闭当前线程的session
+    在任务完成后调用，释放资源
+    """
+    if hasattr(_thread_local, 'session') and _thread_local.session is not None:
+        try:
+            _thread_local.session.close()
+        except:
+            pass
+        _thread_local.session = None
 
 
 def _get_date_range():
@@ -91,7 +121,7 @@ def get_all_orders(session, status="", page_size=20):
     获取所有页面的订单（自动分页）
     
     参数:
-        session: 登录后的会话对象
+        session: 登录后的会话对象（用于第1页，后续并发页面使用线程本地session）
         status: 订单状态ID，默认为空（获取所有状态的订单）
         page_size: 每页数量，默认 20
     
@@ -101,10 +131,14 @@ def get_all_orders(session, status="", page_size=20):
     流程:
         1. 获取第1页，得到总订单数和总页数
         2. 判断是否需要获取更多页
-        3. 并发获取剩余页面
+        3. 并发获取剩余页面（每个线程使用独立的session）
         4. 合并所有订单返回
+    
+    线程安全说明:
+        - 第1页使用传入的session（主线程）
+        - 后续页面使用线程本地session（每个并发线程独立创建）
+        - 避免多线程共享session导致的段错误
     """
-    import threading
     from app.core.task_manager import task_manager
     
     if session is None:
@@ -138,13 +172,29 @@ def get_all_orders(session, status="", page_size=20):
     failed_pages = []
     
     def fetch_page(page):
+        """
+        获取单页订单数据（线程安全版本）
+        每个线程使用独立的session，避免共享导致的段错误
+        """
         thread_id = threading.current_thread().ident
         print(f"【订单】线程 {thread_id}: 获取第 {page}/{total_pages} 页...")
-        result = get_orders(session, status=status, page_num=page, page_size=page_size)
-        if result is None:
-            print(f"【订单】线程 {thread_id}: 第 {page} 页获取失败")
-            return None
-        return result.get("data", {}).get("list", [])
+        
+        # 获取线程本地的session（每个线程独立）
+        thread_session = _get_thread_session()
+        
+        try:
+            result = get_orders(thread_session, status=status, page_num=page, page_size=page_size)
+            if result is None:
+                print(f"【订单】线程 {thread_id}: 第 {page} 页获取失败")
+                return page, None  # 返回页码用于重试
+            return page, result.get("data", {}).get("list", [])
+        except Exception as e:
+            print(f"【订单】线程 {thread_id}: 第 {page} 页获取异常: {e}")
+            return page, None
+        finally:
+            # 可选：任务完成后关闭线程session（如果需要）
+            # 注意：保持session打开可以提高性能，但可能占用资源
+            pass
     
     # 使用 task_manager 提交并发任务
     pages_to_fetch = list(range(2, total_pages + 1))
@@ -153,20 +203,18 @@ def get_all_orders(session, status="", page_size=20):
     # 收集结果
     for future in futures:
         try:
-            orders_list = future.result()
+            page_num, orders_list = future.result()
             if orders_list is not None:
                 all_orders.extend(orders_list)
             else:
-                # 记录失败的页码（通过future无法直接获取page，这里简化处理）
-                pass
+                failed_pages.append(page_num)
         except Exception as e:
             print(f"【订单】获取页面时出错: {e}")
-            failed_pages.append("unknown")
     
-    # 如果有失败的页面，尝试重新获取
+    # 如果有失败的页面，使用主session重试（避免再次登录）
     if failed_pages:
         print(f"【订单】正在重试 {len(failed_pages)} 个失败的页面...")
-        for page in failed_pages[:]:  # 使用副本迭代，因为可能修改原列表
+        for page in failed_pages[:]:
             result = get_orders(session, status=status, page_num=page, page_size=page_size)
             if result is not None:
                 orders_list = result.get("data", {}).get("list", [])

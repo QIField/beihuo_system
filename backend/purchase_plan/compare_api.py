@@ -52,7 +52,7 @@ def compare_permission_required(f):
 @compare_permission_required
 def get_compare_list():
     """
-    获取比价数据列表（使用新的汇总表）
+    获取比价数据列表（服务端分页+排序）
     支持分页、筛选和排序
     根据用户所在组织过滤数据
     """
@@ -64,7 +64,14 @@ def get_compare_list():
         brand = request.args.get('brand', '').strip()
         product_name = request.args.get('product_name', '').strip()
         vehicle_brand = request.args.get('vehicle_brand', '').strip()
-        
+
+        # 获取排序参数
+        sort_field = request.args.get('sort_field', '').strip()
+        sort_order = request.args.get('sort_order', 'asc').strip().lower()
+
+        # 限制最大每页数量，防止性能问题
+        limit = min(limit, 500)
+
         # 获取用户当前切换到的组织
         company = session.get('current_org', session.get('store', 'fsbbr'))
 
@@ -78,7 +85,9 @@ def get_compare_list():
             page=page,
             limit=limit,
             order_by='updated_time',
-            order_desc=True
+            order_desc=True,
+            sort_field=sort_field,
+            sort_order=sort_order
         )
 
         return jsonify({
@@ -213,131 +222,7 @@ def get_statistics():
         return jsonify({'code': 1, 'msg': f'获取统计信息失败: {str(e)}'}), 500
 
 
-@compare_bp.route('/import', methods=['POST'])
-@compare_permission_required
-def import_compare_data():
-    """
-    导入比价数据（Excel或CSV）
-    """
-    try:
-        if 'file' not in request.files:
-            return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
 
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
-
-        # 读取文件
-        filename = file.filename.lower()
-        if filename.endswith('.csv'):
-            df = pd.read_csv(file, encoding='utf-8')
-        elif filename.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(file)
-        else:
-            return jsonify({'code': 1, 'msg': '不支持的文件格式，请上传Excel或CSV文件'}), 400
-
-        if df.empty:
-            return jsonify({'code': 1, 'msg': '文件中没有数据'}), 400
-
-        # 字段映射（支持中文和英文列名）
-        column_mapping = {
-            # 中文列名映射
-            'OE': 'oe',
-            '品牌': 'brand',
-            '产品名称': 'product_name',
-            '车辆品牌': 'vehicle_brand',
-            '替换号': 'replace_number',
-            '品牌编码': 'brand_code',
-            '询价次数': 'inquiry_count',
-            '产品等级': 'product_level',
-            '销量最好的月份': 'best_sales_month',
-            '销量最好的季节': 'best_sales_season',
-            '最高价': 'max_price',
-            '最低价': 'min_price',
-            '供应商价格': 'supplier_price',
-            '4S含税进价': 'dealer_purchase_price',
-            '4S含税售价': 'dealer_sale_price',
-            '更新价格时间': 'price_update_time',
-            '今日销量': 'today_sales',
-            '昨日销量': 'yesterday_sales',
-            '本月销量': 'month_sales',
-            '近12个月月均销量': 'avg_sales_12m',
-            '近6个月月均销量': 'avg_sales_6m',
-            '近7天销量': 'sales_7d',
-            '系统产品备注': 'product_remark',
-            # 英文列名映射
-            'oe': 'oe',
-            'brand': 'brand',
-            'product_name': 'product_name',
-            'vehicle_brand': 'vehicle_brand',
-            'replace_number': 'replace_number',
-            'brand_code': 'brand_code',
-            'inquiry_count': 'inquiry_count',
-            'product_level': 'product_level',
-            'best_sales_month': 'best_sales_month',
-            'best_sales_season': 'best_sales_season',
-            'max_price': 'max_price',
-            'min_price': 'min_price',
-            'supplier_price': 'supplier_price',
-            'dealer_purchase_price': 'dealer_purchase_price',
-            'dealer_sale_price': 'dealer_sale_price',
-            'price_update_time': 'price_update_time',
-            'today_sales': 'today_sales',
-            'yesterday_sales': 'yesterday_sales',
-            'month_sales': 'month_sales',
-            'avg_sales_12m': 'avg_sales_12m',
-            'avg_sales_6m': 'avg_sales_6m',
-            'sales_7d': 'sales_7d',
-            'product_remark': 'product_remark'
-        }
-
-        # 重命名列
-        df = df.rename(columns=column_mapping)
-
-        # 转换数据类型
-        numeric_columns = [
-            'inquiry_count', 'max_price', 'min_price', 'supplier_price',
-            'dealer_purchase_price', 'dealer_sale_price', 'today_sales',
-            'yesterday_sales', 'month_sales', 'avg_sales_12m', 'avg_sales_6m', 'sales_7d'
-        ]
-        for col in numeric_columns:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-
-        # 将DataFrame转换为字典列表
-        data_list = df.to_dict('records')
-
-        # 过滤掉没有OE号的记录
-        data_list = [d for d in data_list if d.get('oe')]
-
-        if not data_list:
-            return jsonify({'code': 1, 'msg': '没有有效的数据（缺少OE号）'}), 400
-
-        # 批量插入或更新数据
-        success_count = 0
-        error_count = 0
-        errors = []
-
-        for data in data_list:
-            try:
-                CompareDataService.upsert_by_oe(data)
-                success_count += 1
-            except Exception as e:
-                error_count += 1
-                errors.append(f"OE {data.get('oe', 'unknown')}: {str(e)}")
-
-        return jsonify({
-            'code': 0,
-            'msg': '导入完成',
-            'data': {
-                'success_count': success_count,
-                'error_count': error_count,
-                'errors': errors[:10]  # 只返回前10个错误
-            }
-        })
-
-    except Exception as e:
-        return jsonify({'code': 1, 'msg': f'导入失败: {str(e)}'}), 500
 
 
 @compare_bp.route('/upsert', methods=['POST'])

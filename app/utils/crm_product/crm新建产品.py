@@ -14,24 +14,6 @@ from app.utils.database_connection import get_db_connection as get_pooled_db_con
 # 导入统一的 SessionManager
 from app.utils.session_manager import SessionManager, get_session
 
-# 设置 session 工厂函数
-def _create_crm_session():
-    """创建CRM session的工厂函数"""
-    session = requests.Session()
-    # 设置连接池参数
-    adapter = requests.adapters.HTTPAdapter(
-        pool_connections=10,
-        pool_maxsize=10,
-        max_retries=3
-    )
-    session.mount('http://', adapter)
-    session.mount('https://', adapter)
-    # 添加认证信息
-    session.headers.update(CRM_HEADERS)
-    return session
-
-SessionManager.set_session_factory(_create_crm_session)
-
 
 # 配置==============================================================================
 def get_crm_cookies():

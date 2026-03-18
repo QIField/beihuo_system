@@ -1,13 +1,19 @@
 """
 询价模块API
-功能：导入Excel/CSV文件、查看询价比价表格
+功能：导入Excel/CSV文件、查看询价比价表格、B2B上传
 """
-from flask import Blueprint, request, jsonify, session, render_template
+from flask import Blueprint, request, jsonify, session, render_template, send_from_directory
 from functools import wraps
 import pandas as pd
 import math
-from datetime import datetime
+import json
+import os
+from datetime import datetime, timedelta
 from app.utils.database_connection import get_db_connection
+from app.services.procurement_service import add_inquiry_record
+
+# 导入B2B上传模块
+from app.utils.b2b_inquiry_upload import start_upload_task, get_recent_results
 
 # 创建蓝图
 inquiry_bp = Blueprint('inquiry', __name__)
@@ -191,83 +197,145 @@ def import_price_data():
         print(f"[调试] 用户公司: {company}")
         print(f"[调试] 前3条数据预览: {insert_data[:3] if insert_data else '无'}")
 
+        inserted_count = 0
+        updated_count = 0
+        
         if insert_data:
             conn = get_db_connection()
             cursor = conn.cursor()
+            today = datetime.now().strftime('%Y-%m-%d')
 
             try:
-                # 检查唯一索引是否存在
-                cursor.execute("""
-                    SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS 
-                    WHERE TABLE_SCHEMA = DATABASE() 
-                    AND TABLE_NAME = 'crmapp_price_inquiry' 
-                    AND INDEX_NAME = 'uk_oe_brand_supplier_price_company'
-                """)
-                index_exists = cursor.fetchone()
-                print(f"[调试] 唯一索引是否存在: {index_exists is not None}")
+                for data in insert_data:
+                    # data 结构: (oe, brand, supplier, price, warehouse, expire_time, remark, stock_quantity, common_number, creator, company)
+                    oe, brand, supplier, price, warehouse, expire_time, remark, stock_quantity, common_number, creator, comp = data
+                    
+                    # 从比价表查询通用号和开思同步字段
+                    cursor.execute("""
+                        SELECT replace_number, is_cass FROM crmapp_compare_summary 
+                        WHERE oe = %s AND brand = %s AND company = %s
+                    """, (oe, brand, comp))
+                    compare_result = cursor.fetchone()
+                    
+                    # 获取比价表中的字段值，如果没有则使用默认值
+                    sync_common_number = ''
+                    sync_ks_sync = 0
+                    if compare_result:
+                        sync_common_number = compare_result[0] if compare_result[0] else ''
+                        # is_cass 是 VARCHAR 类型，'1' 表示已同步，其他值表示未同步
+                        is_cass_value = compare_result[1]
+                        sync_ks_sync = 1 if is_cass_value and str(is_cass_value) == '1' else 0
+                    
+                    # 查询是否已存在（只根据 oe + brand + supplier + company）
+                    cursor.execute("""
+                        SELECT id, import_history FROM crmapp_price_inquiry 
+                        WHERE oe = %s AND brand = %s AND supplier = %s AND company = %s
+                    """, (oe, brand, supplier, comp))
+                    result = cursor.fetchone()
+                    
+                    # 构建新的导入记录
+                    new_record = {
+                        'price': float(price) if price else 0.0,
+                        'warehouse': warehouse or '',
+                        'date': today
+                    }
+                    
+                    if result:
+                        # 已存在，只保留 oe/brand/supplier/company，其他全部覆盖
+                        record_id = result[0]
+                        import_history = result[1]
+                        
+                        # 解析现有的导入历史
+                        history_list = []
+                        if import_history:
+                            try:
+                                if isinstance(import_history, str):
+                                    history_list = json.loads(import_history)
+                                elif isinstance(import_history, list):
+                                    history_list = import_history
+                            except:
+                                history_list = []
+                        
+                        # 追加新记录到历史
+                        history_list.append(new_record)
+                        
+                        # 更新记录：除 oe/brand/supplier/company 外，其他全部覆盖
+                        # 通用号和开思同步从比价表同步过来
+                        cursor.execute("""
+                            UPDATE crmapp_price_inquiry 
+                            SET price = %s, 
+                                warehouse = %s, 
+                                expire_time = %s, 
+                                remark = %s, 
+                                stock_quantity = %s,
+                                common_number = %s,  -- 通用号从比价表同步
+                                ks_sync = %s,         -- 开思同步从比价表同步
+                                import_history = %s
+                            WHERE id = %s
+                        """, (price, warehouse, expire_time, remark, stock_quantity, 
+                              sync_common_number, sync_ks_sync,
+                              json.dumps(history_list, ensure_ascii=False), record_id))
+                        updated_count += 1
+                        print(f"[调试] 更新记录: OE={oe}, 供应商={supplier}, 历史记录数={len(history_list)}, 通用号={sync_common_number}, 开思同步={sync_ks_sync}")
+                    else:
+                        # 不存在，插入新记录
+                        history_list = [new_record]
+                        cursor.execute("""
+                            INSERT INTO crmapp_price_inquiry 
+                            (oe, brand, supplier, price, warehouse, expire_time, remark, 
+                             stock_quantity, common_number, ks_sync, company, import_history)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (oe, brand, supplier, price, warehouse, expire_time, remark, 
+                              stock_quantity, sync_common_number, sync_ks_sync, comp, 
+                              json.dumps(history_list, ensure_ascii=False)))
+                        inserted_count += 1
+                        print(f"[调试] 插入新记录: OE={oe}, 供应商={supplier}, 通用号={sync_common_number}, 开思同步={sync_ks_sync}")
                 
-                # 先查询数据库中已存在的数据量
-                cursor.execute("SELECT COUNT(*) FROM crmapp_price_inquiry WHERE company = %s", (company,))
-                before_count = cursor.fetchone()[0]
-                print(f"[调试] 导入前数据库中 {company} 的数据量: {before_count}")
-                
-                # 检查第一条数据是否已存在
-                first_data = insert_data[0]
-                cursor.execute("""
-                    SELECT COUNT(*) FROM crmapp_price_inquiry 
-                    WHERE oe = %s AND brand = %s AND supplier = %s AND price = %s AND company = %s
-                """, (first_data[0], first_data[1], first_data[2], first_data[3], first_data[10]))
-                existing_count = cursor.fetchone()[0]
-                print(f"[调试] 第一条数据是否已存在: {existing_count > 0}, oe={first_data[0]}")
-                
-                # 使用INSERT IGNORE，重复数据会自动忽略
-                cursor.executemany("""
-                    INSERT IGNORE INTO crmapp_price_inquiry
-                    (oe, brand, supplier, price, warehouse, expire_time, remark, stock_quantity, common_number, creator, company)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, insert_data)
-
                 conn.commit()
-                
-                # 再查询数据库中的数据量
-                cursor.execute("SELECT COUNT(*) FROM crmapp_price_inquiry WHERE company = %s", (company,))
-                after_count = cursor.fetchone()[0]
-                print(f"[调试] 导入后数据库中 {company} 的数据量: {after_count}")
-                
-                # 计算实际插入数量
-                inserted_count = after_count - before_count
-                print(f"[调试] 实际插入数量: {inserted_count}")
+                print(f"[调试] 导入完成: 插入={inserted_count}, 更新={updated_count}")
 
             except Exception as e:
                 conn.rollback()
-                print(f"[调试] 批量插入失败: {str(e)}")
-                return jsonify({'code': 1, 'msg': f'批量插入失败: {str(e)}'}), 500
+                print(f"[调试] 导入失败: {str(e)}")
+                return jsonify({'code': 1, 'msg': f'导入失败: {str(e)}'}), 500
             finally:
                 cursor.close()
                 conn.close()
 
-        # 计算重复数量
-        duplicate_count = total_rows - inserted_count
-        print(f"[调试] 重复忽略数量: {duplicate_count}")
-        
-        # 同步到比价汇总表（使用INSERT IGNORE批量插入）
+        # 同步到比价汇总表和采购记录表
         sync_count = 0
-        if inserted_count > 0:
-            print(f"[调试] 开始同步到比价汇总表...")
+        procurement_count = 0
+        if inserted_count > 0 or updated_count > 0:
+            print(f"[调试] 开始同步到比价汇总表和采购记录表...")
             
             # 准备同步数据（去重）
             sync_data_map = {}
+            procurement_data_list = []  # 用于采购记录表
+            
             for data in insert_data:
-                key = (data[0], data[1], data[10])  # oe, brand, company
+                oe, brand, supplier, price, warehouse, expire_time, remark, stock_quantity, common_number, creator, comp = data
+                
+                # 比价汇总表数据（去重）
+                key = (oe, brand, comp)
                 if key not in sync_data_map:
-                    sync_data_map[key] = (data[0], data[1], data[10])
+                    sync_data_map[key] = (oe, brand, comp)
+                
+                # 采购记录表数据（包含供应商和价格）
+                if supplier and price > 0:
+                    procurement_data_list.append({
+                        'oe': oe,
+                        'brand': brand,
+                        'supplier': supplier,
+                        'price': price,
+                        'company': comp
+                    })
             
             sync_data_list = list(sync_data_map.values())
             
             conn = get_db_connection()
             cursor = conn.cursor()
             try:
-                # 使用INSERT IGNORE批量插入
+                # 1. 同步到比价汇总表
                 cursor.executemany("""
                     INSERT IGNORE INTO crmapp_compare_summary (oe, brand, company)
                     VALUES (%s, %s, %s)
@@ -275,6 +343,24 @@ def import_price_data():
                 conn.commit()
                 sync_count = cursor.rowcount
                 print(f"[调试] 同步到比价汇总表完成: {sync_count} 条")
+                
+                # 2. 同步到采购记录表（询价自带的供应商价格）
+                for proc_data in procurement_data_list:
+                    try:
+                        success = add_inquiry_record(
+                            proc_data['oe'],
+                            proc_data['brand'],
+                            proc_data['supplier'],
+                            proc_data['price'],
+                            proc_data['company']
+                        )
+                        if success:
+                            procurement_count += 1
+                    except Exception as e:
+                        print(f"[调试] 保存采购记录失败: OE={proc_data['oe']}, 供应商={proc_data['supplier']}, 错误={e}")
+                
+                print(f"[调试] 同步到采购记录表完成: {procurement_count} 条")
+                
             except Exception as e:
                 conn.rollback()
                 print(f"[调试] 同步到比价表失败: {str(e)}")
@@ -282,15 +368,27 @@ def import_price_data():
                 cursor.close()
                 conn.close()
 
+        # 导入成功后，启动B2B上传任务（异步）
+        b2b_task_info = None
+        try:
+            # 使用处理后的DataFrame启动上传任务
+            b2b_task_info = start_upload_task(df, company)
+            print(f"[B2B上传] 任务已启动: {b2b_task_info}")
+        except Exception as e:
+            print(f"[B2B上传] 启动失败: {e}")
+            b2b_task_info = {'status': 'error', 'message': str(e)}
+
         return jsonify({
             'code': 0,
-            'msg': f'导入完成，成功{inserted_count}条，重复忽略{duplicate_count}条，同步比价表{sync_count}条',
+            'msg': f'导入完成，插入{inserted_count}条，更新{updated_count}条，同步比价表{sync_count}条，同步采购记录{procurement_count}条',
             'data': {
                 'total_count': total_rows,
-                'success_count': inserted_count,
-                'duplicate_count': duplicate_count,
+                'inserted_count': inserted_count,
+                'updated_count': updated_count,
                 'sync_count': sync_count,
-                'errors': error_rows[:10]  # 返回前10个错误
+                'procurement_count': procurement_count,
+                'errors': error_rows[:10],  # 返回前10个错误
+                'b2b_upload': b2b_task_info  # B2B上传任务信息
             }
         })
 
@@ -344,7 +442,7 @@ def get_inquiry_list():
             SELECT id, oe, brand, supplier, price, warehouse, expire_time, remark, stock_quantity, common_number, ks_sync
             FROM crmapp_price_inquiry
             {where_clause}
-            ORDER BY oe, brand, created_time DESC
+            ORDER BY oe, brand, id DESC
         """
         cursor.execute(data_sql, params)
 
@@ -372,3 +470,46 @@ def get_inquiry_list():
 
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'获取数据失败: {str(e)}'}), 500
+
+
+@inquiry_bp.route('/b2b_upload_history', methods=['GET'])
+@login_required
+def get_b2b_upload_history():
+    """
+    获取B2B上传历史记录（7天内）
+    """
+    try:
+        files = get_recent_results(days=7)
+        
+        # 添加下载链接
+        for file in files:
+            file['download_url'] = f"/api/purchase_plan/inquiry/b2b_upload_download/{file['filename']}"
+        
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': files
+        })
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取历史记录失败: {str(e)}'}), 500
+
+
+@inquiry_bp.route('/b2b_upload_download/<filename>', methods=['GET'])
+@login_required
+def download_b2b_result(filename):
+    """
+    下载B2B上传结果文件
+    """
+    try:
+        output_dir = 'static/uploads/b2b_results'
+        # 安全检查：防止目录遍历
+        safe_filename = os.path.basename(filename)
+        
+        return send_from_directory(
+            output_dir,
+            safe_filename,
+            as_attachment=True,
+            download_name=safe_filename
+        )
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'下载失败: {str(e)}'}), 500

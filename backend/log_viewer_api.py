@@ -1,13 +1,16 @@
 # backend/log_viewer_api.py
 """
 日志查看器 API 模块
-用于读取和展示服务器日志文件
+用于读取和展示服务器日志文件及系统配置
 """
 
 from flask import Blueprint, request, jsonify, session, render_template
 from functools import wraps
 import os
 import re
+import sys
+import platform
+import subprocess
 from datetime import datetime
 
 # 创建蓝图
@@ -570,6 +573,260 @@ def calculate_line_position(target_line_num, limit=50):
         'total_pages': total_pages,
         'limit': limit
     }
+
+
+@log_viewer_bp.route('/api/server/config')
+@login_required
+def get_server_config():
+    """
+    获取服务器配置信息
+    包括uWSGI配置、Python环境、系统资源、数据库状态等
+    """
+    try:
+        config_data = {
+            'uwsgi': get_uwsgi_config(),
+            'python': get_python_info(),
+            'system': get_system_info(),
+            'database': get_database_status(),
+            'application': get_application_info()
+        }
+        
+        return jsonify({
+            'code': 0,
+            'msg': 'success',
+            'data': config_data
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'获取服务器配置失败: {str(e)}'
+        })
+
+
+def get_uwsgi_config():
+    """获取uWSGI配置信息"""
+    config = {
+        'config_file': 'uwsgi.ini',
+        'config_exists': os.path.exists('uwsgi.ini'),
+        'settings': {}
+    }
+    
+    # 尝试读取uwsgi.ini文件
+    if config['config_exists']:
+        try:
+            with open('uwsgi.ini', 'r', encoding='utf-8') as f:
+                content = f.read()
+                config['raw_content'] = content
+                
+            # 解析关键配置项
+            config['settings'] = {
+                'module': extract_ini_value(content, 'module'),
+                'processes': extract_ini_value(content, 'processes'),
+                'threads': extract_ini_value(content, 'threads'),
+                'enable_threads': extract_ini_value(content, 'enable-threads'),
+                'single_interpreter': extract_ini_value(content, 'single-interpreter'),
+                'lazy_apps': extract_ini_value(content, 'lazy-apps'),
+                'http': extract_ini_value(content, 'http'),
+                'master': extract_ini_value(content, 'master'),
+                'max_requests': extract_ini_value(content, 'max-requests'),
+                'harakiri': extract_ini_value(content, 'harakiri'),
+                'buffer_size': extract_ini_value(content, 'buffer-size')
+            }
+        except Exception as e:
+            config['error'] = str(e)
+    
+    # 检测是否在uWSGI环境中运行
+    config['running_in_uwsgi'] = 'uwsgi' in sys.modules
+    
+    return config
+
+
+def extract_ini_value(content, key):
+    """从ini文件内容中提取配置值"""
+    pattern = rf'^{key}\s*=\s*(.+)$'
+    match = re.search(pattern, content, re.MULTILINE | re.IGNORECASE)
+    return match.group(1).strip() if match else None
+
+
+def get_python_info():
+    """获取Python环境信息"""
+    info = {
+        'version': sys.version,
+        'version_info': {
+            'major': sys.version_info.major,
+            'minor': sys.version_info.minor,
+            'micro': sys.version_info.micro,
+            'releaselevel': sys.version_info.releaselevel
+        },
+        'executable': sys.executable,
+        'platform': platform.platform(),
+        'machine': platform.machine(),
+        'processor': platform.processor(),
+        'prefix': sys.prefix,
+        'path': sys.path[:5]  # 只显示前5个路径
+    }
+    
+    # 获取关键库版本
+    try:
+        import pandas
+        info['pandas_version'] = pandas.__version__
+    except ImportError:
+        info['pandas_version'] = '未安装'
+    
+    try:
+        import numpy
+        info['numpy_version'] = numpy.__version__
+    except ImportError:
+        info['numpy_version'] = '未安装'
+    
+    try:
+        import flask
+        info['flask_version'] = flask.__version__
+    except ImportError:
+        info['flask_version'] = '未安装'
+    
+    try:
+        import sqlalchemy
+        info['sqlalchemy_version'] = sqlalchemy.__version__
+    except ImportError:
+        info['sqlalchemy_version'] = '未安装'
+    
+    return info
+
+
+def get_system_info():
+    """获取系统资源信息"""
+    info = {
+        'os': platform.system(),
+        'os_release': platform.release(),
+        'hostname': platform.node(),
+        'cpu_count': os.cpu_count(),
+    }
+    
+    # 尝试获取内存信息（Linux）
+    try:
+        with open('/proc/meminfo', 'r') as f:
+            meminfo = f.read()
+            
+        # 解析内存信息
+        total_match = re.search(r'MemTotal:\s+(\d+)\s+kB', meminfo)
+        available_match = re.search(r'MemAvailable:\s+(\d+)\s+kB', meminfo)
+        
+        if total_match:
+            total_kb = int(total_match.group(1))
+            info['memory_total'] = format_memory_size(total_kb * 1024)
+        
+        if available_match:
+            available_kb = int(available_match.group(1))
+            info['memory_available'] = format_memory_size(available_kb * 1024)
+            
+        if total_match and available_match:
+            used_kb = int(total_match.group(1)) - int(available_match.group(1))
+            info['memory_used'] = format_memory_size(used_kb * 1024)
+            info['memory_usage_percent'] = round(used_kb / int(total_match.group(1)) * 100, 1)
+            
+    except Exception:
+        info['memory_info'] = '无法获取（非Linux系统或权限不足）'
+    
+    # 尝试获取磁盘信息
+    try:
+        stat = os.statvfs('.')
+        total = stat.f_blocks * stat.f_frsize
+        free = stat.f_bfree * stat.f_frsize
+        used = total - free
+        
+        info['disk_total'] = format_memory_size(total)
+        info['disk_free'] = format_memory_size(free)
+        info['disk_used'] = format_memory_size(used)
+        info['disk_usage_percent'] = round(used / total * 100, 1)
+    except Exception as e:
+        info['disk_info'] = f'无法获取: {str(e)}'
+    
+    return info
+
+
+def format_memory_size(size_bytes):
+    """将字节大小转换为可读格式"""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.2f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.2f} MB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+def get_database_status():
+    """获取数据库连接状态"""
+    status = {
+        'status': '未知',
+        'config_loaded': False,
+        'connection_test': '未测试'
+    }
+    
+    try:
+        # 尝试导入数据库配置
+        from app.utils.db_pool import pool
+        status['config_loaded'] = True
+        
+        # 尝试获取连接池信息
+        if hasattr(pool, '_pool'):
+            pool_obj = pool._pool
+            status['pool_size'] = pool_obj._pool_size if hasattr(pool_obj, '_pool_size') else '未知'
+            status['connections'] = len(pool_obj._connections) if hasattr(pool_obj, '_connections') else '未知'
+        
+        # 测试连接
+        try:
+            conn = pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+            cursor.close()
+            pool.release_connection(conn)
+            status['status'] = '正常'
+            status['connection_test'] = '成功'
+        except Exception as e:
+            status['status'] = '连接失败'
+            status['connection_test'] = f'失败: {str(e)}'
+            
+    except ImportError:
+        status['status'] = '配置未加载'
+        status['connection_test'] = '无法导入数据库模块'
+    except Exception as e:
+        status['status'] = '异常'
+        status['connection_test'] = f'错误: {str(e)}'
+    
+    return status
+
+
+def get_application_info():
+    """获取应用运行信息"""
+    info = {
+        'current_working_directory': os.getcwd(),
+        'process_id': os.getpid(),
+        'parent_process_id': os.getppid(),
+        'environment_variables': {
+            'PYTHONPATH': os.environ.get('PYTHONPATH', '未设置'),
+            'FLASK_ENV': os.environ.get('FLASK_ENV', '未设置'),
+            'FLASK_DEBUG': os.environ.get('FLASK_DEBUG', '未设置')
+        }
+    }
+    
+    # 获取已加载的模块数量
+    info['loaded_modules_count'] = len(sys.modules)
+    
+    # 检测是否在uWSGI中
+    info['uwsgi_mode'] = 'uwsgi' in sys.modules
+    
+    # 获取线程信息
+    try:
+        import threading
+        info['active_threads'] = threading.active_count()
+    except Exception:
+        pass
+    
+    return info
 
 
 def register_log_viewer_routes(app):

@@ -53,7 +53,10 @@ class SimpleFileLock:
             if os.name == 'nt':  # Windows
                 import ctypes
                 kernel32 = ctypes.windll.kernel32
-                handle = kernel32.OpenProcess(1, False, pid)  # PROCESS_TERMINATE = 1
+                # 使用 PROCESS_QUERY_INFORMATION (0x0400) 权限，更可靠地查询进程状态
+                # 替代原来的 PROCESS_TERMINATE (1)，避免权限不足导致误判
+                PROCESS_QUERY_INFORMATION = 0x0400
+                handle = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION, False, pid)
                 if handle:
                     kernel32.CloseHandle(handle)
                     return True

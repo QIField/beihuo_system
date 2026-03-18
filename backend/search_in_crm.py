@@ -9,6 +9,8 @@ from functools import partial
 from pathlib import Path
 from app.utils.database_connection import get_db_connection  # 使用统一的连接池实现
 from app.utils.search import parse_mixed  # 使用搜索工具包
+from app.utils.session_manager import SessionManager  # 使用线程安全的 Session 管理器
+from config import create_crm_session  # 使用统一的 CRM session 创建函数
 
 # 创建蓝图
 search_in_crm_bp = Blueprint('search_in_crm', __name__)
@@ -164,44 +166,36 @@ def init_search_oe_table():
 init_search_oe_table()
 
 # ========================================
-# CRM API请求相关
+# CRM API请求相关 - 使用 SessionManager 管理 session
 # ========================================
 
-def get_crm_cookies():
-    url = "http://113.45.176.129:8001/get_crm_cookies?key=fs"
-    payload = {}
-    request_headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cache-Control': 'max-age=0',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36'
-    }
-    response = requests.request("GET", url, headers=request_headers, data=payload)
-    cookies = json.loads(response.text)['cookie']
 
-    return cookies
 
-# 获取cookies
-CRM_HEADERS = get_crm_cookies()
 
-# API请求用的headers
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
-    'referer': 'https://crm.gzbbr.com/',
-}
-# 将认证信息添加到headers中
-headers.update(CRM_HEADERS)
+def get_crm_session():
+    """
+    获取线程本地的 CRM session
+    使用 SessionManager 确保线程安全，避免重复创建 session
+    """
+    return SessionManager.get_session()
+
 
 def search_crm_by_oe(oe_number):
-    """根据OE号码搜索CRM系统"""
+    """根据OE号码搜索CRM系统 - 使用 SessionManager 复用 session"""
     try:
+        # 获取线程本地的 session（自动复用，避免重复创建）
+        crm_session = get_crm_session()
+        
         get_params = {
            "number": oe_number 
         }
-        response = requests.get(url = 'https://crm.gzbbr.com/api/Product.Product/list', params=get_params, headers=headers)
-        response_data = json.loads(response.text)
+        
+        # 使用 session 发送请求，自动携带认证信息
+        response = crm_session.get(
+            url='https://crm.gzbbr.com/api/Product.Product/list',
+            params=get_params
+        )
+        response_data = response.json()
 
         # 检查响应是否成功 - 通常status为200表示成功
         if response_data.get('status') == 200 or response_data.get('msg') == '操作成功':

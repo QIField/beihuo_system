@@ -19,7 +19,8 @@ class CompareDataService:
         'best_sales_season', 'max_price', 'min_price', 'supplier_price',
         'dealer_purchase_price', 'dealer_sale_price', 'price_update_time',
         'today_sales', 'yesterday_sales', 'month_sales', 'avg_sales_12m',
-        'avg_sales_6m', 'sales_7d', 'product_remark', 'created_time', 'updated_time'
+        'avg_sales_6m', 'sales_7d', 'product_remark', 'procurement_records',
+        'updated_time'
     ]
     
     @staticmethod
@@ -55,7 +56,8 @@ class CompareDataService:
                     avg_sales_6m DECIMAL(10,2) DEFAULT 0.00 COMMENT '近6个月月均销量',
                     sales_7d INT DEFAULT 0 COMMENT '近7天销量',
                     product_remark TEXT COMMENT '系统产品备注',
-                    created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    is_cass VARCHAR(10) COMMENT '是否同步开思',
+                    procurement_records JSON COMMENT '采购记录JSON数组 [{"supplier_name": "xxx", "purchase_price": 100, "purchase_date": "2026-01-12"}, ...]',
                     updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
                     INDEX idx_oe (oe),
                     INDEX idx_brand (brand),
@@ -326,6 +328,16 @@ class CompareDataService:
         finally:
             conn.close()
     
+    # 允许的排序字段白名单（防止SQL注入）
+    ALLOWED_SORT_FIELDS = {
+        'oe', 'brand', 'product_name', 'vehicle_brand',
+        'supplier_price', 'dealer_purchase_price', 'dealer_sale_price',
+        'max_price', 'min_price', 'inquiry_count',
+        'today_sales', 'yesterday_sales', 'month_sales',
+        'avg_sales_12m', 'avg_sales_6m', 'sales_7d',
+        'updated_time', 'price_update_time', 'product_level'
+    }
+
     @staticmethod
     def list_data(
         oe: str = '',
@@ -336,11 +348,13 @@ class CompareDataService:
         page: int = 1,
         limit: int = 100,
         order_by: str = 'updated_time',
-        order_desc: bool = True
+        order_desc: bool = True,
+        sort_field: str = '',
+        sort_order: str = 'asc'
     ) -> Tuple[List[Dict], int]:
         """
-        查询数据列表（支持分页和筛选）
-        
+        查询数据列表（支持分页、筛选和排序）
+
         参数:
             oe: OE号筛选
             brand: 品牌筛选
@@ -349,9 +363,11 @@ class CompareDataService:
             company: 公司/组织筛选（必填）
             page: 页码
             limit: 每页条数
-            order_by: 排序字段
+            order_by: 默认排序字段
             order_desc: 是否降序
-            
+            sort_field: 用户点击的排序字段（优先级高于order_by）
+            sort_order: 排序方向 asc/desc
+
         返回:
             (数据列表, 总记录数)
         """
@@ -361,12 +377,12 @@ class CompareDataService:
                 # 构建WHERE条件
                 where_conditions = []
                 params = []
-                
+
                 # 必须按公司/组织过滤
                 if company:
                     where_conditions.append("company = %s")
                     params.append(company)
-                
+
                 if oe:
                     where_conditions.append("oe LIKE %s")
                     params.append(f"%{oe}%")
@@ -379,45 +395,62 @@ class CompareDataService:
                 if vehicle_brand:
                     where_conditions.append("vehicle_brand LIKE %s")
                     params.append(f"%{vehicle_brand}%")
-                
+
                 where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
-                
+
                 # 查询总数
                 count_sql = f"SELECT COUNT(*) FROM {CompareDataService.TABLE_NAME} {where_clause}"
                 cursor.execute(count_sql, params)
                 total = cursor.fetchone()[0]
-                
+
+                # 确定排序字段（优先使用用户指定的排序字段）
+                if sort_field and sort_field in CompareDataService.ALLOWED_SORT_FIELDS:
+                    final_order_by = sort_field
+                    final_order_desc = sort_order == 'desc'
+                else:
+                    final_order_by = order_by
+                    final_order_desc = order_desc
+
                 # 查询数据
-                order_direction = "DESC" if order_desc else "ASC"
+                order_direction = "DESC" if final_order_desc else "ASC"
                 offset = (page - 1) * limit
-                
+
+                # 价格字段特殊处理：NULL 和 0 放在最后，确保按有效价格排序
+                price_fields = {'supplier_price', 'dealer_purchase_price', 'dealer_sale_price', 'max_price', 'min_price'}
+                if sort_field in price_fields:
+                    # 使用 CASE WHEN 将 NULL 和 0 排在最后
+                    nulls_last = "DESC" if final_order_desc else "ASC"
+                    order_clause = f"CASE WHEN {sort_field} IS NULL OR {sort_field} = 0 THEN 1 ELSE 0 END ASC, {sort_field} {order_direction}"
+                else:
+                    order_clause = f"{final_order_by} {order_direction}"
+
                 data_sql = f"""
                     SELECT * FROM {CompareDataService.TABLE_NAME}
                     {where_clause}
-                    ORDER BY {order_by} {order_direction}
+                    ORDER BY {order_clause}
                     LIMIT %s OFFSET %s
                 """
                 cursor.execute(data_sql, params + [limit, offset])
-                
+
                 columns = [desc[0] for desc in cursor.description]
                 rows = cursor.fetchall()
-                
+
                 data = []
                 for row in rows:
                     item = dict(zip(columns, row))
                     # 格式化时间字段
-                    for time_field in ['price_update_time', 'created_time', 'updated_time']:
+                    for time_field in ['price_update_time', 'updated_time']:
                         if item.get(time_field):
                             if hasattr(item[time_field], 'strftime'):
                                 item[time_field] = item[time_field].strftime('%Y-%m-%d %H:%M:%S')
                     # 格式化价格字段
-                    for price_field in ['max_price', 'min_price', 'supplier_price', 
+                    for price_field in ['max_price', 'min_price', 'supplier_price',
                                        'dealer_purchase_price', 'dealer_sale_price',
                                        'avg_sales_12m', 'avg_sales_6m']:
                         if item.get(price_field) is not None:
                             item[price_field] = float(item[price_field])
                     data.append(item)
-                
+
                 return data, total
         except Exception as e:
             print(f"查询列表时出错: {str(e)}")
@@ -446,10 +479,22 @@ class CompareDataService:
                 for row in rows:
                     item = dict(zip(columns, row))
                     # 格式化时间字段
-                    for time_field in ['price_update_time', 'created_time', 'updated_time']:
+                    for time_field in ['price_update_time', 'updated_time']:
                         if item.get(time_field):
                             if hasattr(item[time_field], 'strftime'):
                                 item[time_field] = item[time_field].strftime('%Y-%m-%d %H:%M:%S')
+                    # 解析 procurement_records JSON 字段
+                    if item.get('procurement_records'):
+                        import json
+                        if isinstance(item['procurement_records'], str):
+                            try:
+                                item['procurement_records'] = json.loads(item['procurement_records'])
+                            except:
+                                item['procurement_records'] = []
+                        elif not isinstance(item['procurement_records'], list):
+                            item['procurement_records'] = []
+                    else:
+                        item['procurement_records'] = []
                     data.append(item)
                 
                 return data

@@ -35,6 +35,10 @@ from app.utils.database.table_manager import init_all_tables
 # 导入轻量级任务管理器（延迟初始化）
 from app.core.task_manager import task_manager
 
+# 导入并初始化全局Session管理器
+from app.core.session_init import init_session_manager
+init_session_manager()
+
 
 app = Flask(__name__, 
             template_folder='./templates',
@@ -4326,9 +4330,11 @@ def init_virtual_inventory_tables():
 def init_background_tasks():
     """
     初始化后台任务 - 单 worker 环境下直接启动
+    所有任务统一通过 task_manager 管理
     """
     try:
         from app.core.task_manager import task_manager, init_ks_bill_monitor
+        from app.utils.scheduler import register_cleanup_tasks
         
         print("[任务初始化] 正在初始化...")
         task_manager.initialize()
@@ -4338,11 +4344,11 @@ def init_background_tasks():
             run_virtual_inventory_task,
             'cron',
             'virtual_inventory_daily',
-            hour=13,
+            hour=0,
             minute=0,
             replace_existing=True
         )
-        print("[任务] 虚拟库存: 每天13:00")
+        print("[任务] 虚拟库存: 每天00:00")
         
         # 注册购物车清理任务
         task_manager.schedule(
@@ -4353,6 +4359,9 @@ def init_background_tasks():
             replace_existing=True
         )
         print("[任务] 购物车清理: 每小时")
+        
+        # 注册清理和销量同步任务
+        register_cleanup_tasks(task_manager)
         
         # 注册自动更新任务
         setup_scheduled_tasks()

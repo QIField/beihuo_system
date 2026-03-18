@@ -13,14 +13,8 @@ from datetime import datetime
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
-# 导入配置
-from config import create_crm_session
-
 # 导入统一的 SessionManager
 from app.utils.session_manager import SessionManager, get_session
-
-# 设置 session 工厂函数
-SessionManager.set_session_factory(create_crm_session)
 
 # 保持向后兼容的别名
 get_thread_session = get_session
