@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import requests  # 新增导入request库用于发送HTTP请求
 import sys
 from pathlib import Path
-import threading
 
 # 添加项目根目录到Python路径
 current_dir = Path(__file__).parent
@@ -15,35 +14,6 @@ sys.path.insert(0, str(project_root))
 
 from app.utils.audio_player import play_notification_sound
 from app.utils.database_connection import get_db_connection
-
-# 线程本地存储，每个线程有独立的session
-_thread_local = threading.local()
-
-
-def _get_thread_session():
-    """
-    获取线程本地的session对象
-    每个线程有独立的session，避免多线程冲突导致的段错误
-    """
-    if not hasattr(_thread_local, 'session') or _thread_local.session is None:
-        # 导入login函数创建新的session
-        from app.ks_auto_bill.ks_login import login
-        _thread_local.session = login()
-        print(f"【线程 {threading.current_thread().ident}】创建新的session")
-    return _thread_local.session
-
-
-def _close_thread_session():
-    """
-    关闭当前线程的session
-    在任务完成后调用，释放资源
-    """
-    if hasattr(_thread_local, 'session') and _thread_local.session is not None:
-        try:
-            _thread_local.session.close()
-        except:
-            pass
-        _thread_local.session = None
 
 
 def _get_date_range():
@@ -116,31 +86,23 @@ def get_orders(session, status="", page_num=1, page_size=20):
     return resp.json()
 
 
-def get_all_orders(session, status="", page_size=20):
+def get_all_orders(session, status="", page_size=100):
     """
-    获取所有页面的订单（自动分页）
+    获取所有页面的订单（自动分页）- 单线程循环版本
     
     参数:
-        session: 登录后的会话对象（用于第1页，后续并发页面使用线程本地session）
+        session: 登录后的会话对象
         status: 订单状态ID，默认为空（获取所有状态的订单）
-        page_size: 每页数量，默认 20
+        page_size: 每页数量，默认 100
     
     返回:
         list: 所有订单的列表
     
     流程:
         1. 获取第1页，得到总订单数和总页数
-        2. 判断是否需要获取更多页
-        3. 并发获取剩余页面（每个线程使用独立的session）
-        4. 合并所有订单返回
-    
-    线程安全说明:
-        - 第1页使用传入的session（主线程）
-        - 后续页面使用线程本地session（每个并发线程独立创建）
-        - 避免多线程共享session导致的段错误
+        2. 循环获取剩余页面
+        3. 合并所有订单返回
     """
-    from app.core.task_manager import task_manager
-    
     if session is None:
         print("✗ session 为空，请先登录")
         return []
@@ -167,51 +129,24 @@ def get_all_orders(session, status="", page_size=20):
         print("【订单】✓ 只有1页，获取完成")
         return all_orders
     
-    # 使用统一任务管理器并发获取剩余页面
-    max_workers = min(5, total_pages - 1)  # 限制最大并发数
+    # 单线程循环获取剩余页面
     failed_pages = []
     
-    def fetch_page(page):
-        """
-        获取单页订单数据（线程安全版本）
-        每个线程使用独立的session，避免共享导致的段错误
-        """
-        thread_id = threading.current_thread().ident
-        print(f"【订单】线程 {thread_id}: 获取第 {page}/{total_pages} 页...")
-        
-        # 获取线程本地的session（每个线程独立）
-        thread_session = _get_thread_session()
-        
+    for page in range(2, total_pages + 1):
+        print(f"【订单】获取第 {page}/{total_pages} 页...")
         try:
-            result = get_orders(thread_session, status=status, page_num=page, page_size=page_size)
+            result = get_orders(session, status=status, page_num=page, page_size=page_size)
             if result is None:
-                print(f"【订单】线程 {thread_id}: 第 {page} 页获取失败")
-                return page, None  # 返回页码用于重试
-            return page, result.get("data", {}).get("list", [])
+                print(f"【订单】第 {page} 页获取失败，加入重试列表")
+                failed_pages.append(page)
+                continue
+            orders_list = result.get("data", {}).get("list", [])
+            all_orders.extend(orders_list)
         except Exception as e:
-            print(f"【订单】线程 {thread_id}: 第 {page} 页获取异常: {e}")
-            return page, None
-        finally:
-            # 可选：任务完成后关闭线程session（如果需要）
-            # 注意：保持session打开可以提高性能，但可能占用资源
-            pass
+            print(f"【订单】第 {page} 页获取异常: {e}，加入重试列表")
+            failed_pages.append(page)
     
-    # 使用 task_manager 提交并发任务
-    pages_to_fetch = list(range(2, total_pages + 1))
-    futures = [task_manager.submit(fetch_page, page) for page in pages_to_fetch]
-    
-    # 收集结果
-    for future in futures:
-        try:
-            page_num, orders_list = future.result()
-            if orders_list is not None:
-                all_orders.extend(orders_list)
-            else:
-                failed_pages.append(page_num)
-        except Exception as e:
-            print(f"【订单】获取页面时出错: {e}")
-    
-    # 如果有失败的页面，使用主session重试（避免再次登录）
+    # 重试失败的页面
     if failed_pages:
         print(f"【订单】正在重试 {len(failed_pages)} 个失败的页面...")
         for page in failed_pages[:]:
