@@ -21,7 +21,6 @@ def init_global_socketio(app, socketio):
     global _global_socketio, _global_app
     _global_socketio = socketio
     _global_app = app
-    print("[WebSocket] 全局SocketIO初始化完成")
 
 
 def get_global_socketio():

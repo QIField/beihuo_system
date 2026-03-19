@@ -4,43 +4,27 @@ from app.utils.database_connection import get_db_connection
 
 
 def check_and_add_fields(table_name, fields_to_check):
-    """
-    检查并添加表字段
-    
-    参数:
-        table_name: 表名
-        fields_to_check: 字段列表，每个字段包含name和definition
-    """
+    """检查并添加表字段"""
     conn = get_db_connection()
+    added = []
     try:
         with conn.cursor() as cursor:
             for field in fields_to_check:
                 cursor.execute("""
-                    SELECT COLUMN_NAME 
-                    FROM INFORMATION_SCHEMA.COLUMNS 
-                    WHERE TABLE_SCHEMA = DATABASE() 
-                    AND TABLE_NAME = %s 
-                    AND COLUMN_NAME = %s
+                    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s
                 """, (table_name, field['name']))
-                
-                result = cursor.fetchone()
-                if not result:
+                if not cursor.fetchone():
                     cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN `{field['name']}` {field['definition']}")
-                    print(f"已添加 {table_name}.{field['name']} 字段")
-    except Exception as e:
-        print(f"检查并添加字段时出错: {str(e)}")
+                    added.append(field['name'])
+    except:
+        pass
     finally:
         conn.close()
 
 
 def check_and_create_indexes(table_name, indexes_to_check):
-    """
-    检查并创建表索引
-    
-    参数:
-        table_name: 表名
-        indexes_to_check: 索引列表，每个索引包含name和definition
-    """
+    """检查并创建表索引"""
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -48,9 +32,8 @@ def check_and_create_indexes(table_name, indexes_to_check):
                 cursor.execute(f"SHOW INDEX FROM {table_name} WHERE Key_name = '{idx['name']}'")
                 if not cursor.fetchone():
                     cursor.execute(f"ALTER TABLE {table_name} {idx['definition']}")
-                    print(f"已创建 {table_name}.{idx['name']} 索引")
-    except Exception as e:
-        print(f"检查并创建索引时出错: {str(e)}")
+    except:
+        pass
     finally:
         conn.close()
 
@@ -106,9 +89,8 @@ def init_cart_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='购物车表';
             """
             cursor.execute(create_table_sql)
-            print("购物车表初始化完成")
     except Exception as e:
-        print(f"初始化购物车表时出错: {str(e)}")
+        print(f"  ✗ 购物车表: {e}")
     finally:
         conn.close()
 
@@ -139,12 +121,11 @@ def init_user_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
             """
             cursor.execute(create_table_sql)
-            print("用户表初始化完成")
     except Exception as e:
-        print(f"初始化用户表时出错: {str(e)}")
+        print(f"  ✗ 用户表: {e}")
     finally:
         conn.close()
-    
+
     # 检查并添加缺失的字段
     user_fields_to_check = [
         {
@@ -230,12 +211,11 @@ def init_beihuo_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='备货数据表';
             """
             cursor.execute(create_table_sql)
-            print("备货数据表初始化完成")
     except Exception as e:
-        print(f"初始化备货数据表时出错: {str(e)}")
+        print(f"  ✗ 备货数据表: {e}")
     finally:
         conn.close()
-    
+
     # 检查并添加缺失的字段
     beihuo_fields_to_check = [
         {
@@ -300,9 +280,8 @@ def init_date_search_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='日期搜索数据表';
             """
             cursor.execute(create_table_sql)
-            print("日期搜索数据表初始化完成")
     except Exception as e:
-        print(f"初始化日期搜索数据表时出错: {str(e)}")
+        print(f"  ✗ 日期搜索表: {e}")
     finally:
         conn.close()
 
@@ -328,9 +307,8 @@ def init_ks_auto_bill_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开思自动账单表';
             """
             cursor.execute(create_table_sql)
-            print("开思自动账单表初始化完成")
     except Exception as e:
-        print(f"初始化开思自动账单表时出错: {str(e)}")
+        print(f"  ✗ 开思自动账单表: {e}")
     finally:
         conn.close()
 
@@ -338,58 +316,40 @@ def init_ks_auto_bill_table():
 def ensure_table_structure():
     """确保数据库表结构正确，包括字段长度等"""
     conn = get_db_connection()
+    modified = []
     try:
         with conn.cursor() as cursor:
-            # 定义需要修改的字段列表（表名、字段名、新定义）
             fields_to_modify = [
-                {'table': 'crmapp_beihuo', 'field': '车型', 'definition': 'TEXT', 'desc': '车型字段'},
-                {'table': 'crmapp_cart', 'field': 'car_model', 'definition': 'TEXT', 'desc': '购物车车型字段'},
-                {'table': 'crmapp_beihuo', 'field': '供应商', 'definition': 'TEXT', 'desc': '供应商字段'},
-                {'table': 'crmapp_beihuo', 'field': '内部备注', 'definition': 'TEXT', 'desc': '内部备注字段'}
+                {'table': 'crmapp_beihuo', 'field': '车型', 'definition': 'TEXT'},
+                {'table': 'crmapp_cart', 'field': 'car_model', 'definition': 'TEXT'},
+                {'table': 'crmapp_beihuo', 'field': '供应商', 'definition': 'TEXT'},
+                {'table': 'crmapp_beihuo', 'field': '内部备注', 'definition': 'TEXT'},
             ]
-            
+
             for field in fields_to_modify:
                 try:
                     cursor.execute(f"""
                         ALTER TABLE {field['table']} MODIFY COLUMN `{field['field']}` {field['definition']}
                     """)
-                    print(f"✅ {field['desc']}已更新为{field['definition']}类型")
-                except Exception as e:
-                    print(f"ℹ️ 修改{field['desc']}类型时可能遇到预期情况: {str(e)}")
-    except Exception as e:
-        print(f"确保表结构正确时出错: {str(e)}")
+                    modified.append(field['field'])
+                except:
+                    pass
+    except:
+        pass
     finally:
         conn.close()
+    if modified:
+        print(f"[数据库] 已更新字段: {', '.join(modified)}")
 
 
 def ensure_cart_indexes():
     """确保购物车表有适当的索引"""
     cart_indexes = [
-        {
-            'name': 'idx_barcode_store',
-            'definition': 'ADD INDEX idx_barcode_store (barcode, store)',
-            'desc': '物料条码和门店组合索引'
-        },
-        {
-            'name': 'idx_oe_store',
-            'definition': 'ADD INDEX idx_oe_store (oe, store)',
-            'desc': 'oe和门店组合索引'
-        },
-        {
-            'name': 'idx_oe_barcode',
-            'definition': 'ADD INDEX idx_oe_barcode (oe, barcode)',
-            'desc': 'oe和物料条码组合索引'
-        },
-        {
-            'name': 'idx_added_time',
-            'definition': 'ADD INDEX idx_added_time (added_time)',
-            'desc': '添加时间索引'
-        },
-        {
-            'name': 'idx_oe_barcode_store',
-            'definition': 'ADD INDEX idx_oe_barcode_store (oe, barcode, store)',
-            'desc': 'oe、物料条码和门店组合索引'
-        }
+        {'name': 'idx_barcode_store', 'definition': 'ADD INDEX idx_barcode_store (barcode, store)'},
+        {'name': 'idx_oe_store', 'definition': 'ADD INDEX idx_oe_store (oe, store)'},
+        {'name': 'idx_oe_barcode', 'definition': 'ADD INDEX idx_oe_barcode (oe, barcode)'},
+        {'name': 'idx_added_time', 'definition': 'ADD INDEX idx_added_time (added_time)'},
+        {'name': 'idx_oe_barcode_store', 'definition': 'ADD INDEX idx_oe_barcode_store (oe, barcode, store)'},
     ]
     check_and_create_indexes('crmapp_cart', cart_indexes)
 
@@ -447,37 +407,39 @@ def init_price_inquiry_table():
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 oe VARCHAR(100) NOT NULL COMMENT 'OE号',
                 brand VARCHAR(50) COMMENT '品牌',
-                price DECIMAL(10,2) DEFAULT 0.00 COMMENT '单价（最新导入）',
+                price DECIMAL(10,2) DEFAULT 0.00 COMMENT '单价',
                 supplier VARCHAR(50) COMMENT '供应商',
-                warehouse VARCHAR(255) COMMENT '仓库（最新导入）',
+                warehouse VARCHAR(255) COMMENT '仓库',
                 expire_time DATETIME COMMENT '失效时间',
                 remark TEXT COMMENT '备注',
                 stock_quantity INT DEFAULT 0 COMMENT '库存数量',
                 common_number VARCHAR(255) COMMENT '通用号',
                 ks_sync TINYINT(1) DEFAULT 0 COMMENT '开思是否同步，0=未同步，1=已同步',
                 company VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码',
-                import_history JSON COMMENT '导入记录历史 [{price: 100, warehouse: "北京", date: "2026-01-12"}, ...]',
+                import_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '导入时间',
                 INDEX idx_oe (oe),
                 INDEX idx_brand (brand),
                 INDEX idx_supplier (supplier),
                 INDEX idx_company (company),
                 INDEX idx_oe_brand (oe, brand),
                 INDEX idx_oe_brand_company (oe, brand, company),
-                UNIQUE INDEX uk_oe_brand_supplier_company (oe, brand, supplier, company)
+                INDEX idx_import_time (import_time),
+                -- 唯一索引：同一产品同一品牌同一供应商同一价格只能有一条记录
+                UNIQUE INDEX uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='询价比价表';
             """
             cursor.execute(create_table_sql)
             
             # 检查并添加缺失的字段（兼容旧表）
             alter_columns = [
-                ("warehouse", "VARCHAR(255) COMMENT '仓库（最新导入）'"),
+                ("warehouse", "VARCHAR(255) COMMENT '仓库'"),
                 ("expire_time", "DATETIME COMMENT '失效时间'"),
                 ("remark", "TEXT COMMENT '备注'"),
                 ("stock_quantity", "INT DEFAULT 0 COMMENT '库存数量'"),
                 ("common_number", "VARCHAR(255) COMMENT '通用号'"),
                 ("ks_sync", "TINYINT(1) DEFAULT 0 COMMENT '开思是否同步，0=未同步，1=已同步'"),
                 ("company", "VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码'"),
-                ("import_history", "JSON COMMENT '导入记录历史 [{price: 100, warehouse: \"北京\", date: \"2026-01-12\"}, ...]'")
+                ("import_time", "DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '导入时间'")
             ]
             
             for col_name, col_def in alter_columns:
@@ -486,6 +448,14 @@ def init_price_inquiry_table():
                 except Exception as e:
                     if "Duplicate column name" not in str(e):
                         print(f"添加字段 {col_name} 时出错: {str(e)}")
+            
+            # 删除旧的import_history字段（如果存在）
+            try:
+                cursor.execute("ALTER TABLE crmapp_price_inquiry DROP COLUMN import_history")
+                print("已删除旧字段 import_history")
+            except Exception as e:
+                if "Can't DROP" not in str(e) and "doesn't exist" not in str(e):
+                    print(f"删除字段 import_history 时出错: {str(e)}")
             
             # 检查并修改字段长度（兼容旧表）
             try:
@@ -500,6 +470,7 @@ def init_price_inquiry_table():
             index_list = [
                 ("idx_company", "company"),
                 ("idx_oe_brand_company", "oe, brand, company"),
+                ("idx_import_time", "import_time"),
             ]
             
             for idx_name, idx_cols in index_list:
@@ -510,32 +481,34 @@ def init_price_inquiry_table():
                     if "Duplicate key name" not in str(e):
                         print(f"添加索引 {idx_name} 时出错: {str(e)}")
             
-            # 检查并修改唯一索引（改为 uk_oe_brand_supplier_company）
+            # ==================== 修改唯一索引为包含价格 ====================
             # 先删除旧索引（如果存在）
-            try:
-                cursor.execute("""
-                    ALTER TABLE crmapp_price_inquiry 
-                    DROP INDEX uk_oe_brand_supplier_price_company
-                """)
-                print("已删除旧唯一索引 uk_oe_brand_supplier_price_company")
-            except Exception as e:
-                if "Can't DROP" not in str(e) and "doesn't exist" not in str(e):
-                    print(f"删除旧索引时出错: {str(e)}")
+            old_indexes = [
+                "uk_oe_brand_supplier_company",
+                "uk_oe_brand_supplier_price_company"
+            ]
             
-            # 添加新唯一索引
+            for old_idx in old_indexes:
+                try:
+                    cursor.execute(f"ALTER TABLE crmapp_price_inquiry DROP INDEX {old_idx}")
+                    print(f"已删除旧唯一索引 {old_idx}")
+                except Exception as e:
+                    if "Can't DROP" not in str(e) and "doesn't exist" not in str(e):
+                        print(f"删除旧索引 {old_idx} 时出错: {str(e)}")
+            
+            # 添加新唯一索引（包含价格）
             try:
                 cursor.execute("""
                     ALTER TABLE crmapp_price_inquiry 
-                    ADD UNIQUE INDEX uk_oe_brand_supplier_company (oe, brand, supplier, company)
+                    ADD UNIQUE INDEX uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)
                 """)
-                print("已添加唯一索引 uk_oe_brand_supplier_company")
+                print("已添加唯一索引 uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)")
             except Exception as e:
-                if "Duplicate key name" not in str(e) and "Duplicate entry" not in str(e):
+                if "Duplicate key name" not in str(e):
                     print(f"添加唯一索引时出错: {str(e)}")
             
-            print("询价比价表初始化完成")
     except Exception as e:
-        print(f"初始化询价比价表时出错: {str(e)}")
+        print(f"  ✗ 询价比价表: {e}")
     finally:
         conn.close()
 
@@ -616,11 +589,9 @@ def init_compare_summary_table():
                     print(f"已添加字段 {col_name} 到 crmapp_compare_summary 表")
                 except Exception as e:
                     if "Duplicate column name" not in str(e):
-                        print(f"添加字段 {col_name} 时出错: {str(e)}")
-            
-            print("比价数据汇总表(crmapp_compare_summary)初始化完成")
+                        pass  # 静默处理字段添加错误
     except Exception as e:
-        print(f"初始化比价数据汇总表时出错: {str(e)}")
+        print(f"  ✗ 比价汇总表: {e}")
     finally:
         conn.close()
 
@@ -650,23 +621,151 @@ def init_sales_history_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='CRM销量明细表（按天汇总）';
             """
             cursor.execute(create_table_sql)
-            print("销量明细表(crmapp_sales_history)初始化完成")
     except Exception as e:
-        print(f"初始化销量明细表时出错: {str(e)}")
+        print(f"  ✗ 销量明细表: {e}")
+    finally:
+        conn.close()
+
+
+def init_quote_count_ks_table():
+    """
+    初始化开思询价次数统计表
+    用于存储按(年月, OE, 品牌)统计的询价次数
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS crmapp_quote_count_ks (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+                `year_month` VARCHAR(7) NOT NULL COMMENT '年月，格式：YYYY-MM',
+                oe VARCHAR(100) NOT NULL COMMENT 'OE号/零件号',
+                brand VARCHAR(100) NOT NULL COMMENT '品牌名称',
+                quote_count INT NOT NULL DEFAULT 0 COMMENT '询价次数',
+                company VARCHAR(50) NOT NULL DEFAULT 'fsbbr' COMMENT '公司代码',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                UNIQUE KEY uk_year_month_oe_brand_company (`year_month`, oe, brand, company),
+                KEY idx_year_month (`year_month`),
+                KEY idx_company (company),
+                KEY idx_oe (oe),
+                KEY idx_brand (brand)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开思询价次数统计表';
+            """
+            cursor.execute(create_table_sql)
+    except Exception as e:
+        print(f"  ✗ 询价次数表: {e}")
+    finally:
+        conn.close()
+
+
+def init_procurement_history_table():
+    """
+    初始化采购历史表
+    用于存储采购记录（按月汇总）
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS crmapp_procurement_history (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                `year_month` VARCHAR(7) NOT NULL COMMENT '年月，格式：YYYY-MM',
+                purchase_date DATE NOT NULL COMMENT '采购日期',
+                supplier_name VARCHAR(255) NOT NULL COMMENT '供应商名称',
+                oe VARCHAR(100) NOT NULL COMMENT 'OE号',
+                brand VARCHAR(100) NOT NULL COMMENT '品牌',
+                unit_price DECIMAL(10,2) NOT NULL COMMENT '单价',
+                company VARCHAR(50) DEFAULT 'fsbbr' COMMENT '公司代码',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                UNIQUE KEY uk_month_oe_brand_supplier_price (`year_month`, oe, brand, supplier_name, unit_price, company),
+                KEY idx_year_month (`year_month`),
+                KEY idx_oe_brand (oe, brand),
+                KEY idx_purchase_date (purchase_date),
+                KEY idx_company (company)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='采购历史表';
+            """
+            cursor.execute(create_table_sql)
+    except Exception as e:
+        print(f"  ✗ 采购历史表: {e}")
+    finally:
+        conn.close()
+
+
+def init_zhuozhixing_table():
+    """
+    初始化卓之星库存数据表
+    用于存储从卓之星API同步的广星、鑫峰供应商库存数据
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS zhuozhixing_inventory (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
+                supplier_name VARCHAR(50) NOT NULL COMMENT '供应商名称：广星/鑫峰',
+                配件ID VARCHAR(50) COMMENT '配件ID',
+                零件编码 VARCHAR(100) COMMENT '零件编码',
+                制造编码 VARCHAR(100) COMMENT '制造编码',
+                零件名称 VARCHAR(255) COMMENT '零件名称',
+                零件英文名称 VARCHAR(255) COMMENT '零件英文名称',
+                零件车型 VARCHAR(255) COMMENT '零件车型',
+                产地 VARCHAR(100) COMMENT '产地',
+                价格 DECIMAL(10,2) COMMENT '价格',
+                库存数 INT COMMENT '库存数',
+                零件品牌 VARCHAR(100) COMMENT '零件品牌',
+                品牌 VARCHAR(100) COMMENT '品牌',
+                品牌编码 VARCHAR(50) COMMENT '品牌编码',
+                公会编码 VARCHAR(50) COMMENT '公会编码',
+                通用车型 VARCHAR(255) COMMENT '通用车型',
+                互换码 VARCHAR(100) COMMENT '互换码',
+                是否共享 TINYINT COMMENT '是否共享：0-否，1-是',
+                商家库存表自增ID VARCHAR(50) COMMENT '商家库存表自增ID',
+                库号 VARCHAR(50) COMMENT '库号（仓库）',
+                sync_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '同步时间',
+                INDEX idx_supplier (supplier_name),
+                INDEX idx_零件编码 (零件编码),
+                INDEX idx_制造编码 (制造编码),
+                INDEX idx_sync_time (sync_time),
+                INDEX idx_零件名称 (零件名称)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='卓之星库存数据';
+            """
+            cursor.execute(create_table_sql)
+    except Exception as e:
+        print(f"  ✗ 卓之星库存表: {e}")
     finally:
         conn.close()
 
 
 def init_all_tables():
     """初始化所有数据库表"""
-    init_beihuo_table()
-    init_cart_table()
-    init_user_table()
-    init_date_search_table()
-    init_ks_auto_bill_table()
-    init_price_inquiry_table()
-    init_compare_summary_table()
-    init_sales_history_table()
+    tables = [
+        ('备货数据', init_beihuo_table),
+        ('购物车', init_cart_table),
+        ('用户', init_user_table),
+        ('日期搜索', init_date_search_table),
+        ('开思自动账单', init_ks_auto_bill_table),
+        ('询价比价', init_price_inquiry_table),
+        ('比价汇总', init_compare_summary_table),
+        ('销量明细', init_sales_history_table),
+        ('询价次数', init_quote_count_ks_table),
+        ('采购历史', init_procurement_history_table),
+        ('卓之星库存', init_zhuozhixing_table),
+    ]
+
+    completed = []
+    for name, init_func in tables:
+        try:
+            init_func()
+            completed.append('✓')
+        except Exception as e:
+            completed.append('✗')
+            print(f"  ✗ {name}表: {e}")
+
+    # 结构优化和索引
     ensure_table_structure()
     ensure_cart_indexes()
     check_and_create_default_users()
+
+    # 简洁输出
+    print(f"[数据库] {sum(1 for c in completed if c == '✓')}/{len(tables)} 表初始化完成")

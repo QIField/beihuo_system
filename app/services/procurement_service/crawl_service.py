@@ -110,19 +110,8 @@ class CRMDataCrawlService:
         product_grade = str(product.get('product_grade', '6'))
         product_level = PRODUCT_GRADE_MAP.get(product_grade, '无')
 
-        # 解析采购记录
-        purchasing_record = product.get('purchasing_record', '')
-        procurement_records = self._parse_purchasing_record(purchasing_record)
-
-        # 计算价格
-        purchase_summary = float(product.get('purchase_summary', 0)) if product.get('purchase_summary') else 0.0
-        max_price, min_price = self._calculate_max_min_price(procurement_records)
-
-        # 如果没有采购记录，使用purchase_summary作为supplier_price
-        if not procurement_records:
-            supplier_price = purchase_summary
-        else:
-            supplier_price = self._get_latest_price(procurement_records)
+        # 注意：采购记录现在由 PurchaseHistoryService 单独处理
+        # 这里不再解析 purchasing_record 字段，价格字段由同步服务更新
 
         return {
             'oe': product.get('number', ''),
@@ -135,70 +124,11 @@ class CRMDataCrawlService:
             'is_cass': product.get('is_cass', ''),
             'product_remark': product.get('company_remark', ''),
             'product_level': product_level,
-            'supplier_price': supplier_price,
-            'max_price': max_price,
-            'min_price': min_price,
-            'procurement_records': json.dumps(procurement_records, ensure_ascii=False) if procurement_records else None
+            'supplier_price': 0.0,  # 由 PurchaseSyncService 更新
+            'max_price': 0.0,       # 由 PurchaseSyncService 更新
+            'min_price': 0.0,       # 由 PurchaseSyncService 更新
+            'procurement_records': None  # 由 PurchaseSyncService 更新
         }
-
-    def _parse_purchasing_record(self, purchasing_record: str) -> List[Dict]:
-        """解析采购记录字符串"""
-        if not purchasing_record:
-            return []
-
-        records = []
-        raw_records = re.split(r'<br\s*/?>|\n', purchasing_record)
-
-        for raw_record in raw_records:
-            raw_record = raw_record.strip()
-            if not raw_record:
-                continue
-
-            try:
-                # 提取日期
-                date_match = re.match(r'(\d{4}-\d{2}-\d{2})', raw_record)
-                if not date_match:
-                    continue
-                purchase_date = date_match.group(1)
-
-                # 提取供应商
-                supplier_match = re.search(r'供应商:([^,]+)', raw_record)
-                if not supplier_match:
-                    continue
-                supplier_name = supplier_match.group(1).strip()
-
-                # 提取单价
-                price_match = re.search(r'单价:([\d.]+)', raw_record)
-                purchase_price = float(price_match.group(1)) if price_match else 0.0
-
-                records.append({
-                    'supplier_name': supplier_name,
-                    'purchase_price': purchase_price,
-                    'purchase_date': purchase_date
-                })
-            except:
-                continue
-
-        return records
-
-    def _calculate_max_min_price(self, records: List[Dict]) -> Tuple[float, float]:
-        """计算最高价和最低价"""
-        if not records:
-            return 0.0, 0.0
-
-        prices = [r.get('purchase_price', 0) for r in records if r.get('purchase_price', 0) > 0]
-        if not prices:
-            return 0.0, 0.0
-
-        return max(prices), min(prices)
-
-    def _get_latest_price(self, records: List[Dict]) -> float:
-        """获取最新价格"""
-        if not records:
-            return 0.0
-
-        sorted_records = sorted(records, key=lambda x: x.get('purchase_date', ''), reverse=True)
-        return sorted_records[0].get('purchase_price', 0.0)
 
     def batch_save(self, products: List[Dict]) -> int:
         """

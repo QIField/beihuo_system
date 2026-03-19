@@ -323,3 +323,75 @@ def upload_inquiry_data(df, company='fsbbr'):
         'valid_items': valid_items,
         'skipped_items': skipped_items
     }
+
+
+def validate_b2b_upload(items, company='fsbbr'):
+    """
+    验证B2B上传可行性（不实际上传，只验证仓库、供应商等映射是否存在）
+    用于导入前的预验证，确保数据能成功上传
+    
+    Args:
+        items: 待验证的数据列表
+        company: 公司代码
+        
+    Returns:
+        dict: {oe: {'status': 'success'/'error', 'msg': '...'}, ...}
+    """
+    if not items:
+        return {}
+    
+    print(f"[B2B验证] 开始验证 {len(items)} 条数据...")
+    
+    try:
+        # 登录获取token和映射表
+        token = login(company)
+        warehouse_df = getAllCassWarehouse(token)
+        supplier_df = getAllSupplierChannel(token)
+        brand_mapping = load_crm_aliases_mapping()
+        
+        results = {}
+        
+        for item in items:
+            oe = item['oe']
+            brand = item['brand']
+            supplier = item['supplier']
+            warehouse = item['warehouse']
+            
+            # 品牌映射
+            mapped_brand = brand_mapping.get(brand, brand)
+            
+            # 验证仓库是否存在
+            warehouse_match = warehouse_df[warehouse_df['warehouse_name'] == warehouse]
+            if warehouse_match.empty:
+                results[oe] = {
+                    'status': 'error',
+                    'msg': f'仓库未找到: {warehouse}'
+                }
+                continue
+            
+            # 验证供应商是否存在
+            supplier_match = supplier_df[supplier_df['name'] == supplier]
+            if supplier_match.empty:
+                results[oe] = {
+                    'status': 'error',
+                    'msg': f'供应商未找到: {supplier}'
+                }
+                continue
+            
+            # 验证通过
+            results[oe] = {
+                'status': 'success',
+                'msg': '验证通过',
+                'mapped_brand': mapped_brand if mapped_brand != brand else None,
+                'warehouse_id': int(warehouse_match.iloc[0]['cass_warehouse_id']),
+                'supplier_id': int(supplier_match.iloc[0]['supplier_channel_id'])
+            }
+        
+        success_count = sum(1 for r in results.values() if r['status'] == 'success')
+        print(f"[B2B验证] 完成: 通过={success_count}, 失败={len(results) - success_count}")
+        return results
+        
+    except Exception as e:
+        print(f"[B2B验证] 验证过程异常: {e}")
+        # 如果验证过程出错，返回所有项目都失败
+        return {item['oe']: {'status': 'error', 'msg': f'验证异常: {str(e)}'} for item in items}

@@ -1629,11 +1629,10 @@ def get_blacklist_stats_api():
 def register_virtual_inventory_routes(app):
     # 注册蓝图
     app.register_blueprint(virtual_inventory_bp)
-    
+
     # 初始化黑名单表
     try:
         from app.utils.inventory_tasks import init_blacklist_table
         init_blacklist_table()
-        print("[黑名单] 路由注册完成,黑名单表已初始化")
-    except Exception as e:
-        print(f"[黑名单] 初始化失败: {e}")
+    except:
+        pass

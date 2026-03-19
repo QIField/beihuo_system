@@ -25,6 +25,7 @@ import uuid
 from backend.get_order import get_order_bp
 from backend.log_viewer_api import register_log_viewer_routes
 from backend.purchase_plan import register_purchase_plan_routes
+from backend.zhuozhixing_api import register_zhuozhixing_routes
 from flask_socketio import SocketIO
 from app.sockets import register_socket_events, notification_manager
 from app.utils.database_connection import get_db_connection
@@ -51,6 +52,7 @@ app.register_blueprint(get_order_bp)
 app.register_blueprint(ks_auto_bill_bp)
 register_log_viewer_routes(app)  # 注册日志查看器路由
 register_purchase_plan_routes(app)  # 注册采购计划模块路由
+register_zhuozhixing_routes(app)  # 注册卓之星同步API路由
 # 根据环境选择 async_mode
 import platform
 
@@ -68,22 +70,13 @@ try:
 except ImportError:
     EVENTLET_AVAILABLE = False
 
-# 选择 async_mode 的优先级：
-# 1. 如果在 uWSGI 中运行，必须使用 threading（eventlet/gevent 与 uWSGI 不兼容）
-# 2. 如果不在 uWSGI 中且 eventlet 可用，使用 eventlet（性能更好）
-# 3. 否则使用 threading（保底方案）
+# 选择 async_mode
 if IS_UWSGI:
-    # uWSGI 环境：必须使用 threading
     ASYNC_MODE = 'threading'
-    print("[SocketIO] 检测到 uWSGI 环境，使用 threading 模式")
 elif EVENTLET_AVAILABLE and platform.system() == 'Linux':
-    # Linux 独立运行：使用 eventlet（高并发）
     ASYNC_MODE = 'eventlet'
-    print("[SocketIO] 使用 eventlet 模式")
 else:
-    # Windows 或 eventlet 不可用：使用 threading
     ASYNC_MODE = 'threading'
-    print(f"[SocketIO] 使用 threading 模式 (平台: {platform.system()})")
 
 socketio = SocketIO(
     app,
@@ -99,12 +92,9 @@ app.config['JSON_AS_ASCII'] = False
 
 try:
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-    from openpyxl.utils import get_column_letter
     XLSX_SUPPORT = True
 except ImportError:
     XLSX_SUPPORT = False
-    print("警告：未安装openpyxl，无法导出XLSX格式，请运行 'pip install openpyxl'")
 
 # 门店映射
 STORES = {
@@ -155,23 +145,17 @@ def fix_user_store_data():
     """修复可能存在的错误用户数据，将store为'all'的用户更新为有效门店代码"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     try:
-        # 检查并更新store为'all'的用户
         cursor.execute("UPDATE crmapp_users SET store = 'fsbbr' WHERE store = 'all'")
-        affected_rows = cursor.rowcount
-        if affected_rows > 0:
-            print(f"✅ 已修复 {affected_rows} 个用户的错误门店数据")
-        else:
-            print("ℹ️ 未发现需要修复的错误门店数据")
+        if cursor.rowcount > 0:
+            print(f"[数据修复] 已修复 {cursor.rowcount} 个用户门店数据")
         conn.commit()
-    except Exception as e:
-        print(f"❌ 修复用户门店数据失败: {str(e)}")
+    except:
+        pass
     finally:
         cursor.close()
         conn.close()
 
-# 在应用启动时修复数据
 fix_user_store_data()
 
 def login_required(f):
@@ -375,14 +359,7 @@ def print_task_debug_info():
     
     # 显示最近5次执行记录
     recent_logs = task_execution_tracker['execution_log'][-5:] if task_execution_tracker['execution_log'] else []
-    print("\n最近的执行记录:")
-    for log in recent_logs:
-        print(f"  - {log}")
-    print("="*50)
 
-print("定时任务已启动：每天13:00执行虚拟库存数据同步，完成后执行CRM新建产品")
-print("调试信息将在任务执行时输出，可通过 print_task_debug_info() 查看当前状态")
-print("任务统计信息可通过 /api/tasks/stats 查看")
 
 
 #定时更新========================================================================================================================================
@@ -594,16 +571,14 @@ def schedule_fetch_after_delay():
         # 如果之前有定时器，取消它
         if scheduled_fetch_timer:
             scheduled_fetch_timer.cancel()
-            print("⏰ 已取消之前的延时拉取任务")
 
         # 15分钟后执行拉取
         def delayed_fetch():
             auto_fetch_data()
 
         # 创建定时器，15分钟后执行
-        scheduled_fetch_timer = Timer(15 * 60, delayed_fetch)  # 15分钟 = 900秒
+        scheduled_fetch_timer = Timer(15 * 60, delayed_fetch)
         scheduled_fetch_timer.start()
-        print(f"⏰ 已设定15分钟后自动拉取数据")
 
 
 def fetch_data_for_company(company):
@@ -820,8 +795,6 @@ def setup_scheduled_tasks():
         replace_existing=True
     )
 
-    print("[任务初始化] 自动更新任务已注册（每整点和30分执行）")
-
 
 # 清理函数
 def cleanup_timers():
@@ -829,7 +802,6 @@ def cleanup_timers():
     global scheduled_fetch_timer
     if scheduled_fetch_timer:
         scheduled_fetch_timer.cancel()
-        print("⏰ 已取消待执行的延时拉取任务")
 
 
 # 注册清理函数
@@ -4311,20 +4283,16 @@ def init_virtual_inventory_tables():
     在应用启动时调用，确保所有表已创建
     """
     global _virtual_inventory_tables_initialized
-    
+
     if _virtual_inventory_tables_initialized:
         return
-    
+
     try:
-        print(f"[{datetime.now()}] 正在初始化虚拟库存数据库表...")
         from app.utils import virtual_inventory
         virtual_inventory.create_tables()
         _virtual_inventory_tables_initialized = True
-        print(f"[{datetime.now()}] 虚拟库存数据库表初始化完成")
-    except Exception as e:
-        print(f"[{datetime.now()}] 初始化虚拟库存数据库表失败: {e}")
-        import traceback
-        traceback.print_exc()
+    except:
+        pass
 
 # 初始化后台任务（单 worker 极简版）
 def init_background_tasks():
@@ -4335,10 +4303,9 @@ def init_background_tasks():
     try:
         from app.core.task_manager import task_manager, init_ks_bill_monitor
         from app.utils.scheduler import register_cleanup_tasks
-        
-        print("[任务初始化] 正在初始化...")
+
         task_manager.initialize()
-        
+
         # 注册虚拟库存任务
         task_manager.schedule(
             run_virtual_inventory_task,
@@ -4348,8 +4315,7 @@ def init_background_tasks():
             minute=0,
             replace_existing=True
         )
-        print("[任务] 虚拟库存: 每天00:00")
-        
+
         # 注册购物车清理任务
         task_manager.schedule(
             run_cart_cleanup_task,
@@ -4358,23 +4324,24 @@ def init_background_tasks():
             minute=0,
             replace_existing=True
         )
-        print("[任务] 购物车清理: 每小时")
-        
+
         # 注册清理和销量同步任务
         register_cleanup_tasks(task_manager)
-        
+
         # 注册自动更新任务
         setup_scheduled_tasks()
-        
+
         # 初始化开思自动对单
         init_ks_bill_monitor()
-        
-        print("[任务初始化] 完成")
-        
-    except Exception as e:
-        print(f"[任务初始化] 失败: {e}")
-        import traceback
-        traceback.print_exc()
+
+        # 初始化卓之星每日同步
+        from app.core.task_manager import init_zhuozhixing_sync
+        init_zhuozhixing_sync()
+
+        print("[系统] 定时任务已启动")
+
+    except:
+        pass
 
 # 应用启动配置
 if __name__ == '__main__':
@@ -4389,33 +4356,20 @@ if __name__ == '__main__':
 
 # uWSGI/gunicorn 环境下的初始化
 if IS_UWSGI or not __name__ == '__main__':
-    print(f"[服务器] 检测到生产环境，正在初始化... (PID: {os.getpid()})")
-    
     # 初始化数据库表
     try:
         init_virtual_inventory_tables()
-        print("[服务器] 数据库表初始化完成")
-    except Exception as e:
-        print(f"[服务器] 数据库表初始化失败: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    # 延迟初始化后台任务 - 给服务器一些时间完全启动
+    except:
+        pass
+
+    # 延迟初始化后台任务
     def delayed_init():
         try:
-            print(f"[服务器] 等待环境就绪... (PID: {os.getpid()})")
             time.sleep(5)
-            
-            # 初始化后台任务（内部会自动检测是否为主 worker）
             init_background_tasks()
-            print(f"[服务器] 后台任务初始化完成 (PID: {os.getpid()})")
-            
-        except Exception as e:
-            print(f"[服务器] 初始化失败: {e}")
-            import traceback
-            traceback.print_exc()
-    
+        except:
+            pass
+
     # 启动延迟初始化线程
     init_thread = threading.Thread(target=delayed_init, daemon=True, name='server_init')
     init_thread.start()
-    print("[服务器] 初始化线程已启动（5秒后执行）")

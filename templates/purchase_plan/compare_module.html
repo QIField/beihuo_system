@@ -56,30 +56,12 @@
             background-color: #d9d9d9;
         }
 
-        .result-info {
-            margin-top: 15px;
-            padding: 12px;
-            border-radius: 4px;
-        }
-
-        .result-success {
-            background-color: #f6ffed;
-            border: 1px solid #b7eb8f;
-            color: #52c41a;
-        }
-
-        .result-error {
-            background-color: #fff2f0;
-            border: 1px solid #ffccc7;
-            color: #ff4d4f;
-        }
-
-        /* 自定义浮窗样式 */
+        /* 自定义浮窗样式 - 左右分栏布局 */
         .price-tooltip {
             position: absolute;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 10px 16px;
+            padding: 0;
             border-radius: 8px;
             font-size: 13px;
             line-height: 1.6;
@@ -88,6 +70,8 @@
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.2s ease;
+            /* 移除max-width限制，让浮窗根据内容自动变宽 */
+            display: flex;
             white-space: nowrap;
         }
 
@@ -106,11 +90,35 @@
             border-color: #764ba2 transparent transparent transparent;
         }
 
+        /* 浮窗左侧 - 价格信息 */
+        .price-tooltip-left {
+            padding: 12px 16px;
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 120px;
+        }
+
+        /* 浮窗右侧 - 采购记录 */
+        .price-tooltip-right {
+            padding: 12px 16px;
+            /* 移除max-width限制，让浮窗根据内容自动变宽 */
+            /* 移除max-height和overflow-y，展示全部内容 */
+        }
+
+        .price-tooltip-title {
+            font-weight: 600;
+            font-size: 12px;
+            margin-bottom: 8px;
+            opacity: 0.9;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 4px;
+        }
+
         .price-tooltip-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 12px;
+            margin-bottom: 6px;
         }
 
         .price-tooltip-label {
@@ -121,6 +129,222 @@
         .price-tooltip-value {
             font-weight: 600;
             font-size: 14px;
+        }
+
+        .procurement-record-item {
+            font-size: 12px;
+            line-height: 1.5;
+            margin-bottom: 4px;
+            white-space: nowrap;
+        }
+
+        .procurement-record-empty {
+            font-size: 12px;
+            opacity: 0.7;
+            font-style: italic;
+        }
+
+        /* 36个月份价格矩阵样式 - 调整为横向年份，纵向月份 */
+        .monthly-price-matrix {
+            display: flex;
+            flex-direction: row;
+            gap: 16px;
+            font-size: 11px;
+        }
+
+        .matrix-column {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .matrix-year-header {
+            font-weight: 600;
+            font-size: 12px;
+            text-align: center;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            margin-bottom: 4px;
+        }
+
+        .matrix-month-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            min-width: 130px;
+        }
+
+        .matrix-month-name {
+            font-size: 11px;
+            opacity: 0.8;
+            min-width: 32px;
+        }
+
+        .matrix-month-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            font-size: 10px;
+            max-width: 85px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .matrix-supplier {
+            opacity: 0.95;
+            font-size: 12px;
+            font-weight: 500;
+            max-width: 85px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 2px;
+        }
+
+        .matrix-price {
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .matrix-price.empty {
+            opacity: 0.4;
+        }
+
+        /* 销量浮窗样式 - 蓝色渐变 */
+        .sales-tooltip {
+            position: absolute;
+            background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+            color: white;
+            padding: 0;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            display: flex;
+            white-space: nowrap;
+        }
+
+        .sales-tooltip.show {
+            opacity: 1;
+        }
+
+        .sales-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: #096dd9 transparent transparent transparent;
+        }
+
+        .sales-tooltip-left {
+            padding: 12px 16px;
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 120px;
+        }
+
+        .sales-tooltip-right {
+            padding: 12px 16px;
+        }
+
+        /* 询价次数矩阵样式 */
+        .quote-count-matrix {
+            display: flex;
+            flex-direction: row;
+            gap: 16px;
+            font-size: 11px;
+        }
+
+        .quote-count-column {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .quote-count-year-header {
+            font-weight: 600;
+            font-size: 12px;
+            text-align: center;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            margin-bottom: 4px;
+        }
+
+        .quote-count-month-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            min-width: 80px;
+        }
+
+        .quote-count-month-name {
+            font-size: 11px;
+            opacity: 0.8;
+            min-width: 32px;
+        }
+
+        .quote-count-value {
+            font-weight: 600;
+            font-size: 12px;
+            min-width: 30px;
+            text-align: right;
+        }
+
+        .quote-count-value.empty {
+            opacity: 0.4;
+        }
+
+        /* 展开按钮样式 - 简约设计，默认隐藏 */
+        .expand-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            margin-left: 4px;
+            background: transparent;
+            color: #999;
+            border: 1px solid #d9d9d9;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 10px;
+            line-height: 1;
+            vertical-align: middle;
+            transition: all 0.2s ease;
+            opacity: 0;  /* 默认隐藏 */
+        }
+
+        /* 单元格悬浮时显示展开按钮 */
+        .handsontable .htCore td:hover .expand-btn {
+            opacity: 1;
+        }
+
+        .expand-btn:hover {
+            background: #f0f0f0;
+            border-color: #bfbfbf;
+            color: #666;
+        }
+
+        .expand-btn.expanded {
+            background: #e6f7ff;
+            border-color: #1890ff;
+            color: #1890ff;
+            opacity: 1;  /* 展开状态始终显示 */
         }
 
         .data-container {
@@ -349,6 +573,86 @@
             return num.toLocaleString();
         }
 
+        // 询价历史缓存（Map结构：key为 "oe|brand"，value为询价历史数组）
+        const quoteHistoryCache = new Map();
+        const QUOTE_HISTORY_CACHE_SIZE = 1000; // 最多缓存1000个产品的询价历史
+
+        // 加载单个产品的询价历史
+        function loadQuoteHistory(oe, brand, callback) {
+            const cacheKey = oe + '|' + brand;
+            
+            // 检查缓存
+            if (quoteHistoryCache.has(cacheKey)) {
+                callback(quoteHistoryCache.get(cacheKey));
+                return;
+            }
+
+            // 发起请求
+            fetch(`/purchase_plan/compare/quote_history?oe=${encodeURIComponent(oe)}&brand=${encodeURIComponent(brand)}`)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.code === 0 && result.data && result.data.history) {
+                        const history = result.data.history;
+                        
+                        // 缓存控制：如果缓存已满，删除最早的条目
+                        if (quoteHistoryCache.size >= QUOTE_HISTORY_CACHE_SIZE) {
+                            const firstKey = quoteHistoryCache.keys().next().value;
+                            quoteHistoryCache.delete(firstKey);
+                        }
+                        
+                        quoteHistoryCache.set(cacheKey, history);
+                        callback(history);
+                    } else {
+                        callback([]);
+                    }
+                })
+                .catch(error => {
+                    console.error('加载询价历史失败:', error);
+                    callback([]);
+                });
+        }
+
+        // 批量加载询价历史（用于预加载当前页数据）
+        function batchLoadQuoteHistory(products) {
+            if (!products || products.length === 0) return;
+
+            // 过滤掉已缓存的产品
+            const uncachedProducts = products.filter(p => {
+                const cacheKey = p.oe + '|' + p.brand;
+                return !quoteHistoryCache.has(cacheKey);
+            });
+
+            if (uncachedProducts.length === 0) return;
+
+            // 限制单次请求数量
+            const batch = uncachedProducts.slice(0, 100);
+
+            fetch('/purchase_plan/compare/quote_history/batch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ products: batch })
+            })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.code === 0 && result.data) {
+                        // 将结果存入缓存
+                        Object.entries(result.data).forEach(([key, history]) => {
+                            // 缓存控制
+                            if (quoteHistoryCache.size >= QUOTE_HISTORY_CACHE_SIZE) {
+                                const firstKey = quoteHistoryCache.keys().next().value;
+                                quoteHistoryCache.delete(firstKey);
+                            }
+                            quoteHistoryCache.set(key, history);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('批量加载询价历史失败:', error);
+                });
+        }
+
         // 价格浮窗相关函数
         let priceTooltip = null;
 
@@ -360,22 +664,37 @@
             }
         }
 
-        function showPriceTooltip(event, maxPrice, minPrice) {
+        function showPriceTooltip(event, maxPrice, minPrice, procurementRecords) {
             createPriceTooltip();
 
+            // 构建36个月份价格矩阵（2024-2026年）
+            const monthlyPrices = buildMonthlyPriceMatrix(procurementRecords);
+
             priceTooltip.innerHTML = `
-                <div class="price-tooltip-row">
-                    <span class="price-tooltip-label">最高价:</span>
-                    <span class="price-tooltip-value">${maxPrice}</span>
+                <div class="price-tooltip-left">
+                    <div class="price-tooltip-title">价格信息</div>
+                    <div class="price-tooltip-row">
+                        <span class="price-tooltip-label">最高价:</span>
+                        <span class="price-tooltip-value">${maxPrice}</span>
+                    </div>
+                    <div class="price-tooltip-row">
+                        <span class="price-tooltip-label">最低价:</span>
+                        <span class="price-tooltip-value">${minPrice}</span>
+                    </div>
                 </div>
-                <div class="price-tooltip-row">
-                    <span class="price-tooltip-label">最低价:</span>
-                    <span class="price-tooltip-value">${minPrice}</span>
+                <div class="price-tooltip-right">
+                    <div class="price-tooltip-title">历史采购价（近三年）</div>
+                    <div class="monthly-price-matrix">
+                        ${monthlyPrices}
+                    </div>
                 </div>
             `;
 
             // 计算位置
             const rect = event.target.getBoundingClientRect();
+
+            // 先显示才能获取尺寸
+            priceTooltip.classList.add('show');
             const tooltipRect = priceTooltip.getBoundingClientRect();
 
             let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
@@ -392,13 +711,249 @@
 
             priceTooltip.style.left = left + 'px';
             priceTooltip.style.top = top + 'px';
-            priceTooltip.classList.add('show');
         }
 
         function hidePriceTooltip() {
             if (priceTooltip) {
                 priceTooltip.classList.remove('show');
             }
+        }
+
+        // 销量浮窗相关函数
+        let salesTooltip = null;
+
+        function createSalesTooltip() {
+            if (!salesTooltip) {
+                salesTooltip = document.createElement('div');
+                salesTooltip.className = 'sales-tooltip';
+                document.body.appendChild(salesTooltip);
+            }
+        }
+
+        function showSalesTooltip(event, salesData, quoteHistory) {
+            createSalesTooltip();
+
+            const today = formatNumber(salesData.todaySales) || '-';
+            const yesterday = formatNumber(salesData.yesterdaySales) || '-';
+            const sales7d = formatNumber(salesData.sales7d) || '-';
+            const month = formatNumber(salesData.monthSales) || '-';
+            const avg6m = formatNumber(salesData.avgSales6m) || '-';
+            const avg12m = formatNumber(salesData.avgSales12m) || '-';
+
+            // 构建询价次数矩阵
+            const quoteMatrix = buildQuoteCountMatrix(quoteHistory);
+
+            salesTooltip.innerHTML = `
+                <div class="sales-tooltip-left">
+                    <div class="price-tooltip-title">销量统计</div>
+                    <div class="price-tooltip-row">
+                        <span class="price-tooltip-label">今日:</span>
+                        <span class="price-tooltip-value">${today}</span>
+                    </div>
+                    <div class="price-tooltip-row">
+                        <span class="price-tooltip-label">昨日:</span>
+                        <span class="price-tooltip-value">${yesterday}</span>
+                    </div>
+                    <div class="price-tooltip-row">
+                        <span class="price-tooltip-label">近7天:</span>
+                        <span class="price-tooltip-value">${sales7d}</span>
+                    </div>
+                    <div class="price-tooltip-row">
+                        <span class="price-tooltip-label">本月:</span>
+                        <span class="price-tooltip-value">${month}</span>
+                    </div>
+                    <div class="price-tooltip-row">
+                        <span class="price-tooltip-label">近6月月均:</span>
+                        <span class="price-tooltip-value">${avg6m}</span>
+                    </div>
+                    <div class="price-tooltip-row">
+                        <span class="price-tooltip-label">近12月月均:</span>
+                        <span class="price-tooltip-value">${avg12m}</span>
+                    </div>
+                </div>
+                <div class="sales-tooltip-right">
+                    <div class="price-tooltip-title">询价次数（最近36个月）</div>
+                    <div class="quote-count-matrix">
+                        ${quoteMatrix}
+                    </div>
+                </div>
+            `;
+
+            // 计算位置
+            const rect = event.target.getBoundingClientRect();
+
+            // 先显示才能获取尺寸
+            salesTooltip.classList.add('show');
+            const tooltipRect = salesTooltip.getBoundingClientRect();
+
+            let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+            let top = rect.top - tooltipRect.height - 10;
+
+            // 边界检查
+            if (left < 10) left = 10;
+            if (left + tooltipRect.width > window.innerWidth - 10) {
+                left = window.innerWidth - tooltipRect.width - 10;
+            }
+            if (top < 10) {
+                top = rect.bottom + 10;
+            }
+
+            salesTooltip.style.left = left + 'px';
+            salesTooltip.style.top = top + 'px';
+        }
+
+        function hideSalesTooltip() {
+            if (salesTooltip) {
+                salesTooltip.classList.remove('show');
+            }
+        }
+
+        // 构建询价次数矩阵（最近36个月，按月份倒序排列）
+        function buildQuoteCountMatrix(quoteHistory) {
+            // 存储每月的询价次数
+            // key: "year-month", value: quote_count
+            const recordMap = new Map();
+
+            // 将询价历史按年月分组
+            if (quoteHistory && quoteHistory.length > 0) {
+                quoteHistory.forEach(record => {
+                    if (record.year_month && record.quote_count !== undefined) {
+                        recordMap.set(record.year_month, record.quote_count);
+                    }
+                });
+            }
+
+            // 生成最近36个月的年月列表（从当前月往前推35个月）
+            const monthList = [];
+            const now = new Date();
+            for (let i = 0; i < 36; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const year = d.getFullYear();
+                const month = (d.getMonth() + 1).toString().padStart(2, '0');
+                monthList.push({
+                    year: year,
+                    month: d.getMonth() + 1,
+                    monthName: month + '月',
+                    key: `${year}-${month}`
+                });
+            }
+
+            // 按年份分组（用于列展示）
+            const yearGroups = {};
+            monthList.forEach(m => {
+                if (!yearGroups[m.year]) {
+                    yearGroups[m.year] = [];
+                }
+                yearGroups[m.year].push(m);
+            });
+
+            // 按年份倒序排列（最近的年份在左边）
+            const sortedYears = Object.keys(yearGroups).sort((a, b) => b - a);
+
+            // 构建HTML - 横向列（年份），每列12行或更少（月份）
+            let html = '';
+
+            sortedYears.forEach(year => {
+                const months = yearGroups[year];
+                html += '<div class="quote-count-column">';
+                html += `<div class="quote-count-year-header">${year}年</div>`;
+
+                months.forEach(m => {
+                    const count = recordMap.get(m.key);
+
+                    if (count !== undefined) {
+                        // 有数据时显示询价次数
+                        html += '<div class="quote-count-month-row">';
+                        html += `<div class="quote-count-month-name">${m.monthName}</div>`;
+                        html += `<div class="quote-count-value">${count}</div>`;
+                        html += '</div>';
+                    } else {
+                        // 无数据时显示 -
+                        html += '<div class="quote-count-month-row">';
+                        html += `<div class="quote-count-month-name">${m.monthName}</div>`;
+                        html += '<div class="quote-count-value empty">-</div>';
+                        html += '</div>';
+                    }
+                });
+
+                html += '</div>';
+            });
+
+            return html;
+        }
+
+        // 构建36个月份价格矩阵（2024-2026年）- 横向年份，纵向月份，显示供应商和价格
+        function buildMonthlyPriceMatrix(procurementRecords) {
+            // 初始化2024-2026年的36个月份数据
+            const years = [2024, 2025, 2026];
+            const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+            // 存储每月的最低价格记录（包含供应商信息）
+            // key: "year-month", value: {price, supplier}
+            const recordMap = new Map();
+
+            // 将采购记录按年月分组，取每月最低价及供应商
+            if (procurementRecords && procurementRecords.length > 0) {
+                procurementRecords.forEach(record => {
+                    if (record.purchase_date && record.purchase_price) {
+                        const date = new Date(record.purchase_date);
+                        const year = date.getFullYear();
+                        const month = date.getMonth() + 1;
+                        const key = `${year}-${month.toString().padStart(2, '0')}`;
+                        const price = parseFloat(record.purchase_price);
+                        const supplier = record.supplier_name || '未知';
+
+                        // 只记录2024-2026年的数据
+                        if (years.includes(year)) {
+                            if (!recordMap.has(key) || price < recordMap.get(key).price) {
+                                recordMap.set(key, { price, supplier });
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 构建HTML - 横向3列（年份），每列12行（月份）
+            let html = '<div class="monthly-price-matrix">';
+
+            years.forEach(year => {
+                html += '<div class="matrix-column">';
+                html += `<div class="matrix-year-header">${year}年</div>`;
+
+                months.forEach((monthName, monthIndex) => {
+                    const monthNum = (monthIndex + 1).toString().padStart(2, '0');
+                    const key = `${year}-${monthNum}`;
+                    const record = recordMap.get(key);
+
+                    if (record) {
+                        // 有数据时显示供应商和价格
+                        const priceText = record.price.toFixed(2);
+                        // 截断供应商名称，超过9个字符才截断
+                        const supplierText = record.supplier.length > 9
+                            ? record.supplier.substring(0, 9) + '...'
+                            : record.supplier;
+
+                        html += '<div class="matrix-month-row">';
+                        html += `<div class="matrix-month-name">${monthName}</div>`;
+                        html += '<div class="matrix-month-info">';
+                        html += `<div class="matrix-supplier" title="${record.supplier}">${supplierText}</div>`;
+                        html += `<div class="matrix-price">¥${priceText}</div>`;
+                        html += '</div></div>';
+                    } else {
+                        // 无数据时显示 -
+                        html += '<div class="matrix-month-row">';
+                        html += `<div class="matrix-month-name">${monthName}</div>`;
+                        html += '<div class="matrix-month-info">';
+                        html += '<div class="matrix-price empty">-</div>';
+                        html += '</div></div>';
+                    }
+                });
+
+                html += '</div>';
+            });
+
+            html += '</div>';
+            return html;
         }
 
         // 处理数据并计算合并单元格（服务端分页版本 - 保持后端排序顺序）
@@ -439,28 +994,43 @@
 
                     // 添加每一行数据
                     brandItems.forEach((item, index) => {
+                        // 处理采购记录数据
+                        let procurementRecords = [];
+                        if (item.procurement_records) {
+                            try {
+                                if (typeof item.procurement_records === 'string') {
+                                    procurementRecords = JSON.parse(item.procurement_records);
+                                } else if (Array.isArray(item.procurement_records)) {
+                                    procurementRecords = item.procurement_records;
+                                }
+                            } catch (e) {
+                                procurementRecords = [];
+                            }
+                        }
+
                         processedData.push({
                             rowNumber: (currentPage - 1) * pageSize + currentRow + 1,
-                            oe: index === 0 ? formatEmptyValue(item.oe || item.OE || item.oE) : '',
-                            brand: index === 0 ? formatEmptyValue(item.brand || item.品牌) : '',
-                            productName: formatEmptyValue(item.product_name || item.产品名称 || item.productName),
-                            vehicleBrand: formatEmptyValue(item.vehicle_brand || item.车辆品牌 || item.vehicleBrand),
-                            replaceNumber: formatEmptyValue(item.replace_number || item.替换号 || item.replaceNumber),
-                            productLevel: formatEmptyValue(item.product_level || item.产品等级 || item.productLevel),
-                            supplierPrice: formatPrice(item.supplier_price || item.供应商价格 || item.supplierPrice),
-                            maxPrice: formatPrice(item.max_price || item.最高价 || item.maxPrice),
-                            minPrice: formatPrice(item.min_price || item.最低价 || item.minPrice),
-                            dealerPurchasePrice: formatPrice(item.dealer_purchase_price || item['4S含税进价'] || item.dealerPurchasePrice),
-                            dealerSalePrice: formatPrice(item.dealer_sale_price || item['4S含税售价'] || item.dealerSalePrice),
-                            priceUpdateTime: formatEmptyValue(item.price_update_time || item.更新价格时间 || item.priceUpdateTime),
-                            todaySales: formatNumber(item.today_sales || item.今日销量 || item.todaySales),
-                            yesterdaySales: formatNumber(item.yesterday_sales || item.昨日销量 || item.yesterdaySales),
-                            monthSales: formatNumber(item.month_sales || item.本月销量 || item.monthSales),
-                            avgSales12m: formatNumber(item.avg_sales_12m || item.近12个月月均销量 || item.avgSales12m),
-                            avgSales6m: formatNumber(item.avg_sales_6m || item.近6个月月均销量 || item.avgSales6m),
-                            sales7d: formatNumber(item.sales_7d || item.近7天销量 || item.sales7d),
-                            productRemark: formatEmptyValue(item.product_remark || item.系统产品备注 || item.productRemark),
-                            brandCode: formatEmptyValue(item.brand_code || item.品牌编码 || item.brandCode),
+                            oe: index === 0 ? formatEmptyValue(item.oe) : '',
+                            brand: index === 0 ? formatEmptyValue(item.brand) : '',
+                            productName: formatEmptyValue(item.product_name),
+                            vehicleBrand: formatEmptyValue(item.vehicle_brand),
+                            replaceNumber: formatEmptyValue(item.replace_number),
+                            productLevel: formatEmptyValue(item.product_level),
+                            supplierPrice: formatPrice(item.supplier_price),
+                            maxPrice: formatPrice(item.max_price),
+                            minPrice: formatPrice(item.min_price),
+                            procurementRecords: procurementRecords,
+                            dealerPurchasePrice: formatPrice(item.dealer_purchase_price),
+                            dealerSalePrice: formatPrice(item.dealer_sale_price),
+                            priceUpdateTime: formatEmptyValue(item.price_update_time),
+                            todaySales: formatNumber(item.today_sales),
+                            yesterdaySales: formatNumber(item.yesterday_sales),
+                            monthSales: formatNumber(item.month_sales),
+                            avgSales12m: formatNumber(item.avg_sales_12m),
+                            avgSales6m: formatNumber(item.avg_sales_6m),
+                            sales7d: formatNumber(item.sales_7d),
+                            productRemark: formatEmptyValue(item.product_remark),
+                            brandCode: formatEmptyValue(item.brand_code),
                             _oeGroup: oe,
                             _brandGroup: brand
                         });
@@ -506,13 +1076,11 @@
             updatePagination();
         }
 
-        // 格式化数字，空值显示为 -
-        function formatNum(value) {
-            if (value === null || value === undefined || value === '' || value === 0) {
-                return '-';
-            }
-            return value.toLocaleString();
-        }
+        // 行高固定为40px
+        const DEFAULT_ROW_HEIGHT = 40;
+
+        // 记录哪些行被展开
+        let expandedRows = new Set();
 
         function initHandsontable(data, mergeCells) {
             const container = document.getElementById('handsontable-container');
@@ -530,15 +1098,172 @@
                     { data: 'oe', title: 'OE', width: 140, className: 'oe-cell', readOnly: true },
                     // 品牌
                     { data: 'brand', title: '品牌', width: 100, className: 'brand-cell', readOnly: true },
-                    // 产品名称
-                    { data: 'productName', title: '产品名称', width: 200, className: 'product-name-cell', readOnly: true },
-                    // 车辆品牌
-                    { data: 'vehicleBrand', title: '车辆品牌', width: 120, className: 'vehicle-brand-cell', readOnly: true },
-                    // 替换号
-                    { data: 'replaceNumber', title: '替换号', width: 120, readOnly: true },
+                    // 产品名称（带展开按钮）
+                    {
+                        data: 'productName',
+                        title: '产品名称',
+                        width: 200,
+                        className: 'product-name-cell',
+                        readOnly: true,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            const isExpanded = expandedRows.has(row);
+                            const hasContent = value && value.length > 8;  // 降低阈值到8个字符
+
+                            const container = document.createElement('div');
+                            container.style.width = '100%';
+                            container.style.height = '100%';
+                            container.style.position = 'relative';
+
+                            // 文本内容
+                            const textSpan = document.createElement('span');
+                            textSpan.textContent = value || '';
+                            textSpan.style.display = 'block';
+                            textSpan.style.width = '100%';
+                            textSpan.style.overflow = 'hidden';
+                            textSpan.style.textOverflow = isExpanded ? 'clip' : 'ellipsis';
+                            textSpan.style.whiteSpace = isExpanded ? 'normal' : 'nowrap';
+                            textSpan.style.paddingRight = hasContent ? '20px' : '0';
+                            container.appendChild(textSpan);
+
+                            // 展开/收起按钮
+                            if (hasContent) {
+                                const btn = document.createElement('button');
+                                btn.className = 'expand-btn' + (isExpanded ? ' expanded' : '');
+                                btn.innerHTML = isExpanded ? '−' : '+';
+                                btn.style.position = 'absolute';
+                                btn.style.right = '2px';
+                                btn.style.top = '50%';
+                                btn.style.transform = 'translateY(-50%)';
+                                btn.onclick = function(e) {
+                                    e.stopPropagation();
+                                    if (expandedRows.has(row)) {
+                                        expandedRows.delete(row);
+                                    } else {
+                                        expandedRows.add(row);
+                                    }
+                                    hot.render();
+                                };
+                                container.appendChild(btn);
+                            }
+
+                            td.innerHTML = '';
+                            td.appendChild(container);
+
+                            return td;
+                        }
+                    },
+                    // 车辆品牌（带展开按钮）
+                    {
+                        data: 'vehicleBrand',
+                        title: '车辆品牌',
+                        width: 120,
+                        className: 'vehicle-brand-cell',
+                        readOnly: true,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            const isExpanded = expandedRows.has(row);
+                            const hasContent = value && value.length > 6;
+
+                            const container = document.createElement('div');
+                            container.style.width = '100%';
+                            container.style.height = '100%';
+                            container.style.position = 'relative';
+
+                            const textSpan = document.createElement('span');
+                            textSpan.textContent = value || '';
+                            textSpan.style.display = 'block';
+                            textSpan.style.width = '100%';
+                            textSpan.style.overflow = 'hidden';
+                            textSpan.style.textOverflow = isExpanded ? 'clip' : 'ellipsis';
+                            textSpan.style.whiteSpace = isExpanded ? 'normal' : 'nowrap';
+                            textSpan.style.paddingRight = hasContent ? '20px' : '0';
+
+                            container.appendChild(textSpan);
+
+                            if (hasContent) {
+                                const btn = document.createElement('button');
+                                btn.className = 'expand-btn' + (isExpanded ? ' expanded' : '');
+                                btn.innerHTML = isExpanded ? '−' : '+';
+                                btn.style.position = 'absolute';
+                                btn.style.right = '2px';
+                                btn.style.top = '50%';
+                                btn.style.transform = 'translateY(-50%)';
+                                btn.onclick = function(e) {
+                                    e.stopPropagation();
+                                    if (expandedRows.has(row)) {
+                                        expandedRows.delete(row);
+                                    } else {
+                                        expandedRows.add(row);
+                                    }
+                                    hot.render();
+                                };
+                                container.appendChild(btn);
+                            }
+
+                            td.innerHTML = '';
+                            td.appendChild(container);
+                            return td;
+                        }
+                    },
+                    // 替换号（带展开按钮，展开后逗号分隔显示）
+                    {
+                        data: 'replaceNumber',
+                        title: '替换号',
+                        width: 120,
+                        readOnly: true,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            const isExpanded = expandedRows.has(row);
+                            const hasContent = value && value.length > 8;
+
+                            const container = document.createElement('div');
+                            container.style.width = '100%';
+                            container.style.height = '100%';
+                            container.style.position = 'relative';
+
+                            const textSpan = document.createElement('span');
+                            // 展开时将逗号替换为逗号+空格，让内容自动换行
+                            if (isExpanded && value) {
+                                textSpan.innerHTML = value.replace(/,/g, ',<br>');
+                            } else {
+                                textSpan.textContent = value || '';
+                            }
+                            textSpan.style.display = 'block';
+                            textSpan.style.width = '100%';
+                            textSpan.style.overflow = 'hidden';
+                            textSpan.style.textOverflow = isExpanded ? 'clip' : 'ellipsis';
+                            textSpan.style.whiteSpace = isExpanded ? 'normal' : 'nowrap';
+                            textSpan.style.paddingRight = hasContent ? '20px' : '0';
+                            textSpan.style.lineHeight = isExpanded ? '1.6' : 'normal';
+
+                            container.appendChild(textSpan);
+
+                            if (hasContent) {
+                                const btn = document.createElement('button');
+                                btn.className = 'expand-btn' + (isExpanded ? ' expanded' : '');
+                                btn.innerHTML = isExpanded ? '−' : '+';
+                                btn.style.position = 'absolute';
+                                btn.style.right = '2px';
+                                btn.style.top = isExpanded ? '4px' : '50%';
+                                btn.style.transform = isExpanded ? 'none' : 'translateY(-50%)';
+                                btn.onclick = function(e) {
+                                    e.stopPropagation();
+                                    if (expandedRows.has(row)) {
+                                        expandedRows.delete(row);
+                                    } else {
+                                        expandedRows.add(row);
+                                    }
+                                    hot.render();
+                                };
+                                container.appendChild(btn);
+                            }
+
+                            td.innerHTML = '';
+                            td.appendChild(container);
+                            return td;
+                        }
+                    },
                     // 产品等级
                     { data: 'productLevel', title: '产品等级', width: 100, className: 'level-cell', readOnly: true },
-                    // 供应商价格（带最高价最低价浮窗）
+                    // 供应商价格（带最高价最低价和采购记录浮窗）
                     {
                         data: 'supplierPrice',
                         title: '供应商价格',
@@ -553,14 +1278,12 @@
                             td.style.fontWeight = '500';
 
                             // 添加自定义浮窗事件
-                            if (data.maxPrice || data.minPrice) {
+                            if (data.maxPrice || data.minPrice || (data.procurementRecords && data.procurementRecords.length > 0)) {
                                 td.style.cursor = 'pointer';
-                                td.dataset.maxPrice = data.maxPrice || '-';
-                                td.dataset.minPrice = data.minPrice || '-';
 
                                 // 鼠标进入显示浮窗
                                 td.addEventListener('mouseenter', function(e) {
-                                    showPriceTooltip(e, this.dataset.maxPrice, this.dataset.minPrice);
+                                    showPriceTooltip(e, data.maxPrice || '-', data.minPrice || '-', data.procurementRecords);
                                 });
 
                                 // 鼠标离开隐藏浮窗
@@ -578,33 +1301,121 @@
                     { data: 'dealerSalePrice', title: '4S含税售价', width: 110, className: 'price-cell', readOnly: true },
                     // 更新价格时间
                     { data: 'priceUpdateTime', title: '更新价格时间', width: 140, className: 'date-cell', readOnly: true },
-                    // 销量及月均销量（合并显示）
-                    { 
-                        data: 'salesData', 
-                        title: '销量及月均销量', 
-                        width: 160, 
-                        className: 'quantity-cell', 
+                    // 销量及月均销量（合并显示，带悬浮窗）
+                    {
+                        data: 'salesData',
+                        title: '销量及月均销量',
+                        width: 160,
+                        className: 'quantity-cell',
                         readOnly: true,
                         renderer: function(instance, td, row, col, prop, value, cellProperties) {
                             const data = instance.getSourceDataAtRow(row);
-                            const today = formatNum(data.todaySales);
-                            const yesterday = formatNum(data.yesterdaySales);
-                            const sales7d = formatNum(data.sales7d);
-                            const month = formatNum(data.monthSales);
-                            const avg6m = formatNum(data.avgSales6m);
-                            const avg12m = formatNum(data.avgSales12m);
-                            
+                            const today = formatNumber(data.todaySales) || '-';
+                            const yesterday = formatNumber(data.yesterdaySales) || '-';
+                            const sales7d = formatNumber(data.sales7d) || '-';
+                            const month = formatNumber(data.monthSales) || '-';
+                            const avg6m = formatNumber(data.avgSales6m) || '-';
+                            const avg12m = formatNumber(data.avgSales12m) || '-';
+
                             td.innerHTML = '<div style="line-height:1.4;padding:4px;text-align:center;">' +
                                            '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales7d + '</div>' +
                                            '<div>近1/6/12月: ' + month + '/' + avg6m + '/' + avg12m + '</div>' +
                                            '</div>';
                             td.style.textAlign = 'center';
                             td.style.verticalAlign = 'middle';
+                            td.style.cursor = 'pointer';
+
+                            // 添加悬浮窗事件
+                            const salesData = {
+                                todaySales: data.todaySales,
+                                yesterdaySales: data.yesterdaySales,
+                                sales7d: data.sales7d,
+                                monthSales: data.monthSales,
+                                avgSales6m: data.avgSales6m,
+                                avgSales12m: data.avgSales12m
+                            };
+
+                            // 从缓存获取询价历史，如果没有则异步加载
+                            const cacheKey = data.oe + '|' + data.brand;
+                            let quoteHistory = quoteHistoryCache.get(cacheKey);
+
+                            td.addEventListener('mouseenter', function(e) {
+                                if (quoteHistory) {
+                                    // 缓存中有数据，直接显示
+                                    showSalesTooltip(e, salesData, quoteHistory);
+                                } else {
+                                    // 显示加载中
+                                    showSalesTooltip(e, salesData, []);
+                                    // 异步加载询价历史
+                                    loadQuoteHistory(data.oe, data.brand, function(history) {
+                                        quoteHistory = history;
+                                        // 如果鼠标还在单元格上，更新浮窗
+                                        if (td.matches(':hover')) {
+                                            showSalesTooltip(e, salesData, quoteHistory);
+                                        }
+                                    });
+                                }
+                            });
+
+                            td.addEventListener('mouseleave', function() {
+                                hideSalesTooltip();
+                            });
+
                             return td;
                         }
                     },
-                    // 系统产品备注
-                    { data: 'productRemark', title: '系统产品备注', width: 150, className: 'remark-cell', readOnly: true },
+                    // 系统产品备注（带展开按钮）
+                    {
+                        data: 'productRemark',
+                        title: '系统产品备注',
+                        width: 150,
+                        className: 'remark-cell',
+                        readOnly: true,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            const isExpanded = expandedRows.has(row);
+                            const hasContent = value && value.length > 8;
+
+                            const container = document.createElement('div');
+                            container.style.width = '100%';
+                            container.style.height = '100%';
+                            container.style.position = 'relative';
+
+                            const textSpan = document.createElement('span');
+                            textSpan.textContent = value || '';
+                            textSpan.style.display = 'block';
+                            textSpan.style.width = '100%';
+                            textSpan.style.overflow = 'hidden';
+                            textSpan.style.textOverflow = isExpanded ? 'clip' : 'ellipsis';
+                            textSpan.style.whiteSpace = isExpanded ? 'normal' : 'nowrap';
+                            textSpan.style.paddingRight = hasContent ? '20px' : '0';
+
+                            container.appendChild(textSpan);
+
+                            if (hasContent) {
+                                const btn = document.createElement('button');
+                                btn.className = 'expand-btn' + (isExpanded ? ' expanded' : '');
+                                btn.innerHTML = isExpanded ? '−' : '+';
+                                btn.style.position = 'absolute';
+                                btn.style.right = '2px';
+                                btn.style.top = '50%';
+                                btn.style.transform = 'translateY(-50%)';
+                                btn.onclick = function(e) {
+                                    e.stopPropagation();
+                                    if (expandedRows.has(row)) {
+                                        expandedRows.delete(row);
+                                    } else {
+                                        expandedRows.add(row);
+                                    }
+                                    hot.render();
+                                };
+                                container.appendChild(btn);
+                            }
+
+                            td.innerHTML = '';
+                            td.appendChild(container);
+                            return td;
+                        }
+                    },
                     // 品牌编码
                     { data: 'brandCode', title: '品牌编码', width: 100, className: 'code-cell', readOnly: true }
                 ],
@@ -615,16 +1426,23 @@
                 width: '100%',
                 stretchH: 'all',
                 licenseKey: 'non-commercial-and-evaluation',
-                
+
+                // 统一行高设置 - 展开的行自适应高度，未展开的行固定40px
+                rowHeights: function(row) {
+                    return expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                },
+                // 禁用自动行高
+                autoRowSize: false,
+
                 // 只读模式 - 禁止编辑
                 readOnly: true,
                 disableVisualSelection: false,
-                
+
                 // 选中复制功能
                 selectionMode: 'multiple',
                 copyPaste: true,
                 contextMenu: false,
-                
+
                 // 其他配置
                 manualColumnResize: true,
                 manualRowResize: false,
@@ -635,7 +1453,7 @@
                 filters: false,
                 dropdownMenu: false,
 
-                // 添加点击表头排序事件
+                // 点击表头排序
                 afterOnCellMouseDown: function(event, coords, TD) {
                     // 检查是否点击了表头（第一行）
                     if (coords.row === -1 && coords.col >= 0) {
@@ -739,6 +1557,16 @@
                     console.log('当前页数据条数:', allData.length, '总条数:', result.count, '总页数:', totalPages);
 
                     renderCurrentPage();
+
+                    // 预加载当前页产品的询价历史（异步，不阻塞页面渲染）
+                    if (allData.length > 0) {
+                        const products = allData.map(item => ({
+                            oe: item.oe,
+                            brand: item.brand
+                        })).filter(p => p.oe && p.brand);
+                        // 延迟执行，优先保证页面渲染
+                        setTimeout(() => batchLoadQuoteHistory(products), 500);
+                    }
                 } else {
                     container.innerHTML = '<div class="loading-overlay">加载失败: ' + result.msg + '</div>';
                 }

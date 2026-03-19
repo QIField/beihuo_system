@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..
 # 导入统一的 SessionManager
 from app.utils.session_manager import SessionManager, get_session
 
+# 导入 CRM Session 创建函数
+from config import create_crm_session
+
 # 保持向后兼容的别名
 get_thread_session = get_session
 

@@ -122,15 +122,15 @@ task_manager = LightweightTaskManager(max_workers=10)
 def init_ks_bill_monitor():
     """初始化开思自动对单任务"""
     import os
-    
+
     auto_start = os.environ.get('AUTO_START_KS_BILL', 'true').lower() != 'false'
     if not auto_start:
         print("[开思自动对单] 已禁用")
         return
-    
+
     try:
         from app.ks_auto_bill.task import ks_auto_bill_task
-        
+
         task_manager.schedule(
             ks_auto_bill_task,
             'interval',
@@ -138,8 +138,32 @@ def init_ks_bill_monitor():
             minutes=1,
             replace_existing=True
         )
-        
-        print("[开思自动对单] 任务已启动（每分钟）")
-        
+
     except Exception as e:
         logger.error(f"[开思自动对单] 失败: {e}")
+
+
+def init_zhuozhixing_sync():
+    """初始化卓之星每日同步任务（每晚23:00执行）"""
+    import os
+
+    auto_start = os.environ.get('AUTO_START_ZHUOZHIXING', 'true').lower() != 'false'
+    if not auto_start:
+        print("[卓之星同步] 已禁用")
+        return
+
+    try:
+        from app.external_services.zhuozhixing_sync.sync_service import zhuozhixing_daily_sync
+
+        task_manager.schedule(
+            zhuozhixing_daily_sync,
+            'cron',
+            'zhuozhixing_daily_sync',
+            hour=23,
+            minute=0,
+            replace_existing=True
+        )
+        print("[卓之星同步] 定时任务已注册（每晚23:00）")
+
+    except Exception as e:
+        logger.error(f"[卓之星同步] 失败: {e}")

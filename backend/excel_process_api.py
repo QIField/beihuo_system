@@ -250,7 +250,7 @@ def register_excel_process_routes(app):
             ]
         })
     
-    print("✅ Excel处理API接口已注册（支持两列和三列模式）")
+
 
 def process_excel_concurrent(file_path, process_type, mode='two_column'):
     """

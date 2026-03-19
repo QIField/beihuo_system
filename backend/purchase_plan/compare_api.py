@@ -108,9 +108,12 @@ def get_compare_list():
 def export_compare_data():
     """
     导出比价数据为Excel或CSV
-    支持筛选条件
+    支持筛选条件，导出列与前端表格保持一致
+    包含：最高价、最低价、采购记录（合并显示）
     """
     try:
+        import json
+
         # 获取查询参数
         oe = request.args.get('oe', '').strip()
         brand = request.args.get('brand', '').strip()
@@ -118,12 +121,16 @@ def export_compare_data():
         vehicle_brand = request.args.get('vehicle_brand', '').strip()
         export_format = request.args.get('format', 'excel').lower()
 
-        # 获取所有数据（不分页）
+        # 获取用户当前切换到的组织
+        company = session.get('current_org', session.get('store', 'fsbbr'))
+
+        # 获取所有数据（不分页），根据搜索条件过滤
         data, _ = CompareDataService.list_data(
             oe=oe,
             brand=brand,
             product_name=product_name,
             vehicle_brand=vehicle_brand,
+            company=company,
             page=1,
             limit=999999  # 获取所有数据
         )
@@ -131,44 +138,88 @@ def export_compare_data():
         if not data:
             return jsonify({'code': 1, 'msg': '没有数据可导出'}), 400
 
+        # 处理数据，构建导出格式
+        export_data = []
+        for idx, item in enumerate(data, start=1):
+            # 处理采购记录，格式化为多行文本
+            procurement_records_str = ''
+            if item.get('procurement_records'):
+                try:
+                    records = item['procurement_records']
+                    if isinstance(records, str):
+                        records = json.loads(records)
+                    if isinstance(records, list) and records:
+                        # 按采购日期倒序排列
+                        sorted_records = sorted(
+                            records,
+                            key=lambda x: x.get('purchase_date', ''),
+                            reverse=True
+                        )
+                        # 格式化为多行文本
+                        lines = []
+                        for record in sorted_records:
+                            supplier = record.get('supplier_name', '')
+                            price = record.get('purchase_price', '')
+                            date = record.get('purchase_date', '')
+                            if supplier:
+                                lines.append(f"{supplier}: ¥{price} ({date})")
+                        procurement_records_str = '\n'.join(lines)
+                except Exception as e:
+                    procurement_records_str = ''
+
+            # 格式化价格字段
+            def format_price(value):
+                if value is None or value == '' or value == 0:
+                    return ''
+                try:
+                    return float(value)
+                except:
+                    return value
+
+            # 格式化数字字段
+            def format_number(value):
+                if value is None or value == '' or value == 0:
+                    return ''
+                try:
+                    return int(float(value))
+                except:
+                    return value
+
+            row = {
+                '行号': idx,
+                'OE': item.get('oe', ''),
+                '品牌': item.get('brand', ''),
+                '产品名称': item.get('product_name', ''),
+                '车辆品牌': item.get('vehicle_brand', ''),
+                '替换号': item.get('replace_number', ''),
+                '产品等级': item.get('product_level', ''),
+                '供应商价格': format_price(item.get('supplier_price')),
+                '最高价': format_price(item.get('max_price')),
+                '最低价': format_price(item.get('min_price')),
+                '采购记录': procurement_records_str,
+                '4S含税进价': format_price(item.get('dealer_purchase_price')),
+                '4S含税售价': format_price(item.get('dealer_sale_price')),
+                '更新价格时间': item.get('price_update_time', ''),
+                '今日销量': format_number(item.get('today_sales')),
+                '昨日销量': format_number(item.get('yesterday_sales')),
+                '近7天销量': format_number(item.get('sales_7d')),
+                '本月销量': format_number(item.get('month_sales')),
+                '近6个月月均销量': format_number(item.get('avg_sales_6m')),
+                '近12个月月均销量': format_number(item.get('avg_sales_12m')),
+                '系统产品备注': item.get('product_remark', ''),
+                '品牌编码': item.get('brand_code', '')
+            }
+            export_data.append(row)
+
         # 转换为DataFrame
-        df = pd.DataFrame(data)
-
-        # 选择要导出的列并重命名
-        columns_mapping = {
-            'oe': 'OE',
-            'brand': '品牌',
-            'product_name': '产品名称',
-            'vehicle_brand': '车辆品牌',
-            'replace_number': '替换号',
-            'brand_code': '品牌编码',
-            'inquiry_count': '询价次数',
-            'product_level': '产品等级',
-            'best_sales_month': '销量最好的月份',
-            'best_sales_season': '销量最好的季节',
-            'max_price': '最高价',
-            'min_price': '最低价',
-            'supplier_price': '供应商价格',
-            'dealer_purchase_price': '4S含税进价',
-            'dealer_sale_price': '4S含税售价',
-            'price_update_time': '更新价格时间',
-            'today_sales': '今日销量',
-            'yesterday_sales': '昨日销量',
-            'month_sales': '本月销量',
-            'avg_sales_12m': '近12个月月均销量',
-            'avg_sales_6m': '近6个月月均销量',
-            'sales_7d': '近7天销量',
-            'product_remark': '系统产品备注'
-        }
-
-        # 只保留存在的列
-        existing_columns = [col for col in columns_mapping.keys() if col in df.columns]
-        df = df[existing_columns]
-        df = df.rename(columns=columns_mapping)
+        df = pd.DataFrame(export_data)
 
         # 生成文件名
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f'比价数据_{timestamp}'
+        # 对中文文件名进行URL编码，避免UnicodeEncodeError
+        from urllib.parse import quote
+        encoded_filename = quote(filename)
 
         if export_format == 'csv':
             # 导出为CSV
@@ -180,7 +231,7 @@ def export_compare_data():
                 output.getvalue(),
                 mimetype='text/csv; charset=utf-8-sig',
                 headers={
-                    'Content-Disposition': f'attachment; filename={filename}.csv',
+                    'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}.csv",
                     'Content-Type': 'text/csv; charset=utf-8-sig'
                 }
             )
@@ -189,13 +240,43 @@ def export_compare_data():
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df.to_excel(writer, index=False, sheet_name='比价数据')
+
+                # 获取工作表并设置列宽
+                worksheet = writer.sheets['比价数据']
+                column_widths = {
+                    'A': 8,   # 行号
+                    'B': 15,  # OE
+                    'C': 12,  # 品牌
+                    'D': 25,  # 产品名称
+                    'E': 15,  # 车辆品牌
+                    'F': 15,  # 替换号
+                    'G': 12,  # 产品等级
+                    'H': 12,  # 供应商价格
+                    'I': 10,  # 最高价
+                    'J': 10,  # 最低价
+                    'K': 40,  # 采购记录（较宽以显示多行内容）
+                    'L': 12,  # 4S含税进价
+                    'M': 12,  # 4S含税售价
+                    'N': 18,  # 更新价格时间
+                    'O': 10,  # 今日销量
+                    'P': 10,  # 昨日销量
+                    'Q': 12,  # 近7天销量
+                    'R': 12,  # 本月销量
+                    'S': 16,  # 近6个月月均销量
+                    'T': 16,  # 近12个月月均销量
+                    'U': 25,  # 系统产品备注
+                    'V': 12   # 品牌编码
+                }
+                for col, width in column_widths.items():
+                    worksheet.column_dimensions[col].width = width
+
             output.seek(0)
 
             return Response(
                 output.getvalue(),
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 headers={
-                    'Content-Disposition': f'attachment; filename={filename}.xlsx'
+                    'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}.xlsx"
                 }
             )
 
@@ -298,3 +379,84 @@ def get_by_id(record_id):
 
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'获取失败: {str(e)}'}), 500
+
+
+@compare_bp.route('/quote_history/batch', methods=['POST'])
+@compare_permission_required
+def get_quote_history_batch():
+    """
+    批量查询多个产品的询价历史
+    请求体格式：{"products": [{"oe": "xxx", "brand": "xxx"}, ...]}
+    返回：每个产品的近36个月询价次数
+    """
+    try:
+        data = request.get_json()
+        if not data or 'products' not in data:
+            return jsonify({'code': 1, 'msg': '请求参数错误，需要提供products列表'}), 400
+        
+        products = data['products']
+        if not isinstance(products, list) or len(products) == 0:
+            return jsonify({'code': 1, 'msg': 'products必须是非空数组'}), 400
+        
+        # 限制单次查询数量，防止性能问题
+        if len(products) > 500:
+            return jsonify({'code': 1, 'msg': '单次查询最多支持500个产品'}), 400
+        
+        # 构建产品标识列表
+        product_keys = []
+        for p in products:
+            if 'oe' in p and 'brand' in p:
+                product_keys.append((p['oe'], p['brand']))
+        
+        if not product_keys:
+            return jsonify({'code': 1, 'msg': '产品信息不完整，需要oe和brand字段'}), 400
+        
+        # 获取用户当前组织
+        company = session.get('current_org', session.get('store', 'fsbbr'))
+        
+        # 批量查询询价历史
+        result = CompareDataService.get_quote_history_batch(product_keys, company=company, months=36)
+        
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取询价历史失败: {str(e)}'}), 500
+
+
+@compare_bp.route('/quote_history', methods=['GET'])
+@compare_permission_required
+def get_quote_history():
+    """
+    查询单个产品的询价历史
+    参数：oe, brand
+    返回：近36个月的询价次数列表
+    """
+    try:
+        oe = request.args.get('oe', '').strip()
+        brand = request.args.get('brand', '').strip()
+        
+        if not oe or not brand:
+            return jsonify({'code': 1, 'msg': 'OE号和品牌不能为空'}), 400
+        
+        # 获取用户当前组织
+        company = session.get('current_org', session.get('store', 'fsbbr'))
+        
+        # 查询询价历史
+        result = CompareDataService.get_quote_history(oe, brand, company=company, months=36)
+        
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': {
+                'oe': oe,
+                'brand': brand,
+                'history': result
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取询价历史失败: {str(e)}'}), 500

@@ -20,4 +20,3 @@ def register_purchase_plan_routes(app):
     使用方式: register_purchase_plan_routes(app)
     """
     app.register_blueprint(purchase_plan_bp, url_prefix='/api/purchase_plan')
-    print("✅ 采购计划模块路由注册完成")

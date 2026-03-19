@@ -373,6 +373,44 @@
             color: #ff4d4f;
             border: 1px solid #ffccc7;
         }
+
+        /* 展开按钮样式 - 简约设计，默认隐藏 */
+        .expand-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            margin-left: 4px;
+            background: transparent;
+            color: #999;
+            border: 1px solid #d9d9d9;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 10px;
+            line-height: 1;
+            vertical-align: middle;
+            transition: all 0.2s ease;
+            opacity: 0;  /* 默认隐藏 */
+        }
+
+        /* 单元格悬浮时显示展开按钮 */
+        .handsontable .htCore td:hover .expand-btn {
+            opacity: 1;
+        }
+
+        .expand-btn:hover {
+            background: #f0f0f0;
+            border-color: #bfbfbf;
+            color: #666;
+        }
+
+        .expand-btn.expanded {
+            background: #e6f7ff;
+            border-color: #1890ff;
+            color: #1890ff;
+            opacity: 1;  /* 展开状态始终显示 */
+        }
     </style>
 </head>
 <body>
@@ -463,6 +501,12 @@
         let currentPage = 1;
         let pageSize = 100;
         let totalPages = 1;
+
+        // 行高固定为40px
+        const DEFAULT_ROW_HEIGHT = 40;
+
+        // 记录哪些行被展开
+        let expandedRows = new Set();
 
         // 空值处理函数
         function formatEmptyValue(value) {
@@ -598,6 +642,108 @@
             updatePagination();
         }
 
+        // 创建带展开按钮的列renderer
+        function createExpandableRenderer(threshold) {
+            return function(instance, td, row, col, prop, value, cellProperties) {
+                const isExpanded = expandedRows.has(row);
+                const hasContent = value && value.length > threshold;
+
+                const container = document.createElement('div');
+                container.style.width = '100%';
+                container.style.height = '100%';
+                container.style.position = 'relative';
+
+                const textSpan = document.createElement('span');
+                textSpan.textContent = value || '';
+                textSpan.style.display = 'block';
+                textSpan.style.width = '100%';
+                textSpan.style.overflow = 'hidden';
+                textSpan.style.textOverflow = isExpanded ? 'clip' : 'ellipsis';
+                textSpan.style.whiteSpace = isExpanded ? 'normal' : 'nowrap';
+                textSpan.style.paddingRight = hasContent ? '20px' : '0';
+
+                container.appendChild(textSpan);
+
+                if (hasContent) {
+                    const btn = document.createElement('button');
+                    btn.className = 'expand-btn' + (isExpanded ? ' expanded' : '');
+                    btn.innerHTML = isExpanded ? '−' : '+';
+                    btn.style.position = 'absolute';
+                    btn.style.right = '2px';
+                    btn.style.top = isExpanded ? '4px' : '50%';
+                    btn.style.transform = isExpanded ? 'none' : 'translateY(-50%)';
+                    btn.onclick = function(e) {
+                        e.stopPropagation();
+                        if (expandedRows.has(row)) {
+                            expandedRows.delete(row);
+                        } else {
+                            expandedRows.add(row);
+                        }
+                        hot.render();
+                    };
+                    container.appendChild(btn);
+                }
+
+                td.innerHTML = '';
+                td.appendChild(container);
+                return td;
+            };
+        }
+
+        // 创建通用号列的renderer（展开时逗号分隔换行）
+        function createCommonNumberRenderer(threshold) {
+            return function(instance, td, row, col, prop, value, cellProperties) {
+                const isExpanded = expandedRows.has(row);
+                const hasContent = value && value.length > threshold;
+
+                const container = document.createElement('div');
+                container.style.width = '100%';
+                container.style.height = '100%';
+                container.style.position = 'relative';
+
+                const textSpan = document.createElement('span');
+                // 展开时将逗号替换为逗号+<br>，让内容自动换行
+                if (isExpanded && value) {
+                    textSpan.innerHTML = value.replace(/,/g, ',<br>');
+                } else {
+                    textSpan.textContent = value || '';
+                }
+                textSpan.style.display = 'block';
+                textSpan.style.width = '100%';
+                textSpan.style.overflow = 'hidden';
+                textSpan.style.textOverflow = isExpanded ? 'clip' : 'ellipsis';
+                textSpan.style.whiteSpace = isExpanded ? 'normal' : 'nowrap';
+                textSpan.style.paddingRight = hasContent ? '20px' : '0';
+                textSpan.style.lineHeight = isExpanded ? '1.6' : 'normal';
+
+                container.appendChild(textSpan);
+
+                if (hasContent) {
+                    const btn = document.createElement('button');
+                    btn.className = 'expand-btn' + (isExpanded ? ' expanded' : '');
+                    btn.innerHTML = isExpanded ? '−' : '+';
+                    btn.style.position = 'absolute';
+                    btn.style.right = '2px';
+                    btn.style.top = isExpanded ? '4px' : '50%';
+                    btn.style.transform = isExpanded ? 'none' : 'translateY(-50%)';
+                    btn.onclick = function(e) {
+                        e.stopPropagation();
+                        if (expandedRows.has(row)) {
+                            expandedRows.delete(row);
+                        } else {
+                            expandedRows.add(row);
+                        }
+                        hot.render();
+                    };
+                    container.appendChild(btn);
+                }
+
+                td.innerHTML = '';
+                td.appendChild(container);
+                return td;
+            };
+        }
+
         function initHandsontable(data, mergeCells) {
             const container = document.getElementById('handsontable-container');
             
@@ -611,13 +757,13 @@
                     { data: 'rowNumber', title: '行号', width: 70, className: 'row-number-cell', readOnly: true },
                     { data: 'oe', title: 'OE号', width: 150, className: 'oe-cell', readOnly: true },
                     { data: 'brand', title: '品牌', width: 120, className: 'brand-cell', readOnly: true },
-                    { data: 'supplier', title: '供应商', width: 150, readOnly: true },
+                    { data: 'supplier', title: '供应商', width: 150, readOnly: true, renderer: createExpandableRenderer(10) },
                     { data: 'price', title: '单价', width: 100, className: 'price-cell', readOnly: true },
-                    { data: 'warehouse', title: '仓库', width: 120, readOnly: true },
+                    { data: 'warehouse', title: '仓库', width: 120, readOnly: true, renderer: createExpandableRenderer(8) },
                     { data: 'expire_time', title: '失效时间', width: 160, readOnly: true },
-                    { data: 'remark', title: '备注', width: 150, readOnly: true },
+                    { data: 'remark', title: '备注', width: 150, readOnly: true, renderer: createExpandableRenderer(8) },
                     { data: 'stock_quantity', title: '库存数量', width: 100, readOnly: true },
-                    { data: 'common_number', title: '通用号', width: 150, readOnly: true },
+                    { data: 'common_number', title: '通用号', width: 150, readOnly: true, renderer: createCommonNumberRenderer(10) },
                     { data: 'ks_sync', title: '开思是否同步', width: 120, readOnly: true }
                 ],
                 mergeCells: mergeCells,
@@ -627,6 +773,13 @@
                 width: '100%',
                 stretchH: 'all',
                 licenseKey: 'non-commercial-and-evaluation',
+
+                // 统一行高设置 - 展开的行自适应高度，未展开的行固定40px
+                rowHeights: function(row) {
+                    return expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                },
+                // 禁用自动行高
+                autoRowSize: false,
                 
                 // 只读模式 - 禁止编辑
                 readOnly: true,

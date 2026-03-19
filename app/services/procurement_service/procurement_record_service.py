@@ -407,9 +407,9 @@ def update_procurement_records(oe: str, brand: str, company: str,
 def add_inquiry_record(oe: str, brand: str, supplier: str, price: float, 
                        company: str) -> bool:
     """
-    添加询价导入的记录到采购记录
+    添加询价导入的记录到采购历史表
     
-    将询价导入时自带的供应商和单价作为一条记录存入
+    将询价导入时自带的供应商和单价作为一条记录存入 crmapp_procurement_history 表
     日期使用当天日期
     
     Args:
@@ -426,17 +426,43 @@ def add_inquiry_record(oe: str, brand: str, supplier: str, price: float,
         print("添加询价记录失败: OE 或供应商不能为空")
         return False
     
-    today = datetime.now().strftime('%Y-%m-%d')
+    from app.utils.database_connection import get_db_connection
     
-    # 构建记录
-    record = {
-        'supplier_name': supplier,
-        'purchase_price': float(price) if price else 0.0,
-        'purchase_date': today
-    }
+    today = datetime.now()
+    purchase_date = today.strftime('%Y-%m-%d')
+    year_month = today.strftime('%Y-%m')
     
-    # 使用相同的保存逻辑
-    return save_procurement_records(oe, brand or '', company, [record])
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 插入到采购历史表，使用 ON DUPLICATE KEY UPDATE 去重
+            sql = """
+                INSERT INTO crmapp_procurement_history 
+                (year_month, purchase_date, supplier_name, oe, brand, unit_price, company)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE 
+                    purchase_date = VALUES(purchase_date)
+            """
+            cursor.execute(sql, (
+                year_month,
+                purchase_date,
+                supplier,
+                oe,
+                brand or '',
+                float(price) if price else 0.0,
+                company
+            ))
+            conn.commit()
+            
+            print(f"添加询价记录成功: OE={oe}, 供应商={supplier}, 价格={price}")
+            return True
+            
+    except Exception as e:
+        conn.rollback()
+        print(f"添加询价记录失败: OE={oe}, 错误={e}")
+        return False
+    finally:
+        conn.close()
 
 
 def get_procurement_records(oe: str, brand: str = '', company: str = '') -> List[Dict]:

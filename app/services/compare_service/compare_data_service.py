@@ -5,6 +5,7 @@
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from app.utils.database_connection import get_db_connection
+from app.utils.search.parser import parse_space, parse_comma
 
 
 class CompareDataService:
@@ -383,18 +384,39 @@ class CompareDataService:
                     where_conditions.append("company = %s")
                     params.append(company)
 
-                if oe:
-                    where_conditions.append("oe LIKE %s")
-                    params.append(f"%{oe}%")
-                if brand:
-                    where_conditions.append("brand LIKE %s")
-                    params.append(f"%{brand}%")
-                if product_name:
-                    where_conditions.append("product_name LIKE %s")
-                    params.append(f"%{product_name}%")
-                if vehicle_brand:
-                    where_conditions.append("vehicle_brand LIKE %s")
-                    params.append(f"%{vehicle_brand}%")
+                # 处理多行搜索
+                oe_list = parse_space(oe) if oe else []
+                brand_list = parse_comma(brand) if brand else []
+                product_name_list = parse_comma(product_name) if product_name else []
+                vehicle_brand_list = parse_comma(vehicle_brand) if vehicle_brand else []
+
+                if oe_list:
+                    or_conditions = []
+                    for item in oe_list:
+                        or_conditions.append("oe LIKE %s")
+                        params.append(f"%{item}%")
+                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+
+                if brand_list:
+                    or_conditions = []
+                    for item in brand_list:
+                        or_conditions.append("brand LIKE %s")
+                        params.append(f"%{item}%")
+                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+
+                if product_name_list:
+                    or_conditions = []
+                    for item in product_name_list:
+                        or_conditions.append("product_name LIKE %s")
+                        params.append(f"%{item}%")
+                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+
+                if vehicle_brand_list:
+                    or_conditions = []
+                    for item in vehicle_brand_list:
+                        or_conditions.append("vehicle_brand LIKE %s")
+                        params.append(f"%{item}%")
+                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
 
                 where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
@@ -620,6 +642,112 @@ class CompareDataService:
                 return stats
         except Exception as e:
             print(f"获取统计数据时出错: {str(e)}")
+            raise
+        finally:
+            conn.close()
+
+
+    @staticmethod
+    def get_quote_history_batch(product_keys: List[Tuple[str, str]], company: str = 'fsbbr', months: int = 36) -> Dict[str, List[Dict]]:
+        """
+        批量查询多个产品的询价历史
+        
+        参数:
+            product_keys: 产品标识列表，每个元素为 (oe, brand) 元组
+            company: 公司代码
+            months: 查询最近多少个月的数据，默认36个月
+            
+        返回:
+            字典，key为 "oe|brand"，value为该产品的询价历史列表
+            每个历史记录包含：year_month, quote_count
+        """
+        if not product_keys:
+            return {}
+        
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                # 计算起始年月（最近N个月）
+                from datetime import datetime, timedelta
+                now = datetime.now()
+                start_date = now - timedelta(days=30 * months)
+                start_year_month = start_date.strftime('%Y-%m')
+                
+                # 构建 OR 条件查询多个产品
+                or_conditions = []
+                params = [company, start_year_month]
+                
+                for oe, brand in product_keys:
+                    or_conditions.append("(oe = %s AND brand = %s)")
+                    params.extend([oe, brand])
+                
+                where_clause = " OR ".join(or_conditions)
+                
+                sql = f"""
+                    SELECT oe, brand, year_month, quote_count
+                    FROM crmapp_quote_count_ks
+                    WHERE company = %s AND year_month >= %s AND ({where_clause})
+                    ORDER BY oe, brand, year_month DESC
+                """
+                
+                cursor.execute(sql, params)
+                rows = cursor.fetchall()
+                
+                # 按产品分组
+                result = {}
+                for row in rows:
+                    oe, brand, year_month, quote_count = row
+                    key = f"{oe}|{brand}"
+                    if key not in result:
+                        result[key] = []
+                    result[key].append({
+                        'year_month': year_month,
+                        'quote_count': quote_count
+                    })
+                
+                return result
+        except Exception as e:
+            print(f"批量查询询价历史时出错: {str(e)}")
+            raise
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def get_quote_history(oe: str, brand: str, company: str = 'fsbbr', months: int = 36) -> List[Dict]:
+        """
+        查询单个产品的询价历史
+        
+        参数:
+            oe: OE号
+            brand: 品牌
+            company: 公司代码
+            months: 查询最近多少个月的数据
+            
+        返回:
+            询价历史列表，每个元素包含 year_month 和 quote_count
+        """
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                # 计算起始年月
+                from datetime import datetime, timedelta
+                now = datetime.now()
+                start_date = now - timedelta(days=30 * months)
+                start_year_month = start_date.strftime('%Y-%m')
+                
+                sql = """
+                    SELECT year_month, quote_count
+                    FROM crmapp_quote_count_ks
+                    WHERE oe = %s AND brand = %s AND company = %s AND year_month >= %s
+                    ORDER BY year_month DESC
+                """
+                
+                cursor.execute(sql, (oe, brand, company, start_year_month))
+                rows = cursor.fetchall()
+                
+                return [{'year_month': row[0], 'quote_count': row[1]} for row in rows]
+        except Exception as e:
+            print(f"查询询价历史时出错: {str(e)}")
             raise
         finally:
             conn.close()

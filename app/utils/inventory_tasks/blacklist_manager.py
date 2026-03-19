@@ -29,9 +29,7 @@ def init_blacklist_table():
         """
         cursor.execute(create_table_sql)
         conn.commit()
-        print("[黑名单] 黑名单表初始化完成")
     except Exception as e:
-        print(f"[黑名单] 初始化黑名单表失败: {e}")
         conn.rollback()
         raise
     finally:
