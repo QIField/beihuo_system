@@ -14,7 +14,7 @@ import sys
 import os
 
 # 添加项目根目录到Python路径
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
 import time
@@ -92,8 +92,8 @@ def execute_daily_pipeline():
         print(f"3. 开始询价次数同步（上月 + 当月）")
         print(f"{'='*60}")
 
-        from app.services.quote_count_service.quote_count_service import QuoteCountService
-        service = QuoteCountService()
+        from app.services.quote_count_service import QuoteCountSyncService
+        service = QuoteCountSyncService()
         quote_result = service.sync_recent_two_months()
 
         all_results['tasks']['quote_count'] = quote_result

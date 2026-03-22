@@ -22,15 +22,28 @@ def clear_supplier_data(supplier_name: str) -> int:
     Returns:
         删除的行数
     """
-    sql = f"DELETE FROM {DB_TABLE_NAME} WHERE supplier_name = %s"
-
     try:
         with db_cursor(dict_cursor=False) as cursor:
-            affected = cursor.execute(sql, (supplier_name,))
+            sql_delete = f"DELETE FROM {DB_TABLE_NAME} WHERE supplier_name = %s"
+            affected = cursor.execute(sql_delete, (supplier_name,))
             print(f"  ✓ 已清空 {supplier_name} 旧数据: {affected} 条")
             return affected
     except Exception as e:
         print(f"  ✗ 清空数据失败: {e}")
+        raise
+
+
+def clear_all_and_reset_auto_increment() -> None:
+    """
+    清空整张表并重置自增ID为1
+    """
+    try:
+        with db_cursor(dict_cursor=False) as cursor:
+            cursor.execute(f"DELETE FROM {DB_TABLE_NAME}")
+            cursor.execute(f"ALTER TABLE {DB_TABLE_NAME} AUTO_INCREMENT = 1")
+            print("[数据库] 已清空整张表并重置自增ID")
+    except Exception as e:
+        print(f"[数据库] 清空表失败: {e}")
         raise
 
 
@@ -73,17 +86,18 @@ def batch_insert_records(records: List[Tuple]) -> int:
         raise
 
 
-def save_supplier_data(supplier_name: str, records: List[Tuple]) -> dict:
+def save_supplier_data(supplier_name: str, records: List[Tuple], skip_clear: bool = False) -> dict:
     """
     保存供应商数据到数据库
 
     流程：
-    1. 清空该供应商旧数据
+    1. 清空该供应商旧数据（可选）
     2. 批量插入新数据
 
     Args:
         supplier_name: 供应商名称
         records: 数据记录列表
+        skip_clear: 是否跳过清空旧数据（全量同步时已清空整张表，可跳过）
 
     Returns:
         操作结果统计
@@ -99,8 +113,10 @@ def save_supplier_data(supplier_name: str, records: List[Tuple]) -> dict:
             'success': True
         }
 
-    # 清空旧数据
-    deleted_count = clear_supplier_data(supplier_name)
+    deleted_count = 0
+    if not skip_clear:
+        # 清空旧数据（非全量同步时）
+        deleted_count = clear_supplier_data(supplier_name)
 
     # 插入新数据
     inserted_count = batch_insert_records(records)

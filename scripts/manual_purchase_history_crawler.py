@@ -17,6 +17,11 @@ import time
 import traceback
 from datetime import datetime
 
+# 初始化 SessionManager，设置 CRM session 工厂函数
+from app.utils.session_manager import SessionManager
+from config import create_crm_session
+SessionManager.set_session_factory(create_crm_session)
+
 from app.services.procurement_service.purchase_history_service import PurchaseHistoryService
 
 

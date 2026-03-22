@@ -8,7 +8,6 @@ import json
 import requests
 import time
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def login(company='fsbbr'):
@@ -153,6 +152,7 @@ def prepare_data(df):
 def upload_single_item(item, token, warehouse_df, supplier_df, brand_mapping):
     """
     单条数据上传到B2B
+    返回包含update_msg字段的结果
     """
     oe = item['oe']
     brand = item['brand']
@@ -163,23 +163,27 @@ def upload_single_item(item, token, warehouse_df, supplier_df, brand_mapping):
     # 查找仓库ID
     warehouse_match = warehouse_df[warehouse_df['warehouse_name'] == item['warehouse']]
     if warehouse_match.empty:
+        error_msg = f'仓库未找到: {item["warehouse"]}'
         return {
             'oe': oe,
             'status': 'error',
-            'msg': f'仓库未找到: {item["warehouse"]}',
+            'msg': error_msg,
             'operation': None,
-            'mapped_brand': mapped_brand if mapped_brand != brand else None
+            'mapped_brand': mapped_brand if mapped_brand != brand else None,
+            'update_msg': error_msg
         }
     
     # 查找供应商ID
     supplier_match = supplier_df[supplier_df['name'] == item['supplier']]
     if supplier_match.empty:
+        error_msg = f'供应商未找到: {item["supplier"]}'
         return {
             'oe': oe,
             'status': 'error',
-            'msg': f'供应商未找到: {item["supplier"]}',
+            'msg': error_msg,
             'operation': None,
-            'mapped_brand': mapped_brand if mapped_brand != brand else None
+            'mapped_brand': mapped_brand if mapped_brand != brand else None,
+            'update_msg': error_msg
         }
     
     # 构建上传数据
@@ -217,39 +221,47 @@ def upload_single_item(item, token, warehouse_df, supplier_df, brand_mapping):
                     'status': 'error',
                     'msg': error_msg,
                     'operation': None,
-                    'mapped_brand': mapped_brand if mapped_brand != brand else None
+                    'mapped_brand': mapped_brand if mapped_brand != brand else None,
+                    'update_msg': error_msg
                 }
             elif succes_data and len(succes_data) > 0:
                 operation = succes_data[0].get('operation_name', 'unknown')
+                success_msg = succes_data[0].get('message', f'上传{operation}成功')
                 return {
                     'oe': oe,
                     'status': 'success',
-                    'msg': '上传成功',
+                    'msg': success_msg,
                     'operation': operation,
-                    'mapped_brand': mapped_brand if mapped_brand != brand else None
+                    'mapped_brand': mapped_brand if mapped_brand != brand else None,
+                    'update_msg': success_msg
                 }
         
+        # 响应格式不符合预期
+        error_msg = f'响应格式异常: {json.dumps(result, ensure_ascii=False)[:200]}'
         return {
             'oe': oe,
             'status': 'error',
-            'msg': '响应格式异常',
+            'msg': error_msg,
             'operation': None,
-            'mapped_brand': mapped_brand if mapped_brand != brand else None
+            'mapped_brand': mapped_brand if mapped_brand != brand else None,
+            'update_msg': error_msg
         }
         
     except Exception as e:
+        error_msg = f'请求异常: {str(e)}'
         return {
             'oe': oe,
             'status': 'error',
-            'msg': f'请求异常: {str(e)}',
+            'msg': error_msg,
             'operation': None,
-            'mapped_brand': mapped_brand if mapped_brand != brand else None
+            'mapped_brand': mapped_brand if mapped_brand != brand else None,
+            'update_msg': error_msg
         }
 
 
-def batch_upload(items, max_workers=5):
+def batch_upload(items):
     """
-    批量上传（线程池）
+    批量上传（循环处理）
     """
     if not items:
         return {}
@@ -264,25 +276,59 @@ def batch_upload(items, max_workers=5):
     
     results = {}
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_item = {
-            executor.submit(upload_single_item, item, token, warehouse_df, supplier_df, brand_mapping): item
-            for item in items
-        }
-        
-        for future in as_completed(future_to_item):
-            item = future_to_item[future]
-            try:
-                result = future.result()
-                results[result['oe']] = result
-            except Exception as e:
-                results[item['oe']] = {
-                    'oe': item['oe'],
-                    'status': 'error',
-                    'msg': f'处理异常: {str(e)}',
-                    'operation': None,
-                    'mapped_brand': None
-                }
+    # 循环处理每个项目
+    for item in items:
+        try:
+            result = upload_single_item(item, token, warehouse_df, supplier_df, brand_mapping)
+            results[result['oe']] = result
+        except Exception as e:
+            results[item['oe']] = {
+                'oe': item['oe'],
+                'status': 'error',
+                'msg': f'处理异常: {str(e)}',
+                'operation': None,
+                'mapped_brand': None,
+                'update_msg': f'处理异常: {str(e)}'
+            }
+    
+    return results
+
+
+def batch_upload_with_callback(items, callback=None):
+    """
+    批量上传并支持回调函数
+    """
+    if not items:
+        return {}
+    
+    # 登录获取token
+    token = login('fsbbr')
+    
+    # 获取映射表
+    warehouse_df = getAllCassWarehouse(token)
+    supplier_df = getAllSupplierChannel(token)
+    brand_mapping = load_crm_aliases_mapping()
+    
+    results = {}
+    
+    # 循环处理每个项目
+    for item in items:
+        try:
+            result = upload_single_item(item, token, warehouse_df, supplier_df, brand_mapping)
+            results[result['oe']] = result
+            
+            # 调用回调函数
+            if callback:
+                callback(result)
+        except Exception as e:
+            results[item['oe']] = {
+                'oe': item['oe'],
+                'status': 'error',
+                'msg': f'处理异常: {str(e)}',
+                'operation': None,
+                'mapped_brand': None,
+                'update_msg': f'处理异常: {str(e)}'
+            }
     
     return results
 
@@ -290,7 +336,7 @@ def batch_upload(items, max_workers=5):
 def upload_inquiry_data(df, company='fsbbr'):
     """
     主入口：询价数据B2B上传
-    
+
     Returns:
         dict: {
             'b2b_results': {...},  # B2B上传结果
@@ -329,7 +375,7 @@ def validate_b2b_upload(items, company='fsbbr'):
     """
     验证B2B上传可行性（不实际上传，只验证仓库、供应商等映射是否存在）
     用于导入前的预验证，确保数据能成功上传
-    
+
     Args:
         items: 待验证的数据列表
         company: 公司代码

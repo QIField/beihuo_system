@@ -5,7 +5,6 @@ CRM Excel 文件处理模块
 
 import pandas as pd
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def identify_columns(df):
@@ -322,27 +321,16 @@ def process_single_sheet_batch(session, sheet_info, mode, process_func):
             
             processing_items.append(item)
     
-    # 使用线程池并发处理
-    max_workers = min(10, len(processing_items))
-    
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交所有任务
-        future_to_item = {
-            executor.submit(process_func, session, item): item 
-            for item in processing_items
-        }
-        
-        # 收集结果
-        completed_count = 0
-        for future in as_completed(future_to_item):
-            item = future_to_item[future]
-            try:
-                result = future.result()
-                results_dict[item['oe_number']] = result
-                completed_count += 1
-                print(f"工作表处理进度：{completed_count}/{len(processing_items)} - OE: {item['oe_number']}, 结果：{result}")
-            except Exception as e:
-                print(f"工作表处理 OE: {item['oe_number']} 时发生异常：{e}")
-                results_dict[item['oe_number']] = f"失败 - {str(e)}"
+    # 串行循环处理（改为循环执行）
+    completed_count = 0
+    for item in processing_items:
+        try:
+            result = process_func(session, item)
+            results_dict[item['oe_number']] = result
+            completed_count += 1
+            print(f"工作表处理进度：{completed_count}/{len(processing_items)} - OE: {item['oe_number']}, 结果：{result}")
+        except Exception as e:
+            print(f"工作表处理 OE: {item['oe_number']} 时发生异常：{e}")
+            results_dict[item['oe_number']] = f"失败 - {str(e)}"
     
     return results_dict

@@ -81,9 +81,15 @@ def get_orders(session, status="", page_num=1, page_size=20):
     
     if resp.status_code != 200:
         print(f"✗ 请求失败，状态码: {resp.status_code}")
+        print(f"响应内容: {resp.text[:500]}")  # 打印响应内容前500个字符
         return None
     
-    return resp.json()
+    try:
+        return resp.json()
+    except Exception as e:
+        print(f"✗ JSON 解析失败: {e}")
+        print(f"响应内容: {resp.text}")
+        raise
 
 
 def get_all_orders(session, status="", page_size=100):

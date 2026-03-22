@@ -20,7 +20,7 @@ class CompareDataService:
         'best_sales_season', 'max_price', 'min_price', 'supplier_price',
         'dealer_purchase_price', 'dealer_sale_price', 'price_update_time',
         'today_sales', 'yesterday_sales', 'month_sales', 'avg_sales_12m',
-        'avg_sales_6m', 'sales_7d', 'product_remark', 'procurement_records',
+        'avg_sales_6m', 'sales_7d', 'product_remark',
         'updated_time'
     ]
     
@@ -58,7 +58,6 @@ class CompareDataService:
                     sales_7d INT DEFAULT 0 COMMENT '近7天销量',
                     product_remark TEXT COMMENT '系统产品备注',
                     is_cass VARCHAR(10) COMMENT '是否同步开思',
-                    procurement_records JSON COMMENT '采购记录JSON数组 [{"supplier_name": "xxx", "purchase_price": 100, "purchase_date": "2026-01-12"}, ...]',
                     updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
                     INDEX idx_oe (oe),
                     INDEX idx_brand (brand),
@@ -72,6 +71,19 @@ class CompareDataService:
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='比价数据汇总表';
                 """
                 cursor.execute(create_table_sql)
+                
+                # 检查并删除冗余字段 procurement_records
+                try:
+                    cursor.execute("""
+                        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'crmapp_compare_summary' AND COLUMN_NAME = 'procurement_records'
+                    """)
+                    if cursor.fetchone():
+                        cursor.execute("ALTER TABLE crmapp_compare_summary DROP COLUMN procurement_records")
+                        print("已删除冗余字段 procurement_records 从 crmapp_compare_summary 表")
+                except Exception as e:
+                    print(f"删除字段 procurement_records 时出错: {str(e)}")
+                
                 conn.commit()
                 print(f"表 {CompareDataService.TABLE_NAME} 创建成功或已存在")
                 return True
@@ -505,18 +517,6 @@ class CompareDataService:
                         if item.get(time_field):
                             if hasattr(item[time_field], 'strftime'):
                                 item[time_field] = item[time_field].strftime('%Y-%m-%d %H:%M:%S')
-                    # 解析 procurement_records JSON 字段
-                    if item.get('procurement_records'):
-                        import json
-                        if isinstance(item['procurement_records'], str):
-                            try:
-                                item['procurement_records'] = json.loads(item['procurement_records'])
-                            except:
-                                item['procurement_records'] = []
-                        elif not isinstance(item['procurement_records'], list):
-                            item['procurement_records'] = []
-                    else:
-                        item['procurement_records'] = []
                     data.append(item)
                 
                 return data

@@ -5,13 +5,13 @@ from datetime import datetime, timedelta
 import pymysql
 import os
 from pathlib import Path
-from .database_connection import get_db_connection  # 使用统一的连接池实现
+from app.utils.database_connection import get_db_connection, get_dict_cursor  # 使用统一的连接池实现
 
 
 def get_new_order_number():
     """从数据库获取最新的订单号并生成新订单号"""
     connection = get_db_connection()
-    cursor = connection.cursor()
+    cursor = get_dict_cursor(connection)
     
     # 使用事务和锁确保订单号生成的唯一性
     try:
@@ -73,7 +73,7 @@ def preallocate_order_numbers(count):
         return []
     
     connection = get_db_connection()
-    cursor = connection.cursor()
+    cursor = get_dict_cursor(connection)
     
     try:
         # 开启事务
@@ -133,7 +133,7 @@ def preallocate_order_numbers(count):
 def init_database():
     """初始化数据库表，如果不存在则创建并插入初始数据"""
     connection = get_db_connection()
-    cursor = connection.cursor()
+    cursor = get_dict_cursor(connection)
     
     # 检查表是否已经存在
     check_table_sql = """

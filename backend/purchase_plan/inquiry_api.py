@@ -1,6 +1,15 @@
 """
 询价模块API
 功能：导入Excel/CSV文件、查看询价比价表格、B2B上传
+
+【新流程】
+1. B2B上传 → 返回update_msg
+2. 筛选"产品不存在"的失败项 → CRM新建
+3. 根据update_msg + create_result 判断九大类 → 生成"处理结果"
+4. 生成"详情"列（有新建用新建结果，否则用update_msg）
+5. 二次上传（针对新建成功的产品）
+6. 生成Excel结果文件（原列 + 处理结果 + 详情 + 二次上传）
+7. 将"处理结果"="上传成功"或二次上传成功的数据导入询价表
 """
 from flask import Blueprint, request, jsonify, session, render_template, send_from_directory
 from functools import wraps
@@ -54,16 +63,71 @@ def inquiry_permission_required(f):
     return decorated_function
 
 
+def classify_nine_category(update_msg, create_result=None):
+    """
+    根据update_msg和create_result判断九大类
+    
+    九大类：
+    1. 上传成功 - B2B直接上传成功
+    2. 新建成功-已存在 - B2B失败+新建时发现已存在
+    3. 新建成功-新创建 - B2B失败+新建成功
+    4. 新建失败-未找到产品名称 - 新建失败（无产品名）
+    5. 新建失败-车型不能为空 - 新建失败（无车型）
+    6. 上传失败-过期时间错误 - B2B返回过期时间错误
+    7. 上传失败-品牌不存在 - B2B返回品牌不存在
+    8. 上传失败-产品不存在 - B2B返回产品不存在但没走新建
+    9. 其他 - 其他错误
+    """
+    if not update_msg:
+        return '其他'
+    
+    # 上传成功
+    if '成功' in update_msg and ('上传' in update_msg or 'update' in update_msg.lower() or 'add' in update_msg.lower()):
+        return '上传成功'
+    
+    # 有新建结果的情况
+    if create_result:
+        if '已存在' in create_result:
+            return '新建成功-已存在'
+        elif '成功' in create_result and '失败' not in create_result:
+            return '新建成功-新创建'
+        elif '未找到产品名称' in create_result:
+            return '新建失败-未找到产品名称'
+        elif '车型不能为空' in create_result:
+            return '新建失败-车型不能为空'
+        else:
+            return '新建失败-其他'
+    
+    # 无新建结果，根据B2B错误分类
+    # 注意：判定顺序很重要，先判定特定的，再判定通用的
+    if '过期时间' in update_msg or '失效时间' in update_msg:
+        return '上传失败-过期时间错误'
+    elif '产品数据不存在' in update_msg or '物料所属品牌' in update_msg and '产品数据不存在' in update_msg:
+        # 格式：物料所属品牌【XXX】OE号【XXX】产品数据不存在
+        return '上传失败-产品不存在'
+    elif '品牌名称' in update_msg and '总部不存在' in update_msg:
+        # 格式：品牌名称【XXX】总部不存在
+        return '上传失败-品牌不存在'
+    else:
+        return '其他'
+
+
+def get_detail_message(update_msg, create_result=None):
+    """
+    生成详情列内容
+    如果有新建结果，用新建结果覆盖；否则用update_msg
+    """
+    if create_result:
+        return create_result
+    return update_msg
+
+
 @inquiry_bp.route('/import', methods=['POST'])
 @login_required
 def import_price_data():
     """
     导入Excel或CSV文件到询价比价表
-    支持字段：oe, brand, supplier, price, warehouse, expire_time, remark, stock_quantity, common_number
-    
-    【改进点】
-    1. 先进行B2B上传验证，只将上传成功的数据导入数据库
-    2. 同一产品新数据不覆盖旧数据（存在则跳过）
+    新流程：B2B上传 → CRM新建 → 九分类 → 二次上传 → 生成结果文件 → 导入数据库
     """
     if 'file' not in request.files:
         return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
@@ -86,12 +150,15 @@ def import_price_data():
             return jsonify({'code': 1, 'msg': '不支持的文件格式，请上传Excel或CSV文件'}), 400
 
         # 检查必需的列
-        required_columns = ['oe']
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return jsonify({'code': 1, 'msg': f'文件缺少必需的列: {", ".join(missing_columns)}'}), 400
+        required_columns = ['oe', 'OE', 'OE号']
+        has_oe = any(col in df.columns for col in required_columns)
+        if not has_oe:
+            return jsonify({'code': 1, 'msg': '文件缺少必需的列: oe/OE/OE号'}), 400
 
-        # 重命名列以匹配数据库字段（支持中英文列名）
+        # 保存原始列名（用于输出时保持中文表头）
+        original_columns = list(df.columns)
+        
+        # 列名映射：中文 -> 英文（内部处理用）
         column_mapping = {
             'oe': 'oe', 'OE': 'oe', 'OE号': 'oe',
             '品牌': 'brand', 'brand': 'brand',
@@ -104,7 +171,24 @@ def import_price_data():
             '通用号': 'common_number', 'common_number': 'common_number'
         }
 
-        # 重命名存在的列
+        # 创建反向映射：英文 -> 原始中文列名（用于输出）
+        reverse_mapping = {}
+        for col in original_columns:
+            if col in column_mapping:
+                english_name = column_mapping[col]
+                reverse_mapping[english_name] = col
+            else:
+                # 已经是英文或未知列，保持原样
+                reverse_mapping[col] = col
+        
+        # 保存原始品牌列名（用于输出）
+        original_brand_col = None
+        for col in original_columns:
+            if col in ['品牌', 'brand']:
+                original_brand_col = col
+                break
+
+        # 重命名存在的列（内部处理用英文）
         rename_dict = {old_col: new_col for old_col, new_col in column_mapping.items() 
                       if old_col in df.columns and new_col not in df.columns}
         if rename_dict:
@@ -112,17 +196,16 @@ def import_price_data():
 
         # 数据清洗
         df = df.where(pd.notnull(df), None)
+        
+        # 加载品牌别名映射（用于后续处理）
+        from app.utils.b2b_inquiry_upload.uploader import load_crm_aliases_mapping
+        brand_aliases_mapping = load_crm_aliases_mapping()
 
-        # ==================== 第一步：数据预处理和验证 ====================
-        # 先进行B2B上传验证，筛选出能成功上传的数据
-        print(f"\n{'='*60}")
-        print("【询价导入】开始处理，先进行B2B上传验证...")
-        print(f"{'='*60}")
+        # ==================== 第一步：B2B上传 ====================
+        # 导入B2B上传模块
+        from app.utils.b2b_inquiry_upload.uploader import prepare_data, batch_upload
         
-        # 导入B2B验证模块
-        from app.utils.b2b_inquiry_upload.uploader import prepare_data, validate_b2b_upload
-        
-        # 准备数据并验证B2B上传可行性
+        # 准备数据
         valid_items, skipped_items = prepare_data(df)
         
         if not valid_items:
@@ -132,54 +215,205 @@ def import_price_data():
                 'data': {'skipped_count': len(skipped_items), 'skipped_reasons': [item.get('skip_reason', '') for item in skipped_items[:5]]}
             }), 400
         
-        # 进行B2B上传验证（只验证，获取哪些数据能上传成功）
-        print(f"[询价导入] 开始进行B2B上传验证，共 {len(valid_items)} 条数据...")
-        b2b_validation_results = validate_b2b_upload(valid_items, company)
+        # B2B上传（循环处理）
+        b2b_results = batch_upload(valid_items)
         
-        # 筛选出B2B上传成功的数据
-        upload_success_items = []
-        upload_failed_items = []
+        # 将B2B结果合并到valid_items中，并处理品牌别名映射
+        for item in valid_items:
+            oe = item['oe']
+            result = b2b_results.get(oe, {})
+            item['update_msg'] = result.get('update_msg', '未知错误')
+            item['b2b_status'] = result.get('status', 'error')
+            
+            # 品牌别名映射：使用匹配后的标准品牌名
+            original_brand = item.get('brand', '')
+            mapped_brand = brand_aliases_mapping.get(original_brand, original_brand)
+            item['mapped_brand'] = mapped_brand  # 保存映射后的品牌名
+            
+            # 如果B2B返回了mapped_brand（说明有别名映射），优先使用B2B的映射结果
+            b2b_mapped_brand = result.get('mapped_brand')
+            if b2b_mapped_brand:
+                item['mapped_brand'] = b2b_mapped_brand
+        
+        # ==================== 第二步：筛选需要新建的项 ====================
+        # 筛选需要去CRM新建的项（产品不存在的情况）
+        # 格式：物料所属品牌【XXX】OE号【XXX】产品数据不存在,请核查数据
+        need_create_keywords = [
+            '产品数据不存在',  # 主要格式：物料所属品牌【XXX】OE号【XXX】产品数据不存在
+            '物料所属品牌'     # 辅助匹配
+        ]
+        need_create_items = []
+        
+        for item in valid_items:
+            update_msg = item.get('update_msg', '')
+            if any(keyword in update_msg for keyword in need_create_keywords):
+                # 使用映射后的品牌名进行新建
+                need_create_items.append({
+                    'oe_number': item['oe'],
+                    'brand': item.get('mapped_brand', item['brand']),  # 使用映射后的品牌
+                    'supplier_name': item.get('supplier', ''),
+                    'mode': 'inquiry'
+                })
+        
+        # ==================== 第三步：CRM新建 ====================
+        create_results = {}
+        if need_create_items:
+            # 导入CRM产品创建模块
+            from app.utils.crm_product.crm_productAdd.main import (
+                load_alias_data, load_product_data, _process_with_loop
+            )
+            
+            # 加载产品数据和别名数据
+            alias_df = load_alias_data()
+            product_df = load_product_data()
+            
+            # 循环处理新建
+            create_results = _process_with_loop(need_create_items, product_df, alias_df, None)
+        
+        # ==================== 第四步：二次上传（针对新建成功的产品）====================
+        # 筛选出新建成功的产品，尝试二次上传
+        second_upload_items = []
+        for item in valid_items:
+            oe = item['oe']
+            create_result = create_results.get(oe, '')
+            # 新建成功-已存在 或 新建成功-新创建
+            if create_result and ('已存在' in create_result or ('成功' in create_result and '失败' not in create_result)):
+                second_upload_items.append(item)
+        
+        second_upload_results = {}
+        if second_upload_items:
+            # 使用相同的batch_upload函数进行二次上传
+            second_b2b_results = batch_upload(second_upload_items)
+            
+            for item in second_upload_items:
+                oe = item['oe']
+                result = second_b2b_results.get(oe, {})
+                second_upload_results[oe] = result.get('update_msg', '')
+        
+        # ==================== 第五步：九分类判断 ====================
+        # 统计各分类数量
+        category_count = {
+            '上传成功': 0,
+            '新建成功-已存在': 0,
+            '新建成功-新创建': 0,
+            '新建失败-未找到产品名称': 0,
+            '新建失败-车型不能为空': 0,
+            '上传失败-过期时间错误': 0,
+            '上传失败-品牌不存在': 0,
+            '上传失败-产品不存在': 0,
+            '其他': 0
+        }
         
         for item in valid_items:
             oe = item['oe']
-            result = b2b_validation_results.get(oe, {})
-            if result.get('status') == 'success':
+            update_msg = item.get('update_msg', '')
+            create_result = create_results.get(oe)
+            
+            # 九分类判断
+            category = classify_nine_category(update_msg, create_result)
+            item['处理结果'] = category
+            category_count[category] = category_count.get(category, 0) + 1
+            
+            # 详情列
+            item['详情'] = get_detail_message(update_msg, create_result)
+            
+            # 二次上传结果
+            item['二次上传'] = second_upload_results.get(oe, '')
+        
+        # 处理跳过的项
+        for item in skipped_items:
+            item['处理结果'] = '其他'
+            item['详情'] = f"跳过: {item.get('skip_reason', '')}"
+            item['二次上传'] = ''
+            category_count['其他'] = category_count.get('其他', 0) + 1
+        
+        # ==================== 第六步：生成Excel结果文件 ====================
+        # 合并所有数据
+        all_items = valid_items + skipped_items
+        
+        # 创建结果DataFrame - 保持原Excel的列顺序和中文表头
+        result_data = []
+        for item in all_items:
+            # 获取原始行数据（保持原Excel的列）
+            row_data = {}
+            
+            # 根据原始列名来构建数据
+            for orig_col in original_columns:
+                # 获取对应的英文列名
+                english_col = column_mapping.get(orig_col, orig_col)
+                
+                if english_col == 'brand':
+                    # 品牌列使用映射后的标准品牌名
+                    row_data[orig_col] = item.get('mapped_brand', item.get('brand', ''))
+                elif english_col in ['oe', 'supplier', 'price', 'warehouse', 'expire_time', 'stock_quantity', 'remark']:
+                    row_data[orig_col] = item.get(english_col, '')
+                else:
+                    # 其他列从原始df中获取
+                    idx = item.get('index')
+                    if idx is not None and idx < len(df):
+                        row_data[orig_col] = df.iloc[idx].get(english_col, '')
+            
+            # 添加处理结果、详情和二次上传列
+            row_data['处理结果'] = item.get('处理结果', '')
+            row_data['详情'] = item.get('详情', '')
+            row_data['二次上传'] = item.get('二次上传', '')
+            
+            result_data.append(row_data)
+        
+        result_df = pd.DataFrame(result_data)
+        
+        # 确保列顺序：原df的列 + 处理结果 + 详情 + 二次上传（保持中文表头）
+        output_cols = list(original_columns)  # 使用原始中文列名
+        if '处理结果' not in output_cols:
+            output_cols.append('处理结果')
+        if '详情' not in output_cols:
+            output_cols.append('详情')
+        if '二次上传' not in output_cols:
+            output_cols.append('二次上传')
+        result_df = result_df[output_cols]
+        
+        # 保存结果文件
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        result_filename = f'inquiry_upload_result_{timestamp}.xlsx'
+        result_dir = 'static/uploads/b2b_results'
+        os.makedirs(result_dir, exist_ok=True)
+        result_path = os.path.join(result_dir, result_filename)
+        result_df.to_excel(result_path, index=False)
+        
+        # ==================== 第七步：导入数据库（上传成功 + 二次上传成功）====================
+        # 筛选需要导入的数据：
+        # 1. 处理结果 = "上传成功" 的
+        # 2. 二次上传成功（包含"上传add成功"或"上传update成功"）的
+        upload_success_items = []
+        for item in valid_items:
+            # 情况1：直接上传成功
+            if item.get('处理结果') == '上传成功':
                 upload_success_items.append(item)
-            else:
-                item['fail_reason'] = result.get('msg', 'B2B上传验证失败')
-                upload_failed_items.append(item)
+            # 情况2：二次上传成功
+            elif item.get('二次上传'):
+                second_upload_msg = item.get('二次上传', '')
+                if '上传add成功' in second_upload_msg or '上传update成功' in second_upload_msg:
+                    upload_success_items.append(item)
         
-        print(f"[询价导入] B2B验证结果: 成功={len(upload_success_items)}, 失败={len(upload_failed_items)}, 跳过={len(skipped_items)}")
-        
-        # 如果没有成功上传的数据，直接返回错误
-        if not upload_success_items:
-            return jsonify({
-                'code': 1,
-                'msg': '所有数据B2B上传验证失败，未导入任何数据',
-                'data': {
-                    'total': len(df),
-                    'upload_failed': len(upload_failed_items),
-                    'skipped': len(skipped_items),
-                    'failed_reasons': [f"{item['oe']}: {item.get('fail_reason', '')}" for item in upload_failed_items[:10]]
-                }
-            }), 400
-
-        # ==================== 第二步：只将B2B上传成功的数据导入数据库 ====================
-        # 准备导入数据（只包含上传成功的）
         insert_data = []
         error_rows = []
-        today = datetime.now().strftime('%Y-%m-%d')
         
         for item in upload_success_items:
             try:
                 oe = item['oe']
-                brand = item['brand'] or None
-                supplier = item['supplier'] or None
-                price = item['price']
-                warehouse = item['warehouse'] or None
-                expire_time = item['expire_time']
-                remark = item['remark'] or None
-                stock_quantity = item['stock_quantity']
+                # 使用映射后的品牌名导入数据库
+                brand = item.get('mapped_brand') or item.get('brand') or None
+                supplier = item.get('supplier') or None
+                price = item.get('price', 0)
+                warehouse = item.get('warehouse') or None
+                expire_time = item.get('expire_time')
+                # 处理备注：为空或nan时设为None
+                remark = item.get('remark')
+                if remark and str(remark).lower() == 'nan':
+                    remark = None
+                elif remark:
+                    remark = str(remark).strip() or None
+                stock_quantity = item.get('stock_quantity', 0)
                 
                 # 处理失效时间
                 if expire_time and pd.notna(expire_time):
@@ -203,17 +437,13 @@ def import_price_data():
                     'expire_time': expire_time,
                     'remark': remark,
                     'stock_quantity': stock_quantity,
-                    'common_number': None,  # 从比价表同步
+                    'common_number': None,
                     'company': company
                 })
             except Exception as e:
                 error_rows.append(f"OE={item.get('oe', 'unknown')} 处理失败: {str(e)}")
-
-        # 批量插入数据（使用INSERT IGNORE）
-        # 【关键逻辑】
-        # 唯一索引: uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)
-        # - 同一产品+品牌+供应商+不同价格 -> 插入新记录（保存历史价格）
-        # - 同一产品+品牌+供应商+相同价格 -> 忽略（跳过重复）
+        
+        # 批量插入数据
         inserted_count = 0
         skipped_exists_count = 0
         
@@ -247,7 +477,6 @@ def import_price_data():
                     ))
                 
                 # 使用 INSERT IGNORE 批量插入
-                # 利用唯一索引自动去重：同一价格跳过，不同价格插入
                 cursor.executemany("""
                     INSERT IGNORE INTO crmapp_price_inquiry 
                     (oe, brand, supplier, price, warehouse, expire_time, remark, 
@@ -260,24 +489,19 @@ def import_price_data():
                 # 统计结果
                 inserted_count = cursor.rowcount
                 skipped_exists_count = len(batch_insert_data) - inserted_count
-                
-                print(f"[询价导入] 数据库导入完成: 尝试插入={len(batch_insert_data)}, 成功={inserted_count}, 跳过(同价格已存在)={skipped_exists_count}")
 
             except Exception as e:
                 conn.rollback()
-                print(f"[询价导入] 数据库导入失败: {str(e)}")
                 return jsonify({'code': 1, 'msg': f'导入失败: {str(e)}'}), 500
             finally:
                 cursor.close()
                 conn.close()
-
-        # ==================== 第三步：同步到比价表和采购记录表 ====================
+        
+        # ==================== 第八步：同步到比价表和采购记录表 ====================
         sync_count = 0
         procurement_count = 0
         
         if inserted_count > 0:
-            print(f"[询价导入] 开始同步到比价汇总表和采购记录表...")
-            
             # 准备同步数据
             sync_data_map = {}
             procurement_data_list = []
@@ -309,7 +533,6 @@ def import_price_data():
                     """, list(sync_data_map.values()))
                     conn.commit()
                     sync_count = cursor.rowcount
-                    print(f"[询价导入] 同步到比价汇总表完成: {sync_count} 条")
                 
                 # 2. 同步到采购记录表
                 for proc_data in procurement_data_list:
@@ -324,13 +547,10 @@ def import_price_data():
                         if success:
                             procurement_count += 1
                     except Exception as e:
-                        print(f"[询价导入] 保存采购记录失败: OE={proc_data['oe']}, 错误={e}")
-                
-                print(f"[询价导入] 同步到采购记录表完成: {procurement_count} 条")
+                        pass
                 
                 # 3. 触发采购数据同步到比价表
                 if procurement_count > 0:
-                    print(f"[询价导入] 开始同步采购数据到比价表...")
                     try:
                         from app.services.procurement_service.purchase_sync_service import PurchaseSyncService
                         sync_service = PurchaseSyncService()
@@ -342,52 +562,32 @@ def import_price_data():
                                 proc_data['brand'], 
                                 proc_data['company']
                             )
-                        
-                        print(f"[询价导入] 采购数据同步到比价表完成")
                     except Exception as e:
-                        print(f"[询价导入] 同步采购数据到比价表失败: {str(e)}")
+                        pass
                 
             except Exception as e:
                 conn.rollback()
-                print(f"[询价导入] 同步到比价表失败: {str(e)}")
             finally:
                 cursor.close()
                 conn.close()
 
-        # ==================== 第四步：生成结果报告 ====================
-        print(f"\n{'='*60}")
-        print("【询价导入】处理完成统计：")
-        print(f"  文件总行数: {len(df)}")
-        print(f"  B2B上传成功: {len(upload_success_items)}")
-        print(f"  B2B上传失败: {len(upload_failed_items)}")
-        print(f"  数据不完整跳过: {len(skipped_items)}")
-        print(f"  数据库插入(新价格): {inserted_count}")
-        print(f"  数据库跳过(同价格已存在): {skipped_exists_count}")
-        print(f"{'='*60}\n")
-
         return jsonify({
             'code': 0,
-            'msg': f'导入完成：B2B验证通过{len(upload_success_items)}条，新价格导入{inserted_count}条，同价格跳过{skipped_exists_count}条',
+            'msg': f'导入完成：上传成功{category_count.get("上传成功", 0)}条，新建成功{category_count.get("新建成功-已存在", 0) + category_count.get("新建成功-新创建", 0)}条，数据库导入{inserted_count}条',
             'data': {
                 'total_count': len(df),
-                'upload_success': len(upload_success_items),
-                'upload_failed': len(upload_failed_items),
-                'skipped_invalid': len(skipped_items),
-                'inserted_count': inserted_count,  # 新价格记录数
-                'skipped_same_price': skipped_exists_count,  # 同价格跳过数
+                'category_count': category_count,
+                'inserted_count': inserted_count,
+                'skipped_same_price': skipped_exists_count,
                 'sync_count': sync_count,
                 'procurement_count': procurement_count,
-                'upload_failed_details': [
-                    {'oe': item['oe'], 'reason': item.get('fail_reason', '')} 
-                    for item in upload_failed_items[:10]
-                ],
+                'result_file': result_filename,
                 'errors': error_rows[:10]
             }
         })
 
     except Exception as e:
         import traceback
-        print(f"[询价导入] 异常: {str(e)}")
         traceback.print_exc()
         return jsonify({'code': 1, 'msg': f'导入失败: {str(e)}'}), 500
 
@@ -525,3 +725,50 @@ def download_b2b_result(filename):
         )
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'下载失败: {str(e)}'}), 500
+
+
+@inquiry_bp.route('/crm_brands', methods=['GET'])
+@login_required
+def get_crm_brands():
+    """
+    查询CRM品牌列表
+    根据关键字搜索品牌，返回所有匹配的l_name_zh
+    """
+    keyword = request.args.get('keyword', '').strip()
+    
+    try:
+        # 导入CRM品牌查询模块
+        from app.utils.crm_product.crm_productAdd.crm_brand_id import get_brand_list
+        from config import create_crm_session
+        
+        # 创建CRM session
+        session = create_crm_session()
+        
+        # 准备请求参数
+        params = {}
+        if keyword:
+            params['l_name_zh'] = keyword
+        
+        # 调用CRM API获取品牌列表
+        result = get_brand_list(params=params, session=session)
+        
+        if result and result.get('status') == 200:
+            brand_list = result.get('data', {}).get('list', [])
+            # 提取所有l_name_zh字段
+            brand_names = [item['l_name_zh'] for item in brand_list if item.get('l_name_zh')]
+            
+            return jsonify({
+                'code': 0,
+                'msg': '获取成功',
+                'data': brand_names,
+                'total': len(brand_names)
+            })
+        else:
+            return jsonify({
+                'code': 1,
+                'msg': result.get('msg', '查询失败'),
+                'data': []
+            }), 500
+            
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'查询品牌失败: {str(e)}', 'data': []}), 500

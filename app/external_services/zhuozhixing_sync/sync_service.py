@@ -12,10 +12,10 @@ from typing import List, Dict, Any
 from .config import SUPPLIERS
 from .api_client import fetch_supplier_data
 from .data_processor import process_data
-from .db_service import save_supplier_data
+from .db_service import save_supplier_data, clear_all_and_reset_auto_increment
 
 
-def sync_supplier(supplier_name: str, gsign: str) -> Dict[str, Any]:
+def sync_supplier(supplier_name: str, gsign: str, skip_clear: bool = False) -> Dict[str, Any]:
     """
     同步单个供应商的数据
 
@@ -27,6 +27,7 @@ def sync_supplier(supplier_name: str, gsign: str) -> Dict[str, Any]:
     Args:
         supplier_name: 供应商名称
         gsign: 供应商签名
+        skip_clear: 是否跳过清空旧数据（全量同步时已清空整张表，可跳过）
 
     Returns:
         同步结果
@@ -53,7 +54,7 @@ def sync_supplier(supplier_name: str, gsign: str) -> Dict[str, Any]:
         records = process_data(raw_data, supplier_name)
 
         # 第三步：保存到数据库
-        result = save_supplier_data(supplier_name, records)
+        result = save_supplier_data(supplier_name, records, skip_clear=skip_clear)
 
         time_cost = round(time.time() - start_time, 2)
         print(f"\n[{supplier_name}] 同步完成，耗时: {time_cost}秒")
@@ -92,10 +93,13 @@ def sync_all_suppliers() -> List[Dict[str, Any]]:
     print(f"# 开始全量同步 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'#'*60}")
 
+    # 先清空整张表并重置自增ID
+    clear_all_and_reset_auto_increment()
+
     results = []
 
     for supplier_name, config in SUPPLIERS.items():
-        result = sync_supplier(supplier_name, config['gsign'])
+        result = sync_supplier(supplier_name, config['gsign'], skip_clear=True)
         results.append(result)
 
     # 打印汇总

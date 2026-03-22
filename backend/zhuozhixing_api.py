@@ -12,6 +12,8 @@ from datetime import datetime
 
 from app.external_services.zhuozhixing_sync import sync_all_suppliers, sync_supplier, SUPPLIERS
 from app.external_services.zhuozhixing_sync.db_service import query_data, get_data_count
+from app.external_services.zhuozhixing_sync.sync_service import zhuozhixing_daily_sync
+from app.core.task_manager import task_manager
 
 # 创建蓝图
 zhuozhixing_bp = Blueprint('zhuozhixing', __name__, url_prefix='/api/zhuozhixing')
@@ -20,7 +22,7 @@ zhuozhixing_bp = Blueprint('zhuozhixing', __name__, url_prefix='/api/zhuozhixing
 @zhuozhixing_bp.route('/sync', methods=['POST'])
 def trigger_sync():
     """
-    手动触发数据同步
+    手动触发数据同步（同步等待版本）
 
     请求参数（JSON，可选）：
         - supplier: 供应商名称（'广星' 或 '鑫峰'），不传则同步全部
@@ -66,6 +68,56 @@ def trigger_sync():
         return jsonify({
             'success': False,
             'message': f'同步失败: {str(e)}'
+        }), 500
+
+
+@zhuozhixing_bp.route('/sync/async', methods=['POST'])
+def trigger_sync_async():
+    """
+    手动触发数据同步（异步后台执行版本）
+
+    请求参数（JSON，可选）：
+        - supplier: 供应商名称（'广星' 或 '鑫峰'），不传则同步全部
+
+    返回：
+        任务已提交的确认信息
+    """
+    try:
+        data = request.get_json() or {}
+        supplier = data.get('supplier')
+
+        # 如果指定了供应商，只同步该供应商
+        if supplier:
+            if supplier not in SUPPLIERS:
+                return jsonify({
+                    'success': False,
+                    'message': f'无效的供应商: {supplier}，可选: {list(SUPPLIERS.keys())}'
+                }), 400
+
+            # 异步提交任务
+            task_manager.submit(
+                sync_supplier,
+                supplier,
+                SUPPLIERS[supplier]['gsign']
+            )
+
+            return jsonify({
+                'success': True,
+                'message': f'供应商 {supplier} 的同步任务已提交，正在后台执行...'
+            })
+
+        # 否则同步全部（调用定时任务的入口函数）
+        else:
+            task_manager.submit(zhuozhixing_daily_sync)
+            return jsonify({
+                'success': True,
+                'message': '全量同步任务已提交，正在后台执行...'
+            })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'提交任务失败: {str(e)}'
         }), 500
 
 

@@ -10,7 +10,6 @@
 """
 
 from .cleanup_tasks import (
-    clean_old_import_history,
     sales_history_sync_task,
     register_cleanup_tasks,
     start_scheduler,  # 已废弃，保留兼容
@@ -18,7 +17,6 @@ from .cleanup_tasks import (
 )
 
 __all__ = [
-    'clean_old_import_history',
     'sales_history_sync_task',
     'register_cleanup_tasks',
     'start_scheduler',  # 已废弃

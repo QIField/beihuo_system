@@ -324,14 +324,28 @@ def ensure_table_structure():
                 {'table': 'crmapp_cart', 'field': 'car_model', 'definition': 'TEXT'},
                 {'table': 'crmapp_beihuo', 'field': '供应商', 'definition': 'TEXT'},
                 {'table': 'crmapp_beihuo', 'field': '内部备注', 'definition': 'TEXT'},
+                {'table': 'zhuozhixing_inventory', 'field': '互换码', 'definition': 'TEXT COMMENT \'互换码\''},
             ]
 
             for field in fields_to_modify:
                 try:
-                    cursor.execute(f"""
-                        ALTER TABLE {field['table']} MODIFY COLUMN `{field['field']}` {field['definition']}
-                    """)
-                    modified.append(field['field'])
+                    # 先检查字段当前类型
+                    cursor.execute("""
+                        SELECT DATA_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = %s 
+                        AND COLUMN_NAME = %s
+                    """, (field['table'], field['field']))
+                    result = cursor.fetchone()
+                    
+                    # 如果字段不存在或者类型不对，才修改
+                    target_type = 'TEXT'
+                    if not result or result[0].upper() != target_type:
+                        cursor.execute(f"""
+                            ALTER TABLE {field['table']} MODIFY COLUMN `{field['field']}` {field['definition']}
+                        """)
+                        modified.append(f"{field['table']}.{field['field']}")
                 except:
                     pass
     except:
@@ -339,7 +353,7 @@ def ensure_table_structure():
     finally:
         conn.close()
     if modified:
-        print(f"[数据库] 已更新字段: {', '.join(modified)}")
+        print(f"[数据库] 已修复字段: {', '.join(modified)}")
 
 
 def ensure_cart_indexes():
@@ -549,7 +563,6 @@ def init_compare_summary_table():
                 sales_7d INT DEFAULT 0 COMMENT '近7天销量',
                 product_remark TEXT COMMENT '系统产品备注',
                 is_cass VARCHAR(10) COMMENT '是否同步开思',
-                procurement_records JSON COMMENT '采购记录JSON数组 [{"supplier_name": "xxx", "purchase_price": 100, "purchase_date": "2026-01-12"}, ...]',
                 created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
                 INDEX idx_oe (oe),
@@ -580,7 +593,6 @@ def init_compare_summary_table():
             # 检查并添加缺失的字段（兼容旧表）
             alter_columns = [
                 ("is_cass", "VARCHAR(10) COMMENT '是否同步开思'"),
-                ("procurement_records", "JSON COMMENT '采购记录JSON数组'"),
             ]
             
             for col_name, col_def in alter_columns:
@@ -590,6 +602,18 @@ def init_compare_summary_table():
                 except Exception as e:
                     if "Duplicate column name" not in str(e):
                         pass  # 静默处理字段添加错误
+            
+            # 检查并删除冗余字段 procurement_records
+            try:
+                cursor.execute("""
+                    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'crmapp_compare_summary' AND COLUMN_NAME = 'procurement_records'
+                """)
+                if cursor.fetchone():
+                    cursor.execute("ALTER TABLE crmapp_compare_summary DROP COLUMN procurement_records")
+                    print("已删除冗余字段 procurement_records 从 crmapp_compare_summary 表")
+            except Exception as e:
+                print(f"删除字段 procurement_records 时出错: {str(e)}")
     except Exception as e:
         print(f"  ✗ 比价汇总表: {e}")
     finally:
@@ -718,7 +742,7 @@ def init_zhuozhixing_table():
                 品牌编码 VARCHAR(50) COMMENT '品牌编码',
                 公会编码 VARCHAR(50) COMMENT '公会编码',
                 通用车型 VARCHAR(255) COMMENT '通用车型',
-                互换码 VARCHAR(100) COMMENT '互换码',
+                互换码 TEXT COMMENT '互换码',
                 是否共享 TINYINT COMMENT '是否共享：0-否，1-是',
                 商家库存表自增ID VARCHAR(50) COMMENT '商家库存表自增ID',
                 库号 VARCHAR(50) COMMENT '库号（仓库）',
@@ -737,6 +761,50 @@ def init_zhuozhixing_table():
         conn.close()
 
 
+def init_safety_stock_table():
+    """
+    初始化安全库存计算结果表
+    用于存储安全库存、库存上下限等计算结果
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS crmapp_safety_stock (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                sku VARCHAR(50) NOT NULL COMMENT 'SKU编码/OE号',
+                sku_name VARCHAR(200) COMMENT '产品名称',
+                calc_date DATE NOT NULL COMMENT '计算日期',
+                demand_avg DECIMAL(10,2) COMMENT '日均需求量',
+                demand_max DECIMAL(10,2) COMMENT '需求峰值',
+                demand_std DECIMAL(10,2) COMMENT '需求标准差',
+                lead_time_avg DECIMAL(5,1) COMMENT '平均交货期(天)',
+                lead_time_max DECIMAL(5,1) COMMENT '最长交货期(天)',
+                safety_stock DECIMAL(10,2) COMMENT '安全库存',
+                inventory_min DECIMAL(10,2) COMMENT '库存下限(紧急预警线)',
+                reorder_point DECIMAL(10,2) COMMENT '再订货点',
+                inventory_max DECIMAL(10,2) COMMENT '库存上限',
+                target_inventory DECIMAL(10,2) COMMENT '目标库存水位',
+                current_stock DECIMAL(10,2) COMMENT '当前库存数量',
+                suggested_qty DECIMAL(10,2) COMMENT '建议补货量',
+                stock_status VARCHAR(20) COMMENT '状态(normal/warning/danger)',
+                inquiry_1m INT COMMENT '近1个月询价量',
+                inquiry_3m INT COMMENT '近3个月月均询价量',
+                service_level DECIMAL(3,2) DEFAULT 0.95 COMMENT '服务水平',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                INDEX idx_sku_date (sku, calc_date),
+                INDEX idx_status (stock_status),
+                INDEX idx_calc_date (calc_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全库存计算结果表';
+            """
+            cursor.execute(create_table_sql)
+    except Exception as e:
+        print(f"  ✗ 安全库存表: {e}")
+    finally:
+        conn.close()
+
+
 def init_all_tables():
     """初始化所有数据库表"""
     tables = [
@@ -751,6 +819,7 @@ def init_all_tables():
         ('询价次数', init_quote_count_ks_table),
         ('采购历史', init_procurement_history_table),
         ('卓之星库存', init_zhuozhixing_table),
+        ('安全库存', init_safety_stock_table),
     ]
 
     completed = []

@@ -29,24 +29,182 @@
             color: #333;
         }
 
-        .toolbar {
-            background-color: #fff;
-            padding: 12px 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        /* 顶部工具栏布局 - 左右分栏 */
+        .top-toolbar {
+            display: flex;
+            gap: 20px;
             margin-bottom: 20px;
         }
 
-        .toolbar-header {
+        /* 左侧上传区域 */
+        .left-panel {
+            flex: 0 0 350px;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .left-panel-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
-        .toolbar-header h3 {
+        .left-panel-header h3 {
             margin: 0;
             color: #333;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            border: 2px dashed #d9d9d9;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+            background-color: #fafafa;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #1890ff;
+            background-color: #e6f7ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #1890ff;
+            background-color: #e6f7ff;
+        }
+
+        .upload-icon {
+            font-size: 24px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 3px;
+        }
+
+        .upload-hint {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .result-info {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .result-success {
+            background-color: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #52c41a;
+        }
+
+        .result-error {
+            background-color: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #ff4d4f;
+        }
+
+        /* 右侧品牌搜索区域 */
+        .right-panel {
+            flex: 1;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .right-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .right-panel-header h3 {
+            margin: 0;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .brand-search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .brand-search-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .brand-search-input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .brand-list-container {
+            flex: 1;
+            border: 1px solid #e8e8e8;
+            border-radius: 4px;
+            overflow-y: auto;
+            max-height: 200px;
+            background-color: #fafafa;
+        }
+
+        .brand-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .brand-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 13px;
+        }
+
+        .brand-item:hover {
+            background-color: #e6f7ff;
+        }
+
+        .brand-item:last-child {
+            border-bottom: none;
+        }
+
+        .brand-empty {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .brand-loading {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 13px;
         }
 
         .btn {
@@ -76,62 +234,102 @@
             background-color: #d9d9d9;
         }
 
-        .upload-area {
-            border: 2px dashed #d9d9d9;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            background-color: #fafafa;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .upload-area:hover {
-            border-color: #1890ff;
-            background-color: #e6f7ff;
-        }
-
-        .upload-area.dragover {
-            border-color: #1890ff;
-            background-color: #e6f7ff;
-        }
-
-        .upload-icon {
-            font-size: 32px;
-            color: #999;
-            margin-bottom: 8px;
-        }
-
-        .upload-text {
-            color: #666;
-            margin-bottom: 5px;
-        }
-
-        .upload-hint {
+        .btn-sm {
+            padding: 6px 12px;
             font-size: 12px;
-            color: #999;
         }
 
-        .file-input {
+        /* 历史记录弹窗样式 */
+        .modal-overlay {
             display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
         }
 
-        .result-info {
-            margin-top: 15px;
+        .modal-content {
+            background-color: #fff;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 900px;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            background-color: #fafafa;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+
+        .modal-close {
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 20px;
+            max-height: calc(80vh - 120px);
+            overflow-y: auto;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .history-table th,
+        .history-table td {
             padding: 12px;
-            border-radius: 4px;
+            text-align: left;
+            border-bottom: 1px solid #e8e8e8;
         }
 
-        .result-success {
-            background-color: #f6ffed;
-            border: 1px solid #b7eb8f;
-            color: #52c41a;
+        .history-table th {
+            background-color: #fafafa;
+            font-weight: 600;
+            color: #333;
         }
 
-        .result-error {
-            background-color: #fff2f0;
-            border: 1px solid #ffccc7;
-            color: #ff4d4f;
+        .history-table tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .download-link {
+            color: #1890ff;
+            text-decoration: none;
+        }
+
+        .download-link:hover {
+            text-decoration: underline;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
         }
 
         .data-container {
@@ -255,99 +453,6 @@
             font-size: 14px;
         }
 
-        /* 历史记录弹窗样式 */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #fff;
-            border-radius: 8px;
-            width: 80%;
-            max-width: 900px;
-            max-height: 80vh;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 20px;
-            border-bottom: 1px solid #e8e8e8;
-            background-color: #fafafa;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            color: #333;
-        }
-
-        .modal-close {
-            font-size: 24px;
-            color: #999;
-            cursor: pointer;
-            border: none;
-            background: none;
-        }
-
-        .modal-close:hover {
-            color: #333;
-        }
-
-        .modal-body {
-            padding: 20px;
-            max-height: calc(80vh - 120px);
-            overflow-y: auto;
-        }
-
-        .history-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .history-table th,
-        .history-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e8e8e8;
-        }
-
-        .history-table th {
-            background-color: #fafafa;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .history-table tr:hover {
-            background-color: #f5f5f5;
-        }
-
-        .download-link {
-            color: #1890ff;
-            text-decoration: none;
-        }
-
-        .download-link:hover {
-            text-decoration: underline;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #999;
-        }
-
         .stats-badge {
             display: inline-block;
             padding: 2px 8px;
@@ -417,21 +522,41 @@
     <div class="container">
         <h2>询价模块</h2>
 
-        <div class="toolbar">
-            <div class="toolbar-header">
-                <h3>导入数据</h3>
-                <div style="display: flex; gap: 10px;">
-                    <button type="button" class="btn btn-default" id="historyBtn">📁 上传历史（7天）</button>
-                    <button type="button" class="btn btn-primary" id="downloadTemplateBtn">下载模板</button>
+        <!-- 顶部工具栏：左侧上传 + 右侧品牌搜索 -->
+        <div class="top-toolbar">
+            <!-- 左侧：文件上传 -->
+            <div class="left-panel">
+                <div class="left-panel-header">
+                    <h3>📁 导入数据</h3>
+                    <div style="display: flex; gap: 5px;">
+                        <button type="button" class="btn btn-default btn-sm" id="historyBtn">历史</button>
+                        <button type="button" class="btn btn-primary btn-sm" id="downloadTemplateBtn">模板</button>
+                    </div>
+                </div>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <p class="upload-text">点击或拖拽文件上传</p>
+                    <p class="upload-hint">支持 Excel/CSV</p>
+                </div>
+                <input type="file" class="file-input" id="fileInput" accept=".csv,.xls,.xlsx">
+                <div id="uploadResult"></div>
+            </div>
+
+            <!-- 右侧：品牌搜索 -->
+            <div class="right-panel">
+                <div class="right-panel-header">
+                    <h3>🔍 CRM品牌查询</h3>
+                    <span id="brandCount" style="font-size: 12px; color: #666;"></span>
+                </div>
+                <div class="brand-search-box">
+                    <input type="text" class="brand-search-input" id="brandSearchInput" placeholder="输入品牌名称搜索...">
+                    <button class="btn btn-primary btn-sm" id="brandSearchBtn">搜索</button>
+                    <button class="btn btn-default btn-sm" id="brandClearBtn">清空</button>
+                </div>
+                <div class="brand-list-container" id="brandListContainer">
+                    <div class="brand-empty">请输入条件搜索品牌</div>
                 </div>
             </div>
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">📁</div>
-                <p class="upload-text">点击或拖拽文件到此处上传</p>
-                <p class="upload-hint">支持 Excel (.xls, .xlsx) 或 CSV 格式</p>
-            </div>
-            <input type="file" class="file-input" id="fileInput" accept=".csv,.xls,.xlsx">
-            <div id="uploadResult"></div>
         </div>
 
         <!-- 历史记录弹窗 -->
@@ -994,10 +1119,71 @@
             });
         }
 
+        // 品牌搜索功能
+        function initBrandSearch() {
+            const brandSearchInput = document.getElementById('brandSearchInput');
+            const brandSearchBtn = document.getElementById('brandSearchBtn');
+            const brandClearBtn = document.getElementById('brandClearBtn');
+            const brandListContainer = document.getElementById('brandListContainer');
+            const brandCount = document.getElementById('brandCount');
+
+            async function searchBrands() {
+                const keyword = brandSearchInput.value.trim();
+                
+                brandListContainer.innerHTML = '<div class="brand-loading">搜索中...</div>';
+                brandCount.textContent = '';
+
+                try {
+                    const response = await fetch('/api/purchase_plan/inquiry/crm_brands?keyword=' + encodeURIComponent(keyword));
+                    const result = await response.json();
+
+                    if (result.code === 0 && result.data && result.data.length > 0) {
+                        const listHtml = result.data.map(brand => 
+                            `<li class="brand-item" data-brand="${brand}">${brand}</li>`
+                        ).join('');
+                        
+                        brandListContainer.innerHTML = `<ul class="brand-list">${listHtml}</ul>`;
+                        brandCount.textContent = `共 ${result.data.length} 个品牌`;
+
+                        // 添加点击事件
+                        document.querySelectorAll('.brand-item').forEach(item => {
+                            item.addEventListener('click', () => {
+                                const brandName = item.getAttribute('data-brand');
+                                document.getElementById('searchBrand').value = brandName;
+                                loadData('', brandName, '');
+                            });
+                        });
+                    } else {
+                        brandListContainer.innerHTML = '<div class="brand-empty">未找到匹配的品牌</div>';
+                        brandCount.textContent = '共 0 个品牌';
+                    }
+                } catch (error) {
+                    console.error('搜索品牌失败:', error);
+                    brandListContainer.innerHTML = '<div class="brand-empty">搜索失败: ' + error.message + '</div>';
+                    brandCount.textContent = '';
+                }
+            }
+
+            brandSearchBtn.addEventListener('click', searchBrands);
+            
+            brandSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchBrands();
+                }
+            });
+
+            brandClearBtn.addEventListener('click', () => {
+                brandSearchInput.value = '';
+                brandListContainer.innerHTML = '<div class="brand-empty">请输入条件搜索品牌</div>';
+                brandCount.textContent = '';
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             initUpload();
             initSearch();
             initPagination();
+            initBrandSearch();
             loadData();
         });
 

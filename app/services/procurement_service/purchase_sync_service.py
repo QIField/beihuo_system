@@ -49,12 +49,11 @@ class PurchaseSyncService:
                 # 计算该 OE+品牌 的各项价格数据
                 max_price, min_price = self._calculate_max_min_price(oe, brand, company)
                 supplier_price = self._get_latest_price(oe, brand, company)
-                procurement_records = self._build_procurement_records(oe, brand, company)
 
                 # 更新比价表
                 updated = self._update_compare_summary(
                     oe, brand, company,
-                    max_price, min_price, supplier_price, procurement_records
+                    max_price, min_price, supplier_price
                 )
 
                 if updated:
@@ -217,7 +216,7 @@ class PurchaseSyncService:
 
     def _update_compare_summary(self, oe: str, brand: str, company: str,
                                  max_price: float, min_price: float,
-                                 supplier_price: float, procurement_records: List[Dict]) -> bool:
+                                 supplier_price: float) -> bool:
         """
         更新比价汇总表
 
@@ -228,7 +227,6 @@ class PurchaseSyncService:
             max_price: 最高价
             min_price: 最低价
             supplier_price: 供应商价格
-            procurement_records: 采购记录JSON数组
 
         Returns:
             是否更新成功
@@ -236,9 +234,6 @@ class PurchaseSyncService:
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
-                # 将采购记录转为JSON字符串
-                records_json = json.dumps(procurement_records, ensure_ascii=False) if procurement_records else None
-
                 # 检查记录是否存在
                 check_sql = """
                     SELECT id FROM crmapp_compare_summary
@@ -254,23 +249,22 @@ class PurchaseSyncService:
                         SET max_price = %s,
                             min_price = %s,
                             supplier_price = %s,
-                            procurement_records = %s,
                             updated_time = NOW()
                         WHERE oe = %s AND brand = %s AND company = %s
                     """
                     cursor.execute(update_sql, (
-                        max_price, min_price, supplier_price, records_json,
+                        max_price, min_price, supplier_price,
                         oe, brand, company
                     ))
                 else:
                     # 插入新记录（只填充价格相关字段）
                     insert_sql = """
                         INSERT INTO crmapp_compare_summary
-                        (oe, brand, company, max_price, min_price, supplier_price, procurement_records)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        (oe, brand, company, max_price, min_price, supplier_price)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                     """
                     cursor.execute(insert_sql, (
-                        oe, brand, company, max_price, min_price, supplier_price, records_json
+                        oe, brand, company, max_price, min_price, supplier_price
                     ))
 
                 conn.commit()
@@ -299,11 +293,10 @@ class PurchaseSyncService:
         try:
             max_price, min_price = self._calculate_max_min_price(oe, brand, company)
             supplier_price = self._get_latest_price(oe, brand, company)
-            procurement_records = self._build_procurement_records(oe, brand, company)
 
             return self._update_compare_summary(
                 oe, brand, company,
-                max_price, min_price, supplier_price, procurement_records
+                max_price, min_price, supplier_price
             )
         except Exception as e:
             print(f"同步单个产品失败 OE={oe}, brand={brand}: {e}")

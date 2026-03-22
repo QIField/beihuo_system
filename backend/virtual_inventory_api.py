@@ -202,10 +202,10 @@ def get_business_date_range(target_time=None):
     # 获取业务日期
     business_date = get_business_date(target_time)
     
-    # 业务日开始时间：当天13:00:00
-    start_time = datetime.combine(business_date, datetime.min.time().replace(hour=13))
-    # 业务日结束时间：第二天13:00:00
-    end_time = start_time + timedelta(days=1)
+    # 业务日开始时间：当天00:00:00
+    start_time = datetime.combine(business_date, datetime.min.time())
+    # 业务日结束时间：当天23:59:59
+    end_time = datetime.combine(business_date, datetime.max.time().replace(microsecond=0))
     
     return start_time, end_time
 
@@ -712,45 +712,32 @@ def get_virtual_inventory_by_msg_pattern():
             where_conditions.append("fetch_time >= %s AND fetch_time < %s")
             params.extend([start_time, end_time])
 
-        # 根据模式筛选数据
+        # 根据模式筛选数据 - 使用 update_status 字段（支持8种中文状态）
         if pattern:
-            if pattern == "上传失败":
-                # 匹配所有上传失败的情况
-                where_conditions.append("""
-                    (`update_msg` LIKE %s OR `update_msg` LIKE %s OR `update_msg` LIKE %s OR 
-                    `update_msg` LIKE %s OR `update_msg` LIKE %s OR
-                    `update_msg` IS NULL OR `update_msg` = '' OR
-                    (`update_msg` IS NOT NULL AND `update_msg` != '' AND 
-                    `update_msg` NOT LIKE %s AND `update_msg` NOT LIKE %s AND 
-                    `update_msg` NOT LIKE %s AND `update_msg` NOT LIKE %s AND 
-                    `update_msg` NOT LIKE %s AND LOWER(`update_msg`) NOT LIKE %s))
-                """)
-                # 参数：品牌名称不存在 OR 过期时间无效 OR 产品不存在 OR 新建成功 OR 新建失败 OR 其它情况
-                params.extend([
-                    "%品牌名称%总部不存在%请核查数据%",  # 品牌名称总部不存在
-                    "%过期时间%不能小于当前时间%",      # 过期时间不能小于当前时间
-                    "%物料所属品牌%OE号%产品数据不存在%请核查数据%",  # 物料所属品牌OE号不存在
-                    "%OE号【%】处理结果：成功%",         # 新建成功
-                    "%OE号【%】处理结果：失败%",         # 新建失败
-                    "%品牌名称%总部不存在%请核查数据%",  # 用于NOT LIKE
-                    "%过期时间%不能小于当前时间%",      # 用于NOT LIKE
-                    "%物料所属品牌%OE号%产品数据不存在%请核查数据%",  # 用于NOT LIKE
-                    "%OE号【%】处理结果：成功%",         # 用于NOT LIKE
-                    "%OE号【%】处理结果：失败%",         # 用于NOT LIKE
-                    "%update%"  # 用于NOT LIKE
-                ])
-            elif pattern == "上传成功":
-                # 匹配包含"update"的更新成功信息
-                where_conditions.append("LOWER(`update_msg`) LIKE %s")
-                params.append("%update%")
+            # 8种精确匹配的状态
+            exact_statuses = [
+                '上传成功', '新建成功-已存在', '新建成功-新创建',
+                '新建失败-未找到产品名称', '新建失败-车型不能为空',
+                '上传失败-过期时间错误', '上传失败-品牌不存在', '上传失败-产品不存在',
+                '其他'
+            ]
+            
+            if pattern in exact_statuses:
+                # 精确匹配单种状态
+                where_conditions.append("update_status = %s")
+                params.append(pattern)
+            elif pattern == "上传失败":
+                # 上传失败：除上传成功以外的所有
+                where_conditions.append("(update_status != '上传成功' OR update_status IS NULL)")
             elif pattern == "新建成功":
-                # 匹配包含"OE号【"和"】处理结果：成功"的新建成功信息
-                where_conditions.append("`update_msg` LIKE %s AND `update_msg` LIKE %s")
-                params.extend(["%OE号【%", "%】处理结果：成功%"])
+                # 新建成功：包含两种成功状态
+                where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建')")
             elif pattern == "新建失败":
-                # 匹配包含"OE号【"和"】处理结果：失败"的新建失败信息
-                where_conditions.append("`update_msg` LIKE %s AND `update_msg` LIKE %s")
-                params.extend(["%OE号【%", "%】处理结果：失败%"])
+                # 新建失败：包含三种失败状态
+                where_conditions.append("update_status IN ('新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
+            elif pattern == "没有档案":
+                # 没有档案：包含五种状态
+                where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
 
         # 无论是否有pattern，都要添加其他搜索条件
         if supplier_name:
@@ -897,16 +884,32 @@ def get_virtual_inventory_statistics_by_pattern():
             where_conditions.append("fetch_time >= %s AND fetch_time < %s")
             params.extend([start_time, end_time])
 
-        # 根据模式筛选数据 - 使用 update_status 字段优化查询
+        # 根据模式筛选数据 - 使用 update_status 字段优化查询（支持8种中文状态）
         if pattern:
-            if pattern == "上传失败":
-                where_conditions.append("(update_status != 'success' OR update_status IS NULL)")
-            elif pattern == "上传成功":
-                where_conditions.append("update_status = 'success'")
+            # 8种精确匹配的状态
+            exact_statuses = [
+                '上传成功', '新建成功-已存在', '新建成功-新创建',
+                '新建失败-未找到产品名称', '新建失败-车型不能为空',
+                '上传失败-过期时间错误', '上传失败-品牌不存在', '上传失败-产品不存在',
+                '其他'
+            ]
+            
+            if pattern in exact_statuses:
+                # 精确匹配单种状态
+                where_conditions.append("update_status = %s")
+                params.append(pattern)
+            elif pattern == "上传失败":
+                # 上传失败：除上传成功以外的所有
+                where_conditions.append("(update_status != '上传成功' OR update_status IS NULL)")
             elif pattern == "新建成功":
-                where_conditions.append("update_status = 'new_success'")
+                # 新建成功：包含两种成功状态
+                where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建')")
             elif pattern == "新建失败":
-                where_conditions.append("update_status = 'new_failed'")
+                # 新建失败：包含三种失败状态
+                where_conditions.append("update_status IN ('新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
+            elif pattern == "没有档案":
+                # 没有档案：包含五种状态
+                where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
 
         where_clause = " AND ".join(where_conditions)
 
@@ -1280,60 +1283,61 @@ def get_virtual_inventory_statistics_today():
         total_count = cursor.fetchone()['count']
         print(f"当前业务日总记录数: {total_count}")
 
-        # 成功上传：使用 update_status 索引
-        success_sql = "SELECT COUNT(*) as count FROM virtual_inventory WHERE update_status = 'success' AND fetch_time >= %s AND fetch_time < %s"
-        cursor.execute(success_sql, (start_time, end_time))
-        success_count = cursor.fetchone()['count']
-        print(f"当前业务日成功上传数 (update): {success_count}")
-
-        # 新建成功：使用 update_status 索引
-        new_success_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory
-            WHERE update_status = 'new_success' AND fetch_time >= %s AND fetch_time < %s
+        # 新分类统计（基于中文 update_status）
+        
+        # 1. 上传成功
+        upload_success_sql = """
+            SELECT COUNT(*) as count FROM virtual_inventory 
+            WHERE update_status = '上传成功' AND fetch_time >= %s AND fetch_time < %s
         """
-        cursor.execute(new_success_sql, (start_time, end_time))
-        new_success_count = cursor.fetchone()['count']
-        print(f"当前业务日新建成功数: {new_success_count}")
-
-        # 新建失败：使用 update_status 索引
-        new_fail_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory
-            WHERE update_status = 'new_failed' AND fetch_time >= %s AND fetch_time < %s
+        cursor.execute(upload_success_sql, (start_time, end_time))
+        upload_success_count = cursor.fetchone()['count']
+        print(f"当前业务日上传成功数: {upload_success_count}")
+        
+        # 2. 新建成功（新建成功-已存在 + 新建成功-新创建）
+        new_create_success_sql = """
+            SELECT COUNT(*) as count FROM virtual_inventory 
+            WHERE update_status IN ('新建成功-已存在', '新建成功-新创建') 
+            AND fetch_time >= %s AND fetch_time < %s
         """
-        cursor.execute(new_fail_sql, (start_time, end_time))
-        new_fail_count = cursor.fetchone()['count']
-        print(f"当前业务日新建失败数: {new_fail_count}")
-
-        # 品牌名称总部不存在 - 暂时保持LIKE查询（数据量较小）
-        brand_not_exist_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory
-            WHERE update_msg LIKE %s AND fetch_time >= %s AND fetch_time < %s
+        cursor.execute(new_create_success_sql, (start_time, end_time))
+        new_create_success_count = cursor.fetchone()['count']
+        print(f"当前业务日新建成功数: {new_create_success_count}")
+        
+        # 3. 新建失败（新建失败-未找到产品名称 + 新建失败-车型不能为空 + 上传失败-产品不存在）
+        new_create_fail_sql = """
+            SELECT COUNT(*) as count FROM virtual_inventory 
+            WHERE update_status IN ('新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在') 
+            AND fetch_time >= %s AND fetch_time < %s
         """
-        cursor.execute(brand_not_exist_sql, ["%品牌名称%总部不存在%请核查数据%", start_time, end_time])
-        brand_not_exist_count = cursor.fetchone()['count']
-        print(f"当前业务日品牌名称总部不存在数: {brand_not_exist_count}")
-
-        # 物料所属品牌OE号不存在 - 暂时保持LIKE查询（数据量较小）
-        product_not_exist_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory
-            WHERE update_msg LIKE %s AND fetch_time >= %s AND fetch_time < %s
+        cursor.execute(new_create_fail_sql, (start_time, end_time))
+        new_create_fail_count = cursor.fetchone()['count']
+        print(f"当前业务日新建失败数: {new_create_fail_count}")
+        
+        # 4. 上传失败（除上传成功以外的所有）
+        upload_fail_sql = """
+            SELECT COUNT(*) as count FROM virtual_inventory 
+            WHERE update_status != '上传成功' AND fetch_time >= %s AND fetch_time < %s
         """
-        cursor.execute(product_not_exist_sql, ["%物料所属品牌%OE号%产品数据不存在%请核查数据%", start_time, end_time])
-        product_not_exist_count = cursor.fetchone()['count']
-        print(f"当前业务日物料所属品牌OE号不存在数: {product_not_exist_count}")
-        log_time_cost("统计查询(使用update_status索引)", query_start)
-
-        # 失败：总记录数 - 成功上传
-        failed_count = total_count - success_count
-        print(f"当前业务日失败数: {failed_count}")
-
-        # 没有档案：新建失败 + 新建成功 + 品牌名称总部不存在 + 物料所属品牌OE号不存在
-        no_record_count = new_success_count + new_fail_count + brand_not_exist_count + product_not_exist_count
+        cursor.execute(upload_fail_sql, (start_time, end_time))
+        upload_fail_count = cursor.fetchone()['count']
+        print(f"当前业务日上传失败数: {upload_fail_count}")
+        
+        # 5. 没有档案（新建成功-已存在 + 新建成功-新创建 + 新建失败-未找到产品名称 + 新建失败-车型不能为空 + 上传失败-产品不存在）
+        no_record_sql = """
+            SELECT COUNT(*) as count FROM virtual_inventory 
+            WHERE update_status IN ('新建成功-已存在', '新建成功-新创建', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在') 
+            AND fetch_time >= %s AND fetch_time < %s
+        """
+        cursor.execute(no_record_sql, (start_time, end_time))
+        no_record_count = cursor.fetchone()['count']
         print(f"当前业务日没有档案数: {no_record_count}")
-
-        # 新建档案：新建成功
-        new_archive_count = new_success_count
-        print(f"当前业务日新建档案数: {new_archive_count}")
+        
+        log_time_cost("统计查询(使用update_status索引)", query_start)
+        
+        # 兼容旧字段名
+        success_count = upload_success_count
+        failed_count = upload_fail_count
 
         conn.close()
 
@@ -1344,10 +1348,15 @@ def get_virtual_inventory_statistics_today():
                 'business_date': start_time.strftime('%Y-%m-%d'),
                 'business_time_range': f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}",
                 'total_count': total_count,
-                'success_count': success_count,
-                'failed_count': failed_count,
+                # 新分类统计
+                'upload_success_count': upload_success_count,
+                'new_create_success_count': new_create_success_count,
+                'new_create_fail_count': new_create_fail_count,
+                'upload_fail_count': upload_fail_count,
                 'no_record_count': no_record_count,
-                'new_archive_count': new_archive_count
+                # 兼容旧字段名
+                'success_count': success_count,
+                'failed_count': failed_count
             }
         }
         print(f"当前业务日统计返回结果: {result}")
@@ -1623,6 +1632,45 @@ def get_blacklist_stats_api():
         })
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'获取统计信息失败: {str(e)}'}), 500
+
+
+@virtual_inventory_bp.route('/api/virtual_inventory/trigger_task', methods=['POST'])
+@login_required
+def trigger_virtual_inventory_task():
+    """手动触发虚拟库存任务"""
+    try:
+        import threading
+        from app.utils.virtual_inventory import main_process
+
+        def run_task():
+            """在后台线程中运行任务"""
+            try:
+                print("=" * 60)
+                print("手动触发虚拟库存任务开始")
+                print("=" * 60)
+                main_process(skip_table_creation=True)
+                print("=" * 60)
+                print("手动触发虚拟库存任务完成")
+                print("=" * 60)
+            except Exception as e:
+                print(f"虚拟库存任务执行失败: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # 在后台线程中运行任务，避免阻塞请求
+        thread = threading.Thread(target=run_task)
+        thread.daemon = True
+        thread.start()
+
+        return jsonify({
+            'code': 0,
+            'msg': '虚拟库存任务已启动，请在后台查看执行结果'
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'启动失败: {str(e)}'
+        }), 500
 
 
 # 导入到主应用的函数============================================================================================

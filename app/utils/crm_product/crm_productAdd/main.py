@@ -7,7 +7,6 @@ import os
 import sys
 import time
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 # 添加项目根目录到路径
@@ -47,14 +46,98 @@ from .db_manager import (
 
 
 # ============================================================================
-# 全局配置
-# ============================================================================
-MAX_WORKERS = 10  # 最大并发数
-
-
-# ============================================================================
 # 初始化函数
 # ============================================================================
+
+def init_crmapp_created_products_table(db_manager):
+    """
+    初始化 crmapp_created_products 表
+    用于记录已创建的产品，防止重复创建
+    """
+    create_table_sql = """
+        CREATE TABLE IF NOT EXISTS crmapp_created_products (
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+            oe_code VARCHAR(100) NOT NULL COMMENT 'OE号',
+            brand VARCHAR(100) NOT NULL COMMENT '品牌',
+            supplier_name VARCHAR(100) DEFAULT NULL COMMENT '供应商名称',
+            create_result VARCHAR(50) DEFAULT NULL COMMENT '创建结果状态',
+            update_msg TEXT COMMENT '完整的创建结果消息',
+            first_create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '首次创建时间',
+            last_update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
+            create_count INT DEFAULT 1 COMMENT '创建次数统计',
+            UNIQUE KEY uk_oe_brand (oe_code, brand) COMMENT 'OE号和品牌组合唯一'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CRM已创建产品记录表'
+    """
+    try:
+        db_manager.execute_update(create_table_sql)
+        print("✅ crmapp_created_products 表初始化完成")
+    except Exception as e:
+        print(f"❌ 初始化 crmapp_created_products 表失败: {e}")
+        raise
+
+
+def get_existing_products(db_manager):
+    """
+    获取已存在的产品列表（oe_code + brand 组合）
+    返回: set((oe_code, brand), ...)
+    """
+    try:
+        sql = "SELECT oe_code, brand FROM crmapp_created_products"
+        result = db_manager.execute_query(sql)
+        existing_set = set()
+        for row in result:
+            key = (row['oe_code'], row['brand'])
+            existing_set.add(key)
+        print(f"📋 已存在 {len(existing_set)} 个产品记录")
+        return existing_set
+    except Exception as e:
+        print(f"❌ 获取已存在产品列表失败: {e}")
+        return set()
+
+
+def record_create_result(db_manager, oe_code, brand, supplier_name, result_msg):
+    """
+    记录产品创建结果到 crmapp_created_products 表
+    """
+    # 解析创建结果状态
+    create_result = '其他'
+    if '处理结果：成功 - product_id:' in result_msg:
+        create_result = '新建成功-新创建'
+    elif '处理结果：已存在 - 该物料已关联当前组织!' in result_msg:
+        create_result = '新建成功-已存在'
+    elif '处理结果：失败 - 未找到产品名称' in result_msg:
+        create_result = '新建失败-未找到产品名称'
+    elif '处理结果：失败 - 车型不能为空' in result_msg:
+        create_result = '新建失败-车型不能为空'
+    elif '处理结果：失败' in result_msg:
+        create_result = '新建失败-其他'
+    
+    # 尝试更新已存在的记录
+    update_sql = """
+        UPDATE crmapp_created_products 
+        SET create_result = %s,
+            update_msg = %s,
+            create_count = create_count + 1,
+            last_update_time = NOW()
+        WHERE oe_code = %s AND brand = %s
+    """
+    
+    # 插入新记录
+    insert_sql = """
+        INSERT INTO crmapp_created_products 
+        (oe_code, brand, supplier_name, create_result, update_msg, first_create_time)
+        VALUES (%s, %s, %s, %s, %s, NOW())
+    """
+    
+    try:
+        # 先尝试更新
+        affected = db_manager.execute_update(update_sql, (create_result, result_msg, oe_code, brand))
+        if affected == 0:
+            # 没有更新到，说明是新产品，执行插入
+            db_manager.execute_update(insert_sql, (oe_code, brand, supplier_name, create_result, result_msg))
+    except Exception as e:
+        print(f"❌ 记录创建结果失败 [{oe_code}/{brand}]: {e}")
+
 
 def get_brand_id_by_name(session, brand, timeout=30):
     """
@@ -83,8 +166,9 @@ def get_brand_id_by_name(session, brand, timeout=30):
     
     # 如果直接匹配失败，尝试使用别名
     corrected_brand = find_brand_by_alias(brand)
-    if corrected_brand and corrected_brand != brand:
-        # 使用修正后的品牌名再次尝试
+    
+    if corrected_brand:
+        # 使用修正后的品牌名再次尝试（即使和原品牌名相同，也要尝试查询）
         id_params = {'l_name_zh': corrected_brand}
         id_response = session.get('https://crm.gzbbr.com/api/Product.Brand/index', params=id_params, headers=headers, timeout=timeout)
         
@@ -96,7 +180,8 @@ def get_brand_id_by_name(session, brand, timeout=30):
             for brand_item in brand_list:
                 if brand_item.get("l_name_zh") == corrected_brand:
                     brand_id = brand_item.get("brand_id")
-                    print(f"品牌 '{brand}' -> ID: {brand_id}, 名称: {brand_item.get('l_name_zh')}, 匹配: 别名匹配({corrected_brand})")
+                    match_type = "别名匹配" if corrected_brand != brand else "别名确认"
+                    print(f"品牌 '{brand}' -> ID: {brand_id}, 名称: {brand_item.get('l_name_zh')}, 匹配: {match_type}({corrected_brand})")
                     return brand_id
     
     print(f"品牌 '{brand}' -> 未找到匹配")
@@ -107,7 +192,7 @@ def get_brand_id_by_name(session, brand, timeout=30):
 # 核心处理函数
 # ============================================================================
 
-def process_single_oe(item, product_df, alias_df, db_manager=None):
+def process_single_oe(item, product_df, alias_df, db_manager=None, session=None):
     """
     处理单个 OE 号码（核心逻辑）
     
@@ -116,12 +201,14 @@ def process_single_oe(item, product_df, alias_df, db_manager=None):
         product_df: 产品数据 DataFrame
         alias_df: 别名数据 DataFrame
         db_manager: 数据库管理器（数据库模式用）
+        session: 可选，传入已认证的 session，否则使用线程本地 session
     
     Returns:
         结果字符串
     """
-    # 使用线程本地的session，避免多线程冲突
-    session = get_thread_session()
+    # 使用传入的 session 或线程本地的 session
+    if session is None:
+        session = get_thread_session()
     
     oe_number = item['oe_number']
     brand = item['brand']
@@ -311,6 +398,7 @@ def process_database_mode(session, product_df, alias_df):
     """
     数据库模式处理
     注意：session参数保留用于兼容性，但实际使用线程本地session
+    新增：过滤已创建的产品，防止重复创建
     """
     print("\n【数据库模式】")
     
@@ -321,27 +409,54 @@ def process_database_mode(session, product_df, alias_df):
         return
     
     try:
-        # 加载数据
+        # 1. 初始化 crmapp_created_products 表
+        init_crmapp_created_products_table(db_manager)
+        
+        # 2. 加载数据
         data = load_data_from_mysql()
         if not data:
             print("没有数据需要处理")
             return
         
-        print(f"开始处理 {len(data)} 条数据...")
+        print(f"从数据库加载了 {len(data)} 条数据...")
         
-        # 准备处理项
+        # 3. 获取已存在的产品列表
+        existing_products = get_existing_products(db_manager)
+        
+        # 4. 准备处理项，过滤已存在的产品
         items = []
+        skipped_count = 0
         for row in data:
+            oe_number = str(row['oe_code']).strip()
+            brand = row['brand']
+            
+            # 检查是否已存在
+            key = (oe_number, brand)
+            if key in existing_products:
+                skipped_count += 1
+                continue
+            
             items.append({
-                'oe_number': str(row['oe_code']).strip(),
-                'brand': row['brand'],
+                'oe_number': oe_number,
+                'brand': brand,
+                'supplier_name': row.get('supplier_name', ''),
                 'mode': 'database'
             })
         
-        # 并发处理（使用线程本地session）
-        _process_with_thread_pool(
-            items, product_df, alias_df, db_manager
+        print(f"跳过已存在的 {skipped_count} 个产品，实际待处理 {len(items)} 个产品")
+        
+        if not items:
+            print("没有新产品需要处理")
+            return
+        
+        # 5. 循环处理（替代并发），传入已认证的 session
+        # 处理所有过滤后的产品（无数量限制）
+        results = _process_with_loop_with_record(
+            items, product_df, alias_df, db_manager, session
         )
+        
+        # 6. 所有产品处理完成后，统一更新 update_status
+        batch_update_status(db_manager)
         
     finally:
         db_manager.close()
@@ -385,8 +500,8 @@ def process_two_column_mode(session, product_df, alias_df, file_path):
     
     print(f"有效数据: {len(items)} 条")
 
-    # 并发处理（使用线程本地session）
-    results = _process_with_thread_pool(
+    # 循环处理（替代并发）
+    results = _process_with_loop(
         items, product_df, alias_df, None
     )
 
@@ -433,8 +548,8 @@ def process_three_column_mode(session, product_df, alias_df, file_path):
     
     print(f"有效数据: {len(items)} 条")
 
-    # 并发处理（使用线程本地session）
-    results = _process_with_thread_pool(
+    # 循环处理（替代并发）
+    results = _process_with_loop(
         items, product_df, alias_df, None
     )
 
@@ -442,42 +557,110 @@ def process_three_column_mode(session, product_df, alias_df, file_path):
     _save_excel_results(df, results, oe_col, file_path)
 
 
-def _process_with_thread_pool(items, product_df, alias_df, db_manager=None):
+def _process_with_loop(items, product_df, alias_df, db_manager=None):
     """
-    使用线程池并发处理
-    每个线程使用独立的session，避免多线程冲突
+    使用循环逐个处理（替代并发）
+    避免多线程冲突，提高稳定性
     """
     results = {}
     completed = 0
     total = len(items)
     
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        # 提交所有任务（不传递session，每个线程使用自己的session）
-        future_to_item = {
-            executor.submit(
-                process_single_oe, item, product_df, alias_df, db_manager
-            ): item for item in items
-        }
+    for item in items:
+        oe_number = item['oe_number']
         
-        # 收集结果
-        for future in as_completed(future_to_item):
-            item = future_to_item[future]
-            oe_number = item['oe_number']
-            
-            try:
-                result = future.result()
-                results[oe_number] = result
-            except Exception as e:
-                result = f"失败 - 处理异常: {e}"
-                results[oe_number] = result
-                print(f"❌ {oe_number}: {result}")
-            
-            completed += 1
-            if completed % 10 == 0 or completed == total:
-                print(f"进度: {completed}/{total}")
+        try:
+            result = process_single_oe(item, product_df, alias_df, db_manager)
+            results[oe_number] = result
+        except Exception as e:
+            result = f"失败 - 处理异常: {e}"
+            results[oe_number] = result
+            print(f"❌ {oe_number}: {result}")
+        
+        completed += 1
+        if completed % 10 == 0 or completed == total:
+            print(f"进度: {completed}/{total}")
     
     print(f"\n处理完成: {total} 条")
     return results
+
+
+def _process_with_loop_with_record(items, product_df, alias_df, db_manager=None, session=None):
+    """
+    使用循环逐个处理，并记录创建结果到 crmapp_created_products 表
+    专用于数据库模式
+    
+    Args:
+        items: 待处理的产品列表
+        product_df: 产品数据 DataFrame
+        alias_df: 别名数据 DataFrame
+        db_manager: 数据库管理器
+        session: 可选，已认证的 session
+    """
+    results = {}
+    completed = 0
+    total = len(items)
+    
+    for item in items:
+        oe_number = item['oe_number']
+        brand = item.get('brand', '')
+        supplier_name = item.get('supplier_name', '')
+        
+        try:
+            result = process_single_oe(item, product_df, alias_df, db_manager, session)
+            results[oe_number] = result
+            
+            # 记录创建结果到 crmapp_created_products 表
+            if db_manager:
+                record_create_result(db_manager, oe_number, brand, supplier_name, result)
+                
+        except Exception as e:
+            result = f"失败 - 处理异常: {e}"
+            results[oe_number] = result
+            print(f"❌ {oe_number}: {result}")
+            
+            # 记录失败结果
+            if db_manager:
+                record_create_result(db_manager, oe_number, brand, supplier_name, result)
+        
+        completed += 1
+        if completed % 10 == 0 or completed == total:
+            print(f"进度: {completed}/{total}")
+    
+    print(f"\n处理完成: {total} 条")
+    return results
+
+
+def batch_update_status(db_manager):
+    """
+    批量更新所有记录的 update_status 字段
+    根据 update_msg 内容分类更新状态
+    """
+    print("\n开始批量更新 update_status...")
+    
+    update_sql = """
+        UPDATE virtual_inventory 
+        SET update_status = CASE
+            WHEN LOWER(update_msg) LIKE '%update%' OR LOWER(update_msg) = 'add' THEN '上传成功'
+            WHEN update_msg LIKE 'OE号【%】处理结果：已存在 - 该物料已关联当前组织!' THEN '新建成功-已存在'
+            WHEN update_msg LIKE 'OE号【%】处理结果：成功 - product_id:%' THEN '新建成功-新创建'
+            WHEN update_msg LIKE 'OE号【%】处理结果：失败 - 未找到产品名称' THEN '新建失败-未找到产品名称'
+            WHEN update_msg LIKE 'OE号【%】处理结果：失败 - 车型不能为空%' THEN '新建失败-车型不能为空'
+            WHEN update_msg LIKE '过期时间【%】不能小于当前时间' THEN '上传失败-过期时间错误'
+            WHEN update_msg LIKE '品牌名称【%】总部不存在,请核查数据' THEN '上传失败-品牌不存在'
+            WHEN update_msg LIKE '物料所属品牌【%】OE号【%】产品数据不存在,请核查数据' THEN '上传失败-产品不存在'
+            ELSE '其他'
+        END
+        WHERE update_status IS NULL OR update_status = ''
+    """
+    
+    try:
+        affected_rows = db_manager.execute_update(update_sql)
+        print(f"✅ 已更新 {affected_rows} 条记录的 update_status")
+    except Exception as e:
+        print(f"❌ 更新 update_status 失败: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def _identify_columns(df):
@@ -752,8 +935,8 @@ def process_two_column_mode_with_return(session, product_df, alias_df, file_path
         
         print(f"  有效数据: {len(items)} 条")
 
-        # 并发处理（使用线程本地session）
-        results = _process_with_thread_pool(items, product_df, alias_df, None)
+        # 循环处理（替代并发）
+        results = _process_with_loop(items, product_df, alias_df, None)
         all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
     
     # 保存所有工作表结果到一个文件
@@ -812,8 +995,8 @@ def process_three_column_mode_with_return(session, product_df, alias_df, file_pa
         
         print(f"  有效数据: {len(items)} 条")
 
-        # 并发处理（使用线程本地session）
-        results = _process_with_thread_pool(items, product_df, alias_df, None)
+        # 循环处理（替代并发）
+        results = _process_with_loop(items, product_df, alias_df, None)
         all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
 
     # 保存所有工作表结果到一个文件

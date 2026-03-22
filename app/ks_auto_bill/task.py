@@ -255,14 +255,9 @@ def process_orders_once():
     print("\n[开思自动对单] 获取开思订单并保存到数据库...")
     # 打印本次爬取的时间范围（只打印一次）
     print_date_range()
-    try:
-        all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session)
-        print(f"[开思自动对单] 成功获取并保存 {len(all_order_info_list)} 条订单信息")
-        print(f"[开思自动对单] 找到 {len(pending_confirmation_orders)} 条待处理订单")
-    except Exception as e:
-        error_msg = f"获取订单信息失败: {str(e)}"
-        print(f"[开思自动对单] {error_msg}")
-        return False, error_msg
+    all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session)
+    print(f"[开思自动对单] 成功获取并保存 {len(all_order_info_list)} 条订单信息")
+    print(f"[开思自动对单] 找到 {len(pending_confirmation_orders)} 条待处理订单")
 
     # 5. 发送订单到 CRM
     if pending_confirmation_orders:
@@ -290,7 +285,6 @@ def ks_auto_bill_task():
     特点：
     1. 单次执行，不循环（由调度器负责每分钟调用）
     2. 自带单实例锁，防止重复执行
-    3. 异常隔离，不影响主进程
     """
     # 1. 获取单实例锁
     if not _task_lock.acquire():
@@ -305,13 +299,6 @@ def ks_auto_bill_task():
             print(f"[开思自动对单] 任务执行失败: {message}")
         else:
             print(f"[开思自动对单] 任务执行成功")
-
-    except Exception as e:
-        # 捕获所有异常，防止传播到主进程
-        import traceback
-        error_traceback = traceback.format_exc()
-        print(f"[开思自动对单] 任务异常（已捕获）: {type(e).__name__}: {str(e)}")
-        print(f"[开思自动对单] 堆栈:\n{error_traceback}")
 
     finally:
         # 3. 释放锁

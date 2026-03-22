@@ -167,3 +167,29 @@ def init_zhuozhixing_sync():
 
     except Exception as e:
         logger.error(f"[卓之星同步] 失败: {e}")
+
+
+def init_daily_crawl_task():
+    """初始化每日爬取任务（凌晨2点执行）"""
+    import os
+
+    auto_start = os.environ.get('AUTO_START_DAILY_CRAWL', 'true').lower() != 'false'
+    if not auto_start:
+        print("[每日爬取] 已禁用")
+        return
+
+    try:
+        from app.tasks import execute_daily_pipeline
+
+        task_manager.schedule(
+            execute_daily_pipeline,
+            'cron',
+            'daily_crawl_pipeline',
+            hour=2,
+            minute=0,
+            replace_existing=True
+        )
+        print("[每日爬取] 定时任务已注册（凌晨2点）")
+
+    except Exception as e:
+        logger.error(f"[每日爬取] 失败: {e}")

@@ -1,29 +1,53 @@
+# Web 框架
 Flask==2.3.3
-Flask-SocketIO==5.3.6
-PyMySQL==1.1.0
-requests==2.31.0
-openpyxl==3.1.2
-pandas==2.1.1
-chardet==5.2.0
 Werkzeug==2.3.7
-eventlet==0.35.0
-schedule==1.2.1
+
+# 数据库
+PyMySQL==1.1.0
+pyodbc==4.0.39
 DBUtils==2.0.3
-APScheduler==3.10.4
+
+# 数据处理
+pandas==2.1.1
+numpy==1.24.3
+openpyxl==3.1.2
+
+# HTTP 请求
+requests==2.31.0
+
+# 编码检测
+chardet==5.2.0
+
+# WebSocket
+Flask-SocketIO==5.3.6
 python-socketio==5.9.0
 python-engineio==4.8.0
-bidict==0.22.1
+eventlet==0.35.0
 simple-websocket==1.0.0
 wsproto==1.2.0
 h11==0.14.0
 greenlet==3.0.1
-dnspython==2.4.2
-numpy==1.24.3
-beautifulsoup4==4.12.2
-lxml==4.9.3
-selenium==4.15.2
-webdriver-manager==4.0.1
-Pillow==10.1.0
+bidict==0.22.1
+
+# 定时任务
+schedule==1.2.1
+APScheduler==3.10.4
+
+# 时间处理
 python-dateutil==2.8.2
 pytz==2023.3
 tzdata==2023.3
+
+# 网络/DNS
+dnspython==2.4.2
+
+# 网页解析
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# 自动化测试
+selenium==4.15.2
+webdriver-manager==4.0.1
+
+# 图像处理
+Pillow==10.1.0

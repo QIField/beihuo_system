@@ -21,7 +21,6 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from datetime import datetime, timedelta
-from app.core.session_init import init_session_manager
 from app.services.quote_count_service import QuoteCountSyncService
 
 # 重试配置
@@ -39,29 +38,20 @@ def get_recent_36_months():
     """
     months = []
     now = datetime.now()
-
+    
+    # 从当前月往前推算36个月
+    current_year = now.year
+    current_month = now.month
+    
     for i in range(35, -1, -1):  # 从35个月前到当前月
-        date = now - timedelta(days=i * 30)  # 粗略计算
-        year = date.year
-        month = date.month
-
-        # 确保年月组合唯一
-        if (year, month) not in months:
-            months.append((year, month))
-
-    # 如果不足36个月，补充更早的月份
-    while len(months) < 36:
-        first_year, first_month = months[0]
-        if first_month == 1:
-            new_year = first_year - 1
-            new_month = 12
-        else:
-            new_year = first_year
-            new_month = first_month - 1
-        months.insert(0, (new_year, new_month))
-
-    # 只取36个月
-    months = months[:36]
+        # 计算偏移后的月份
+        year_offset = (current_month - i - 1) // 12
+        month_offset = (current_month - i - 1) % 12
+        
+        year = current_year + year_offset
+        month = month_offset + 1
+        
+        months.append((year, month))
 
     return months
 
@@ -78,13 +68,10 @@ def main():
     print("直接连接线上数据库")
     print("=" * 70)
 
-    # 初始化SessionManager（会自动处理登录）
-    print("\n[初始化] 正在初始化会话管理器...")
-    init_session_manager()
-    print("[初始化] 会话管理器初始化完成")
-
-    # 创建服务实例
+    # 创建服务实例（内部会自动处理双方案登录）
+    print("\n[初始化] 正在初始化服务（自动选择登录方案）...")
     service = QuoteCountSyncService()
+    print("[初始化] 服务初始化完成")
 
     # 获取近36个月的年月列表
     months_to_sync = get_recent_36_months()

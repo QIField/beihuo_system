@@ -36,6 +36,9 @@ from app.utils.database.table_manager import init_all_tables
 # 导入轻量级任务管理器（延迟初始化）
 from app.core.task_manager import task_manager
 
+# 导入安全库存定时任务
+from app.services.inventory_service.safety_stock_service import run_safety_stock_task
+
 # 导入并初始化全局Session管理器
 from app.core.session_init import init_session_manager
 init_session_manager()
@@ -4172,7 +4175,7 @@ def process_bill_files(file_paths, process_type='bill', order_type=''):
             if order_type == '广州龙星景丰':
                 # 调用广州龙星景丰脚本
                 import importlib.util
-                order_script_path = os.path.join(app_path, '广州龙星景丰.py')
+                order_script_path = os.path.join(app_path, 'utils', '广州龙星景丰.py')
                 spec = importlib.util.spec_from_file_location(
                     "gz_longxkjf", 
                     order_script_path
@@ -4199,7 +4202,7 @@ def process_bill_files(file_paths, process_type='bill', order_type=''):
             elif order_type == '厦门华禹':
                 # 调用厦门华禹脚本
                 import importlib.util
-                order_script_path = os.path.join(app_path, '厦门华禹.py')
+                order_script_path = os.path.join(app_path, 'utils', '厦门华禹.py')
                 spec = importlib.util.spec_from_file_location(
                     "xm_huayu", 
                     order_script_path
@@ -4338,6 +4341,21 @@ def init_background_tasks():
         from app.core.task_manager import init_zhuozhixing_sync
         init_zhuozhixing_sync()
 
+        # 初始化每日爬取任务
+        from app.core.task_manager import init_daily_crawl_task
+        init_daily_crawl_task()
+
+        # 注册安全库存定时任务（每天凌晨3点执行）
+        task_manager.schedule(
+            run_safety_stock_task,
+            'cron',
+            'safety_stock_daily',
+            hour=3,
+            minute=0,
+            replace_existing=True
+        )
+        print("[系统] 安全库存定时任务已注册（每天3:00）")
+
         print("[系统] 定时任务已启动")
 
     except:
@@ -4373,3 +4391,82 @@ if IS_UWSGI or not __name__ == '__main__':
     # 启动延迟初始化线程
     init_thread = threading.Thread(target=delayed_init, daemon=True, name='server_init')
     init_thread.start()
+
+
+# ==================== 安全库存API路由 ====================
+
+@app.route('/api/safety-stock/calculate', methods=['POST'])
+def api_calculate_safety_stock():
+    """计算单个SKU的安全库存"""
+    from app.services.inventory_service import SafetyStockService
+    
+    data = request.get_json()
+    sku = data.get('sku')
+    
+    if not sku:
+        return jsonify({'code': 400, 'msg': '缺少SKU参数', 'data': None})
+    
+    service = SafetyStockService()
+    result = service.calculate_single(sku)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/calculate-pilot', methods=['POST'])
+def api_calculate_pilot():
+    """试点计算（10个SKU）"""
+    from app.services.inventory_service import SafetyStockService
+    
+    service = SafetyStockService()
+    result = service.calculate_pilot(limit=10)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/calculate-all', methods=['POST'])
+def api_calculate_all():
+    """全量计算所有SKU"""
+    from app.services.inventory_service import SafetyStockService
+    
+    service = SafetyStockService()
+    result = service.calculate_all(batch_size=100)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/list', methods=['GET'])
+def api_safety_stock_list():
+    """获取安全库存列表"""
+    from app.services.inventory_service import SafetyStockService
+    
+    page = request.args.get('page', 1, type=int)
+    page_size = request.args.get('page_size', 20, type=int)
+    status = request.args.get('status', None)
+    
+    service = SafetyStockService()
+    result = service.get_list(page=page, page_size=page_size, status=status)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/detail/<sku>', methods=['GET'])
+def api_safety_stock_detail(sku):
+    """获取单个SKU的详情"""
+    from app.services.inventory_service import SafetyStockService
+    
+    service = SafetyStockService()
+    result = service.get_result(sku)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/warning', methods=['GET'])
+def api_safety_stock_warning():
+    """获取预警列表"""
+    from app.services.inventory_service import SafetyStockService
+    
+    status = request.args.get('status', 'danger')
+    service = SafetyStockService()
+    result = service.get_warning_list(status=status)
+    return jsonify(result)
+
+
+@app.route('/safety-stock')
+def safety_stock_page():
+    """安全库存管理页面"""
+    return render_template('safety_stock.html')

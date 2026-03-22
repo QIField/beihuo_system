@@ -9,8 +9,6 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 # 导入配置
 from config import create_crm_session
 
@@ -82,28 +80,22 @@ def batch_create_products(items, max_workers=5):
     
     results = {}
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_item = {
-            executor.submit(create_single_product, item, product_df, alias_df): item
-            for item in items
-        }
-        
-        completed = 0
-        total = len(items)
-        
-        for future in as_completed(future_to_item):
-            item = future_to_item[future]
-            try:
-                result = future.result()
-                results[result['oe']] = result['result']
-                completed += 1
+    # 串行循环处理（改为循环执行）
+    completed = 0
+    total = len(items)
+    
+    for item in items:
+        try:
+            result = create_single_product(item, product_df, alias_df)
+            results[result['oe']] = result['result']
+            completed += 1
+            
+            if completed % 10 == 0 or completed == total:
+                print(f"新建进度: {completed}/{total}")
                 
-                if completed % 10 == 0 or completed == total:
-                    print(f"新建进度: {completed}/{total}")
-                    
-            except Exception as e:
-                results[item['oe']] = f"失败 - 异常: {str(e)}"
-                completed += 1
+        except Exception as e:
+            results[item['oe']] = f"失败 - 异常: {str(e)}"
+            completed += 1
     
     # 统计
     success = sum(1 for r in results.values() if '成功' in r)

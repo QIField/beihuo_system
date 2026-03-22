@@ -289,86 +289,46 @@
             });
         },
         
-        // 加载更新信息选项
+        // 加载更新信息选项（固定8种中文状态）
         loadUpdateMsgOptions: function() {
             layui.use(['jquery'], function() {
                 var $ = layui.jquery;
-                var startTime = performance.now();
-                console.log('[⏱️ 计时] 开始加载更新信息选项...');
+                console.log('[⏱️ 计时] 开始加载更新信息选项（固定8种状态）...');
 
-                // 获取更新信息选项
-                $.ajax({
-                    url: '/api/update_msg_options',
-                    type: 'GET',
-                    success: function(res) {
-                        var endTime = performance.now();
-                        var duration = (endTime - startTime).toFixed(2);
-                        console.log(`[⏱️ 计时] 更新信息选项加载完成，耗时: ${duration}ms`);
+                // 固定的8种中文状态（不显示汇总分类）
+                var statusOptions = [
+                    { value: '', label: '选择更新信息分类' },
+                    { value: '上传成功', label: '上传成功' },
+                    { value: '新建成功-已存在', label: '新建成功-已存在' },
+                    { value: '新建成功-新创建', label: '新建成功-新创建' },
+                    { value: '新建失败-未找到产品名称', label: '新建失败-未找到产品名称' },
+                    { value: '新建失败-车型不能为空', label: '新建失败-车型不能为空' },
+                    { value: '上传失败-过期时间错误', label: '上传失败-过期时间错误' },
+                    { value: '上传失败-品牌不存在', label: '上传失败-品牌不存在' },
+                    { value: '上传失败-产品不存在', label: '上传失败-产品不存在' },
+                    { value: '其他', label: '其他' }
+                ];
 
-                        if(res.code === 0) {
-                            var select = $('#updateMsgSelect');
-                            select.empty(); // 清空现有选项
-                            select.append('<option value="">选择更新信息分类</option>'); // 添加默认选项
+                var select = $('#updateMsgSelect');
+                select.empty(); // 清空现有选项
 
-                            // 添加获取到的分类选项
-                            res.data.forEach(function(category) {
-                                select.append('<option value="' + category + '">' + category + '</option>');
-                            });
-
-                            // 重新渲染下拉框
-                            if(layui.form) {
-                                layui.form.render('select');
-                            }
-                        } else {
-                            console.error('获取更新信息选项失败:', res.msg);
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        var endTime = performance.now();
-                        var duration = (endTime - startTime).toFixed(2);
-                        console.error(`[⏱️ 计时] 更新信息选项加载失败，耗时: ${duration}ms, 错误:`, error);
-                    }
+                // 添加固定的分类选项
+                statusOptions.forEach(function(option) {
+                    select.append('<option value="' + option.value + '">' + option.label + '</option>');
                 });
+
+                // 重新渲染下拉框
+                if(layui.form) {
+                    layui.form.render('select');
+                }
+
+                console.log('[⏱️ 计时] 更新信息选项加载完成（固定8种状态）');
             });
         },
         
         getStatistics: function() {
-            layui.use(['jquery'], function() {
-                var $ = layui.jquery;
-                var startTime = performance.now();
-                console.log('[⏱️ 计时] 开始请求统计数据...');
-
-                $.ajax({
-                    url: '/api/virtual_inventory_statistics',
-                    type: 'GET',
-                    success: function(res) {
-                        var endTime = performance.now();
-                        var duration = (endTime - startTime).toFixed(2);
-                        console.log(`[⏱️ 计时] 统计数据加载完成，耗时: ${duration}ms`, res);
-
-                        if(res.code === 0) {
-                            var data = res.data;
-                            console.log('统计数据详情:', data);
-                            var statsHtml = `
-                                <span class="stat-item">成功上传：${data.success_count}条</span>
-                                <span class="stat-item">失败：${data.failed_count}条</span>
-                                <span class="stat-item">没有档案：${data.no_record_count}条</span>
-                                <span class="stat-item">新建档案：${data.new_archive_count}条</span>
-                            `;
-                            $('#statisticsInfo').html(statsHtml);
-                            console.log('统计数据已更新到页面');
-                        } else {
-                            console.error('获取统计数据失败:', res.msg);
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        var endTime = performance.now();
-                        var duration = (endTime - startTime).toFixed(2);
-                        console.error(`[⏱️ 计时] 统计数据加载失败，耗时: ${duration}ms, 错误:`, error);
-                        console.error('错误详情:', xhr, status, error);
-                    }
-                });
-            });
+            // 统一使用今日统计，显示当天数据的5大汇总
+            this.getTodayStatistics();
         },
 
         // 获取今日业务日期统计数据
@@ -389,14 +349,16 @@
                         if(res.code === 0) {
                             var data = res.data;
                             console.log('今日统计数据详情:', data);
+                            // 新四大分类汇总
                             var statsHtml = `
                                 <span class="stat-item">业务日期：${data.business_date}</span>
                                 <span class="stat-item">业务时间：${data.business_time_range}</span>
                                 <span class="stat-item">总记录：${data.total_count}条</span>
-                                <span class="stat-item">成功上传：${data.success_count}条</span>
-                                <span class="stat-item">失败：${data.failed_count}条</span>
-                                <span class="stat-item">没有档案：${data.no_record_count}条</span>
-                                <span class="stat-item">新建档案：${data.new_archive_count}条</span>
+                                <span class="stat-item">上传成功：${data.upload_success_count || 0}条</span>
+                                <span class="stat-item">新建成功：${data.new_create_success_count || 0}条</span>
+                                <span class="stat-item">新建失败：${data.new_create_fail_count || 0}条</span>
+                                <span class="stat-item">上传失败：${data.upload_fail_count || 0}条</span>
+                                <span class="stat-item">没有档案：${data.no_record_count || 0}条</span>
                             `;
                             $('#statisticsInfo').html(statsHtml);
                             console.log('今日统计数据已更新到页面');
@@ -415,53 +377,10 @@
         },
 
         // 异步加载统计数据（表格先显示，统计后加载）
+        // 统一显示当天数据的5大汇总
         loadStatisticsAsync: function(searchParams) {
-            layui.use(['jquery'], function() {
-                var $ = layui.jquery;
-                var startTime = performance.now();
-                console.log('[⏱️ 计时] 开始异步加载统计数据...');
-
-                // 显示加载中提示
-                $('#statisticsInfo').html('<span class="stat-item">统计加载中...</span>');
-
-                // 构建异步统计API参数
-                var asyncParams = {
-                    pattern: searchParams.pattern || '',
-                    business_date_type: searchParams.business_date_type || ''
-                };
-
-                $.ajax({
-                    url: '/api/virtual_inventory_statistics_by_pattern',
-                    type: 'GET',
-                    data: asyncParams,
-                    success: function(res) {
-                        var endTime = performance.now();
-                        var duration = (endTime - startTime).toFixed(2);
-                        console.log(`[⏱️ 计时] 异步统计数据加载完成，耗时: ${duration}ms`, res);
-
-                        if(res.code === 0) {
-                            var data = res.data;
-                            var statsHtml = `
-                                <span class="stat-item">总记录：${data.total_count}条</span>
-                                <span class="stat-item">成功上传：${data.success_count}条</span>
-                                <span class="stat-item">失败：${data.failed_count}条</span>
-                                <span class="stat-item">没有档案：${data.no_record_count}条</span>
-                            `;
-                            $('#statisticsInfo').html(statsHtml);
-                            console.log('异步统计数据已更新到页面');
-                        } else {
-                            $('#statisticsInfo').html('<span class="stat-item">统计加载失败</span>');
-                            console.error('获取异步统计数据失败:', res.msg);
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        var endTime = performance.now();
-                        var duration = (endTime - startTime).toFixed(2);
-                        $('#statisticsInfo').html('<span class="stat-item">统计加载失败</span>');
-                        console.error(`[⏱️ 计时] 异步统计数据加载失败，耗时: ${duration}ms, 错误:`, error);
-                    }
-                });
-            });
+            // 统一使用今日统计，显示当天数据的5大汇总
+            this.getTodayStatistics();
         },
 
         // 在app对象中添加获取供应商汇总的方法

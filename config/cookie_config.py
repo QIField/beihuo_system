@@ -48,8 +48,8 @@ def get_auth_headers(session):
     Returns:
         dict: 包含认证信息的 headers 字典
     """
-    # 从 cookie 中获取 authorization
-    auth_token = session.cookies.get('authorization')
+    # 从 session.headers 中获取 authorization（因为 create_crm_session 把 cookie 放到了 headers）
+    auth_token = session.headers.get('authorization')
     
     headers = {
         'accept': 'application/json, text/plain, */*',
@@ -60,6 +60,8 @@ def get_auth_headers(session):
     # 如果有 authorization token，添加到 header
     if auth_token:
         headers['authorization'] = auth_token
+    else:
+        print(f"[警告] 未找到 authorization token，session.headers: {dict(session.headers)}")
         
     return headers
 

@@ -138,31 +138,84 @@ def export_compare_data():
         if not data:
             return jsonify({'code': 1, 'msg': '没有数据可导出'}), 400
 
+        # 从 crmapp_procurement_history 表查询每月最低价（与悬浮窗展示一致）
+        procurement_map = {}
+        if data:
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cursor:
+                    # 构建查询条件
+                    placeholders = ', '.join(['(%s, %s)'] * len(data))
+                    params = []
+                    for item in data:
+                        params.append(item.get('oe', ''))
+                        params.append(item.get('brand', ''))
+                    if company:
+                        placeholders = f"({placeholders})"
+                        # 查询每月最低价（与悬浮窗逻辑一致）
+                        sql = f"""
+                            SELECT oe, brand, supplier_name, unit_price, purchase_date
+                            FROM crmapp_procurement_history t1
+                            WHERE company = %s 
+                            AND (oe, brand) IN {placeholders}
+                            AND purchase_date >= '2024-01-01'
+                            AND purchase_date <= '2026-12-31'
+                            AND unit_price = (
+                                SELECT MIN(unit_price)
+                                FROM crmapp_procurement_history t2
+                                WHERE t2.oe = t1.oe 
+                                AND t2.brand = t1.brand
+                                AND t2.company = t1.company
+                                AND DATE_FORMAT(t2.purchase_date, '%Y-%m') = DATE_FORMAT(t1.purchase_date, '%Y-%m')
+                            )
+                            ORDER BY purchase_date DESC
+                        """
+                        params.insert(0, company)
+                        cursor.execute(sql, params)
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            key = (row[0], row[1])
+                            if key not in procurement_map:
+                                procurement_map[key] = []
+                            procurement_map[key].append({
+                                'supplier_name': row[2],
+                                'purchase_price': float(row[3]) if row[3] else 0.0,
+                                'purchase_date': row[4].strftime('%Y-%m-%d') if hasattr(row[4], 'strftime') else str(row[4])
+                            })
+            except Exception as e:
+                print(f"查询采购记录失败: {e}")
+            finally:
+                conn.close()
+        
         # 处理数据，构建导出格式
         export_data = []
         for idx, item in enumerate(data, start=1):
-            # 处理采购记录，格式化为多行文本
+            # 从 procurement_map 获取每月最低价记录，格式化为多行文本
             procurement_records_str = ''
-            if item.get('procurement_records'):
+            key = (item.get('oe', ''), item.get('brand', ''))
+            if key in procurement_map and procurement_map[key]:
                 try:
-                    records = item['procurement_records']
-                    if isinstance(records, str):
-                        records = json.loads(records)
+                    records = procurement_map[key]
                     if isinstance(records, list) and records:
-                        # 按采购日期倒序排列
-                        sorted_records = sorted(
-                            records,
-                            key=lambda x: x.get('purchase_date', ''),
-                            reverse=True
-                        )
-                        # 格式化为多行文本
+                        # 按年月分组，每组只取第一条（最低价）
+                        monthly_records = {}
+                        for record in records:
+                            date = record.get('purchase_date', '')
+                            if date:
+                                year_month = date[:7]  # 提取 YYYY-MM
+                                if year_month not in monthly_records:
+                                    monthly_records[year_month] = record
+                        
+                        # 按年月倒序排列，格式化为多行文本
+                        sorted_months = sorted(monthly_records.keys(), reverse=True)
                         lines = []
-                        for record in sorted_records:
+                        for year_month in sorted_months:
+                            record = monthly_records[year_month]
                             supplier = record.get('supplier_name', '')
                             price = record.get('purchase_price', '')
                             date = record.get('purchase_date', '')
                             if supplier:
-                                lines.append(f"{supplier}: ¥{price} ({date})")
+                                lines.append(f"{year_month} {supplier}: ¥{price}")
                         procurement_records_str = '\n'.join(lines)
                 except Exception as e:
                     procurement_records_str = ''
@@ -425,6 +478,141 @@ def get_quote_history_batch():
         
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'获取询价历史失败: {str(e)}'}), 500
+
+
+@compare_bp.route('/procurement_history', methods=['GET'])
+@compare_permission_required
+def get_procurement_history():
+    """
+    查询单个产品的采购历史
+    参数：oe, brand
+    返回：采购记录列表
+    """
+    try:
+        oe = request.args.get('oe', '').strip()
+        brand = request.args.get('brand', '').strip()
+        
+        if not oe or not brand:
+            return jsonify({'code': 1, 'msg': 'OE号和品牌不能为空'}), 400
+        
+        # 获取用户当前组织
+        company = session.get('current_org', session.get('store', 'fsbbr'))
+        
+        # 查询采购历史
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                sql = """
+                    SELECT supplier_name, unit_price, purchase_date
+                    FROM crmapp_procurement_history
+                    WHERE oe = %s AND brand = %s AND company = %s
+                    ORDER BY purchase_date DESC
+                """
+                cursor.execute(sql, (oe, brand, company))
+                rows = cursor.fetchall()
+                records = []
+                for row in rows:
+                    records.append({
+                        'supplier_name': row[0],
+                        'purchase_price': float(row[1]) if row[1] else 0.0,
+                        'purchase_date': row[2].strftime('%Y-%m-%d') if hasattr(row[2], 'strftime') else str(row[2])
+                    })
+                return jsonify({
+                    'code': 0,
+                    'msg': '获取成功',
+                    'data': {
+                        'oe': oe,
+                        'brand': brand,
+                        'history': records
+                    }
+                })
+        except Exception as e:
+            return jsonify({'code': 1, 'msg': f'获取采购历史失败: {str(e)}'}), 500
+        finally:
+            conn.close()
+        
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取采购历史失败: {str(e)}'}), 500
+
+
+@compare_bp.route('/procurement_history/batch', methods=['POST'])
+@compare_permission_required
+def get_procurement_history_batch():
+    """
+    批量查询多个产品的采购历史
+    请求体格式：{"products": [{"oe": "xxx", "brand": "xxx"}, ...]}
+    返回：每个产品的采购记录列表
+    """
+    try:
+        data = request.get_json()
+        if not data or 'products' not in data:
+            return jsonify({'code': 1, 'msg': '请求参数错误，需要提供products列表'}), 400
+        
+        products = data['products']
+        if not isinstance(products, list) or len(products) == 0:
+            return jsonify({'code': 1, 'msg': 'products必须是非空数组'}), 400
+        
+        # 限制单次查询数量，防止性能问题
+        if len(products) > 500:
+            return jsonify({'code': 1, 'msg': '单次查询最多支持500个产品'}), 400
+        
+        # 构建产品标识列表
+        product_keys = []
+        for p in products:
+            if 'oe' in p and 'brand' in p:
+                product_keys.append((p['oe'], p['brand']))
+        
+        if not product_keys:
+            return jsonify({'code': 1, 'msg': '产品信息不完整，需要oe和brand字段'}), 400
+        
+        # 获取用户当前组织
+        company = session.get('current_org', session.get('store', 'fsbbr'))
+        
+        # 批量查询采购历史
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                # 构建查询条件
+                placeholders = ', '.join(['(%s, %s)'] * len(product_keys))
+                params = []
+                for oe, brand in product_keys:
+                    params.append(oe)
+                    params.append(brand)
+                params.insert(0, company)
+                
+                sql = f"""
+                    SELECT oe, brand, supplier_name, unit_price, purchase_date
+                    FROM crmapp_procurement_history
+                    WHERE company = %s AND (oe, brand) IN ({placeholders})
+                    ORDER BY purchase_date DESC
+                """
+                cursor.execute(sql, params)
+                rows = cursor.fetchall()
+                
+                # 按产品分组
+                result = {}
+                for row in rows:
+                    key = f"{row[0]}|{row[1]}"
+                    if key not in result:
+                        result[key] = []
+                    result[key].append({
+                        'supplier_name': row[2],
+                        'purchase_price': float(row[3]) if row[3] else 0.0,
+                        'purchase_date': row[4].strftime('%Y-%m-%d') if hasattr(row[4], 'strftime') else str(row[4])
+                    })
+                
+                return jsonify({
+                    'code': 0,
+                    'msg': '获取成功',
+                    'data': result
+                })
+        except Exception as e:
+            return jsonify({'code': 1, 'msg': f'获取采购历史失败: {str(e)}'}), 500
+        finally:
+            conn.close()
+        
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取采购历史失败: {str(e)}'}), 500
 
 
 @compare_bp.route('/quote_history', methods=['GET'])

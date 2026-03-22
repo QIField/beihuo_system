@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import pymysql
 import os
 from pathlib import Path
-from .database_connection import get_db_connection
+from app.utils.database_connection import get_db_connection, get_dict_cursor
 
 def convertNumToChinese(totalPrice):
     dictChinese = [u'零',u'壹',u'贰',u'叁',u'肆',u'伍',u'陆',u'柒',u'捌',u'玖']
@@ -71,7 +71,7 @@ def convertNumToChinese(totalPrice):
 def get_new_order_number():
     """从数据库获取最新的订单号并生成新订单号"""
     connection = get_db_connection()
-    cursor = connection.cursor()
+    cursor = get_dict_cursor(connection)
     
     # 使用事务和锁确保订单号生成的唯一性
     try:
@@ -115,7 +115,7 @@ def get_new_order_number():
         
         # 插入新订单号到数据库
         connection = get_db_connection()
-        cursor = connection.cursor()
+        cursor = get_dict_cursor(connection)
         insert_query = "INSERT INTO crmapp_order_number (company, datetime, order_number) VALUES (%s, %s, %s)"
         cursor.execute(insert_query, ('广州龙星景丰', current_date, new_order_number))
         connection.commit()
@@ -137,7 +137,7 @@ def preallocate_order_numbers(count):
         return []
     
     connection = get_db_connection()
-    cursor = connection.cursor()
+    cursor = get_dict_cursor(connection)
     
     try:
         # 开启事务
@@ -197,7 +197,7 @@ def preallocate_order_numbers(count):
 def init_database():
     """初始化数据库表，如果不存在则创建并插入初始数据"""
     connection = get_db_connection()
-    cursor = connection.cursor()
+    cursor = get_dict_cursor(connection)
     
     # 检查表是否已经存在
     check_table_sql = """

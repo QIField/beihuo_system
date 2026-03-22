@@ -353,7 +353,8 @@ def create_tables():
                 stock INT,
                 remark TEXT,
                 fetch_time DATETIME,
-                update_msg TEXT
+                update_msg TEXT,
+                update_status VARCHAR(50) DEFAULT NULL COMMENT '更新状态'
             )
         """)
 
@@ -501,13 +502,15 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
     """
     从数据库获取指定供应商的数据
     """
-    # 定义连接字符串
+    # 定义连接字符串（Windows 版本）
     conn_str = (
         f"DRIVER={{ODBC Driver 17 for SQL Server}};"
         f"SERVER={server};"
         f"DATABASE={database};"
         f"UID={username};"
-        f"PWD={password}"
+        f"PWD={password};"
+        f"TrustServerCertificate=yes;"
+        f"Encrypt=no"
     )
 
     try:
@@ -2002,6 +2005,21 @@ def main_process(skip_table_creation=False):
     
     # 上传到B2B系统（使用品牌映射版本），只上传当天数据
     start_b2b_upload_with_brand_mapping(today_only=True)
+    
+    # 运行CRM产品新建（数据库模式）
+    print("\n" + "="*60)
+    print("开始运行CRM产品新建（数据库模式）")
+    print("="*60)
+    try:
+        from app.utils.crm_product.crm_productAdd.main import process_database_mode_api
+        process_database_mode_api()
+        print("="*60)
+        print("CRM产品新建完成")
+        print("="*60)
+    except Exception as e:
+        print(f"CRM产品新建失败: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == '__main__':

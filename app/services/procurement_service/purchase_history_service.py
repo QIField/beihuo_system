@@ -275,10 +275,10 @@ class PurchaseHistoryService:
         try:
             with conn.cursor() as cursor:
                 sql = """
-                    INSERT INTO crmapp_procurement_history 
-                    (year_month, purchase_date, supplier_name, oe, brand, unit_price, company)
+                    INSERT INTO crmapp_procurement_history
+                    (`year_month`, purchase_date, supplier_name, oe, brand, unit_price, company)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE 
+                    ON DUPLICATE KEY UPDATE
                         purchase_date = VALUES(purchase_date)
                 """
 
