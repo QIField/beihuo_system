@@ -179,12 +179,12 @@ class PurchaseSyncService:
             with conn.cursor() as cursor:
                 # 按年月分组，取每组最低价的记录
                 sql = """
-                    SELECT year_month, MIN(unit_price) as min_price
+                    SELECT `year_month`, MIN(unit_price) as min_price
                     FROM crmapp_procurement_history
                     WHERE oe = %s AND brand = %s AND company = %s
                     AND unit_price > 0
-                    GROUP BY year_month
-                    ORDER BY year_month DESC
+                    GROUP BY `year_month`
+                    ORDER BY `year_month` DESC
                 """
                 cursor.execute(sql, (oe, brand, company))
                 monthly_min = cursor.fetchall()
@@ -196,7 +196,7 @@ class PurchaseSyncService:
                         SELECT supplier_name, unit_price, purchase_date
                         FROM crmapp_procurement_history
                         WHERE oe = %s AND brand = %s AND company = %s
-                        AND year_month = %s AND unit_price = %s
+                        AND `year_month` = %s AND unit_price = %s
                         ORDER BY purchase_date DESC
                         LIMIT 1
                     """

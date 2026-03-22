@@ -346,12 +346,22 @@ def import_price_data():
                     # 品牌列使用映射后的标准品牌名
                     row_data[orig_col] = item.get('mapped_brand', item.get('brand', ''))
                 elif english_col in ['oe', 'supplier', 'price', 'warehouse', 'expire_time', 'stock_quantity', 'remark']:
-                    row_data[orig_col] = item.get(english_col, '')
+                    value = item.get(english_col, '')
+                    # 处理 nan 值：为空或 nan 时设为空字符串
+                    if value is None or (isinstance(value, float) and math.isnan(value)) or str(value).lower() == 'nan':
+                        value = ''
+                    row_data[orig_col] = value
                 else:
                     # 其他列从原始df中获取
                     idx = item.get('index')
                     if idx is not None and idx < len(df):
-                        row_data[orig_col] = df.iloc[idx].get(english_col, '')
+                        value = df.iloc[idx].get(english_col, '')
+                        # 处理 nan 值：为空或 nan 时设为空字符串
+                        if value is None or (isinstance(value, float) and math.isnan(value)) or str(value).lower() == 'nan':
+                            value = ''
+                        row_data[orig_col] = value
+                    else:
+                        row_data[orig_col] = ''
             
             # 添加处理结果、详情和二次上传列
             row_data['处理结果'] = item.get('处理结果', '')

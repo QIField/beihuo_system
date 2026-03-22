@@ -437,11 +437,11 @@ def add_inquiry_record(oe: str, brand: str, supplier: str, price: float,
         with conn.cursor() as cursor:
             # 插入到采购历史表，使用 ON DUPLICATE KEY UPDATE 去重
             sql = """
-                INSERT INTO crmapp_procurement_history 
-                (year_month, purchase_date, supplier_name, oe, brand, unit_price, company)
+                INSERT INTO crmapp_procurement_history
+                (`year_month`, `purchase_date`, `supplier_name`, `oe`, `brand`, `unit_price`, `company`)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE 
-                    purchase_date = VALUES(purchase_date)
+                ON DUPLICATE KEY UPDATE
+                    `purchase_date` = VALUES(`purchase_date`)
             """
             cursor.execute(sql, (
                 year_month,

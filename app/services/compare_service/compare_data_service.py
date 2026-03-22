@@ -684,10 +684,10 @@ class CompareDataService:
                 where_clause = " OR ".join(or_conditions)
                 
                 sql = f"""
-                    SELECT oe, brand, year_month, quote_count
+                    SELECT oe, brand, `year_month`, quote_count
                     FROM crmapp_quote_count_ks
-                    WHERE company = %s AND year_month >= %s AND ({where_clause})
-                    ORDER BY oe, brand, year_month DESC
+                    WHERE company = %s AND `year_month` >= %s AND ({where_clause})
+                    ORDER BY oe, brand, `year_month` DESC
                 """
                 
                 cursor.execute(sql, params)
@@ -736,10 +736,10 @@ class CompareDataService:
                 start_year_month = start_date.strftime('%Y-%m')
                 
                 sql = """
-                    SELECT year_month, quote_count
+                    SELECT `year_month`, quote_count
                     FROM crmapp_quote_count_ks
-                    WHERE oe = %s AND brand = %s AND company = %s AND year_month >= %s
-                    ORDER BY year_month DESC
+                    WHERE oe = %s AND brand = %s AND company = %s AND `year_month` >= %s
+                    ORDER BY `year_month` DESC
                 """
                 
                 cursor.execute(sql, (oe, brand, company, start_year_month))
