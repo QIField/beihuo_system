@@ -1,261 +1,1636 @@
-Last login: Fri Mar 20 09:35:31 2026 from 127.0.0.1
-root@hcss-ecs-5274:~# cd /www/wwwroot/beihuo_system
-
-# 1. 删除旧的 Windows 虚拟环境
-rm -rf .venv
-
-# 2. 创建新的 Linux 虚拟环境
-python3 -m venv .venv
-
-# 3. 激活虚拟环境
-source .venv/bin/activate
-
-# 4. 安装所有依赖（包括 pyodbc）
-pip install -r requirements.txt
-
-# 5. 验证安装
-python -c "from app.utils import virtual_inventory; print('✅ 导入成功！')"
-The virtual environment was not created successfully because ensurepip is not
-available.  On Debian/Ubuntu systems, you need to install the python3-venv
-package using the following command.
-
-    apt install python3.10-venv
-
-You may need to use sudo with that command.  After installing the python3-venv
-package, recreate your virtual environment.
-
-Failing command: ['/www/wwwroot/beihuo_system/.venv/bin/python3', '-Im', 'ensurepip', '--upgrade', '--default-pip']
-
--bash: .venv/bin/activate: No such file or directory
-Looking in indexes: https://mirrors.aliyun.com/pypi/simple
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/flask/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting Flask==2.3.3
-  Downloading https://mirrors.aliyun.com/pypi/packages/fd/56/26f0be8adc2b4257df20c1c4260ddd0aa396cf8e75d90ab2f7ff99bc34f9/flask-2.3.3-py3-none-any.whl (96 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 96.1/96.1 KB 9.4 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/werkzeug/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting Werkzeug==2.3.7
-  Downloading https://mirrors.aliyun.com/pypi/packages/9b/59/a7c32e3d8d0e546a206e0552a2c04444544f15c1da4a01df8938d20c6ffc/werkzeug-2.3.7-py3-none-any.whl (242 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 242.2/242.2 KB 33.1 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/pymysql/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting PyMySQL==1.1.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/e5/30/20467e39523d0cfc2b6227902d3687a16364307260c75e6a1cb4422b0c62/PyMySQL-1.1.0-py3-none-any.whl (44 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.8/44.8 KB 9.1 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/pyodbc/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting pyodbc==4.0.39
-  Downloading https://mirrors.aliyun.com/pypi/packages/24/59/1a657510e6dd058c74df3b3a4d8af51d724f21db34f10b4f3ac484bedb91/pyodbc-4.0.39-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (343 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 343.5/343.5 KB 4.1 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/dbutils/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting DBUtils==2.0.3
-  Downloading https://mirrors.aliyun.com/pypi/packages/33/8a/2881f871ad5c0b30b966665f66019e68a07e86ac6e171956264a78520448/DBUtils-2.0.3-py3-none-any.whl (32 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/pandas/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting pandas==2.1.1
-  Downloading https://mirrors.aliyun.com/pypi/packages/2f/0e/3b74e8f7c908082793adafb02753477f653ccd7e189f3ba070757d2d0e65/pandas-2.1.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (12.3 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.3/12.3 MB 1.5 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/numpy/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting numpy==1.24.3
-  Downloading https://mirrors.aliyun.com/pypi/packages/6f/72/38f9a536bdb5bfb1682f2520f133ec6e08dde8bcca1f632e347641d90763/numpy-1.24.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (17.3 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 17.3/17.3 MB 1.3 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/openpyxl/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting openpyxl==3.1.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/6a/94/a59521de836ef0da54aaf50da6c4da8fb4072fb3053fa71f052fd9399e7a/openpyxl-3.1.2-py2.py3-none-any.whl (249 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 250.0/250.0 KB 1.9 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/requests/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting requests==2.31.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl (62 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.6/62.6 KB 4.7 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/chardet/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting chardet==5.2.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/38/6f/f5fbc992a329ee4e0f288c1fe0e2ad9485ed064cac731ed2fe47dcc38cbf/chardet-5.2.0-py3-none-any.whl (199 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 199.4/199.4 KB 3.8 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/flask-socketio/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting Flask-SocketIO==5.3.6
-  Downloading https://mirrors.aliyun.com/pypi/packages/56/c8/dc0be9e26272dc89342868ecc2d9ddb9e31002b4b8e49fdb754aa0f9ecbf/Flask_SocketIO-5.3.6-py3-none-any.whl (18 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/python-socketio/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting python-socketio==5.9.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/2b/31/fd41960cf365177f323d8c10d774a0b017336556c6f0ba0a38403240914d/python_socketio-5.9.0-py3-none-any.whl (57 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 57.6/57.6 KB 11.3 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/python-engineio/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting python-engineio==4.8.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/8b/89/70ebee15c1ef37d3a5408dbb03e57aa226dc6f1921735ed8cd59ac2a0136/python_engineio-4.8.0-py3-none-any.whl (56 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 56.8/56.8 KB 1.5 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/eventlet/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting eventlet==0.35.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/79/10/c831739f7848843c0d00e7191152e396842f31dc70a38fa1166d34b498ad/eventlet-0.35.0-py3-none-any.whl (359 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 359.6/359.6 KB 8.4 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/simple-websocket/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting simple-websocket==1.0.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/6d/ea/288a8ac1d9551354488ff60c0ac6a76acc3b6b60f0460ac1944c75e240da/simple_websocket-1.0.0-py3-none-any.whl (13 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/wsproto/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting wsproto==1.2.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/78/58/e860788190eba3bcce367f74d29c4675466ce8dddfba85f7827588416f01/wsproto-1.2.0-py3-none-any.whl (24 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/h11/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting h11==0.14.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/95/04/ff642e65ad6b90db43e668d70ffb6736436c7ce41fcc549f4e9472234127/h11-0.14.0-py3-none-any.whl (58 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 58.3/58.3 KB 8.8 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/greenlet/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting greenlet==3.0.1
-  Downloading https://mirrors.aliyun.com/pypi/packages/da/ab/7cc6502628565d70dce2edb619d87554d65ac4e2f17c805a5a45bfaefa5c/greenlet-3.0.1-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (613 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 613.2/613.2 KB 5.1 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/bidict/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting bidict==0.22.1
-  Downloading https://mirrors.aliyun.com/pypi/packages/b5/82/ce0b6380f35f49d3fe687979a324c342cfa3588380232f3801db9dd62f9e/bidict-0.22.1-py3-none-any.whl (35 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/schedule/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting schedule==1.2.1
-  Downloading https://mirrors.aliyun.com/pypi/packages/f0/1a/e5a65c08d708ee4c002f3f938ba69b2282af478755700c40f037eacc92ef/schedule-1.2.1-py2.py3-none-any.whl (11 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/apscheduler/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting APScheduler==3.10.4
-  Downloading https://mirrors.aliyun.com/pypi/packages/13/b5/7af0cb920a476dccd612fbc9a21a3745fb29b1fcd74636078db8f7ba294c/APScheduler-3.10.4-py3-none-any.whl (59 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 59.3/59.3 KB 11.5 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/python-dateutil/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting python-dateutil==2.8.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/36/7a/87837f39d0296e723bb9b62bbb257d0355c7f6128853c78955f57342a56d/python_dateutil-2.8.2-py2.py3-none-any.whl (247 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 247.7/247.7 KB 42.7 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/pytz/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting pytz==2023.3
-  Downloading https://mirrors.aliyun.com/pypi/packages/7f/99/ad6bd37e748257dd70d6f85d916cafe79c0b0f5e2e95b11f7fbc82bf3110/pytz-2023.3-py2.py3-none-any.whl (502 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 502.3/502.3 KB 61.7 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/tzdata/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting tzdata==2023.3
-  Downloading https://mirrors.aliyun.com/pypi/packages/d5/fb/a79efcab32b8a1f1ddca7f35109a50e4a80d42ac1c9187ab46522b2407d7/tzdata-2023.3-py2.py3-none-any.whl (341 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 341.8/341.8 KB 53.1 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/dnspython/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting dnspython==2.4.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/f6/b4/0a9bee52c50f226a3cbfb54263d02bb421c7f2adc136520729c2c689c1e5/dnspython-2.4.2-py3-none-any.whl (300 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 300.4/300.4 KB 46.9 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/beautifulsoup4/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting beautifulsoup4==4.12.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/57/f4/a69c20ee4f660081a7dedb1ac57f29be9378e04edfcb90c526b923d4bebc/beautifulsoup4-4.12.2-py3-none-any.whl (142 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 143.0/143.0 KB 29.8 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/lxml/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting lxml==4.9.3
-  Downloading https://mirrors.aliyun.com/pypi/packages/3c/d2/11533f0bc47ff4d828a20cfb702f3453fe714bd5b475fcdc8cec6e6b7dcf/lxml-4.9.3-cp310-cp310-manylinux_2_28_x86_64.whl (7.9 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.9/7.9 MB 2.0 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/selenium/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting selenium==4.15.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/0e/59/aae37fa93e2d4292c3148efcc3066c8ecfe5cfaa72bf8c0b1a5614622cf7/selenium-4.15.2-py3-none-any.whl (10.2 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.2/10.2 MB 1.4 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/webdriver-manager/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting webdriver-manager==4.0.1
-  Downloading https://mirrors.aliyun.com/pypi/packages/b1/51/b5c11cf739ac4eecde611794a0ec9df420d0239d51e73bc19eb44f02b48b/webdriver_manager-4.0.1-py2.py3-none-any.whl (27 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/pillow/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting Pillow==10.1.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/e5/b9/5c6ad3241f1ccca4b781dfeddbab2dac4480f95aedc351a0e60c9f4c8aa9/Pillow-10.1.0-cp310-cp310-manylinux_2_28_x86_64.whl (3.6 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.6/3.6 MB 2.0 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/click/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting click>=8.1.3
-  Downloading https://mirrors.aliyun.com/pypi/packages/98/78/01c019cdb5d6498122777c1a43056ebb3ebfeef2076d9d026bfe15583b2b/click-8.3.1-py3-none-any.whl (108 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 108.3/108.3 KB 6.1 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/jinja2/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting Jinja2>=3.1.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl (134 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.9/134.9 KB 9.8 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/blinker/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting blinker>=1.6.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl (8.5 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/itsdangerous/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting itsdangerous>=2.1.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl (16 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/markupsafe/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting MarkupSafe>=2.1.1
-  Downloading https://mirrors.aliyun.com/pypi/packages/af/cd/ce6e848bbf2c32314c9b237839119c5a564a59725b53157c856e90937b7a/markupsafe-3.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (20 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/et-xmlfile/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting et-xmlfile
-  Downloading https://mirrors.aliyun.com/pypi/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl (18 kB)
-Requirement already satisfied: urllib3<3,>=1.21.1 in /usr/lib/python3/dist-packages (from requests==2.31.0->-r requirements.txt (line 16)) (1.26.5)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/charset-normalizer/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting charset-normalizer<4,>=2
-  Downloading https://mirrors.aliyun.com/pypi/packages/fd/ce/865e4e09b041bad659d682bbd98b47fb490b8e124f9398c9448065f64fee/charset_normalizer-3.4.6-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (207 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 207.9/207.9 KB 19.7 MB/s eta 0:00:00
-Requirement already satisfied: idna<4,>=2.5 in /usr/lib/python3/dist-packages (from requests==2.31.0->-r requirements.txt (line 16)) (3.3)
-Requirement already satisfied: certifi>=2017.4.17 in /usr/lib/python3/dist-packages (from requests==2.31.0->-r requirements.txt (line 16)) (2020.6.20)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/tzlocal/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting tzlocal!=3.*,>=2.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/c2/14/e2a54fabd4f08cd7af1c07030603c3356b74da07f7cc056e600436edfa17/tzlocal-5.3.1-py3-none-any.whl (18 kB)
-Requirement already satisfied: six>=1.4.0 in /usr/lib/python3/dist-packages (from APScheduler==3.10.4->-r requirements.txt (line 34)) (1.16.0)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/soupsieve/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting soupsieve>1.2
-  Downloading https://mirrors.aliyun.com/pypi/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl (37 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/certifi/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting certifi>=2017.4.17
-  Downloading https://mirrors.aliyun.com/pypi/packages/9a/3c/c17fb3ca2d9c3acff52e30b309f538586f9f5b9c9cf454f3845fc9af4881/certifi-2026.2.25-py3-none-any.whl (153 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 153.7/153.7 KB 25.9 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/trio-websocket/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting trio-websocket~=0.9
-  Downloading https://mirrors.aliyun.com/pypi/packages/c7/19/eb640a397bba49ba49ef9dbe2e7e5c04202ba045b6ce2ec36e9cadc51e04/trio_websocket-0.12.2-py3-none-any.whl (21 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/trio/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting trio~=0.17
-  Downloading https://mirrors.aliyun.com/pypi/packages/1c/93/dab25dc87ac48da0fe0f6419e07d0bfd98799bed4e05e7b9e0f85a1a4b4b/trio-0.33.0-py3-none-any.whl (510 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 510.3/510.3 KB 29.9 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/packaging/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting packaging
-  Downloading https://mirrors.aliyun.com/pypi/packages/b7/b9/c538f279a4e237a006a2c98387d081e9eb060d203d8ed34467cc0f0b9b53/packaging-26.0-py3-none-any.whl (74 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 74.4/74.4 KB 14.1 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/python-dotenv/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting python-dotenv
-  Downloading https://mirrors.aliyun.com/pypi/packages/0b/d7/1959b9648791274998a9c3526f6d0ec8fd2233e4d4acce81bbae76b44b2a/python_dotenv-1.2.2-py3-none-any.whl (22 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/sniffio/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting sniffio>=1.3.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl (10 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/outcome/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting outcome
-  Downloading https://mirrors.aliyun.com/pypi/packages/55/8b/5ab7257531a5d830fc8000c476e63c935488d74609b50f9384a643ec0a62/outcome-1.3.0.post0-py2.py3-none-any.whl (10 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/attrs/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting attrs>=23.2.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl (67 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.5/67.5 KB 12.6 MB/s eta 0:00:00
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/sortedcontainers/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting sortedcontainers
-  Downloading https://mirrors.aliyun.com/pypi/packages/32/46/9cb0e58b2deb7f82b84065f37f3bffeb12413f947f9388e4cac22c4621ce/sortedcontainers-2.4.0-py2.py3-none-any.whl (29 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/exceptiongroup/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting exceptiongroup
-  Downloading https://mirrors.aliyun.com/pypi/packages/8a/0e/97c33bf5009bdbac74fd2beace167cab3f978feb69cc36f1ef79360d6c4e/exceptiongroup-1.3.1-py3-none-any.whl (16 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/pysocks/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting PySocks!=1.5.7,<2.0,>=1.5.6
-  Downloading https://mirrors.aliyun.com/pypi/packages/8d/59/b4572118e098ac8e46e399a1dd0f2d85403ce8bbaad9ec79373ed6badaf9/PySocks-1.7.1-py3-none-any.whl (16 kB)
-DEPRECATION: The HTML index page being used (https://mirrors.aliyun.com/pypi/simple/typing-extensions/) is not a proper HTML 5 document. This is in violation of PEP 503 which requires these pages to be well-formed HTML 5 documents. Please reach out to the owners of this index page, and ask them to update this index page to a valid HTML 5 document. pip 22.2 will enforce this behaviour change. Discussion can be found at https://github.com/pypa/pip/issues/10825
-Collecting typing-extensions>=4.6.0
-  Downloading https://mirrors.aliyun.com/pypi/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl (44 kB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.6/44.6 KB 8.7 MB/s eta 0:00:00
-Installing collected packages: sortedcontainers, pytz, DBUtils, tzlocal, tzdata, typing-extensions, soupsieve, sniffio, schedule, python-dotenv, python-dateutil, PySocks, pyodbc, PyMySQL, Pillow, packaging, numpy, MarkupSafe, lxml, itsdangerous, h11, greenlet, et-xmlfile, dnspython, click, charset-normalizer, chardet, certifi, blinker, bidict, attrs, wsproto, Werkzeug, requests, pandas, outcome, openpyxl, Jinja2, exceptiongroup, eventlet, beautifulsoup4, APScheduler, webdriver-manager, trio, simple-websocket, Flask, trio-websocket, python-engineio, selenium, python-socketio, Flask-SocketIO
-  Attempting uninstall: pytz
-    Found existing installation: pytz 2022.1
-    Not uninstalling pytz at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'pytz'. No files were found to uninstall.
-  Attempting uninstall: MarkupSafe
-    Found existing installation: MarkupSafe 2.0.1
-    Not uninstalling markupsafe at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'MarkupSafe'. No files were found to uninstall.
-  Attempting uninstall: click
-    Found existing installation: click 8.0.3
-    Not uninstalling click at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'click'. No files were found to uninstall.
-  Attempting uninstall: chardet
-    Found existing installation: chardet 4.0.0
-    Not uninstalling chardet at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'chardet'. No files were found to uninstall.
-  Attempting uninstall: certifi
-    Found existing installation: certifi 2020.6.20
-    Not uninstalling certifi at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'certifi'. No files were found to uninstall.
-  Attempting uninstall: blinker
-    Found existing installation: blinker 1.4
-    Not uninstalling blinker at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'blinker'. No files were found to uninstall.
-  Attempting uninstall: attrs
-    Found existing installation: attrs 21.2.0
-    Not uninstalling attrs at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'attrs'. No files were found to uninstall.
-  Attempting uninstall: requests
-    Found existing installation: requests 2.25.1
-    Not uninstalling requests at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'requests'. No files were found to uninstall.
-  Attempting uninstall: Jinja2
-    Found existing installation: Jinja2 3.0.3
-    Not uninstalling jinja2 at /usr/lib/python3/dist-packages, outside environment /usr
-    Can't uninstall 'Jinja2'. No files were found to uninstall.
-Successfully installed APScheduler-3.10.4 DBUtils-2.0.3 Flask-2.3.3 Flask-SocketIO-5.3.6 Jinja2-3.1.6 MarkupSafe-3.0.3 Pillow-10.1.0 PyMySQL-1.1.0 PySocks-1.7.1 Werkzeug-2.3.7 attrs-26.1.0 beautifulsoup4-4.12.2 bidict-0.22.1 blinker-1.9.0 certifi-2026.2.25 chardet-5.2.0 charset-normalizer-3.4.6 click-8.3.1 dnspython-2.4.2 et-xmlfile-2.0.0 eventlet-0.35.0 exceptiongroup-1.3.1 greenlet-3.0.1 h11-0.14.0 itsdangerous-2.2.0 lxml-4.9.3 numpy-1.24.3 openpyxl-3.1.2 outcome-1.3.0.post0 packaging-26.0 pandas-2.1.1 pyodbc-4.0.39 python-dateutil-2.8.2 python-dotenv-1.2.2 python-engineio-4.8.0 python-socketio-5.9.0 pytz-2023.3 requests-2.31.0 schedule-1.2.1 selenium-4.15.2 simple-websocket-1.0.0 sniffio-1.3.1 sortedcontainers-2.4.0 soupsieve-2.8.3 trio-0.33.0 trio-websocket-0.12.2 typing-extensions-4.15.0 tzdata-2023.3 tzlocal-5.3.1 webdriver-manager-4.0.1 wsproto-1.2.0
-WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
-Command 'python' not found, did you mean:
-  command 'python3' from deb python3
-  command 'python' from deb python-is-python3
-root@hcss-ecs-5274:/www/wwwroot/beihuo_system# 
+index.js?v=6:359 [DEBUG] DataGrid options.rowHeights: ƒ (row) {
+                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
+index.js?v=6:360 [DEBUG] DataGrid options.rowHeight: 40
+index.js?v=6:361 [DEBUG] DataGrid typeof rowHeights: function
+index.js?v=6:362 [DEBUG] DataGrid virtualScroll: false
+index.js?v=6:421 [DEBUG] finalConfig.rowHeights: ƒ (row) {
+                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
+index.js?v=6:422 [DEBUG] finalConfig.virtualScroll: true
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
+index.js?v=6:427 [DEBUG] Handsontable actual rowHeights: ƒ (row) {
+                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
+index.js?v=6:428 [DEBUG] Handsontable actual rowHeight: undefined
+index.js?v=6:359 [DEBUG] DataGrid options.rowHeights: ƒ (row) {
+                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
+index.js?v=6:360 [DEBUG] DataGrid options.rowHeight: 40
+index.js?v=6:361 [DEBUG] DataGrid typeof rowHeights: function
+index.js?v=6:362 [DEBUG] DataGrid virtualScroll: false
+index.js?v=6:421 [DEBUG] finalConfig.rowHeights: ƒ (row) {
+                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
+index.js?v=6:422 [DEBUG] finalConfig.virtualScroll: true
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
+ [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
+date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
+index.js?v=6:427 [DEBUG] Handsontable actual rowHeights: ƒ (row) {
+                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
+index.js?v=6:428 [DEBUG] Handsontable actual rowHeight: undefined
+date_query?start=2026-03-04&end=2026-03-07:576 [DEBUG] Actual row count: 400
+date_query?start=2026-03-04&end=2026-03-07:581 [DEBUG] First row first cell height: 220
+date_query?start=2026-03-04&end=2026-03-07:582 [DEBUG] First row first cell style: height: 39px;
+date_query?start=2026-03-04&end=2026-03-07:588 [DEBUG] Table height style: 

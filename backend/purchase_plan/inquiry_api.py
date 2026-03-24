@@ -143,9 +143,10 @@ def import_price_data():
     try:
         # 根据文件扩展名选择读取方式
         if file.filename.endswith('.csv'):
-            df = pd.read_csv(file, encoding='utf-8')
+            df = pd.read_csv(file, encoding='utf-8', dtype=str)
         elif file.filename.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(file)
+            # 使用dtype=str将所有列读取为字符串，保持原始数据格式（如OE号前导零）
+            df = pd.read_excel(file, dtype=str)
         else:
             return jsonify({'code': 1, 'msg': '不支持的文件格式，请上传Excel或CSV文件'}), 400
 
@@ -196,6 +197,30 @@ def import_price_data():
 
         # 数据清洗
         df = df.where(pd.notnull(df), None)
+        
+        # ==================== 价格加价处理 ====================
+        # 获取加价倍数参数（从前端传入）
+        # 1 = 价格不变, 1.1 = 价格×1.1, 1.5 = 价格×1.5
+        markup_rate = request.form.get('markup_rate', '1')
+        try:
+            markup_rate = float(markup_rate)
+        except:
+            markup_rate = 1
+        
+        # 如果加价倍数不等于1，对价格进行加价处理
+        if markup_rate != 1 and 'price' in df.columns:
+            try:
+                # 将价格转换为数值类型
+                df['price'] = pd.to_numeric(df['price'], errors='coerce')
+                # 保存原价格（用于采购记录表）
+                df['original_price'] = df['price'].copy()
+                # 价格处理：原始价格 × 加价倍数，四舍五入保留两位小数
+                # 例如：原价100，倍数1.0 → 100 × 1.0 = 100（不变）
+                #      原价100，倍数1.1 → 100 × 1.1 = 110（加价10%）
+                #      原价100，倍数1.5 → 100 × 1.5 = 150（加价50%）
+                df['price'] = (df['price'] * markup_rate).round(2)
+            except Exception as e:
+                print(f"价格加价处理失败: {e}")
         
         # 加载品牌别名映射（用于后续处理）
         from app.utils.b2b_inquiry_upload.uploader import load_crm_aliases_mapping
@@ -415,6 +440,8 @@ def import_price_data():
                 brand = item.get('mapped_brand') or item.get('brand') or None
                 supplier = item.get('supplier') or None
                 price = item.get('price', 0)
+                # 获取原价格（用于采购记录表）
+                original_price = item.get('original_price', price)
                 warehouse = item.get('warehouse') or None
                 expire_time = item.get('expire_time')
                 # 处理备注：为空或nan时设为None
@@ -425,16 +452,52 @@ def import_price_data():
                     remark = str(remark).strip() or None
                 stock_quantity = item.get('stock_quantity', 0)
                 
-                # 处理失效时间
+                # 处理失效时间 - 支持多种格式自动转换
+                # 格式1: 2026/3/22 18:36 (斜杠分隔，无秒)
+                # 格式2: 2026-12-31 11:36:19 (横杠分隔，有秒)
                 if expire_time and pd.notna(expire_time):
                     if isinstance(expire_time, str):
-                        try:
-                            expire_time = datetime.strptime(expire_time, '%Y-%m-%d %H:%M:%S')
-                        except:
+                        expire_time = expire_time.strip()
+                        # 尝试多种格式解析
+                        parsed = False
+                        # 格式1: 2026/3/22 18:36 (斜杠分隔，无秒)
+                        if not parsed:
+                            try:
+                                expire_time = datetime.strptime(expire_time, '%Y/%m/%d %H:%M')
+                                parsed = True
+                            except ValueError:
+                                pass
+                        # 格式2: 2026-12-31 11:36:19 (横杠分隔，有秒)
+                        if not parsed:
+                            try:
+                                expire_time = datetime.strptime(expire_time, '%Y-%m-%d %H:%M:%S')
+                                parsed = True
+                            except ValueError:
+                                pass
+                        # 格式3: 2026-12-31 11:36 (横杠分隔，无秒)
+                        if not parsed:
+                            try:
+                                expire_time = datetime.strptime(expire_time, '%Y-%m-%d %H:%M')
+                                parsed = True
+                            except ValueError:
+                                pass
+                        # 格式4: 纯日期 2026-03-22
+                        if not parsed:
                             try:
                                 expire_time = datetime.strptime(expire_time, '%Y-%m-%d')
-                            except:
-                                expire_time = None
+                                parsed = True
+                            except ValueError:
+                                pass
+                        # 格式5: 纯日期 2026/3/22
+                        if not parsed:
+                            try:
+                                expire_time = datetime.strptime(expire_time, '%Y/%m/%d')
+                                parsed = True
+                            except ValueError:
+                                pass
+                        # 都解析失败则设为None
+                        if not parsed:
+                            expire_time = None
                 else:
                     expire_time = None
                 
@@ -443,6 +506,7 @@ def import_price_data():
                     'brand': brand,
                     'supplier': supplier,
                     'price': price,
+                    'original_price': original_price,
                     'warehouse': warehouse,
                     'expire_time': expire_time,
                     'remark': remark,
@@ -522,13 +586,15 @@ def import_price_data():
                 if key not in sync_data_map:
                     sync_data_map[key] = key
                 
-                # 采购记录表数据
-                if data['supplier'] and data['price'] > 0:
+                # 采购记录表数据 - 使用原价格（不加价）
+                # 从insert_data中获取原价格
+                original_price = data.get('original_price', data['price'])
+                if data['supplier'] and original_price > 0:
                     procurement_data_list.append({
                         'oe': data['oe'],
                         'brand': data['brand'],
                         'supplier': data['supplier'],
-                        'price': data['price'],
+                        'price': original_price,
                         'company': data['company']
                     })
             

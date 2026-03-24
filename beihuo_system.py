@@ -3465,6 +3465,12 @@ def load_data_api():
 date_ordercount_cache = {}  # 用户缓存字典
 cache_lock = threading.Lock()  # 缓存访问锁
 
+@app.route('/date_query')
+@login_required
+def date_query():
+    """日期查询页面"""
+    return render_template('date_query.html')
+
 @app.route('/api/date_ordercount', methods=['POST'])
 @login_required
 def date_ordercount():
@@ -3473,6 +3479,10 @@ def date_ordercount():
         data = request.get_json()
         start_date = data.get('start')
         end_date = data.get('end')
+        page = data.get('page', 1)
+        page_size = data.get('pageSize', 200)
+        sort = data.get('sort', {})
+        filter_params = data.get('filter', {})
         
         if not start_date or not end_date:
             return jsonify({'code': 1, 'msg': '缺少日期参数'}), 400
@@ -3486,7 +3496,7 @@ def date_ordercount():
         session['last_date_ordercount_end_date'] = end_date
         session['last_date_ordercount_company'] = company
         
-        print(f"存储到session - 用户: {username}, 开始日期: {start_date}, 结束日期: {end_date}")
+        print(f"存储到session - 用户: {username}, 开始日期: {start_date}, 结束日期: {end_date}, 页码: {page}, 每页: {page_size}")
         
         # 检查数据库中是否已有该用户和日期范围的数据
         conn = get_db_connection()
@@ -3502,20 +3512,32 @@ def date_ordercount():
         
         if existing_data:
             # 如果已有数据，直接从数据库获取
+            # 先获取总数
+            count_sql = """
+            SELECT COUNT(*) as total FROM crmapp_date_search 
+            WHERE username = %s AND start_date = %s AND end_date = %s
+            """
+            cursor.execute(count_sql, (username, start_date, end_date))
+            total = cursor.fetchone()['total']
+            
+            # 获取分页数据
+            offset = (page - 1) * page_size
             get_sql = """
             SELECT * FROM crmapp_date_search 
             WHERE username = %s AND start_date = %s AND end_date = %s
             ORDER BY id
+            LIMIT %s OFFSET %s
             """
-            cursor.execute(get_sql, (username, start_date, end_date))
+            cursor.execute(get_sql, (username, start_date, end_date, page_size, offset))
             beihuo_data = cursor.fetchall()
-            print(f"从数据库获取已有数据，条数: {len(beihuo_data)}")
+            print(f"从数据库获取已有数据，总数: {total}, 当前页: {len(beihuo_data)}")
             conn.close()
             
             return jsonify({
                 'code': 0,
                 'msg': '查询成功',
-                'data': beihuo_data
+                'data': beihuo_data,
+                'total': total
             })
         else:
             # 没有缓存数据，调用外部API获取数据
@@ -3644,12 +3666,19 @@ def date_ordercount():
                 print("没有数据需要插入到数据库")
             
             conn.commit()
+            
+            # 获取总数和分页数据
+            total = len(beihuo_data)
+            offset = (page - 1) * page_size
+            paginated_data = beihuo_data[offset:offset + page_size]
+            
             conn.close()
             
             return jsonify({
                 'code': 0,
                 'msg': '查询成功',
-                'data': beihuo_data
+                'data': paginated_data,
+                'total': total
             })
         
     except Exception as e:
@@ -4360,6 +4389,86 @@ def init_background_tasks():
 
     except:
         pass
+
+
+# ==================== 安全库存API路由 ====================
+
+@app.route('/api/safety-stock/calculate', methods=['POST'])
+def api_calculate_safety_stock():
+    """计算单个SKU的安全库存"""
+    from app.services.inventory_service import SafetyStockService
+    
+    data = request.get_json()
+    sku = data.get('sku')
+    
+    if not sku:
+        return jsonify({'code': 400, 'msg': '缺少SKU参数', 'data': None})
+    
+    service = SafetyStockService()
+    result = service.calculate_single(sku)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/calculate-pilot', methods=['POST'])
+def api_calculate_pilot():
+    """试点计算（10个SKU）"""
+    from app.services.inventory_service import SafetyStockService
+    
+    service = SafetyStockService()
+    result = service.calculate_pilot(limit=10)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/calculate-all', methods=['POST'])
+def api_calculate_all():
+    """全量计算所有SKU"""
+    from app.services.inventory_service import SafetyStockService
+    
+    service = SafetyStockService()
+    result = service.calculate_all(batch_size=100)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/list', methods=['GET'])
+def api_safety_stock_list():
+    """获取安全库存列表"""
+    from app.services.inventory_service import SafetyStockService
+    
+    page = request.args.get('page', 1, type=int)
+    page_size = request.args.get('page_size', 20, type=int)
+    status = request.args.get('status', None)
+    
+    service = SafetyStockService()
+    result = service.get_list(page=page, page_size=page_size, status=status)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/detail/<sku>', methods=['GET'])
+def api_safety_stock_detail(sku):
+    """获取单个SKU的详情"""
+    from app.services.inventory_service import SafetyStockService
+    
+    service = SafetyStockService()
+    result = service.get_result(sku)
+    return jsonify(result)
+
+
+@app.route('/api/safety-stock/warning', methods=['GET'])
+def api_safety_stock_warning():
+    """获取预警列表"""
+    from app.services.inventory_service import SafetyStockService
+    
+    status = request.args.get('status', 'danger')
+    service = SafetyStockService()
+    result = service.get_warning_list(status=status)
+    return jsonify(result)
+
+
+@app.route('/safety-stock')
+def safety_stock_page():
+    """安全库存管理页面"""
+    return render_template('safety_stock.html')
+
 
 # 应用启动配置
 if __name__ == '__main__':

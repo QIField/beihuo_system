@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日期查询 - 备货系统</title>
+    
+    <!-- Handsontable -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/handsontable/handsontable.full.min.css') }}">
+    <script src="{{ url_for('static', filename='js/handsontable/handsontable.full.min.js') }}"></script>
+    
+    <!-- DataGrid 组件库 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/datagrid.css') }}?v=6">
+    <script src="{{ url_for('static', filename='js/components/index.js') }}?v=6"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container { max-width: 100%; margin: 0 auto; }
+        h2 { margin-bottom: 20px; color: #333; }
+        
+        .toolbar {
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .date-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            width: 140px;
+        }
+        
+        .search-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            width: 180px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary { background-color: #1890ff; color: white; }
+        .btn-primary:hover { background-color: #40a9ff; }
+        .btn-success { background-color: #52c41a; color: white; }
+        .btn-success:hover { background-color: #73d13d; }
+        .btn-warning { background-color: #faad14; color: white; }
+        .btn-warning:hover { background-color: #ffc53d; }
+        
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #table-container {
+            height: calc(100vh - 280px);
+            min-height: 500px;
+        }
+        
+        .handsontable .htCore td {
+            border: 1px solid #e8e8e8;
+            color: #000 !important;
+            height: 40px !important;
+            max-height: 40px !important;
+            overflow: hidden !important;
+            white-space: nowrap !important;
+            text-overflow: ellipsis !important;
+            line-height: 40px !important;
+            padding: 0 8px !important;
+        }
+        
+        /* 展开状态的行 - 允许内容换行 */
+        .handsontable .htCore tr.expanded-row td {
+            height: auto !important;
+            max-height: none !important;
+            white-space: normal !important;
+            line-height: 1.4 !important;
+        }
+        
+        .handsontable .htCore th {
+            background-color: #fafafa;
+            border: 1px solid #e8e8e8;
+            color: #000 !important;
+            font-weight: 600;
+        }
+        
+        .stock-cell {
+            background-color: #f5f5f5 !important;
+            color: #000 !important;
+        }
+        
+        .in-cart-row {
+            background-color: #ffccc7 !important;
+        }
+        
+        .in-cart-row td {
+            background-color: #ffccc7 !important;
+        }
+        
+        .hover-row {
+            background-color: #e6f7ff !important;
+        }
+        
+        /* 展开按钮样式 - 简约设计，默认隐藏 */
+        .expand-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            margin-left: 4px;
+            background: transparent;
+            color: #999;
+            border: 1px solid #d9d9d9;
+            border-radius: 2px;
+            cursor: pointer;
+            font-size: 10px;
+            line-height: 1;
+            vertical-align: middle;
+            transition: all 0.2s ease;
+            opacity: 0;  /* 默认隐藏 */
+        }
+
+        /* 单元格悬浮时显示展开按钮 */
+        .handsontable .htCore td:hover .expand-btn {
+            opacity: 1;
+        }
+
+        .expand-btn:hover {
+            background: #f0f0f0;
+            border-color: #bfbfbf;
+            color: #666;
+        }
+
+        .expand-btn.expanded {
+            background: #e6f7ff;
+            border-color: #1890ff;
+            color: #1890ff;
+            opacity: 1;  /* 展开状态始终显示 */
+        }
+        
+        .sales-data-cell {
+            white-space: nowrap !important;
+            line-height: 40px !important;
+            height: 40px !important;
+            overflow: hidden !important;
+        }
+        
+        /* 展开状态下的销量数据单元格 */
+        .handsontable .htCore tr.expanded-row .sales-data-cell {
+            white-space: normal !important;
+            line-height: 1.4 !important;
+            height: auto !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>日期查询</h2>
+        
+        <div class="toolbar">
+            <input type="date" id="startDate" class="date-input">
+            <span>至</span>
+            <input type="date" id="endDate" class="date-input">
+            <button class="btn btn-primary" onclick="loadData()">查询</button>
+            
+            <div style="width: 1px; height: 24px; background: #d9d9d9; margin: 0 10px;"></div>
+            
+            <input type="text" id="searchOe" class="search-input" placeholder="搜索OE号">
+            <input type="text" id="searchBrand" class="search-input" placeholder="搜索品牌">
+            <button class="btn btn-primary" onclick="searchData()">搜索</button>
+            <button class="btn btn-warning" onclick="clearSearch()">清空</button>
+            
+            <div style="flex: 1;"></div>
+            
+            <button class="btn btn-success" onclick="addSelectedToCart()">加入购物车</button>
+            <button class="btn btn-primary" onclick="exportData()">导出</button>
+        </div>
+        
+        <div class="table-container">
+            <div id="table-container"></div>
+        </div>
+    </div>
+
+    <script>
+        let grid = null;
+        let cartData = new Set();
+        let currentStartDate = '';
+        let currentEndDate = '';
+        
+        function formatEmptyValue(value) {
+            if (value === null || value === undefined || value === '' || 
+                value === 'nan' || value === 'NaN') {
+                return '';
+            }
+            return value;
+        }
+        
+        function isInCart(oe, brand) {
+            return cartData.has(`${oe}_${brand}`);
+        }
+        
+
+        
+
+        
+        function rowNumberRenderer(instance, td, row, col, prop, value, cellProperties) {
+            td.textContent = value || (row + 1);
+            td.style.textAlign = 'center';
+            td.style.fontWeight = '500';
+            return td;
+        }
+        
+        // 全选状态
+        let selectAllState = false;
+        
+        // 表头渲染器 - 第一列显示全选复选框
+        function headerCheckboxRenderer(instance, col, th) {
+            th.innerHTML = '';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'htCheckboxRendererInput';
+            checkbox.checked = selectAllState;
+            checkbox.style.cursor = 'pointer';
+            checkbox.addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectAllState = !selectAllState;
+                toggleSelectAll(selectAllState);
+            });
+            th.appendChild(checkbox);
+            th.style.textAlign = 'center';
+            return th;
+        }
+        
+        // 全选/取消全选功能
+        function toggleSelectAll(checked) {
+            if (!grid || !grid.hot) return;
+            const data = grid.hot.getSourceData();
+            data.forEach((row, index) => {
+                row.selected = checked;
+            });
+            grid.hot.render();
+        }
+        
+        // 记录哪些行被展开
+        let expandedRows = new Set();
+        
+        // 固定行高 - 参考 inquiry_module.html
+        const DEFAULT_ROW_HEIGHT = 40;
+        
+        // 更新行展开状态的CSS类
+        function updateRowExpandedClass(row) {
+            if (!grid || !grid.hot) return;
+            const container = grid.hot.container || grid.hot.rootElement;
+            if (!container) return;
+            // 找到对应的行元素 (考虑表头，所以 +1)
+            const rowElement = container.querySelector(`.htCore tbody tr:nth-child(${row + 1})`);
+            if (rowElement) {
+                if (expandedRows.has(row)) {
+                    rowElement.classList.add('expanded-row');
+                } else {
+                    rowElement.classList.remove('expanded-row');
+                }
+            }
+        }
+        
+        // 创建带展开按钮的列renderer
+        function createExpandableRenderer(threshold) {
+            return function(instance, td, row, col, prop, value, cellProperties) {
+                const isExpanded = expandedRows.has(row);
+                const hasContent = value && value.length > threshold;
+
+                const container = document.createElement('div');
+                container.style.width = '100%';
+                container.style.height = '100%';
+                container.style.position = 'relative';
+
+                const textSpan = document.createElement('span');
+                textSpan.textContent = value || '';
+                textSpan.style.display = 'block';
+                textSpan.style.width = '100%';
+                textSpan.style.overflow = 'hidden';
+                textSpan.style.textOverflow = isExpanded ? 'clip' : 'ellipsis';
+                textSpan.style.whiteSpace = isExpanded ? 'normal' : 'nowrap';
+                textSpan.style.paddingRight = hasContent ? '20px' : '0';
+
+                container.appendChild(textSpan);
+
+                if (hasContent) {
+                    const btn = document.createElement('button');
+                    btn.className = 'expand-btn' + (isExpanded ? ' expanded' : '');
+                    btn.innerHTML = isExpanded ? '−' : '+';
+                    btn.style.position = 'absolute';
+                    btn.style.right = '2px';
+                    btn.style.top = isExpanded ? '4px' : '50%';
+                    btn.style.transform = isExpanded ? 'none' : 'translateY(-50%)';
+                    btn.onclick = function(e) {
+                        e.stopPropagation();
+                        if (expandedRows.has(row)) {
+                            expandedRows.delete(row);
+                        } else {
+                            expandedRows.add(row);
+                        }
+                        // 更新行的CSS类
+                        updateRowExpandedClass(row);
+                        grid.hot.render();
+                    };
+                    container.appendChild(btn);
+                }
+
+                td.innerHTML = '';
+                td.appendChild(container);
+                return td;
+            };
+        }
+        
+        // 销量数据渲染器 - 参考主页面，显示两列数据
+        function salesDataRenderer(instance, td, row, col, prop, value, cellProperties) {
+            const isExpanded = expandedRows.has(row);
+            td.innerHTML = '';
+            td.className = 'stock-cell sales-data-cell';
+
+            const data = instance.getSourceDataAtRow(row);
+            if (data) {
+                const today = parseInt(data['今日销量'] || 0);
+                const yesterday = parseInt(data['昨日销量'] || 0);
+                const sales7d = parseInt(data['近7天销量'] || 0);
+                const salesMonth = parseInt(data['本月销量'] || 0);
+                const avg6m = parseInt(data['近6个月月均销量'] || 0);
+                const avg12m = parseInt(data['近12个月月均销量'] || 0);
+
+                if (isExpanded) {
+                    // 展开状态显示两行
+                    td.innerHTML = `
+                        <div style="line-height: 1.4; font-size: 12px;">
+                            <div>今/昨/近7天: ${today}/${yesterday}/${sales7d}</div>
+                            <div>近1/6/12月: ${salesMonth}/${avg6m}/${avg12m}</div>
+                        </div>
+                    `;
+                } else {
+                    // 默认状态显示一行，带省略号
+                    const text = `今/昨/7天/1/6/12月: ${today}/${yesterday}/${sales7d}/${salesMonth}/${avg6m}/${avg12m}`;
+                    td.innerHTML = `<span style="font-size: 12px;">${text}</span>`;
+                }
+            }
+
+            return td;
+        }
+        
+        // 整数渲染器 - 用于显示整数（去除小数）
+        function integerRenderer(instance, td, row, col, prop, value, cellProperties) {
+            td.textContent = parseInt(value || 0);
+            td.style.textAlign = 'right';
+            return td;
+        }
+        
+        const columns = [
+            { data: 'selected', type: 'checkbox', width: 40, headerRenderer: headerCheckboxRenderer, readOnly: false },
+            { data: 'rowNumber', title: '行号', width: 60, renderer: rowNumberRenderer },
+            { data: 'oe', title: 'OE', width: 120, sortable: true },
+            { data: '物料名称', title: '物料名称', width: 150 },
+            { data: '品牌', title: '品牌', width: 80, sortable: true },
+            { data: '物料条码', title: '物料条码', width: 120 },
+            { data: '品牌号', title: '品牌号', width: 100 },
+            { data: '替换号', title: '替换号', width: 100 },
+            { data: '车型品牌', title: '车型品牌', width: 80 },
+            { data: '标签', title: '标签', width: 60 },
+            { data: '车型', title: '车型', width: 100, renderer: createExpandableRenderer(8) },
+            { data: '库存数量', title: '库存数量', width: 88, sortable: true, className: 'stock-cell' },
+            { data: '在途数量', title: '在途数量', width: 88, className: 'stock-cell' },
+            { data: '销量', title: '销量', width: 60, sortable: true },
+            { data: '销量数据', title: '销量数据', width: 180, renderer: salesDataRenderer },
+            { data: '库存金额', title: '库存金额', width: 88 },
+            { data: '成本价', title: '成本价', width: 100 },
+            { data: '成品可卖天数', title: '成品可卖天数', width: 100 },
+            { data: '预警状态', title: '预警状态', width: 100 },
+            { data: '供应商', title: '供应商', width: 150, renderer: createExpandableRenderer(10) },
+            { data: '近1个月询价量', title: '近1个月询价量', width: 120 },
+            { data: '近3个月月均询价量', title: '近3个月月均询价量', width: 130, renderer: integerRenderer },
+            { data: '全国近1个月询价量', title: '全国近1个月询价量', width: 130 },
+            { data: '全国近3个月月均询价量', title: '全国近3个月月均询价量', width: 140 },
+            { data: '内部备注', title: '内部备注', width: 150, renderer: createExpandableRenderer(10) }
+        ];
+        
+        // 自定义 DataSource 类，支持日期参数
+        class DateQueryDataSource extends DataSource {
+            constructor(options = {}) {
+                super(options);
+                this.dateParams = { start: '', end: '' };
+                this.isFirstLoad = true;
+            }
+            
+            setDateParams(start, end) {
+                this.dateParams = { start, end };
+            }
+            
+            async load(params = {}) {
+                // 首次加载时检查日期参数
+                if (this.isFirstLoad && (!this.dateParams.start || !this.dateParams.end)) {
+                    // 获取当前日期选择器的值
+                    const startDate = document.getElementById('startDate')?.value;
+                    const endDate = document.getElementById('endDate')?.value;
+                    if (startDate && endDate) {
+                        this.setDateParams(startDate, endDate);
+                    }
+                    this.isFirstLoad = false;
+                }
+                return super.load(params);
+            }
+            
+            async loadFromServer(params) {
+                const { url, method, headers, dataKey, totalKey } = this.options;
+                
+                // 合并日期参数和分页参数
+                const requestData = {
+                    ...this.dateParams,
+                    page: params.page || 1,
+                    pageSize: params.pageSize || 200,
+                    sort: params.sort || {},
+                    filter: params.filter || {}
+                };
+                
+                // 确保 POST 请求有正确的 Content-Type
+                const requestOptions = {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...headers
+                    }
+                };
+                
+                const response = await this.requestManager.post(url, requestData, requestOptions);
+                const result = await response.json();
+                
+                if (result.code !== 0) throw new Error(result.message || '加载失败');
+                
+                // 数据转换
+                let list = result[dataKey] || [];
+                if (this.options.transform && typeof this.options.transform === 'function') {
+                    list = list.map(this.options.transform);
+                }
+                
+                return { list, total: result[totalKey] || 0 };
+            }
+        }
+        
+        function initGrid() {
+            if (grid) {
+                grid.destroy();
+            }
+            
+            // 创建自定义数据源
+            const dataSource = new DateQueryDataSource({
+                type: 'server',
+                url: '/api/date_ordercount',
+                method: 'POST',
+                cache: true,
+                transform: (item, index) => ({
+                    ...item,
+                    rowNumber: index + 1,
+                    selected: false
+                })
+            });
+            
+            grid = new DataGrid('#table-container', {
+                dataSource: dataSource,
+                columns: columns,
+                pagination: true,
+                serverSide: true,
+                sorting: true,
+                filtering: true,
+                selection: 'multiple',
+                fixedColumns: { left: 15, right: 0 },
+                virtualScroll: false,
+                rowHeights: function(row) {
+                    return expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                },
+                pageSize: 200,
+                handsontableOptions: {
+                    afterSelection: function(r, c, r2, c2) {
+                        highlightRow(r);
+                    },
+                    afterDocumentKeyDown: function(event) {
+                        const selected = grid.hot.getSelected();
+                        if (!selected || selected.length === 0) return;
+                        const row = selected[0][0];
+                        if (event.key === ' ' || event.key === 'Enter') {
+                            event.preventDefault();
+                            addToCart(row);
+                        }
+                    },
+                    afterRender: function() {
+                        // 渲染完成后更新展开行的CSS类
+                        expandedRows.forEach(row => {
+                            updateRowExpandedClass(row);
+                        });
+                    }
+                }
+            });
+            
+            // 保存数据源引用以便后续使用
+            grid.dateDataSource = dataSource;
+        }
+        
+        function highlightRow(row) {
+            if (!grid || !grid.hot) return;
+            // 使用 Handsontable 的 container 元素来查找行
+            const container = grid.hot.container || grid.hot.rootElement;
+            if (!container) return;
+            const rows = container.querySelectorAll('tr');
+            rows.forEach(tr => tr.classList.remove('hover-row'));
+            const currentRow = container.querySelector(`tr:nth-child(${row + 1})`);
+            if (currentRow) {
+                currentRow.classList.add('hover-row');
+            }
+        }
+        
+        function addToCart(row) {
+            const data = grid.hot.getSourceDataAtRow(row);
+            if (!data) return;
+            const key = `${data.oe}_${data.品牌}`;
+            if (cartData.has(key)) {
+                cartData.delete(key);
+            } else {
+                cartData.add(key);
+            }
+            grid.hot.render();
+        }
+        
+        function addSelectedToCart() {
+            const data = grid.hot.getSourceData();
+            let added = 0;
+            data.forEach(item => {
+                if (item.selected) {
+                    const key = `${item.oe}_${item.品牌}`;
+                    if (!cartData.has(key)) {
+                        cartData.add(key);
+                        added++;
+                    }
+                }
+            });
+            alert(`已添加 ${added} 项到购物车`);
+            grid.hot.render();
+        }
+        
+        async function loadData() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate || !endDate) {
+                alert('请选择日期范围');
+                return;
+            }
+            
+            currentStartDate = startDate;
+            currentEndDate = endDate;
+            
+            // 设置日期参数并刷新
+            if (grid && grid.dateDataSource) {
+                grid.dateDataSource.setDateParams(startDate, endDate);
+                grid.state.page = 1;
+                await grid.loadData();
+            }
+        }
+        
+        function searchData() {
+            const oe = document.getElementById('searchOe').value.trim();
+            const brand = document.getElementById('searchBrand').value.trim();
+            grid.state.filter = { oe: oe, 品牌: brand };
+            grid.state.page = 1;
+            grid.loadData();
+        }
+        
+        function clearSearch() {
+            document.getElementById('searchOe').value = '';
+            document.getElementById('searchBrand').value = '';
+            grid.state.filter = {};
+            grid.state.page = 1;
+            grid.loadData();
+        }
+        
+        function exportData() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            if (!startDate || !endDate) {
+                alert('请先选择日期范围');
+                return;
+            }
+            window.open(`/api/date_ordercount/export?start=${startDate}&end=${endDate}`, '_blank');
+        }
+        
+        function initDateRange() {
+            const today = new Date();
+            const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            document.getElementById('startDate').value = lastWeek.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initDateRange();
+            initGrid();
+            setTimeout(() => loadData(), 100);
+        });
+    </script>
+</body>
+</html>

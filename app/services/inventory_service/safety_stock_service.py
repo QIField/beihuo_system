@@ -29,10 +29,25 @@ class SafetyStockService:
         Returns:
             dict: 计算结果
         """
-        # 1. 聚合数据
-        data = self.aggregator.aggregate_sku_data(sku)
+        print(f"[calculate_single] 开始计算 SKU: {sku}")
+        
+        try:
+            # 1. 聚合数据
+            print(f"[calculate_single] 正在聚合数据...")
+            data = self.aggregator.aggregate_sku_data(sku)
+            print(f"[calculate_single] 数据聚合完成: {data}")
+        except Exception as e:
+            import traceback
+            print(f"[calculate_single] 数据聚合失败: {e}")
+            traceback.print_exc()
+            return {
+                'code': 500,
+                'msg': f'SKU {sku} 数据聚合失败: {str(e)}',
+                'data': None
+            }
         
         if data['sales']['demand_avg'] == 0:
+            print(f"[calculate_single] SKU {sku} 没有销量数据")
             return {
                 'code': 400,
                 'msg': f'SKU {sku} 没有销量数据，无法计算',
@@ -123,8 +138,13 @@ class SafetyStockService:
                     results.append(result['data'])
                 else:
                     errors.append({'sku': sku_info['sku'], 'error': result['msg']})
+                    print(f"[试点计算失败] {sku_info['sku']}: {result['msg']}")
             except Exception as e:
-                errors.append({'sku': sku_info['sku'], 'error': str(e)})
+                import traceback
+                error_msg = str(e)
+                errors.append({'sku': sku_info['sku'], 'error': error_msg})
+                print(f"[试点计算异常] {sku_info['sku']}: {error_msg}")
+                traceback.print_exc()
         
         return {
             'code': 200,

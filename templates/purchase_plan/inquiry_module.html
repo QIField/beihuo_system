@@ -253,6 +253,90 @@
             align-items: center;
         }
 
+        /* 加价设置弹窗样式 */
+        .markup-modal-content {
+            background-color: #fff;
+            border-radius: 8px;
+            width: 400px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .markup-modal-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .markup-modal-header h3 {
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .markup-input-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .markup-btn {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #d9d9d9;
+            background-color: #fff;
+            border-radius: 4px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .markup-btn:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+        }
+
+        .markup-btn:active {
+            background-color: #e6f7ff;
+        }
+
+        .markup-input {
+            width: 120px;
+            height: 40px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .markup-input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .markup-hint {
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+
+        .markup-modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .markup-modal-footer .btn {
+            min-width: 100px;
+        }
+
         .modal-content {
             background-color: #fff;
             border-radius: 8px;
@@ -555,6 +639,28 @@
                 </div>
                 <div class="brand-list-container" id="brandListContainer">
                     <div class="brand-empty">请输入条件搜索品牌</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 加价设置弹窗 -->
+        <div class="modal-overlay" id="markupModal">
+            <div class="markup-modal-content">
+                <div class="markup-modal-header">
+                    <h3>💰 价格倍数设置</h3>
+                </div>
+                <div class="markup-input-container">
+                    <button class="markup-btn" id="markupDecrease">−</button>
+                    <input type="number" class="markup-input" id="markupInput" value="1" min="0.1" step="0.1">
+                    <button class="markup-btn" id="markupIncrease">+</button>
+                </div>
+                <div class="markup-hint">
+                    最终价格 = 原价 × 倍数<br>
+                    1 = 价格不变 | 1.1 = 加价10% | 1.5 = 加价50%
+                </div>
+                <div class="markup-modal-footer">
+                    <button class="btn btn-default" id="markupCancel">取消</button>
+                    <button class="btn btn-primary" id="markupConfirm">确认上传</button>
                 </div>
             </div>
         </div>
@@ -1002,6 +1108,9 @@
             });
         }
 
+        // 临时存储待上传的文件
+        let pendingFile = null;
+
         function initUpload() {
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
@@ -1022,17 +1131,18 @@
                 e.preventDefault();
                 uploadArea.classList.remove('dragover');
                 if (e.dataTransfer.files.length > 0) {
-                    handleFileUpload(e.dataTransfer.files[0]);
+                    handleFileSelect(e.dataTransfer.files[0]);
                 }
             });
 
             fileInput.addEventListener('change', () => {
                 if (fileInput.files.length > 0) {
-                    handleFileUpload(fileInput.files[0]);
+                    handleFileSelect(fileInput.files[0]);
                 }
             });
 
-            async function handleFileUpload(file) {
+            // 文件选择后，先弹出加价设置弹窗
+            function handleFileSelect(file) {
                 const validTypes = ['.csv', '.xls', '.xlsx'];
                 const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
                 if (validTypes.indexOf(fileExt) === -1) {
@@ -1040,8 +1150,36 @@
                     return;
                 }
 
+                // 保存文件引用
+                pendingFile = file;
+                
+                // 显示加价设置弹窗
+                showMarkupModal();
+            }
+
+            // 显示加价设置弹窗
+                function showMarkupModal() {
+                    const modal = document.getElementById('markupModal');
+                    modal.style.display = 'flex';
+                    
+                    // 重置默认值为1（价格不变）
+                    document.getElementById('markupInput').value = '1.0';
+                }
+
+            // 隐藏加价设置弹窗
+            function hideMarkupModal() {
+                const modal = document.getElementById('markupModal');
+                modal.style.display = 'none';
+            }
+
+            // 初始化加价弹窗事件
+            initMarkupModalEvents();
+
+            // 实际执行文件上传
+            async function handleFileUpload(file, markupRate) {
                 const formData = new FormData();
                 formData.append('file', file);
+                formData.append('markup_rate', markupRate);
 
                 uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">上传中...</div>';
 
@@ -1092,6 +1230,87 @@
                 }
 
                 fileInput.value = '';
+                pendingFile = null;
+            }
+
+            // 初始化加价弹窗事件
+            function initMarkupModalEvents() {
+                const markupDecrease = document.getElementById('markupDecrease');
+                const markupIncrease = document.getElementById('markupIncrease');
+                const markupInput = document.getElementById('markupInput');
+                const markupCancel = document.getElementById('markupCancel');
+                const markupConfirm = document.getElementById('markupConfirm');
+                const modal = document.getElementById('markupModal');
+
+                // 减号按钮（步长0.1）
+                markupDecrease.addEventListener('click', () => {
+                    let value = parseFloat(markupInput.value) || 1;
+                    value = Math.max(0.1, value - 0.1);
+                    markupInput.value = value.toFixed(1);
+                });
+
+                // 加号按钮（步长0.1）
+                markupIncrease.addEventListener('click', () => {
+                    let value = parseFloat(markupInput.value) || 1;
+                    value = value + 0.1;
+                    markupInput.value = value.toFixed(1);
+                });
+
+                // 输入框限制
+                markupInput.addEventListener('input', () => {
+                    let value = markupInput.value;
+                    // 只允许数字和小数点
+                    value = value.replace(/[^0-9.]/g, '');
+                    // 确保只有一个小数点
+                    const parts = value.split('.');
+                    if (parts.length > 2) {
+                        value = parts[0] + '.' + parts.slice(1).join('');
+                    }
+                    markupInput.value = value;
+                });
+
+                markupInput.addEventListener('blur', () => {
+                    let value = parseFloat(markupInput.value);
+                    if (isNaN(value) || value < 0.1) {
+                        value = 1;
+                    }
+                    markupInput.value = value.toFixed(1);
+                });
+
+                // 取消按钮
+                markupCancel.addEventListener('click', () => {
+                    hideMarkupModal();
+                    pendingFile = null;
+                    fileInput.value = '';
+                });
+
+                // 确认上传按钮
+                markupConfirm.addEventListener('click', () => {
+                    const markupRate = parseFloat(markupInput.value) || 0;
+                    hideMarkupModal();
+                    
+                    if (pendingFile) {
+                        handleFileUpload(pendingFile, markupRate);
+                    }
+                });
+
+                // 点击遮罩关闭
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        hideMarkupModal();
+                        pendingFile = null;
+                        fileInput.value = '';
+                    }
+                });
+
+                // ESC键关闭
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && modal.style.display === 'flex') {
+                        hideMarkupModal();
+                        pendingFile = null;
+                        fileInput.value = '';
+                    }
+                });
             }
         }
 

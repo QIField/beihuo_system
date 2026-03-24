@@ -133,6 +133,12 @@ def prepare_data(df):
             'remark': str(row.get('remark', '')).strip(),
         }
         
+        # 保存原价格（如果存在），用于采购记录表
+        if 'original_price' in df.columns:
+            item['original_price'] = float(row.get('original_price', item['price'])) if pd.notna(row.get('original_price')) else item['price']
+        else:
+            item['original_price'] = item['price']
+        
         # 检查是否跳过
         skip_reasons = []
         if not item['supplier']:

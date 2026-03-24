@@ -302,7 +302,97 @@
         .search-panel .layui-row:nth-child(2) .layui-col-md2:last-child {
             margin-right: 0;
         }
-        
+
+        /* 搜索面板分组样式 */
+        .search-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .search-group:last-child {
+            border-bottom: none;
+        }
+        .group-label {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            white-space: nowrap;
+            min-width: 70px;
+        }
+        .search-fields {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            flex: 1;
+            align-items: center;
+        }
+        .search-fields input,
+        .search-fields select,
+        .group-actions select {
+            height: 34px;
+            padding: 0 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #333;
+            background: #fff;
+            transition: all 0.2s;
+        }
+        .search-fields input {
+            width: 140px;
+        }
+        .search-fields input:focus,
+        .search-fields select:focus,
+        .group-actions select:focus {
+            border-color: #40a9ff;
+            outline: none;
+        }
+        .search-fields input::placeholder {
+            color: #999;
+            font-size: 14px;
+        }
+        .search-fields select,
+        .group-actions select {
+            width: 130px;
+            cursor: pointer;
+        }
+        /* 销量筛选区域 */
+        .compare-fields {
+            gap: 20px;
+        }
+        .compare-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .field-label {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+        .compare-box select {
+            width: 60px;
+            padding: 0 8px;
+        }
+        .compare-box input {
+            width: 80px !important;
+        }
+        /* 按钮组 */
+        .group-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        /* 按钮分隔线 */
+        .action-separator {
+            width: 1px;
+            height: 20px;
+            background-color: #d9d9d9;
+            margin: 0 4px;
+        }
+
         /* 确保表格容器有足够的底部间距 */
         #content {
             padding: 15px;
@@ -2345,113 +2435,72 @@ window.loadContent = function(type) {
     // 动态加载内容
     document.getElementById('content').innerHTML = `
         <!-- 搜索表单 -->
-        <div class="layui-form layui-form-pane search-panel" 
-        lay-filter="searchForm" 
-        style="margin-bottom: 10px; padding: 16px; background-color: #fafafa; border-radius: 6px; border: 1px solid #eee; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div class="layui-form search-panel" lay-filter="searchForm" style="margin-bottom: 10px; padding: 16px; background: #fff; border: 1px solid #e6e6e6;">
         
-        <!-- 更新时间显示行 -->
-        <div class="layui-row layui-col-space12">
-            <div class="layui-col-md12">
-                <span id="updateTimeDisplay" style="font-size: 15px; color: #666; line-height: 32px; min-width: 130px; display: inline-block; white-space: nowrap;">更新时间：-</span>
+        <!-- 更新时间 -->
+        <div style="margin-bottom: 16px;">
+            <span id="updateTimeDisplay" style="font-size: 15px; color: #000; font-weight: bold;">更新时间：-</span>
+        </div>
+
+        <!-- 搜索条件组：基础筛选 + 销量筛选 + 搜索按钮 -->
+        <div class="search-group">
+            <span class="group-label">搜索条件</span>
+            <div class="search-fields">
+                <!-- 基础筛选 -->
+                <input type="text" name="oe" autocomplete="off" placeholder="OE">
+                <select name="brand" id="searchBrand">
+                    <option value="">品牌</option>
+                </select>
+                <input type="text" name="material_name" autocomplete="off" placeholder="物料名称">
+                <input type="text" name="barcode" autocomplete="off" placeholder="品牌号">
+                <select name="tag" id="searchTag">
+                    <option value="">标签</option>
+                </select>
+                <!-- 销量筛选 -->
+                <div class="compare-box">
+                    <span class="field-label">今日销量</span>
+                    <select name="today_sales_op">
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                        <option value="=">=</option>
+                        <option value=">=">≥</option>
+                        <option value="<=">≤</option>
+                    </select>
+                    <input type="number" name="today_sales_val" placeholder="数值">
+                </div>
+                <div class="compare-box">
+                    <span class="field-label">昨日销量</span>
+                    <select name="sales_yesterday_op">
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                        <option value="=">=</option>
+                        <option value=">=">≥</option>
+                        <option value="<=">≤</option>
+                    </select>
+                    <input type="number" name="sales_yesterday_val" placeholder="数值">
+                </div>
+            </div>
+            <div class="group-actions">
+                <button class="layui-btn layui-btn-sm" id="searchBtn">搜索</button>
+                <button class="layui-btn layui-btn-sm layui-btn-primary" id="resetBtn">重置</button>
             </div>
         </div>
 
-        <!-- 第一行：文本/下拉搜索 -->
-        <div class="layui-row layui-col-space12" style="display: flex; flex-wrap: wrap; margin-right: -6px; margin-left: -6px;">
-            <!-- OE -->
-            <div class="layui-col-md2 layui-col-sm4 layui-col-xs6" style="flex: 1; min-width: 140px; margin: 6px; padding: 0 6px;">
-                <div class="layui-input-group">
-                    <span class="layui-input-label">OE</span>
-                    <input type="text" name="oe" autocomplete="off" class="layui-input" placeholder="请输入OE">
-                </div>
-            </div>
-            <!-- 品牌 -->
-            <div class="layui-col-md2 layui-col-sm4 layui-col-xs6" style="flex: 1; min-width: 140px; margin: 6px; padding: 0 6px;">
-                <div class="layui-input-group">
-                    <span class="layui-input-label">品牌</span>
-                    <select name="brand" id="searchBrand" class="layui-select">
-                        <option value="">全部</option>
-                    </select>
-                </div>
-            </div>
-            <!-- 物料名称 -->
-            <div class="layui-col-md2 layui-col-sm4 layui-col-xs6" style="flex: 1; min-width: 140px; margin: 6px; padding: 0 6px;">
-                <div class="layui-input-group">
-                    <span class="layui-input-label">物料名称</span>
-                    <input type="text" name="material_name" autocomplete="off" class="layui-input" placeholder="关键词">
-                </div>
-            </div>
-            <!-- 物料条码 -->
-            <div class="layui-col-md2 layui-col-sm4 layui-col-xs6" style="flex: 1; min-width: 140px; margin: 6px; padding: 0 6px;">
-                <div class="layui-input-group">
-                    <span class="layui-input-label">品牌号</span>
-                    <input type="text" name="barcode" autocomplete="off" class="layui-input" placeholder="物料条码或品牌号码">
-                </div>
-            </div>
-            <!-- 标签 -->
-            <div class="layui-col-md2 layui-col-sm4 layui-col-xs6" style="flex: 1; min-width: 140px; margin: 6px; padding: 0 6px;">
-                <div class="layui-input-group">
-                    <span class="layui-input-label">标签</span>
-                    <select name="tag" id="searchTag" class="layui-select">
-                        <option value="">全部</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- 第二行：数值比较 + 操作按钮 -->
-        <div class="layui-row layui-col-space12" style="display: flex; flex-wrap: wrap; margin-right: -6px; margin-left: -6px; margin-top: 10px;">
-            <!-- 今日销量 -->
-            <div class="layui-col-md2 layui-col-sm4 layui-col-xs6" style="flex: 1; min-width: 150px; margin: 6px; padding: 0 6px;">
-                <div class="layui-input-group number-comparison">
-                    <span class="layui-input-label">今日销量</span>
-                    <div class="layui-input-inline" style="width: auto; display: flex;">
-                        <select name="today_sales_op" class="layui-select-compare" style="width: 50px; padding: 0 8px; height: 32px; border-radius: 2px 0 0 2px; border-right: none;">
-                            <option value=">">&gt;</option>
-                            <option value="<">&lt;</option>
-                            <option value="=">=</option>
-                            <option value=">=">&ge;</option>
-                            <option value="<=">&le;</option>
-                        </select>
-                        <input type="number" name="today_sales_val" autocomplete="off" class="layui-input" 
-                            style="width: 70px; height: 32px; border-radius: 0 2px 2px 0; padding: 0 8px;" placeholder="值">
-                    </div>
-                </div>
-            </div>
-
-            <!-- 昨日销量 -->
-            <div class="layui-col-md2 layui-col-sm4 layui-col-xs6" style="flex: 1; min-width: 150px; margin: 6px; padding: 0 6px;">
-                <div class="layui-input-group number-comparison">
-                    <span class="layui-input-label">昨日销量</span>
-                    <div class="layui-input-inline" style="width: auto; display: flex;">
-                        <select name="sales_yesterday_op" class="layui-select-compare" style="width: 50px; padding: 0 8px; height: 32px; border-radius: 2px 0 0 2px; border-right: none;">
-                            <option value=">">&gt;</option>
-                            <option value="<">&lt;</option>
-                            <option value="=">=</option>
-                            <option value=">=">&ge;</option>
-                            <option value="<=">&le;</option>
-                        </select>
-                        <input type="number" name="sales_yesterday_val" autocomplete="off" class="layui-input" 
-                            style="width: 70px; height: 32px; border-radius: 0 2px 2px 0; padding: 0 8px;" placeholder="值">
-                    </div>
-                </div>
-            </div>
-
-            <!-- 操作按钮区域 -->
-            <div class="layui-col-md2 layui-col-sm4 layui-col-xs6" style="flex: 2; min-width: 350px; margin: 6px; padding: 0 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; align-content: flex-end;">
-                <button class="layui-btn layui-btn-sm" id="searchBtn" style="background-color: #5FB878; height: 32px; padding: 0 10px; flex-shrink: 0;">搜索</button>
-                <button type="button" class="layui-btn layui-btn-primary layui-btn-sm" id="resetBtn" style="height: 32px; padding: 0 10px; flex-shrink: 0;">重置</button>
-                <div class="layui-input-group" style="min-width: 130px; flex: 1; height: 32px;">
-                    <select name="inquiry_field" id="inquiryField" class="layui-select" style="height: 32px; padding: 0 8px; width: 100%; border-radius: 2px 0 0 2px; border: 1px solid #d2d2d2;">
-                        <option value="inquiry_1m">近1个月询价量</option>
-                        <option value="inquiry_3m">近3个月月均询价量</option>
-                        <option value="national_inquiry_1m">全国近1个月询价量</option>
-                        <option value="national_inquiry_3m">全国近3个月月均询价量</option>
-                    </select>
-                <button class="layui-btn layui-btn-sm layui-btn-warm" id="inquiryStockBtn" style="height: 32px; padding: 0 10px; white-space: nowrap; flex-shrink: 0;">询价>9且库存为0</button>
-                </div>
-                <button class="layui-btn layui-btn-sm layui-btn-normal" id="loadDataBtn" style="height: 32px; padding: 0 10px; white-space: nowrap; flex-shrink: 0;">更新数据</button>
-                <button class="layui-btn layui-btn-sm layui-btn-danger" id="fetchDataBtn" style="height: 32px; padding: 0 10px; white-space: nowrap; flex-shrink: 0;">拉取数据</button>
+        <!-- 数据操作组 -->
+        <div class="search-group">
+            <span class="group-label">数据操作</span>
+            <div class="group-actions">
+                <select name="inquiry_field" id="inquiryField">
+                    <option value="inquiry_1m">近1个月询价</option>
+                    <option value="inquiry_3m">近3个月月均询价</option>
+                    <option value="national_inquiry_1m">全国近1个月询价</option>
+                    <option value="national_inquiry_3m">全国近3个月月均询价</option>
+                </select>
+                <button class="layui-btn layui-btn-sm layui-btn-primary" id="inquiryStockBtn">询价>9且库存为0</button>
+                <div class="action-separator"></div>
+                <button class="layui-btn layui-btn-sm layui-btn-primary" id="loadDataBtn">更新数据</button>
+                <div class="action-separator"></div>
+                <button class="layui-btn layui-btn-sm layui-btn-primary" id="fetchDataBtn">拉取数据</button>
             </div>
         </div>
     </div>
@@ -5447,7 +5496,7 @@ function initDateQuery() {
         });
     });
     
-    // 绑定日期查询按钮事件
+    // 绑定日期查询按钮事件 - 打开新页面
     document.getElementById('dateQueryBtn').onclick = function() {
         var startDate = document.getElementById('startDate').value;
         var endDate = document.getElementById('endDate').value;
@@ -5472,45 +5521,9 @@ function initDateQuery() {
             return;
         }
         
-        // 显示加载提示
-        var loadingIndex = layui.layer.load(2, {
-            content: '正在查询数据...',
-            shade: [0.3, '#000']
-        });
-        
-        // 发送日期查询请求
-        fetch('/api/date_ordercount', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                start: startDate,
-                end: endDate
-            })
-        })
-        .then(response => response.json())
-        .then(result => {
-            layui.layer.close(loadingIndex);
-            
-            if (result.code === 0) {
-                layui.layer.msg('查询成功', {icon: 1, time: 1000});
-                
-                // 保存当前日期范围到全局变量，以便重置时使用
-                window.currentDateQueryStart = startDate;
-                window.currentDateQueryEnd = endDate;
-                
-                // 显示查询结果表格
-                showDateQueryResults(result.data);
-            } else {
-                layui.layer.msg(result.msg, {icon: 2});
-            }
-        })
-        .catch(error => {
-            layui.layer.close(loadingIndex);
-            layui.layer.msg('查询失败: ' + error.message, {icon: 2});
-            console.error('日期查询错误:', error);
-        });
+        // 打开新的日期查询页面，传递日期参数
+        var url = '/date_query?start=' + encodeURIComponent(startDate) + '&end=' + encodeURIComponent(endDate);
+        window.open(url, '_blank');
     };
 }
 

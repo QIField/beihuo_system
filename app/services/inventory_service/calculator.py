@@ -42,11 +42,11 @@ class SafetyStockCalculator:
         Returns:
             dict: 包含各缓冲区和安全库存的字典
         """
-        # 需求波动缓冲
-        demand_buffer = (demand_max - demand_avg) * lead_time_avg
+        # 需求波动缓冲（转换为float进行计算）
+        demand_buffer = float(demand_max - demand_avg) * float(lead_time_avg)
         
         # 补货延迟缓冲
-        lead_time_buffer = (lead_time_max - lead_time_avg) * demand_avg
+        lead_time_buffer = float(lead_time_max - lead_time_avg) * float(demand_avg)
         
         # 基础安全库存
         safety_stock = demand_buffer + lead_time_buffer
@@ -83,8 +83,8 @@ class SafetyStockCalculator:
         # 获取Z值
         z = cls.Z_SCORES.get(service_level, 1.65)
         
-        # 计算安全库存
-        safety_stock = z * demand_std * math.sqrt(lead_time_avg)
+        # 计算安全库存（转换为float）
+        safety_stock = z * float(demand_std) * math.sqrt(float(lead_time_avg))
         
         return {
             'z_score': z,
@@ -112,19 +112,23 @@ class SafetyStockCalculator:
         Returns:
             dict: 包含各阈值的字典
         """
-        # 库存下限（紧急预警线）= 安全库存 × 0.5
-        inventory_min = safety_stock * 0.5
+        # 库存下限（紧急预警线）= 安全库存 × 0.5（转换为float）
+        inventory_min = float(safety_stock) * 0.5
         
-        # 再订货点 = 安全库存 + 提前期内的平均需求
-        lead_time_demand = demand_avg * lead_time_avg
-        reorder_point = safety_stock + lead_time_demand
+        # 再订货点 = 安全库存 + 提前期内的平均需求（转换为float）
+        demand_avg_float = float(demand_avg)
+        lead_time_avg_float = float(lead_time_avg)
+        safety_stock_float = float(safety_stock)
+        
+        lead_time_demand = demand_avg_float * lead_time_avg_float
+        reorder_point = safety_stock_float + lead_time_demand
         
         # 目标库存 = 安全库存 + 补货周期需求（假设7天补货周期）
         order_cycle = 7
-        target_inventory = safety_stock + demand_avg * (lead_time_avg + order_cycle)
+        target_inventory = safety_stock_float + demand_avg_float * (lead_time_avg_float + order_cycle)
         
         # 按最大库存天数限制
-        max_by_days = demand_avg * max_inventory_days
+        max_by_days = demand_avg_float * max_inventory_days
         
         # 库存上限取较小值
         inventory_max = min(target_inventory, max_by_days)

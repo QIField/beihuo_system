@@ -48,13 +48,13 @@ class InventoryDataAggregator:
                 # 查询每日销量
                 sql = """
                     SELECT 
-                        DATE(sale_date) as sale_day,
+                        sales_date as sale_day,
                         SUM(quantity) as daily_qty
                     FROM crmapp_sales_history
-                    WHERE sku = %s 
-                      AND sale_date BETWEEN %s AND %s
-                    GROUP BY DATE(sale_date)
-                    ORDER BY sale_day
+                    WHERE oe = %s 
+                      AND sales_date BETWEEN %s AND %s
+                    GROUP BY sales_date
+                    ORDER BY sales_date
                 """
                 cursor.execute(sql, (sku, start_date, end_date))
                 results = cursor.fetchall()
@@ -87,14 +87,17 @@ class InventoryDataAggregator:
     
     def get_purchase_stats(self, sku: str, months: int = 12) -> Dict[str, float]:
         """
-        从crmapp_purchase_history统计补货周期
+        从crmapp_procurement_history统计采购频率（作为补货周期参考）
+        
+        注意：采购历史表只有采购日期，没有到货日期，所以无法计算真实交货期
+        这里用采购频率来估算，默认使用7天平均交货期
         
         Args:
             sku: SKU编码
             months: 统计月份数
             
         Returns:
-            dict: 包含平均交货期、最长交货期等
+            dict: 包含平均交货期、最长交货期等（使用默认值）
         """
         conn = self._get_connection()
         try:
@@ -102,48 +105,34 @@ class InventoryDataAggregator:
                 end_date = datetime.now()
                 start_date = end_date - timedelta(days=months * 30)
                 
-                # 查询采购记录及交货期
+                # 查询采购记录次数（用于判断是否有采购数据）
                 sql = """
-                    SELECT 
-                        order_date,
-                        receive_date,
-                        DATEDIFF(receive_date, order_date) as lead_time
-                    FROM crmapp_purchase_history
-                    WHERE sku = %s 
-                      AND order_date BETWEEN %s AND %s
-                      AND receive_date IS NOT NULL
-                      AND receive_date > order_date
+                    SELECT COUNT(*) as purchase_count
+                    FROM crmapp_procurement_history
+                    WHERE oe = %s 
+                      AND purchase_date BETWEEN %s AND %s
                 """
                 cursor.execute(sql, (sku, start_date, end_date))
-                results = cursor.fetchall()
+                result = cursor.fetchone()
+                purchase_count = result[0] if result else 0
                 
-                if not results:
-                    # 没有采购记录，使用默认值
-                    return {'lead_time_avg': 7, 'lead_time_max': 14, 'count': 0}
-                
-                # 提取交货期
-                lead_times = [row[2] for row in results]
-                
-                # 计算统计值
-                lead_time_avg = sum(lead_times) / len(lead_times)
-                lead_time_max = max(lead_times)
-                
-                # 使用95分位数作为最长交货期（排除极端异常）
-                lead_times_sorted = sorted(lead_times)
-                p95_index = int(len(lead_times_sorted) * 0.95)
-                lead_time_p95 = lead_times_sorted[min(p95_index, len(lead_times_sorted) - 1)]
-                
+                # 由于采购历史表没有到货日期，无法计算真实交货期
+                # 使用默认值：平均7天，最长14天
+                # 后续可以从其他数据源（如入库记录）获取真实交货期
                 return {
-                    'lead_time_avg': round(lead_time_avg, 1),
-                    'lead_time_max': round(lead_time_p95, 1),
-                    'count': len(lead_times)
+                    'lead_time_avg': 7.0,
+                    'lead_time_max': 14.0,
+                    'count': purchase_count
                 }
         finally:
             self._close_connection()
     
     def get_inquiry_stats(self, sku: str) -> Dict[str, int]:
         """
-        从crmapp_quote_count统计询价数据
+        从crmapp_quote_count_ks统计询价数据
+        
+        注意：询价表是按年月统计的，没有具体日期字段
+        这里查询最近1-2个月的询价次数总和
         
         Args:
             sku: SKU编码
@@ -154,25 +143,47 @@ class InventoryDataAggregator:
         conn = self._get_connection()
         try:
             with conn.cursor() as cursor:
-                # 近1个月
-                sql_1m = """
-                    SELECT COUNT(*) 
-                    FROM crmapp_quote_count
-                    WHERE sku = %s 
-                      AND inquiry_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
-                """
-                cursor.execute(sql_1m, (sku,))
-                inquiry_1m = cursor.fetchone()[0] or 0
+                from datetime import datetime
                 
-                # 近3个月（目前可能数据不足，预留）
-                sql_3m = """
-                    SELECT COUNT(*) 
-                    FROM crmapp_quote_count
-                    WHERE sku = %s 
-                      AND inquiry_date >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
+                # 获取当前年月和上个月年月
+                now = datetime.now()
+                current_year_month = now.strftime('%Y-%m')
+                
+                # 计算上个月的年月
+                if now.month == 1:
+                    last_year_month = f"{now.year - 1}-12"
+                else:
+                    last_year_month = f"{now.year}-{now.month - 1:02d}"
+                
+                # 查询最近2个月的询价次数总和（作为近1个月参考）
+                sql_1m = """
+                    SELECT SUM(quote_count) as total_count
+                    FROM crmapp_quote_count_ks
+                    WHERE oe = %s 
+                      AND `year_month` IN (%s, %s)
                 """
-                cursor.execute(sql_3m, (sku,))
-                inquiry_3m = cursor.fetchone()[0] or 0
+                cursor.execute(sql_1m, (sku, current_year_month, last_year_month))
+                result = cursor.fetchone()
+                inquiry_1m = result[0] if result and result[0] else 0
+                
+                # 查询最近3个月的询价次数（作为近3个月参考）
+                # 计算前两个月的年月
+                if now.month == 1:
+                    prev2_year_month = f"{now.year - 1}-11"
+                elif now.month == 2:
+                    prev2_year_month = f"{now.year - 1}-12"
+                else:
+                    prev2_year_month = f"{now.year}-{now.month - 2:02d}"
+                
+                sql_3m = """
+                    SELECT SUM(quote_count) as total_count
+                    FROM crmapp_quote_count_ks
+                    WHERE oe = %s 
+                      AND `year_month` IN (%s, %s, %s)
+                """
+                cursor.execute(sql_3m, (sku, current_year_month, last_year_month, prev2_year_month))
+                result = cursor.fetchone()
+                inquiry_3m = result[0] if result and result[0] else 0
                 
                 return {
                     'inquiry_1m': inquiry_1m,
