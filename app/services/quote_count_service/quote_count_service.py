@@ -22,7 +22,7 @@ from typing import List, Dict, Any, Tuple, Optional
 from collections import defaultdict
 
 from app.utils.database_connection import db_cursor
-from app.ks_auto_bill.ks_login import login as ks_login
+
 
 
 def get_ks_cookies_from_api() -> dict:
@@ -86,50 +86,13 @@ class QuoteCountSyncService:
         self._init_session()
 
     def _init_session(self):
-        """
-        初始化session，先尝试API获取cookie，失败则使用账号密码登录
-        """
-        # 方案1：尝试从API接口获取cookie
-        try:
-            print("[初始化] 尝试方案1：从API接口获取开思cookie...")
-            ks_cookies = get_ks_cookies_from_api()
-            self.session = self._create_session_from_cookies(ks_cookies)
-            self.session_source = 'api_cookie'
-            print("[初始化] 方案1成功：使用API获取的cookie")
-            return
-        except Exception as e:
-            print(f"[初始化] 方案1失败：{e}")
-
-        # 方案2：使用账号密码登录
-        try:
-            print("[初始化] 尝试方案2：使用账号密码登录...")
-            self.session = ks_login()
-            self.session_source = 'ks_login'
-            print("[初始化] 方案2成功：使用账号密码登录")
-            return
-        except Exception as e:
-            print(f"[初始化] 方案2也失败：{e}")
-            raise Exception("无法获取有效的开思平台session，请检查网络或账号状态")
+        """初始化session，使用API获取cookie"""
+        ks_cookies = get_ks_cookies_from_api()
+        self.session = self._create_session_from_cookies(ks_cookies)
+        self.session_source = 'api_cookie'
 
     def _refresh_session(self):
-        """
-        刷新session，根据当前来源决定如何刷新
-        """
-        print(f"[刷新] 当前session来源：{self.session_source}，正在刷新...")
-
-        # 如果当前是方案1，尝试切换到方案2
-        if self.session_source == 'api_cookie':
-            try:
-                print("[刷新] 尝试切换到方案2(账号密码)...")
-                self.session = ks_login()
-                self.session_source = 'ks_login'
-                print("[刷新] 成功切换到方案2")
-                return
-            except Exception as e:
-                print(f"[刷新] 切换到方案2失败：{e}")
-
-        # 重新初始化
-        print("[刷新] 重新初始化session...")
+        """刷新session"""
         self._init_session()
 
     def _create_session_from_cookies(self, cookies: dict) -> requests.Session:
