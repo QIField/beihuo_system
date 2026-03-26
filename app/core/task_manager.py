@@ -170,7 +170,7 @@ def init_zhuozhixing_sync():
 
 
 def init_daily_crawl_task():
-    """初始化每日爬取任务（凌晨2点执行）"""
+    """初始化每日爬取任务（凌晨2点执行，不含询价次数同步）"""
     import os
 
     auto_start = os.environ.get('AUTO_START_DAILY_CRAWL', 'true').lower() != 'false'
@@ -189,7 +189,73 @@ def init_daily_crawl_task():
             minute=0,
             replace_existing=True
         )
-        print("[每日爬取] 定时任务已注册（凌晨2点）")
+        print("[每日爬取] 定时任务已注册（凌晨2点，不含询价次数同步）")
 
     except Exception as e:
         logger.error(f"[每日爬取] 失败: {e}")
+
+
+def init_ks_quote_count_task():
+    """初始化开思询价次数同步任务（每天9:15执行）"""
+    import os
+
+    if os.environ.get('AUTO_START_KS_QUOTE_COUNT', 'true').lower() == 'false':
+        print("[询价次数同步] 已禁用")
+        return
+
+    try:
+        from app.services.quote_count_service import QuoteCountSyncService
+
+        task_manager.schedule(
+            lambda: QuoteCountSyncService().sync_recent_two_months(),
+            'cron',
+            'ks_quote_count_task',
+            hour=9,
+            minute=15,
+            replace_existing=True
+        )
+        print("[询价次数同步] 定时任务已注册（每天9:15）")
+
+    except Exception as e:
+        logger.error(f"[询价次数同步] 失败: {e}")
+
+
+def init_ks_inquiry_monitor_task():
+    """初始化开思询价单监控任务（8:30-19:00每10分钟）"""
+    import os
+
+    auto_start = os.environ.get('AUTO_START_KS_INQUIRY', 'true').lower() != 'false'
+    if not auto_start:
+        print("[询价单监控] 已禁用")
+        return
+
+    try:
+        from app.external_services.ks_inquiry_monitor.inquiry_service import get_all_stats
+        from app.sockets import notification_manager
+
+        def crawl_and_broadcast():
+            """爬取数据并广播"""
+            from datetime import datetime
+            now = datetime.now()
+            # 8:30-19:00运行
+            if not (8 <= now.hour < 19 or (now.hour == 8 and now.minute >= 30)):
+                return
+
+            data = get_all_stats(force_refresh=True)
+            notification_manager.send_notification(
+                notification_type='info',
+                message='询价单数据更新',
+                data=data
+            )
+
+        task_manager.schedule(
+            crawl_and_broadcast,
+            'interval',
+            'ks_inquiry_monitor_task',
+            minutes=10,
+            replace_existing=True
+        )
+        print("[询价单监控] 定时任务已注册（8:30-19:00每10分钟）")
+
+    except Exception as e:
+        logger.error(f"[询价单监控] 失败: {e}")

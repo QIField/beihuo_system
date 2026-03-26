@@ -26,6 +26,8 @@ from backend.get_order import get_order_bp
 from backend.log_viewer_api import register_log_viewer_routes
 from backend.purchase_plan import register_purchase_plan_routes
 from backend.zhuozhixing_api import register_zhuozhixing_routes
+from backend.region_by_number_query import region_by_number_query_bp
+from backend.ks_inquiry_monitor_api import bp as ks_inquiry_monitor_bp
 from flask_socketio import SocketIO
 from app.sockets import register_socket_events, notification_manager
 from app.utils.database_connection import get_db_connection
@@ -56,6 +58,8 @@ app.register_blueprint(ks_auto_bill_bp)
 register_log_viewer_routes(app)  # 注册日志查看器路由
 register_purchase_plan_routes(app)  # 注册采购计划模块路由
 register_zhuozhixing_routes(app)  # 注册卓之星同步API路由
+app.register_blueprint(region_by_number_query_bp)  # 注册溯源查询蓝图
+app.register_blueprint(ks_inquiry_monitor_bp)  # 注册开思询价单监控蓝图
 # 根据环境选择 async_mode
 import platform
 
@@ -4374,16 +4378,24 @@ def init_background_tasks():
         from app.core.task_manager import init_daily_crawl_task
         init_daily_crawl_task()
 
-        # 注册安全库存定时任务（每天凌晨3点执行）
-        task_manager.schedule(
-            run_safety_stock_task,
-            'cron',
-            'safety_stock_daily',
-            hour=3,
-            minute=0,
-            replace_existing=True
-        )
-        print("[系统] 安全库存定时任务已注册（每天3:00）")
+        # 初始化询价单监控任务
+        from app.core.task_manager import init_ks_inquiry_monitor_task
+        init_ks_inquiry_monitor_task()
+
+        # 初始化开思询价次数同步任务（每天9:15）
+        from app.core.task_manager import init_ks_quote_count_task
+        init_ks_quote_count_task()
+
+        # 安全库存定时任务已暂停
+        # task_manager.schedule(
+        #     run_safety_stock_task,
+        #     'cron',
+        #     'safety_stock_daily',
+        #     hour=3,
+        #     minute=0,
+        #     replace_existing=True
+        # )
+        print("[系统] 安全库存定时任务已暂停")
 
         print("[系统] 定时任务已启动")
 

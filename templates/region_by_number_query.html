@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>溯源查询</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        html, body {
+            height: 100%;
+            width: 100%;
+            background-color: #ffffff;
+            padding: 0;
+            margin: 0;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            width: 100vw;
+            height: 100vh;
+            max-width: unset;
+        }
+        .card {
+            background-color: #f9fafc;
+            padding: 40px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group {
+            margin-bottom: 35px;
+        }
+        .form-label {
+            display: flex;
+            align-items: center;
+            font-size: 22px;
+            font-weight: 500;
+            color: #1d2129;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+        .form-label svg {
+            width: 24px;
+            height: 24px;
+            color: #4e6ef2;
+        }
+        .form-control {
+            width: 100%;
+            padding: 16px 20px;
+            border: 1px solid #e5e6eb;
+            border-radius: 6px;
+            font-size: 18px;
+            color: #4e5969;
+            background-color: #ffffff;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #4e6ef2;
+            box-shadow: 0 0 0 3px rgba(78, 110, 242, 0.15);
+        }
+        .select-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2386909c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            padding-right: 50px;
+        }
+        .submit-btn {
+            background-color: #4e6ef2;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+            width: fit-content;
+        }
+        .submit-btn:hover {
+            background-color: #3a57d8;
+        }
+        .result-title {
+            font-size: 24px;
+            font-weight: 500;
+            color: #4e6ef2;
+            margin-bottom: 30px;
+        }
+        .result-content {
+            font-size: 18px;
+            color: #333;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr;
+            }
+            .card {
+                padding: 30px 20px;
+            }
+        }
+        /* 加载动画样式 */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(249, 250, 252, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e5e6eb;
+            border-top: 4px solid #4e6ef2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            margin-top: 16px;
+            font-size: 16px;
+            color: #4e5969;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result-card {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="form-group">
+                <label class="form-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    选择组织
+                </label>
+                <select id="orgSelect" class="form-control select-control">
+                    <option value="">请选择组织</option>
+                    <option value="foshan">佛山</option>
+                    <option value="zhongshan">中山</option>
+                    <option value="zhuhai">珠海</option>
+                    <option value="hefeng">合峰</option>
+                    <option value="baiye">百业</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    开始溯源码
+                </label>
+                <input id="startCode" type="number" class="form-control" placeholder="请输入开始溯源码" oninput="value=value.replace(/[^\d]/g,'')">
+            </div>
+            <div class="form-group">
+                <label class="form-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    结束溯源码
+                </label>
+                <input id="endCode" type="number" class="form-control" placeholder="请输入结束溯源码" oninput="value=value.replace(/[^\d]/g,'')">
+            </div>
+            <button id="submitBtn" class="submit-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                提交查询
+            </button>
+        </div>
+
+        <div class="card result-card">
+            <div class="result-title">溯源结果</div>
+            <div id="resultArea" class="result-content">请提交查询后查看结果...</div>
+            <div id="loadingOverlay" class="loading-overlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">正在查询中...</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * 页面加载完成后绑定提交按钮事件
+ */
+window.onload = function() {
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.addEventListener('click', queryData);
+};
+
+/**
+ * 组织名称 → 后端编码映射
+ */
+const orgCodeMap = {
+    foshan: 'fs',
+    zhongshan: 'zs',
+    zhuhai: 'zh',
+    hefeng: 'hf',
+    baiye: 'by'
+};
+
+/**
+ * 显示加载动画
+ */
+function showLoading() {
+    document.getElementById('loadingOverlay').classList.add('active');
+}
+
+/**
+ * 隐藏加载动画
+ */
+function hideLoading() {
+    document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+/**
+ * 核心查询函数（使用 fetch 解决跨域问题）
+ */
+async function queryData() {
+    // 1. 获取表单数据
+    const orgValue = document.getElementById('orgSelect').value;
+    const startCode = document.getElementById('startCode').value.trim();
+    const endCode = document.getElementById('endCode').value.trim();
+
+    // 2. 表单校验
+    if (!orgValue) { alert('请选择组织！'); return; }
+    if (!startCode) { alert('请输入开始溯源码！'); return; }
+    if (!endCode) { alert('请输入结束溯源码！'); return; }
+
+    // 3. 显示加载动画
+    showLoading();
+
+    // 4. 转换组织编码
+    const md = orgCodeMap[orgValue];
+
+    // 5. 拼接GET请求参数
+    const params = new URLSearchParams({
+        md: md,
+        b1: startCode,
+        b2: endCode
+    });
+
+    // 6. 最终请求地址
+    const apiUrl = `http://127.0.0.1:5000/region_by_number_query?${params.toString()}`;
+
+    try {
+        // ========== 使用 fetch 发送请求，自动处理跨域问题 ==========
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            mode: 'cors',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // 获取JSON数据
+        const result = await response.json();
+        
+        // ========== 控制台输出返回结果 ==========
+        console.log(' ========== 控制台输出返回结果 ==========');
+        console.log('✅ 后端返回JSON数据：', result);
+        // ========= 显示到【溯源结果】下方 =========
+        document.getElementById('resultArea').innerText = JSON.stringify(result, null, 2);
+
+    } catch (error) {
+        console.error('❌ 请求失败：', error);
+        showResult('❌ 请求失败：' + error.message);
+    } finally {
+        // 隐藏加载动画
+        hideLoading();
+    }
+}
+
+/**
+ * 显示结果到页面
+ */
+function showResult(text) {
+    document.getElementById('resultArea').innerText = text;
+}
+</script>
+</body>
+</html>

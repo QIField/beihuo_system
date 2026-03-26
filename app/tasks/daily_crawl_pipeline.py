@@ -86,31 +86,10 @@ def execute_daily_pipeline():
         all_results['tasks']['sales_sync'] = {'error': str(e)}
         all_results['total_failed'] += 1
 
-    # 3. 询价次数同步（上月 + 当月）
-    try:
-        print(f"\n{'='*60}")
-        print(f"3. 开始询价次数同步（上月 + 当月）")
-        print(f"{'='*60}")
-
-        from app.services.quote_count_service import QuoteCountSyncService
-        service = QuoteCountSyncService()
-        quote_result = service.sync_recent_two_months()
-
-        all_results['tasks']['quote_count'] = quote_result
-        all_results['total_synced'] += quote_result.get('total_saved', 0)
-
-        print(f"\n[询价次数同步] 结束:")
-        print(f"  - 处理月份: {', '.join(quote_result.get('months', []))}")
-        print(f"  - 总订单数: {quote_result.get('total_orders', 0)}")
-        print(f"  - 总明细数: {quote_result.get('total_items', 0)}")
-        print(f"  - 保存记录: {quote_result.get('total_saved', 0)}")
-        print(f"  - 失败订单: {quote_result.get('total_failed', 0)}")
-
-    except Exception as e:
-        print(f"\n[询价次数同步] 出现异常: {e}")
-        traceback.print_exc()
-        all_results['tasks']['quote_count'] = {'error': str(e)}
-        all_results['total_failed'] += 1
+    # 3. 询价次数同步（已移到单独任务，每天9:15执行）
+    print(f"\n{'='*60}")
+    print(f"3. 询价次数同步（已移到单独任务ks_quote_count_task，每天9:15执行）")
+    print(f"{'='*60}")
 
     # 4. 采购历史爬取（上月 + 当月）
     try:

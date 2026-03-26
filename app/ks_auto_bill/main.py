@@ -101,14 +101,9 @@ def check_login_status(session):
 
 
 def is_running_time():
-    """
-    检查当前时间是否在运行时间段内（早上7点到晚上24点）
-    
-    返回:
-        bool: True 表示在运行时间段内，False 表示不在
-    """
-    current_hour = datetime.now().hour
-    return 7 <= current_hour < 24
+    """检查是否在运行时间段内（8:30-19:00）"""
+    now = datetime.now()
+    return (8 <= now.hour < 19) or (now.hour == 8 and now.minute >= 30)
 
 
 def process_order_batch(pending_confirmation_orders):

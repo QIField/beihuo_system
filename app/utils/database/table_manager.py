@@ -312,6 +312,27 @@ def init_ks_auto_bill_table():
     finally:
         conn.close()
 
+    # 检查并添加缺失的字段
+    ks_auto_bill_fields_to_check = [
+        {
+            'name': 'crm订单号',
+            'definition': "VARCHAR(50) COMMENT 'CRM订单号'"
+        },
+        {
+            'name': 'crm订单链接',
+            'definition': "VARCHAR(255) COMMENT 'CRM订单链接'"
+        },
+        {
+            'name': 'crm订单状态',
+            'definition': "VARCHAR(50) COMMENT 'CRM订单状态'"
+        },
+        {
+            'name': '开单时间',
+            'definition': "DATETIME COMMENT '开单时间'"
+        }
+    ]
+    check_and_add_fields('crmapp_ks_auto_bill', ks_auto_bill_fields_to_check)
+
 
 def ensure_table_structure():
     """确保数据库表结构正确，包括字段长度等"""

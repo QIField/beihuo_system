@@ -112,3 +112,10 @@ def register_socket_events(socketio):
     def handle_error(error):
         """处理SocketIO错误"""
         print(f"[WebSocket] 客户端错误: {error}")
+
+    @socketio.on('request_ks_inquiry', namespace='/notifications')
+    def handle_request_ks_inquiry():
+        """处理询价单数据请求"""
+        from app.external_services.ks_inquiry_monitor.inquiry_service import get_cached_stats
+        data = get_cached_stats()
+        socketio.emit('ks_inquiry_update', data, room=request.sid)
