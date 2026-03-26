@@ -43,7 +43,6 @@ from .db_service import (
 
 from .procurement_record_service import (
     parse_purchasing_record,
-    update_procurement_records,
     get_procurement_records,
     init_table,
     add_inquiry_record
@@ -70,7 +69,6 @@ __all__ = [
     
     # 采购记录服务
     'parse_purchasing_record',
-    'update_procurement_records',
     'get_procurement_records',
     'init_table',
     'init_procurement_table',

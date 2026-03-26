@@ -126,8 +126,7 @@ class CRMDataCrawlService:
             'product_level': product_level,
             'supplier_price': 0.0,  # 由 PurchaseSyncService 更新
             'max_price': 0.0,       # 由 PurchaseSyncService 更新
-            'min_price': 0.0,       # 由 PurchaseSyncService 更新
-            'procurement_records': None  # 由 PurchaseSyncService 更新
+            'min_price': 0.0        # 由 PurchaseSyncService 更新
         }
 
     def batch_save(self, products: List[Dict]) -> int:
@@ -144,8 +143,7 @@ class CRMDataCrawlService:
                 columns = [
                     'oe', 'brand', 'company', 'product_name', 'vehicle_brand',
                     'replace_number', 'brand_code', 'is_cass', 'product_remark',
-                    'product_level', 'supplier_price', 'max_price', 'min_price',
-                    'procurement_records'
+                    'product_level', 'supplier_price', 'max_price', 'min_price'
                 ]
 
                 placeholders = ', '.join(['%s'] * len(columns))
@@ -175,8 +173,7 @@ class CRMDataCrawlService:
                         product.get('product_level', ''),
                         product.get('supplier_price', 0.0),
                         product.get('max_price', 0.0),
-                        product.get('min_price', 0.0),
-                        product.get('procurement_records')
+                        product.get('min_price', 0.0)
                     ]
                     values.append(row)
 

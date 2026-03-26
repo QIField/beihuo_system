@@ -28,7 +28,6 @@ from app.utils.session_manager import SessionManager
 
 from .api_client import fetch_product_info, fetch_product_info_batch
 from .db_service import update_product_fields, batch_update_product_fields, get_pending_oe_list
-from .procurement_record_service import update_procurement_records
 
 
 def get_crm_session():
@@ -40,9 +39,8 @@ def process_single_oe(oe_number: str, brand_name: str, company: str) -> bool:
     """
     处理单个 OE 号
     
-    从 CRM 获取产品信息并更新到两个表：
-    1. crmapp_compare_summary - 产品基本信息
-    2. crmapp_procurement_records - 采购记录（拆分存储）
+    从 CRM 获取产品信息并更新到比价汇总表：
+    crmapp_compare_summary - 产品基本信息
     
     Args:
         oe_number: OE 号
@@ -56,7 +54,6 @@ def process_single_oe(oe_number: str, brand_name: str, company: str) -> bool:
         >>> process_single_oe('11427585403', '原厂', 'fsbbr')
         [1/1] 获取 CRM 数据: OE=11427585403, 品牌=原厂
         更新产品信息成功: OE=11427585403, 品牌=原厂, ID=123
-        保存采购记录成功: OE=11427585403, 共3条
         True
     """
     print(f"[1/1] 获取 CRM 数据: OE={oe_number}, 品牌={brand_name}")
@@ -90,17 +87,8 @@ def process_single_oe(oe_number: str, brand_name: str, company: str) -> bool:
     if not success:
         print(f"更新产品信息失败: OE={oe_number}")
         return False
-    
-    # 步骤 2: 解析并保存采购记录（拆分存储）
-    print("步骤 2: 保存采购记录...")
-    purchasing_record = product_info.get('purchasing_record', '')
-    purchase_summary = product_info.get('purchase_summary', 0.0)
-    record_count = update_procurement_records(oe_number, brand_name, company, purchasing_record, purchase_summary)
-    if purchasing_record:
-        print(f"保存采购记录完成: 共{record_count}条")
-    else:
-        print(f"无采购记录，使用purchase_summary={purchase_summary}作为供应商价格")
-    
+
+    print(f"更新产品信息成功: OE={oe_number}, 品牌={brand_name}")
     return True
 
 
@@ -108,9 +96,8 @@ def process_oe_list(oe_brand_list: list, company: str) -> dict:
     """
     批量处理 OE 列表
     
-    同时更新两个表：
-    1. crmapp_compare_summary - 产品基本信息
-    2. crmapp_procurement_records - 采购记录（拆分存储）
+    更新到比价汇总表：
+    crmapp_compare_summary - 产品基本信息
     
     Args:
         oe_brand_list: OE 和品牌列表，格式：[(oe1, brand1), (oe2, brand2), ...]
@@ -121,7 +108,6 @@ def process_oe_list(oe_brand_list: list, company: str) -> dict:
         {
             'total': 100,           # 总记录数
             'product_success': 95,  # 产品信息更新成功数
-            'record_success': 280,  # 采购记录保存成功数
             'failed': 5             # 失败数
         }
     
@@ -131,8 +117,7 @@ def process_oe_list(oe_brand_list: list, company: str) -> dict:
         开始批量处理 2 个 OE 号...
         步骤 1: 从 CRM 获取产品信息...
         步骤 2: 更新产品基本信息...
-        步骤 3: 保存采购记录...
-        {'total': 2, 'product_success': 2, 'record_success': 8, 'failed': 0}
+        {'total': 2, 'product_success': 2, 'failed': 0}
     """
     if not oe_brand_list:
         print("OE 列表为空，无需处理")
@@ -173,31 +158,13 @@ def process_oe_list(oe_brand_list: list, company: str) -> dict:
     product_result = batch_update_product_fields(update_data_list)
     product_success = product_result['success']
     failed = product_result['failed']
-    
-    # 步骤 3: 保存采购记录（拆分存储）
-    print("\n步骤 3: 保存采购记录...")
-    record_success = 0
 
-    for product in product_list:
-        purchasing_record = product.get('purchasing_record', '')
-        purchase_summary = product.get('purchase_summary', 0.0)
-        count = update_procurement_records(
-            product['oe'],
-            product['brand'],
-            company,
-            purchasing_record,
-            purchase_summary
-        )
-        record_success += count
-    
     print(f"\n批量处理完成:")
     print(f"  - 产品信息: 成功={product_success}, 失败={failed}")
-    print(f"  - 采购记录: 共{record_success}条")
-    
+
     return {
         'total': total,
         'product_success': product_success,
-        'record_success': record_success,
         'failed': failed
     }
 

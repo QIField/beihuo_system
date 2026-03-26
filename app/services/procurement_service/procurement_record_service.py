@@ -1,12 +1,11 @@
 """
-采购记录服务模块（JSON 存储版本）
-用于解析 purchasing_record 并存储为 JSON 到比价汇总表
+采购记录服务模块
+用于解析 purchasing_record 字符串
 
 核心功能:
     1. 解析 purchasing_record 字符串
-    2. 管理 JSON 数组（增删改查）
-    3. 同一供应商只保留最新价格
-    4. 保存到 crmapp_compare_summary.procurement_records 字段
+    2. 添加询价记录到 crmapp_procurement_history 表
+    3. 查询采购记录
 
 数据格式示例:
     [
@@ -15,10 +14,10 @@
     ]
 
 使用示例:
-    from procurement_record_service import update_procurement_records
+    from procurement_record_service import add_inquiry_record
     
-    purchasing_record = "2026-01-12佛山采购专用,供应商:上海福宝盟汽配,采购:5,单价:112.00"
-    update_procurement_records('11427585403', '原厂', 'fsbbr', purchasing_record)
+    # 添加询价导入的采购记录
+    add_inquiry_record('11427585403', '原厂', '上海福宝盟汽配', 112.00, 'fsbbr')
 """
 
 import re
@@ -126,7 +125,8 @@ def parse_single_record(record: str) -> Optional[Dict]:
 
 def get_existing_records(oe: str, brand: str, company: str) -> List[Dict]:
     """
-    获取现有的采购记录 JSON
+    获取现有的采购记录
+    从 crmapp_procurement_history 表查询
     
     Args:
         oe: OE 号
@@ -139,22 +139,23 @@ def get_existing_records(oe: str, brand: str, company: str) -> List[Dict]:
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = f"""
-                SELECT procurement_records FROM {TABLE_NAME}
+            sql = """
+                SELECT supplier_name, unit_price, purchase_date
+                FROM crmapp_procurement_history
                 WHERE oe = %s AND brand = %s AND company = %s
-                LIMIT 1
+                ORDER BY purchase_date DESC
             """
             cursor.execute(sql, (oe, brand, company))
-            result = cursor.fetchone()
+            rows = cursor.fetchall()
             
-            if result and result[0]:
-                # 解析 JSON
-                if isinstance(result[0], str):
-                    return json.loads(result[0])
-                else:
-                    # 某些数据库驱动可能直接返回 Python 对象
-                    return result[0]
-            return []
+            records = []
+            for row in rows:
+                records.append({
+                    'supplier_name': row[0],
+                    'purchase_price': float(row[1]) if row[1] else 0.0,
+                    'purchase_date': row[2].strftime('%Y-%m-%d') if hasattr(row[2], 'strftime') else str(row[2])
+                })
+            return records
     except Exception as e:
         print(f"获取现有记录失败: {e}")
         return []
@@ -253,157 +254,6 @@ def get_latest_price(records: List[Dict]) -> float:
     return latest_record.get('purchase_price', 0.0)
 
 
-def save_procurement_records(oe: str, brand: str, company: str,
-                             records: List[Dict], purchase_summary: float = 0.0) -> bool:
-    """
-    保存采购记录到数据库（JSON 格式）
-
-    同时计算最高价和最低价
-    如果 purchasing_record 为空，则使用 purchase_summary 作为 supplier_price
-
-    Args:
-        oe: OE 号
-        brand: 品牌
-        company: 公司/组织
-        records: 解析后的记录列表
-        purchase_summary: 采购汇总价（当 records 为空时使用）
-
-    Returns:
-        True 表示成功
-    """
-    # 如果没有采购记录，使用 purchase_summary 作为供应商价格
-    if not records:
-        return save_supplier_price_only(oe, brand, company, purchase_summary)
-
-    try:
-        # 获取现有记录
-        existing_records = get_existing_records(oe, brand, company)
-
-        # 合并记录（同一供应商只保留最新）
-        merged_records = merge_records(existing_records, records)
-
-        # 计算最高价、最低价和最新价格
-        max_price, min_price = calculate_max_min_price(merged_records)
-        latest_price = get_latest_price(merged_records)
-
-        # 转换为 JSON 字符串
-        json_str = json.dumps(merged_records, ensure_ascii=False)
-
-        # 保存到数据库
-        conn = get_db_connection()
-        try:
-            with conn.cursor() as cursor:
-                # 使用 upsert 逻辑：存在则更新，不存在则插入
-                # 先尝试更新
-                update_sql = f"""
-                    UPDATE {TABLE_NAME}
-                    SET procurement_records = %s, max_price = %s, min_price = %s, supplier_price = %s
-                    WHERE oe = %s AND brand = %s AND company = %s
-                """
-                cursor.execute(update_sql, (json_str, max_price, min_price, latest_price, oe, brand, company))
-
-                if cursor.rowcount == 0:
-                    # 没有更新到记录，插入新记录（只含基本信息和采购记录）
-                    insert_sql = f"""
-                        INSERT INTO {TABLE_NAME} (oe, brand, company, procurement_records, max_price, min_price, supplier_price)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """
-                    cursor.execute(insert_sql, (oe, brand, company, json_str, max_price, min_price, latest_price))
-
-                conn.commit()
-                print(f"保存采购记录成功: OE={oe}, 品牌={brand}, 共{len(merged_records)}条供应商记录, 最高价={max_price}, 最低价={min_price}, 最新价={latest_price}")
-                return True
-
-        except Exception as e:
-            conn.rollback()
-            print(f"保存采购记录失败: OE={oe}, 错误={e}")
-            return False
-        finally:
-            conn.close()
-
-    except Exception as e:
-        print(f"处理采购记录失败: OE={oe}, 错误={e}")
-        return False
-
-
-def save_supplier_price_only(oe: str, brand: str, company: str, purchase_summary: float) -> bool:
-    """
-    仅保存供应商价格（当 purchasing_record 为空时使用）
-
-    Args:
-        oe: OE 号
-        brand: 品牌
-        company: 公司/组织
-        purchase_summary: 采购汇总价
-
-    Returns:
-        True 表示成功
-    """
-    try:
-        conn = get_db_connection()
-        try:
-            with conn.cursor() as cursor:
-                # 使用 upsert 逻辑
-                # 先尝试更新（只更新 supplier_price，清空 procurement_records, max_price, min_price）
-                update_sql = f"""
-                    UPDATE {TABLE_NAME}
-                    SET procurement_records = NULL, max_price = NULL, min_price = NULL, supplier_price = %s
-                    WHERE oe = %s AND brand = %s AND company = %s
-                """
-                cursor.execute(update_sql, (purchase_summary, oe, brand, company))
-
-                if cursor.rowcount == 0:
-                    # 没有更新到记录，插入新记录
-                    insert_sql = f"""
-                        INSERT INTO {TABLE_NAME} (oe, brand, company, procurement_records, max_price, min_price, supplier_price)
-                        VALUES (%s, %s, %s, NULL, NULL, NULL, %s)
-                    """
-                    cursor.execute(insert_sql, (oe, brand, company, purchase_summary))
-
-                conn.commit()
-                print(f"保存供应商价格成功: OE={oe}, 品牌={brand}, 价格={purchase_summary}")
-                return True
-
-        except Exception as e:
-            conn.rollback()
-            print(f"保存供应商价格失败: OE={oe}, 错误={e}")
-            return False
-        finally:
-            conn.close()
-
-    except Exception as e:
-        print(f"处理供应商价格失败: OE={oe}, 错误={e}")
-        return False
-
-
-def update_procurement_records(oe: str, brand: str, company: str,
-                               purchasing_record: str, purchase_summary: float = 0.0) -> int:
-    """
-    更新采购记录（一站式函数）
-
-    解析 purchasing_record 并更新到数据库
-    如果 purchasing_record 为空，则使用 purchase_summary 作为供应商价格
-
-    Args:
-        oe: OE 号
-        brand: 品牌
-        company: 公司/组织
-        purchasing_record: 原始采购记录字符串
-        purchase_summary: 采购汇总价（当 purchasing_record 为空时使用）
-
-    Returns:
-        保存的供应商数量
-    """
-    # 解析记录
-    records = parse_purchasing_record(purchasing_record)
-
-    # 保存到数据库（传入 purchase_summary，当 records 为空时会使用）
-    if save_procurement_records(oe, brand, company, records, purchase_summary):
-        return len(records)
-    else:
-        return 0
-
-
 def add_inquiry_record(oe: str, brand: str, supplier: str, price: float, 
                        company: str) -> bool:
     """
@@ -488,6 +338,7 @@ def get_procurement_records(oe: str, brand: str = '', company: str = '') -> List
 def clear_procurement_records(oe: str, brand: str, company: str) -> bool:
     """
     清空采购记录
+    从 crmapp_procurement_history 表删除记录
     
     Args:
         oe: OE 号
@@ -500,9 +351,8 @@ def clear_procurement_records(oe: str, brand: str, company: str) -> bool:
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            sql = f"""
-                UPDATE {TABLE_NAME}
-                SET procurement_records = NULL
+            sql = """
+                DELETE FROM crmapp_procurement_history
                 WHERE oe = %s AND brand = %s AND company = %s
             """
             cursor.execute(sql, (oe, brand, company))
