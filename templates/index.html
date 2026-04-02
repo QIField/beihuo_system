@@ -818,6 +818,7 @@
                         <dl class="layui-nav-child">
                             <dd><a href="javascript:;" onclick="loadContent('db-table')">备货数据</a></dd>
                             <dd><a href="javascript:void(0);" onclick="openVirtualInventoryInNewTab()">虚拟库存</a></dd>
+                            <dd><a href="javascript:void(0);" onclick="openDateQueryInNewTab()">日期查询</a></dd>
                             <dd><a href="javascript:;" onclick="openSearchInCrmInNewTab()">搜索产品（待完善）</a></dd>
                         </dl>
                     </li>
@@ -1519,6 +1520,12 @@ function openSearchInCrmInNewTab() {
 function openSuyuanQuery() {
     // 在新标签页中打开溯源查询页面
     window.open('/region_by_number_query_page', '_blank');
+}
+
+// 添加打开日期查询新标签页的函数
+function openDateQueryInNewTab() {
+    // 在新标签页中打开日期查询页面
+    window.open('/date_query', '_blank');
 }
 
 // 添加打开询价模块的函数
@@ -2638,29 +2645,11 @@ window.loadContent = function(type) {
                             <span>回顶部</span>
                         </button>
                         
-                        <!-- 日期查询按钮 -->
-                        <div class="layui-inline" style="margin: 0; display: flex; align-items: center;">
-                            <div class="layui-form-item" style="margin: 0; display: flex; align-items: center;">
-                                <div class="layui-inline" style="margin: 0 5px 0 0;">
-                                    <input type="text" class="layui-input" id="startDate" placeholder="开始日期" readonly style="width: 120px; padding: 0 8px; font-size: 12px; margin: 0; height: 32px; border: 1px solid #dcdfe6; border-radius: 4px;">
-                                </div>
-                                <div class="layui-inline" style="margin: 0 5px; display: flex; align-items: center; height: 32px;">
-                                    <span style="color: #909399; font-size: 13px;">至</span>
-                                </div>
-                                <div class="layui-inline" style="margin: 0 5px 0 0;">
-                                    <input type="text" class="layui-input" id="endDate" placeholder="结束日期" readonly style="width: 120px;  padding: 0 8px; font-size: 12px; margin: 0; height: 32px; border: 1px solid #dcdfe6; border-radius: 4px;">
-                                </div>
-                                <div class="layui-inline" style="margin: 0 0 0 5px;">
-                                    <button class="layui-btn layui-btn-sm btn-date-query" id="dateQueryBtn" style="margin: 0;">
-                                        <i class="layui-icon layui-icon-date"></i> 查询
-                                    </button>
-                                </div>
-                                <div class="layui-inline" style="margin: 0 0 0 5px;">
-                                    <button class="layui-btn layui-btn-sm btn-process-bill" id="processBillBtn" style="margin: 0;">
-                                        <i class="layui-icon layui-icon-form"></i> Excel处理
-                                    </button>
-                                </div>
-                            </div>
+                        <!-- Excel处理按钮 -->
+                        <div class="layui-inline" style="margin: 0 0 0 5px;">
+                            <button class="layui-btn layui-btn-sm btn-process-bill" id="processBillBtn" style="margin: 0;">
+                                <i class="layui-icon layui-icon-form"></i> Excel处理
+                            </button>
                         </div>    
                     </div>
                 </div>
@@ -2707,9 +2696,6 @@ window.loadContent = function(type) {
 
         // 绑定事件处理器
         bindEventHandlers(myTable, form, table);
-        
-        // 初始化日期查询功能
-        initDateQuery();
 
         // 更新购物车计数
         updateCartCount();
@@ -5483,68 +5469,6 @@ function exportCartData(cartTable) {
             console.error('导出失败:', error);
             layui.layer.msg('导出失败: ' + error.message, {icon: 2});
         });
-}
-
-// 初始化日期查询功能
-function initDateQuery() {
-    layui.use(['laydate'], function() {
-        var laydate = layui.laydate;
-        
-        // 开始日期
-        laydate.render({
-            elem: '#startDate',
-            type: 'date',
-            format: 'yyyy-MM-dd',
-            done: function(value, date, endDate) {
-                // 设置结束日期的最小值为开始日期
-                if(value) {
-                    laydate.render({
-                        elem: '#endDate',
-                        type: 'date',
-                        format: 'yyyy-MM-dd',
-                        min: value  // 设置最小日期
-                    });
-                }
-            }
-        });
-        
-        // 结束日期
-        laydate.render({
-            elem: '#endDate',
-            type: 'date',
-            format: 'yyyy-MM-dd'
-        });
-    });
-    
-    // 绑定日期查询按钮事件 - 打开新页面
-    document.getElementById('dateQueryBtn').onclick = function() {
-        var startDate = document.getElementById('startDate').value;
-        var endDate = document.getElementById('endDate').value;
-        
-        if (!startDate || !endDate) {
-            layui.layer.msg('请选择开始日期和结束日期', {icon: 2});
-            return;
-        }
-        
-        // 验证日期格式
-        var dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-            layui.layer.msg('日期格式不正确，请使用 YYYY-MM-DD 格式', {icon: 2});
-            return;
-        }
-        
-        // 验证结束日期不能早于开始日期
-        var start = new Date(startDate);
-        var end = new Date(endDate);
-        if (end < start) {
-            layui.layer.msg('结束日期不能早于开始日期', {icon: 2});
-            return;
-        }
-        
-        // 打开新的日期查询页面，传递日期参数
-        var url = '/date_query?start=' + encodeURIComponent(startDate) + '&end=' + encodeURIComponent(endDate);
-        window.open(url, '_blank');
-    };
 }
 
 // 日期查询功能

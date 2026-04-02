@@ -5,9 +5,10 @@
 执行顺序：
 1. CRM全量爬取
 2. 销量同步
-3. 询价次数同步
-4. 采购历史爬取
-5. 采购数据同步到比价表
+3. 采购历史爬取（近5天）+ 聚合到旧表
+4. 采购数据同步到比价表（旧表数据同步到比价汇总表）
+
+注：询价次数同步已移至独立的 9:15 定时任务 ks_quote_count_task
 """
 
 import sys
@@ -62,15 +63,15 @@ def execute_daily_pipeline():
         all_results['tasks']['crm_crawl'] = {'error': str(e)}
         all_results['total_failed'] += 1
 
-    # 2. 销量同步（30天）
+    # 2. 销量同步（近5天明细）
     try:
         print(f"\n{'='*60}")
-        print(f"2. 开始销量同步（最近30天）")
+        print(f"2. 开始销量同步（近5天明细）")
         print(f"{'='*60}")
 
         from app.services.sales_history_service.data_sync_service import SalesHistorySyncService
         service = SalesHistorySyncService()
-        sales_result = service.sync_recent_days(days=30)
+        sales_result = service.sync_recent_days(days=5)
 
         all_results['tasks']['sales_sync'] = sales_result
         all_results['total_synced'] += sales_result.get('saved', 0)
@@ -86,28 +87,29 @@ def execute_daily_pipeline():
         all_results['tasks']['sales_sync'] = {'error': str(e)}
         all_results['total_failed'] += 1
 
-    # 3. 询价次数同步（已移到单独任务，每天9:15执行）
-    print(f"\n{'='*60}")
-    print(f"3. 询价次数同步（已移到单独任务ks_quote_count_task，每天9:15执行）")
-    print(f"{'='*60}")
-
-    # 4. 采购历史爬取（上月 + 当月）
+    # 3. 采购历史爬取（近5天）+ 聚合到旧表
     try:
         print(f"\n{'='*60}")
-        print(f"4. 开始采购历史爬取（上月 + 当月）")
+        print(f"3. 开始采购历史爬取（近5天）+ 聚合到旧表")
         print(f"{'='*60}")
 
-        from app.services.procurement_service.purchase_history_service import PurchaseHistoryService
-        service = PurchaseHistoryService()
-        purchase_history_result = service.crawl_last_and_current_month()
+        from app.services.procurement_service.purchase_history_main import run
+        purchase_history_result = run(company='fsbbr', days=5)
 
         all_results['tasks']['purchase_history'] = purchase_history_result
-        all_results['total_synced'] += purchase_history_result.get('saved', 0)
+        
+        # 统计爬取和聚合结果
+        crawl_result = purchase_history_result.get('crawl', {})
+        aggregate_result = purchase_history_result.get('aggregate', {})
+        all_results['total_synced'] += crawl_result.get('saved', 0)
 
         print(f"\n[采购历史爬取] 结束:")
-        print(f"  - 处理月份: {', '.join(purchase_history_result.get('months', []))}")
-        print(f"  - 处理记录数: {purchase_history_result.get('total_processed', 0)}")
-        print(f"  - 保存记录: {purchase_history_result.get('saved', 0)}")
+        print(f"  [爬取结果]:")
+        print(f"    - 处理记录数: {crawl_result.get('total_processed', 0)}")
+        print(f"    - 保存记录: {crawl_result.get('saved', 0)}")
+        print(f"  [聚合结果]:")
+        print(f"    - 聚合记录数: {aggregate_result.get('aggregated_count', 0)}")
+        print(f"    - 保存记录: {aggregate_result.get('saved', 0)}")
 
     except Exception as e:
         print(f"\n[采购历史爬取] 出现异常: {e}")
@@ -115,10 +117,10 @@ def execute_daily_pipeline():
         all_results['tasks']['purchase_history'] = {'error': str(e)}
         all_results['total_failed'] += 1
 
-    # 5. 采购数据同步到比价表
+    # 4. 采购数据同步到比价表
     try:
         print(f"\n{'='*60}")
-        print(f"5. 开始采购数据同步到比价表")
+        print(f"4. 开始采购数据同步到比价表")
         print(f"{'='*60}")
 
         from app.services.procurement_service.purchase_sync_service import PurchaseSyncService

@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日期查询 - AG Grid</title>
+    
+    <!-- AG Grid CSS - 使用本地文件 -->
+    <link rel="stylesheet" href="/static/ag-grid/ag-grid.css">
+    <link rel="stylesheet" href="/static/ag-grid/ag-theme-alpine.css">
+    <link rel="stylesheet" href="/static/ag-grid/ag-custom-checkbox.css">
+    
+    <!-- LayUI -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <script src="/static/layui/layui.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container { max-width: 100%; margin: 0 auto; }
+        h2 { margin-bottom: 20px; color: #333; }
+        
+        .toolbar {
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .date-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            width: 220px;
+            cursor: pointer;
+        }
+        
+        .search-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            width: 180px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary { background-color: #1890ff; color: white; }
+        .btn-primary:hover { background-color: #40a9ff; }
+        .btn-secondary { background-color: #f0f0f0; color: #333; border: 1px solid #d9d9d9; }
+        .btn-secondary:hover { background-color: #e0e0e0; }
+        
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #myGrid {
+            height: calc(100vh - 280px);
+            min-height: 500px;
+            width: 100%;
+        }
+        
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: #d9d9d9;
+            margin: 0 10px;
+        }
+        
+        .flex-spacer {
+            flex: 1;
+        }
+        
+        /* 统计信息 */
+        .stats-bar {
+            background: #f5f5f5;
+            padding: 10px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .stats-bar span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stats-bar .highlight {
+            color: #1890ff;
+            font-weight: 600;
+        }
+
+        /* 分页条数选择器 */
+        .ag-paging-panel {
+            position: relative;
+        }
+
+        /* 分页条数选择器 */
+        .page-size-selector {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .page-size-selector select {
+            padding: 4px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            background: #fff;
+        }
+
+        .page-size-selector select:hover {
+            border-color: #1890ff;
+        }
+
+        .page-size-selector select:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        /* 页码跳转器 */
+        .page-jumper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .page-jumper input {
+            width: 50px;
+            padding: 4px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .page-jumper input:hover {
+            border-color: #1890ff;
+        }
+
+        .page-jumper input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .page-jumper button {
+            padding: 4px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .page-jumper button:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+        }
+
+        /* AG Grid 自定义样式 - 紧凑版 */
+        .ag-theme-alpine {
+            --ag-font-size: 12px;
+            --ag-font-family: 'Microsoft YaHei', Arial, sans-serif;
+            --ag-header-height: 36px;
+            --ag-row-height: 36px;
+            --ag-header-background-color: #fafafa;
+            --ag-odd-row-background-color: #fff;
+            --ag-even-row-background-color: #fafafa;
+            --ag-cell-horizontal-padding: 6px;
+        }
+        
+        .ag-theme-alpine .ag-header-cell-text {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .ag-theme-alpine .ag-cell {
+            font-size: 12px;
+            line-height: 36px;
+        }
+        
+        /* 购物车高亮 */
+        .cart-row .ag-cell {
+            background-color: #ffccc7 !important;
+        }
+        
+        /* 选中行高亮 */
+        .selected-row .ag-cell {
+            background-color: #d4edda !important;
+        }
+        
+        /* 库存单元格 */
+        .stock-cell {
+            background-color: #f5f5f5 !important;
+            font-weight: 500;
+        }
+        
+        /* 销量数据单元格 */
+        .sales-data-cell {
+            line-height: 1.3;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>日期查询</h2>
+        
+        <div class="toolbar">
+            <input type="text" id="dateRange" class="date-input" placeholder="请选择日期范围" readonly>
+            
+            <div class="divider"></div>
+            
+            <input type="text" id="searchOe" class="search-input" placeholder="搜索OE号">
+            <input type="text" id="searchBrand" class="search-input" placeholder="搜索品牌">
+            <button class="btn btn-primary" onclick="searchData()">搜索</button>
+            <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
+            <button class="btn btn-primary" onclick="openAdvancedSearch()">高级搜索</button>
+
+            <div class="flex-spacer"></div>
+
+            <button class="btn btn-primary" onclick="addSelectedToCart()">加入购物车</button>
+            <button class="btn btn-primary" onclick="exportData()">导出</button>
+        </div>
+        
+        <div class="table-container">
+            <div class="stats-bar">
+                <span>总记录: <b id="totalCount" class="highlight">0</b></span>
+                <span>已选中: <b id="selectedCount" class="highlight">0</b></span>
+                <span>购物车: <b id="cartCount" class="highlight">0</b></span>
+                <span>当前显示: <b id="displayCount">0</b></span>
+            </div>
+            <div id="myGrid" class="ag-theme-alpine"></div>
+        </div>
+    </div>
+
+    <!-- AG Grid JS - 使用本地文件 -->
+    <script src="/static/ag-grid/ag-grid-community.min.js"></script>
+    
+    <script>
+        // 全局变量
+        let gridApi = null;
+        let gridColumnApi = null;
+        let currentData = [];
+        let filteredData = [];
+        let cartData = new Set();
+        
+        // 列定义
+        const columnDefs = [
+            {
+                headerName: '选择',
+                field: 'selected',
+                width: 60,
+                pinned: 'left',
+                checkboxSelection: true,
+                headerCheckboxSelection: true,
+                headerCheckboxSelectionFilteredOnly: true,
+                sortable: false,
+                filter: false
+            },
+            {
+                headerName: '行号',
+                field: 'rowNumber',
+                width: 100,
+                pinned: 'left',
+                sortable: false,
+                filter: false,
+                valueGetter: params => {
+                    // 获取当前行的索引并加1
+                    const rowIndex = params.node?.rowIndex;
+                    return rowIndex !== undefined ? rowIndex + 1 : '';
+                }
+            },
+            { field: 'oe', headerName: 'OE', width: 180, pinned: 'left', sortable: true, filter: true },
+            { field: '物料名称', headerName: '物料名称', width: 180, pinned: 'left', sortable: true, filter: true },
+            { field: '品牌', headerName: '品牌', width: 150, pinned: 'left', sortable: true, filter: true },
+            { field: '物料条码', headerName: '物料条码', width: 120, pinned: 'left', sortable: true, filter: true },
+            { field: '品牌号', headerName: '品牌号', width: 110, pinned: 'left', sortable: true, filter: true },
+            { field: '替换号', headerName: '替换号', width: 90, pinned: 'left', sortable: true, filter: true },
+            { field: '车型品牌', headerName: '车型品牌', width: 105, pinned: 'left', sortable: true, filter: true },
+            { field: '标签', headerName: '标签', width: 95, pinned: 'left', sortable: true, filter: true },
+            { field: '车型', headerName: '车型', width: 100, pinned: 'left', sortable: true, filter: true },
+            { 
+                field: '库存数量', 
+                headerName: '库存数量', 
+                width: 120, 
+                pinned: 'left',
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                cellClass: 'stock-cell',
+                valueGetter: params => parseFloat(params.data['库存数量']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { 
+                field: '在途数量', 
+                headerName: '在途数量', 
+                width: 120, 
+                pinned: 'left',
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                cellClass: 'stock-cell',
+                valueGetter: params => parseFloat(params.data['在途数量']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { 
+                field: '销量', 
+                headerName: '销量', 
+                width: 100, 
+                pinned: 'left',
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                valueGetter: params => parseFloat(params.data['销量']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { 
+                field: '销量数据', 
+                headerName: '销量数据', 
+                width: 240,
+                pinned: 'left',
+                cellRenderer: function(params) {
+                    const data = params.data;
+                    const today = parseInt(data['今日销量'] || 0);
+                    const yesterday = parseInt(data['昨日销量'] || 0);
+                    const sales7d = parseInt(data['近7天销量'] || 0);
+                    const salesMonth = parseInt(data['本月销量'] || 0);
+                    const avg6m = parseInt(data['近6个月月均销量'] || 0);
+                    const avg12m = parseInt(data['近12个月月均销量'] || 0);
+                    
+                    return `<div style="font-size: 11px; line-height: 1.3;">
+                        <div>今/昨/近7天: ${today}/${yesterday}/${sales7d}</div>
+                        <div>近1/6/12月: ${salesMonth}/${avg6m}/${avg12m}</div>
+                    </div>`;
+                }
+            },
+            { 
+                field: '库存金额', 
+                headerName: '库存金额', 
+                width: 140, 
+                pinned: 'left',
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                valueGetter: params => parseFloat(params.data['库存金额']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { 
+                field: '成本价', 
+                headerName: '成本价', 
+                width: 140, 
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                valueGetter: params => parseFloat(params.data['成本价']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { field: '成品可卖天数', headerName: '成品可卖天数', width: 175, sortable: true, filter: true },
+            { field: '预警状态', headerName: '预警状态', width: 140, sortable: true, filter: true },
+            { 
+                field: '供应商', 
+                headerName: '供应商', 
+                width: 140, 
+                sortable: true, 
+                filter: true,
+                cellRenderer: function(params) {
+                    const supplierContent = params.value || '';
+                    if (!supplierContent) return '';
+                    
+                    // 创建容器
+                    const container = document.createElement('div');
+                    container.className = 'supplier-cell';
+                    container.style.width = '100%';
+                    container.style.height = '100%';
+                    container.style.position = 'relative';
+                    container.style.overflow = 'hidden';
+                    container.style.textOverflow = 'ellipsis';
+                    container.style.whiteSpace = 'nowrap';
+                    container.textContent = supplierContent;
+                    
+                    // 鼠标悬停显示浮窗
+                    container.addEventListener('mouseenter', function(e) {
+                        showSupplierTooltip(container, supplierContent);
+                    });
+                    
+                    container.addEventListener('mouseleave', function(e) {
+                        setTimeout(() => {
+                            const tooltip = container._tooltip;
+                            if (tooltip && !tooltip.matches(':hover') && !container.matches(':hover')) {
+                                if (tooltip.parentNode) {
+                                    tooltip.parentNode.removeChild(tooltip);
+                                }
+                                container._tooltip = null;
+                            }
+                        }, 100);
+                    });
+                    
+                    return container;
+                }
+            },
+            { 
+                field: '近1个月询价量', 
+                headerName: '近1个月询价量', 
+                width: 120, 
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                valueGetter: params => parseFloat(params.data['近1个月询价量']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { 
+                field: '近3个月月均询价量', 
+                headerName: '近3个月月均询价量', 
+                width: 130, 
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                valueGetter: params => parseFloat(params.data['近3个月月均询价量']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { 
+                field: '全国近1个月询价量', 
+                headerName: '全国近1个月询价量', 
+                width: 130, 
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                valueGetter: params => parseFloat(params.data['全国近1个月询价量']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { 
+                field: '全国近3个月月均询价量', 
+                headerName: '全国近3个月月均询价量', 
+                width: 140, 
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                valueGetter: params => parseFloat(params.data['全国近3个月月均询价量']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB
+            },
+            { field: '内部备注', headerName: '内部备注', width: 150, sortable: true, filter: true }
+        ];
+        
+        // Grid 配置
+        const gridOptions = {
+            columnDefs: columnDefs,
+            rowData: [],
+            defaultColDef: {
+                sortable: true,
+                filter: true,
+                resizable: true,
+                suppressMenu: true  // 禁用菜单按钮（三条杠）
+            },
+            rowHeight: 36,
+            headerHeight: 36,
+            pagination: true,
+            paginationPageSize: 200,
+            paginationPageSizeSelector: [50, 100, 200],
+            rowSelection: 'multiple',
+            suppressRowClickSelection: true,
+            rowMultiSelectWithClick: false,
+            animateRows: true,
+            getRowClass: function(params) {
+                const key = `${params.data.oe}_${params.data.品牌}`;
+                if (cartData.has(key)) {
+                    return 'cart-row';
+                }
+                return '';
+            },
+            onSelectionChanged: function(event) {
+                const selectedRows = gridApi.getSelectedRows();
+                document.getElementById('selectedCount').textContent = selectedRows.length;
+            },
+            onGridReady: function(event) {
+                console.log('[AG Grid] onGridReady 触发');
+                
+                gridApi = event.api;
+                gridColumnApi = event.columnApi;
+                
+                console.log('[AG Grid] API 获取成功', { gridApi, gridColumnApi });
+                
+                // 自动调整列宽以适应内容
+                gridApi.sizeColumnsToFit();
+                
+                // 添加自定义拖拽选择功能
+                initDragSelection();
+                
+                // 初始化双击复制功能
+                initDoubleClickCopy();
+                
+                // 初始化快捷键
+                initShortcuts();
+            }
+        };
+        
+        // 初始化 Grid
+        document.addEventListener('DOMContentLoaded', function() {
+            const gridDiv = document.querySelector('#myGrid');
+            
+            // 使用旧版 API 创建 Grid
+            gridApi = new agGrid.Grid(gridDiv, gridOptions);
+            gridColumnApi = gridOptions.columnApi;
+            
+            console.log('[AG Grid] 初始化完成', gridApi);
+
+            // 初始化日期选择器
+            initDatePicker();
+
+            // 初始化分页条数选择器
+            setTimeout(initPageSizeSelector, 500);
+        });
+
+        // 初始化分页条数选择器
+        function initPageSizeSelector() {
+            const pagingPanel = document.querySelector('.ag-paging-panel');
+            if (!pagingPanel) {
+                console.log('[分页选择器] 未找到分页面板，稍后重试');
+                setTimeout(initPageSizeSelector, 500);
+                return;
+            }
+
+            // 检查是否已存在
+            if (pagingPanel.querySelector('.page-size-selector')) {
+                return;
+            }
+
+            // 创建选择器容器
+            const selectorContainer = document.createElement('div');
+            selectorContainer.className = 'page-size-selector';
+            selectorContainer.innerHTML = `
+                <span>每页显示:</span>
+                <select id="pageSizeSelect">
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="200" selected>200</option>
+                </select>
+                <span>条</span>
+            `;
+
+            pagingPanel.appendChild(selectorContainer);
+
+            // 绑定事件
+            const select = selectorContainer.querySelector('#pageSizeSelect');
+            select.addEventListener('change', function() {
+                const newPageSize = parseInt(this.value);
+                if (gridApi) {
+                    gridApi.paginationSetPageSize(newPageSize);
+                    console.log('[分页选择器] 切换到每页', newPageSize, '条');
+                }
+            });
+
+            // 添加页码跳转器到左侧统计信息位置
+            addPageJumper();
+
+            console.log('[分页选择器] 初始化完成');
+        }
+
+        // 添加页码跳转器
+        function addPageJumper() {
+            const pagingPanel = document.querySelector('.ag-paging-panel');
+            const rowSummaryPanel = pagingPanel.querySelector('.ag-paging-row-summary-panel');
+
+            if (!rowSummaryPanel) return;
+
+            // 清空原有内容
+            rowSummaryPanel.innerHTML = '';
+
+            // 创建跳转器
+            const jumperDiv = document.createElement('div');
+            jumperDiv.className = 'page-jumper';
+            jumperDiv.innerHTML = `
+                <span>跳至</span>
+                <input type="number" id="pageJumperInput" min="1" placeholder="页码">
+                <span>页</span>
+                <button id="pageJumperBtn">跳转</button>
+            `;
+
+            rowSummaryPanel.appendChild(jumperDiv);
+
+            // 绑定事件
+            const input = jumperDiv.querySelector('#pageJumperInput');
+            const btn = jumperDiv.querySelector('#pageJumperBtn');
+
+            const doJump = function() {
+                const pageNum = parseInt(input.value);
+                if (!pageNum || pageNum < 1) {
+                    layui.layer.msg('请输入有效的页码', {icon: 0});
+                    return;
+                }
+
+                const totalPages = gridApi.paginationGetTotalPages();
+                if (pageNum > totalPages) {
+                    layui.layer.msg('页码超出范围，最大页码: ' + totalPages, {icon: 0});
+                    return;
+                }
+
+                // AG Grid 页码从0开始，所以减1
+                gridApi.paginationGoToPage(pageNum - 1);
+                input.value = '';
+                console.log('[页码跳转] 跳转到第', pageNum, '页');
+            };
+
+            btn.addEventListener('click', doJump);
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    doJump();
+                }
+            });
+
+            console.log('[页码跳转器] 初始化完成');
+        }
+        
+        // 自定义拖拽选择功能 - 带调试信息
+        function initDragSelection() {
+            const gridDiv = document.querySelector('#myGrid');
+            let isDragging = false;
+            let startRowIndex = -1;
+            let startColIndex = -1;
+            let dragStartCell = null;
+            
+            console.log('[拖拽选择] 初始化开始');
+            
+            // 阻止默认的文本选择行为
+            gridDiv.addEventListener('selectstart', function(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+            
+            // 监听 mousedown 事件
+            gridDiv.addEventListener('mousedown', function(e) {
+                console.log('[拖拽选择] mousedown 事件触发', {
+                    button: e.button,
+                    target: e.target.className,
+                    ctrlKey: e.ctrlKey,
+                    shiftKey: e.shiftKey
+                });
+                
+                // 只处理左键点击
+                if (e.button !== 0) {
+                    console.log('[拖拽选择] 非左键点击，忽略');
+                    return;
+                }
+                
+                // 如果点击的是复选框或输入框，不启动拖拽
+                if (e.target.closest('input[type="checkbox"]') || 
+                    e.target.classList.contains('ag-checkbox-input') ||
+                    e.target.classList.contains('ag-input-field-input')) {
+                    console.log('[拖拽选择] 点击复选框，不启动拖拽');
+                    return;
+                }
+                
+                // 检查是否点击在单元格上
+                const cellElement = e.target.closest('.ag-cell');
+                if (!cellElement) {
+                    console.log('[拖拽选择] 未点击在单元格上，忽略');
+                    return;
+                }
+                
+                // 获取行元素
+                const rowElement = cellElement.closest('.ag-row');
+                if (!rowElement) {
+                    console.log('[拖拽选择] 未找到行元素，忽略');
+                    return;
+                }
+                
+                // 获取行ID
+                const rowId = rowElement.getAttribute('row-id');
+                console.log('[拖拽选择] 行ID:', rowId);
+                
+                if (rowId === null) {
+                    console.log('[拖拽选择] 行ID为空，忽略');
+                    return;
+                }
+                
+                // 获取行节点
+                const rowNode = gridApi.getRowNode(rowId);
+                if (!rowNode) {
+                    console.log('[拖拽选择] 未找到行节点，忽略');
+                    return;
+                }
+                
+                // 获取列信息
+                const colId = cellElement.getAttribute('col-id');
+                const colIndex = gridColumnApi.getAllDisplayedColumns().findIndex(col => col.getColId() === colId);
+                
+                console.log('[拖拽选择] 单元格信息:', {
+                    rowIndex: rowNode.rowIndex,
+                    colId: colId,
+                    colIndex: colIndex,
+                    data: rowNode.data
+                });
+                
+                // 如果不是按住 Ctrl 或 Shift，开始新的选择
+                if (!e.ctrlKey && !e.shiftKey) {
+                    // 先清除之前的高亮
+                    clearAllCellHighlights();
+                    
+                    isDragging = true;
+                    startRowIndex = rowNode.rowIndex;
+                    startColIndex = colIndex;
+                    dragStartCell = cellElement;
+                    
+                    console.log('[拖拽选择] 开始拖拽:', {
+                        startRowIndex: startRowIndex,
+                        startColIndex: startColIndex
+                    });
+                    
+                    // 拖拽选择不自动勾选复选框
+                    // gridApi.deselectAll();
+                    // rowNode.setSelected(true);
+                    
+                    // 只高亮起始单元格
+                    highlightCell(cellElement, true);
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            });
+            
+            // 监听 mousemove 事件
+            gridDiv.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                // 检查是否移动到其他单元格
+                const cellElement = e.target.closest('.ag-cell');
+                if (!cellElement) return;
+                
+                const rowElement = cellElement.closest('.ag-row');
+                if (!rowElement) return;
+                
+                const rowId = rowElement.getAttribute('row-id');
+                if (rowId === null) return;
+                
+                const rowNode = gridApi.getRowNode(rowId);
+                if (!rowNode) return;
+                
+                const colId = cellElement.getAttribute('col-id');
+                const colIndex = gridColumnApi.getAllDisplayedColumns().findIndex(col => col.getColId() === colId);
+                
+                const currentRowIndex = rowNode.rowIndex;
+                
+                // 计算范围
+                const minRowIndex = Math.min(startRowIndex, currentRowIndex);
+                const maxRowIndex = Math.max(startRowIndex, currentRowIndex);
+                const minColIndex = Math.min(startColIndex, colIndex);
+                const maxColIndex = Math.max(startColIndex, colIndex);
+                
+                console.log('[拖拽选择] 拖拽中:', {
+                    currentRowIndex: currentRowIndex,
+                    currentColIndex: colIndex,
+                    range: {
+                        rows: `${minRowIndex}-${maxRowIndex}`,
+                        cols: `${minColIndex}-${maxColIndex}`
+                    }
+                });
+                
+                // 清除之前的高亮
+                clearAllCellHighlights();
+                
+                // 获取范围内的所有单元格并高亮
+                const allCells = gridDiv.querySelectorAll('.ag-cell');
+                allCells.forEach(cell => {
+                    const cellRow = cell.closest('.ag-row');
+                    if (!cellRow) return;
+                    
+                    const cellRowId = cellRow.getAttribute('row-id');
+                    if (cellRowId === null) return;
+                    
+                    const cellRowNode = gridApi.getRowNode(cellRowId);
+                    if (!cellRowNode) return;
+                    
+                    const cellColId = cell.getAttribute('col-id');
+                    const cellColIndex = gridColumnApi.getAllDisplayedColumns().findIndex(col => col.getColId() === cellColId);
+                    
+                    // 检查是否在范围内
+                    if (cellRowNode.rowIndex >= minRowIndex && 
+                        cellRowNode.rowIndex <= maxRowIndex &&
+                        cellColIndex >= minColIndex && 
+                        cellColIndex <= maxColIndex) {
+                        highlightCell(cell, true);
+                    }
+                });
+                
+                // 拖拽选择不自动勾选复选框，只高亮单元格
+                // gridApi.deselectAll();
+                // gridApi.forEachNode(function(node) {
+                //     if (node.rowIndex >= minRowIndex && node.rowIndex <= maxRowIndex) {
+                //         node.setSelected(true);
+                //     }
+                // });
+            });
+            
+            // 监听 mouseup 事件
+            document.addEventListener('mouseup', function(e) {
+                if (!isDragging) return;
+                
+                console.log('[拖拽选择] 拖拽结束，保持选中样式');
+                
+                isDragging = false;
+                startRowIndex = -1;
+                startColIndex = -1;
+                dragStartCell = null;
+                
+                // 不再清除高亮，保持选中样式
+                // clearAllCellHighlights();
+                
+                // 阻止 mouseup 后立即触发 click 事件
+                e.stopPropagation();
+            });
+            
+            // 使用 mousedown 来清除选中样式（而不是 click）
+            gridDiv.addEventListener('mousedown', function(e) {
+                // 如果点击的是单元格，不处理（让拖拽逻辑处理）
+                if (e.target.closest('.ag-cell')) return;
+                
+                console.log('[拖拽选择] 点击空白处，清除选中样式');
+                clearAllCellHighlights();
+            });
+            
+            console.log('[拖拽选择] 初始化完成');
+        }
+        
+        // 初始化双击复制功能
+        function initDoubleClickCopy() {
+            const gridDiv = document.querySelector('#myGrid');
+            
+            gridDiv.addEventListener('dblclick', function(e) {
+                // 获取所有高亮的单元格
+                const highlightedCells = gridDiv.querySelectorAll('.ag-cell[style*="background-color: rgb(230, 247, 255)"]');
+                
+                // 只有当有且只有一个单元格被选中时才生效
+                if (highlightedCells.length !== 1) {
+                    return;
+                }
+                
+                const cell = highlightedCells[0];
+                const rowElement = cell.closest('.ag-row');
+                const colId = cell.getAttribute('col-id');
+                
+                if (!rowElement || !colId) return;
+                
+                const rowId = rowElement.getAttribute('row-id');
+                const rowNode = gridApi.getRowNode(rowId);
+                
+                if (!rowNode) return;
+                
+                // 获取单元格的值
+                const colDef = gridColumnApi.getColumn(colId).getColDef();
+                let value = '';
+                
+                if (colDef.valueGetter) {
+                    value = colDef.valueGetter({ node: rowNode, data: rowNode.data });
+                } else if (colDef.field) {
+                    value = rowNode.data[colDef.field] || '';
+                }
+                
+                // 复制到剪贴板
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(String(value)).then(function() {
+                        layui.layer.msg('已复制: ' + String(value).substring(0, 20) + (String(value).length > 20 ? '...' : ''), {icon: 1, time: 1500});
+                    }).catch(function(err) {
+                        fallbackCopyText(String(value));
+                    });
+                } else {
+                    fallbackCopyText(String(value));
+                }
+            });
+            
+            console.log('[双击复制] 初始化完成');
+        }
+        
+        // 兼容性复制文本
+        function fallbackCopyText(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                const success = document.execCommand('copy');
+                if (success) {
+                    layui.layer.msg('已复制: ' + text.substring(0, 20) + (text.length > 20 ? '...' : ''), {icon: 1, time: 1500});
+                }
+            } catch (err) {
+                console.error('[双击复制] 复制失败:', err);
+            }
+            
+            document.body.removeChild(textarea);
+        }
+        
+        // 初始化快捷键
+        function initShortcuts() {
+            document.addEventListener('keydown', function(e) {
+                // Ctrl+C 复制选中单元格
+                if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+                    e.preventDefault();
+                    copySelectedCells();
+                }
+                
+                // Alt+Q 添加到购物车
+                if (e.altKey && e.key.toLowerCase() === 'q') {
+                    e.preventDefault();
+                    addSelectedToCart();
+                }
+            });
+            
+            console.log('[快捷键] 初始化完成');
+        }
+        
+        // 复制选中单元格
+        function copySelectedCells() {
+            console.log('[快捷键] Ctrl+C 复制选中单元格');
+            
+            // 获取所有高亮的单元格（拖拽选中的）
+            const gridDiv = document.querySelector('#myGrid');
+            const highlightedCells = gridDiv.querySelectorAll('.ag-cell[style*="background-color: rgb(230, 247, 255)"]');
+            
+            if (highlightedCells.length === 0) {
+                layui.layer.msg('请先拖拽选择单元格', {icon: 0});
+                return;
+            }
+            
+            console.log('[快捷键] 选中单元格数量:', highlightedCells.length);
+            
+            // 收集选中的单元格数据
+            const selectedData = [];
+            highlightedCells.forEach(cell => {
+                const rowElement = cell.closest('.ag-row');
+                const colId = cell.getAttribute('col-id');
+                
+                if (rowElement && colId) {
+                    const rowId = rowElement.getAttribute('row-id');
+                    const rowNode = gridApi.getRowNode(rowId);
+                    
+                    if (rowNode) {
+                        const colDef = gridColumnApi.getColumn(colId).getColDef();
+                        const field = colDef.field;
+                        const value = rowNode.data[field] || '';
+                        const rowIndex = rowNode.rowIndex;
+                        const colIndex = gridColumnApi.getAllDisplayedColumns().findIndex(col => col.getColId() === colId);
+                        
+                        selectedData.push({
+                            rowIndex: rowIndex,
+                            colIndex: colIndex,
+                            value: value,
+                            field: field
+                        });
+                    }
+                }
+            });
+            
+            // 按行列排序
+            selectedData.sort((a, b) => {
+                if (a.rowIndex !== b.rowIndex) {
+                    return a.rowIndex - b.rowIndex;
+                }
+                return a.colIndex - b.colIndex;
+            });
+            
+            // 构建复制内容
+            let copyText = '';
+            let currentRow = -1;
+            let rowValues = [];
+            
+            selectedData.forEach(item => {
+                if (item.rowIndex !== currentRow) {
+                    // 新行，保存上一行数据
+                    if (currentRow !== -1) {
+                        copyText += rowValues.join('\t') + '\n';
+                    }
+                    currentRow = item.rowIndex;
+                    rowValues = [];
+                }
+                rowValues.push(item.value);
+            });
+            
+            // 保存最后一行
+            if (rowValues.length > 0) {
+                copyText += rowValues.join('\t') + '\n';
+            }
+            
+            // 复制到剪贴板 - 兼容性处理
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(copyText).then(function() {
+                    layui.layer.msg(`已复制 ${highlightedCells.length} 个单元格`, {icon: 1});
+                }).catch(function(err) {
+                    console.error('[快捷键] 复制失败:', err);
+                    fallbackCopy(copyText, highlightedCells.length);
+                });
+            } else {
+                fallbackCopy(copyText, highlightedCells.length);
+            }
+        }
+        
+        // 兼容性复制方案
+        function fallbackCopy(text, count) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                const success = document.execCommand('copy');
+                if (success) {
+                    layui.layer.msg(`已复制 ${count} 个单元格`, {icon: 1});
+                } else {
+                    layui.layer.msg('复制失败，请手动复制', {icon: 2});
+                }
+            } catch (err) {
+                console.error('[快捷键] 复制失败:', err);
+                layui.layer.msg('复制失败，请手动复制', {icon: 2});
+            }
+            
+            document.body.removeChild(textarea);
+        }
+        
+        // 高亮单元格
+        function highlightCell(cellElement, highlight) {
+            if (highlight) {
+                cellElement.style.backgroundColor = '#e6f7ff';
+                cellElement.style.border = '1px solid #1890ff';
+            } else {
+                cellElement.style.backgroundColor = '';
+                cellElement.style.border = '';
+            }
+        }
+        
+        // 清除所有单元格高亮
+        function clearAllCellHighlights() {
+            const gridDiv = document.querySelector('#myGrid');
+            const allCells = gridDiv.querySelectorAll('.ag-cell');
+            allCells.forEach(cell => {
+                highlightCell(cell, false);
+            });
+        }
+        
+        // 解析供应商数据
+        function parseSupplierData(content) {
+            const suppliers = [];
+            const regex = /(.+?)：(\d+\.?\d*)/g;
+            let match;
+            while ((match = regex.exec(content)) !== null) {
+                suppliers.push({
+                    name: match[1].trim(),
+                    price: match[2].trim()
+                });
+            }
+            return suppliers;
+        }
+        
+        // 显示供应商浮窗
+        function showSupplierTooltip(element, supplierContent) {
+            const suppliers = parseSupplierData(supplierContent);
+            if (suppliers.length === 0 && !supplierContent) return;
+            
+            // 关闭其他浮窗
+            closeAllSupplierTooltips();
+            
+            // 创建浮窗
+            const tooltip = document.createElement('div');
+            tooltip.className = 'supplier-tooltip';
+            tooltip.style.cssText = `
+                position: fixed;
+                background: #fff;
+                border: 1px solid #e6e6e6;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                max-width: 400px;
+                min-width: 250px;
+                font-size: 12px;
+                z-index: 9999;
+                pointer-events: auto;
+            `;
+            
+            // 构建表格内容
+            let tableContent = '';
+            if (suppliers.length > 0) {
+                tableContent = '<table style="margin:0;border-collapse:collapse;width:100%;font-size:12px;">';
+                tableContent += '<thead><tr><th style="width:70%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">供应商</th><th style="width:30%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">单价</th></tr></thead><tbody>';
+                suppliers.forEach(function(supplier) {
+                    tableContent += `<tr><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                });
+                tableContent += '</tbody></table>';
+            } else {
+                tableContent = `<div style="padding:12px;">${supplierContent}</div>`;
+            }
+            
+            tooltip.innerHTML = tableContent;
+            document.body.appendChild(tooltip);
+            
+            // 计算位置
+            const rect = element.getBoundingClientRect();
+            let left = rect.left;
+            let top = rect.bottom + 5;
+            
+            // 边界检查
+            const tooltipRect = tooltip.getBoundingClientRect();
+            if (left + tooltipRect.width > window.innerWidth) {
+                left = window.innerWidth - tooltipRect.width - 10;
+            }
+            if (top + tooltipRect.height > window.innerHeight) {
+                top = rect.top - tooltipRect.height - 5;
+            }
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+            
+            element._tooltip = tooltip;
+        }
+        
+        // 关闭所有供应商浮窗
+        function closeAllSupplierTooltips() {
+            document.querySelectorAll('.supplier-tooltip').forEach(tooltip => {
+                if (tooltip.parentNode) {
+                    tooltip.parentNode.removeChild(tooltip);
+                }
+            });
+            document.querySelectorAll('.supplier-cell').forEach(cell => {
+                cell._tooltip = null;
+            });
+        }
+        
+        // 点击其他地方关闭浮窗
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.supplier-cell') && !e.target.closest('.supplier-tooltip')) {
+                closeAllSupplierTooltips();
+            }
+        });
+        
+        // 初始化购物车数据
+        async function loadCartCache() {
+            try {
+                console.log('[购物车] 开始加载购物车数据');
+                const response = await fetch('/api/cart?page=1&limit=9999');
+                const result = await response.json();
+                
+                if (result.code === 0) {
+                    // 清空当前缓存
+                    cartData.clear();
+                    
+                    // 将购物车数据添加到缓存中
+                    result.data.forEach(item => {
+                        const oe = item.oe || '';
+                        const brand = item.brand || item['品牌'] || '';
+                        const key = `${oe}_${brand}`;
+                        cartData.add(key);
+                    });
+                    
+                    console.log('[购物车] 加载完成，共', cartData.size, '条');
+                    
+                    // 刷新表格以应用购物车背景色
+                    if (gridApi) {
+                        gridApi.redrawRows();
+                        updateStats();
+                    }
+                }
+            } catch (error) {
+                console.error('[购物车] 加载失败:', error);
+            }
+        }
+        
+        // 初始化日期选择器
+        function initDatePicker() {
+            layui.use(['laydate', 'layer'], function() {
+                const laydate = layui.laydate;
+                
+                // 设置默认日期范围（最近7天）
+                const end = new Date();
+                const start = new Date();
+                start.setDate(start.getDate() - 7);
+                
+                const formatDate = (date) => {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                };
+                
+                laydate.render({
+                    elem: '#dateRange',
+                    trigger: 'click',
+                    format: 'yyyy-MM-dd',
+                    range: true,
+                    max: 0, // 限制最大日期不能超过今天
+                    value: `${formatDate(start)} - ${formatDate(end)}`,
+                    done: function(value, date, endDate) {
+                        // 日期选择后自动触发查询
+                        if (value) {
+                            loadData();
+                        }
+                    }
+                });
+                
+                // 先加载购物车数据，再加载表格数据
+                loadCartCache().then(() => {
+                    setTimeout(() => loadData(), 100);
+                });
+            });
+        }
+        
+        // 加载数据 - 获取全部数据
+        async function loadData() {
+            const dateRange = document.getElementById('dateRange').value;
+            let startDate = '', endDate = '';
+            
+            if (dateRange) {
+                const dates = dateRange.split(' - ');
+                if (dates.length === 2) {
+                    startDate = dates[0];
+                    endDate = dates[1];
+                }
+            }
+            
+            if (!startDate || !endDate) {
+                layui.layer.msg('请选择日期范围', {icon: 0});
+                return;
+            }
+            
+            try {
+                const loadingIndex = layui.layer.load(2);
+                
+                // 先请求第一页获取总数
+                const firstRequestBody = {
+                    start: startDate,
+                    end: endDate,
+                    page: 1,
+                    pageSize: 200
+                };
+                
+                const firstResponse = await fetch('/api/date_ordercount', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(firstRequestBody)
+                });
+                
+                const firstResult = await firstResponse.json();
+                
+                if (firstResult.code !== 0) {
+                    layui.layer.close(loadingIndex);
+                    layui.layer.msg(firstResult.msg || '加载失败', {icon: 2});
+                    return;
+                }
+                
+                let allData = [...firstResult.data];
+                const total = firstResult.total || firstResult.data.length;
+                
+                // 如果有多页数据，继续获取
+                const totalPages = Math.ceil(total / 200);
+                if (totalPages > 1) {
+                    for (let page = 2; page <= totalPages; page++) {
+                        const requestBody = {
+                            start: startDate,
+                            end: endDate,
+                            page: page,
+                            pageSize: 200
+                        };
+                        
+                        const response = await fetch('/api/date_ordercount', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody)
+                        });
+                        
+                        const result = await response.json();
+                        if (result.code === 0) {
+                            allData = allData.concat(result.data);
+                        }
+                    }
+                }
+                
+                layui.layer.close(loadingIndex);
+                
+                currentData = allData.map((item, index) => ({
+                    ...item,
+                    selected: false,
+                    id: index
+                }));
+                filteredData = [...currentData];
+                
+                // 更新表格数据
+                if (gridApi && gridApi.setRowData) {
+                    gridApi.setRowData(filteredData);
+                } else {
+                    console.error('[AG Grid] API 未准备好');
+                }
+                
+                // 更新统计
+                updateStats();
+                
+                layui.layer.msg(`加载了 ${filteredData.length} 条数据（共 ${total} 条）`);
+                
+            } catch (error) {
+                layui.layer.closeAll('loading');
+                layui.layer.msg('加载数据失败: ' + error.message, {icon: 2});
+            }
+        }
+        
+        // 搜索数据
+        function searchData() {
+            const oe = document.getElementById('searchOe').value.trim();
+            const brand = document.getElementById('searchBrand').value.trim();
+            
+            if (!oe && !brand) {
+                filteredData = [...currentData];
+            } else {
+                filteredData = currentData.filter(item => {
+                    const matchOe = !oe || (item.oe && item.oe.toLowerCase().includes(oe.toLowerCase()));
+                    const matchBrand = !brand || (item.品牌 && item.品牌.toLowerCase().includes(brand.toLowerCase()));
+                    return matchOe && matchBrand;
+                });
+            }
+            
+            if (gridApi && gridApi.setRowData) {
+                gridApi.setRowData(filteredData);
+            }
+            updateStats();
+            layui.layer.msg(`找到 ${filteredData.length} 条记录`);
+        }
+        
+        // 重置搜索 - 清空所有搜索条件并刷新表格
+        function resetSearch() {
+            console.log('[重置] 清空所有搜索条件');
+            
+            // 清空普通搜索条件
+            document.getElementById('searchOe').value = '';
+            document.getElementById('searchBrand').value = '';
+            
+            // 清空高级搜索条件（如果弹窗是打开的，也清空）
+            const advOe = document.getElementById('advSearchOe');
+            const advBarcode = document.getElementById('advSearchBarcode');
+            const advMaterialName = document.getElementById('advSearchMaterialName');
+            const advBrand = document.getElementById('advSearchBrand');
+            const advTag = document.getElementById('advSearchTag');
+            
+            if (advOe) advOe.value = '';
+            if (advBarcode) advBarcode.value = '';
+            if (advMaterialName) advMaterialName.value = '';
+            if (advBrand) advBrand.value = '';
+            if (advTag) advTag.value = '';
+            
+            // 清空勾选状态
+            if (gridApi) {
+                gridApi.deselectAll();
+            }
+            
+            // 重新加载数据（从服务器获取最新数据）
+            loadData();
+            
+            layui.layer.msg('已重置搜索条件', {icon: 1});
+        }
+        
+        // 高级搜索 - 完善版，与旧代码一致
+        function openAdvancedSearch() {
+            layui.layer.open({
+                type: 1,
+                title: '高级搜索',
+                area: ['600px', '550px'],
+                content: `
+                    <div style="padding: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">OE号（多行）</label>
+                            <textarea id="advSearchOe" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个OE号"></textarea>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">物料条码（多行）</label>
+                            <textarea id="advSearchBarcode" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个条码"></textarea>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">物料名称（多行）</label>
+                            <textarea id="advSearchMaterialName" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个名称"></textarea>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">品牌（多行）</label>
+                            <textarea id="advSearchBrand" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个品牌"></textarea>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">标签（多行）</label>
+                            <textarea id="advSearchTag" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个标签"></textarea>
+                        </div>
+                    </div>
+                `,
+                btn: ['搜索', '重置', '取消'],
+                yes: function(index, layero) {
+                    // 搜索按钮
+                    performAdvancedSearch();
+                    layui.layer.close(index);
+                },
+                btn2: function(index, layero) {
+                    // 重置按钮
+                    document.getElementById('advSearchOe').value = '';
+                    document.getElementById('advSearchBarcode').value = '';
+                    document.getElementById('advSearchMaterialName').value = '';
+                    document.getElementById('advSearchBrand').value = '';
+                    document.getElementById('advSearchTag').value = '';
+                    return false; // 不关闭弹窗
+                },
+                btn3: function(index, layero) {
+                    // 取消按钮
+                    layui.layer.close(index);
+                }
+            });
+        }
+        
+        // 处理多行搜索输入
+        function process_multiline_search(input) {
+            if (!input) return [];
+            return input.split(/\r?\n/).map(item => item.trim()).filter(item => item !== '');
+        }
+        
+        // 执行高级搜索
+        async function performAdvancedSearch() {
+            const oe = document.getElementById('advSearchOe').value.trim();
+            const barcode = document.getElementById('advSearchBarcode').value.trim();
+            const materialName = document.getElementById('advSearchMaterialName').value.trim();
+            const brand = document.getElementById('advSearchBrand').value.trim();
+            const tag = document.getElementById('advSearchTag').value.trim();
+            
+            // 构建搜索参数
+            const searchParams = {};
+            if (oe) searchParams.oe = oe;
+            if (barcode) searchParams.barcode = barcode;
+            if (materialName) searchParams.material_name = materialName;
+            if (brand) searchParams.brand = brand;
+            if (tag) searchParams.tag = tag;
+            
+            // 如果没有输入任何搜索条件，提示用户
+            if (Object.keys(searchParams).length === 0) {
+                layui.layer.msg('请输入至少一个搜索条件', {icon: 0});
+                return;
+            }
+            
+            // 显示加载中
+            const loadingIndex = layui.layer.load(2, {
+                content: '正在搜索...',
+                shade: [0.3, '#000']
+            });
+            
+            try {
+                console.log('[高级搜索] 发送请求:', searchParams);
+                
+                const response = await fetch('/api/date_ordercount_search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(searchParams)
+                });
+                
+                const result = await response.json();
+                
+                layui.layer.close(loadingIndex);
+                
+                if (result.code === 0) {
+                    console.log('[高级搜索] 数据条数:', result.data ? result.data.length : 0);
+                    
+                    // 更新表格数据
+                    currentData = result.data.map((item, index) => ({
+                        ...item,
+                        selected: false,
+                        id: index
+                    }));
+                    filteredData = [...currentData];
+                    
+                    if (gridApi && gridApi.setRowData) {
+                        gridApi.setRowData(filteredData);
+                    }
+                    
+                    updateStats();
+                    layui.layer.msg(`搜索完成，找到 ${result.data.length} 条记录`, {icon: 1});
+                } else {
+                    layui.layer.msg(result.msg || '搜索失败', {icon: 2});
+                }
+            } catch (error) {
+                layui.layer.close(loadingIndex);
+                console.error('[高级搜索] 搜索失败:', error);
+                layui.layer.msg('搜索失败: ' + error.message, {icon: 2});
+            }
+        }
+        
+        // 更新统计信息
+        function updateStats() {
+            document.getElementById('totalCount').textContent = currentData.length;
+            document.getElementById('selectedCount').textContent = gridApi ? gridApi.getSelectedRows().length : 0;
+            document.getElementById('cartCount').textContent = cartData.size;
+            document.getElementById('displayCount').textContent = filteredData.length;
+        }
+        
+        // 批量添加购物车 - 只添加新商品，不移除
+        async function addSelectedToCart() {
+            const selectedRows = gridApi.getSelectedRows();
+            
+            if (selectedRows.length === 0) {
+                layui.layer.msg('请先选择商品', {icon: 0});
+                return;
+            }
+            
+            // 区分新商品和已存在的商品
+            const newItems = [];
+            const existingItems = [];
+            
+            selectedRows.forEach(row => {
+                const key = `${row.oe}_${row.品牌}`;
+                if (cartData.has(key)) {
+                    existingItems.push(row);
+                } else {
+                    newItems.push(row);
+                }
+            });
+            
+            // 如果全部都已存在，提示用户
+            if (newItems.length === 0) {
+                layui.layer.msg(`所选 ${existingItems.length} 条商品已在购物车中`, {icon: 0});
+                return;
+            }
+            
+            try {
+                const loadingIndex = layui.layer.load(2);
+                
+                // 只处理新商品 - 添加到购物车
+                const addDetails = newItems.map(item => ({
+                    oe: item.oe,
+                    barcode: item.物料条码 || ''
+                }));
+                
+                const addResponse = await fetch('/api/cart/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item_details: addDetails })
+                });
+                
+                const addResult = await addResponse.json();
+                
+                layui.layer.close(loadingIndex);
+                
+                if (addResult.code === 0) {
+                    // 更新本地购物车数据
+                    newItems.forEach(item => {
+                        const key = `${item.oe}_${item.品牌}`;
+                        cartData.add(key);
+                    });
+                    
+                    // 构建提示信息：新增多少，已存在多少
+                    let message = '';
+                    if (existingItems.length > 0) {
+                        message = `新增 ${newItems.length} 条，${existingItems.length} 条已存在`;
+                    } else {
+                        message = `成功添加 ${newItems.length} 条`;
+                    }
+                    
+                    layui.layer.msg(message, {icon: 1});
+                    
+                    // 取消已勾选的状态
+                    gridApi.deselectAll();
+                    
+                    // 刷新表格以显示购物车高亮
+                    gridApi.redrawRows();
+                    updateStats();
+                } else {
+                    layui.layer.msg(addResult.msg || '添加失败', {icon: 2});
+                }
+                
+            } catch (error) {
+                layui.layer.closeAll('loading');
+                layui.layer.msg('操作失败: ' + error.message, {icon: 2});
+                console.error('[购物车] 操作失败:', error);
+            }
+        }
+        
+        // 导出数据
+        function exportData() {
+            const data = filteredData;
+            if (data.length === 0) {
+                layui.layer.msg('没有数据可导出', {icon: 0});
+                return;
+            }
+            
+            // 使用 AG Grid 的 CSV 导出功能
+            gridApi.exportDataAsCsv({
+                fileName: `日期查询_${new Date().toISOString().slice(0, 10)}.csv`
+            });
+            
+            layui.layer.msg('导出成功', {icon: 1});
+        }
+    </script>
+</body>
+</html>

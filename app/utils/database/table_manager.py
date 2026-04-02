@@ -2,6 +2,17 @@ from datetime import datetime
 import pymysql
 from app.utils.database_connection import get_db_connection
 
+# 导入各模块表初始化函数
+from .tables import (
+    init_sales_history_detail_table,
+    init_quote_count_ks_table,
+    init_procurement_history_table,
+    init_procurement_history_detail_table,
+    init_zhuozhixing_table,
+    init_inventory_detail_table,
+    init_safety_stock_table,
+)
+
 
 def check_and_add_fields(table_name, fields_to_check):
     """检查并添加表字段"""
@@ -614,6 +625,9 @@ def init_compare_summary_table():
             # 检查并添加缺失的字段（兼容旧表）
             alter_columns = [
                 ("is_cass", "VARCHAR(10) COMMENT '是否同步开思'"),
+                ("l_model_zh", "VARCHAR(255) COMMENT '车型中文名'"),
+                ("stock_zaitu_list", "JSON COMMENT '在途库存列表'"),
+                ("frey_no", "VARCHAR(255) COMMENT 'Frey编号'"),
             ]
             
             for col_name, col_def in alter_columns:
@@ -641,189 +655,16 @@ def init_compare_summary_table():
         conn.close()
 
 
-def init_sales_history_table():
-    """
-    初始化销量明细表
-    用于存储CRM销量明细数据（按天汇总）
-    """
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            create_table_sql = """
-            CREATE TABLE IF NOT EXISTS crmapp_sales_history (
-                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                oe VARCHAR(100) NOT NULL COMMENT 'OE号',
-                brand VARCHAR(100) NOT NULL COMMENT '品牌名称',
-                company VARCHAR(50) NOT NULL DEFAULT 'fsbbr' COMMENT '公司',
-                quantity INT NOT NULL COMMENT '销量数量(可正可负,退货为负)',
-                sales_date DATE NOT NULL COMMENT '销售日期',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                
-                UNIQUE KEY uk_oe_brand_date (oe, brand, sales_date),
-                INDEX idx_sales_date (sales_date),
-                INDEX idx_oe_brand (oe, brand),
-                INDEX idx_company (company)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='CRM销量明细表（按天汇总）';
-            """
-            cursor.execute(create_table_sql)
-    except Exception as e:
-        print(f"  ✗ 销量明细表: {e}")
-    finally:
-        conn.close()
 
 
-def init_quote_count_ks_table():
-    """
-    初始化开思询价次数统计表
-    用于存储按(年月, OE, 品牌)统计的询价次数
-    """
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            create_table_sql = """
-            CREATE TABLE IF NOT EXISTS crmapp_quote_count_ks (
-                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
-                `year_month` VARCHAR(7) NOT NULL COMMENT '年月，格式：YYYY-MM',
-                oe VARCHAR(100) NOT NULL COMMENT 'OE号/零件号',
-                brand VARCHAR(100) NOT NULL COMMENT '品牌名称',
-                quote_count INT NOT NULL DEFAULT 0 COMMENT '询价次数',
-                company VARCHAR(50) NOT NULL DEFAULT 'fsbbr' COMMENT '公司代码',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-                UNIQUE KEY uk_year_month_oe_brand_company (`year_month`, oe, brand, company),
-                KEY idx_year_month (`year_month`),
-                KEY idx_company (company),
-                KEY idx_oe (oe),
-                KEY idx_brand (brand)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开思询价次数统计表';
-            """
-            cursor.execute(create_table_sql)
-    except Exception as e:
-        print(f"  ✗ 询价次数表: {e}")
-    finally:
-        conn.close()
 
 
-def init_procurement_history_table():
-    """
-    初始化采购历史表
-    用于存储采购记录（按月汇总）
-    """
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            create_table_sql = """
-            CREATE TABLE IF NOT EXISTS crmapp_procurement_history (
-                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                `year_month` VARCHAR(7) NOT NULL COMMENT '年月，格式：YYYY-MM',
-                purchase_date DATE NOT NULL COMMENT '采购日期',
-                supplier_name VARCHAR(255) NOT NULL COMMENT '供应商名称',
-                oe VARCHAR(100) NOT NULL COMMENT 'OE号',
-                brand VARCHAR(100) NOT NULL COMMENT '品牌',
-                unit_price DECIMAL(10,2) NOT NULL COMMENT '单价',
-                company VARCHAR(50) DEFAULT 'fsbbr' COMMENT '公司代码',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                UNIQUE KEY uk_month_oe_brand_supplier_price (`year_month`, oe, brand, supplier_name, unit_price, company),
-                KEY idx_year_month (`year_month`),
-                KEY idx_oe_brand (oe, brand),
-                KEY idx_purchase_date (purchase_date),
-                KEY idx_company (company)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='采购历史表';
-            """
-            cursor.execute(create_table_sql)
-    except Exception as e:
-        print(f"  ✗ 采购历史表: {e}")
-    finally:
-        conn.close()
 
 
-def init_zhuozhixing_table():
-    """
-    初始化卓之星库存数据表
-    用于存储从卓之星API同步的广星、鑫峰供应商库存数据
-    """
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            create_table_sql = """
-            CREATE TABLE IF NOT EXISTS zhuozhixing_inventory (
-                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
-                supplier_name VARCHAR(50) NOT NULL COMMENT '供应商名称：广星/鑫峰',
-                配件ID VARCHAR(50) COMMENT '配件ID',
-                零件编码 VARCHAR(100) COMMENT '零件编码',
-                制造编码 VARCHAR(100) COMMENT '制造编码',
-                零件名称 VARCHAR(255) COMMENT '零件名称',
-                零件英文名称 VARCHAR(255) COMMENT '零件英文名称',
-                零件车型 VARCHAR(255) COMMENT '零件车型',
-                产地 VARCHAR(100) COMMENT '产地',
-                价格 DECIMAL(10,2) COMMENT '价格',
-                库存数 INT COMMENT '库存数',
-                零件品牌 VARCHAR(100) COMMENT '零件品牌',
-                品牌 VARCHAR(100) COMMENT '品牌',
-                品牌编码 VARCHAR(50) COMMENT '品牌编码',
-                公会编码 VARCHAR(50) COMMENT '公会编码',
-                通用车型 VARCHAR(255) COMMENT '通用车型',
-                互换码 TEXT COMMENT '互换码',
-                是否共享 TINYINT COMMENT '是否共享：0-否，1-是',
-                商家库存表自增ID VARCHAR(50) COMMENT '商家库存表自增ID',
-                库号 VARCHAR(50) COMMENT '库号（仓库）',
-                sync_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '同步时间',
-                INDEX idx_supplier (supplier_name),
-                INDEX idx_零件编码 (零件编码),
-                INDEX idx_制造编码 (制造编码),
-                INDEX idx_sync_time (sync_time),
-                INDEX idx_零件名称 (零件名称)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='卓之星库存数据';
-            """
-            cursor.execute(create_table_sql)
-    except Exception as e:
-        print(f"  ✗ 卓之星库存表: {e}")
-    finally:
-        conn.close()
 
 
-def init_safety_stock_table():
-    """
-    初始化安全库存计算结果表
-    用于存储安全库存、库存上下限等计算结果
-    """
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            create_table_sql = """
-            CREATE TABLE IF NOT EXISTS crmapp_safety_stock (
-                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                sku VARCHAR(50) NOT NULL COMMENT 'SKU编码/OE号',
-                sku_name VARCHAR(200) COMMENT '产品名称',
-                calc_date DATE NOT NULL COMMENT '计算日期',
-                demand_avg DECIMAL(10,2) COMMENT '日均需求量',
-                demand_max DECIMAL(10,2) COMMENT '需求峰值',
-                demand_std DECIMAL(10,2) COMMENT '需求标准差',
-                lead_time_avg DECIMAL(5,1) COMMENT '平均交货期(天)',
-                lead_time_max DECIMAL(5,1) COMMENT '最长交货期(天)',
-                safety_stock DECIMAL(10,2) COMMENT '安全库存',
-                inventory_min DECIMAL(10,2) COMMENT '库存下限(紧急预警线)',
-                reorder_point DECIMAL(10,2) COMMENT '再订货点',
-                inventory_max DECIMAL(10,2) COMMENT '库存上限',
-                target_inventory DECIMAL(10,2) COMMENT '目标库存水位',
-                current_stock DECIMAL(10,2) COMMENT '当前库存数量',
-                suggested_qty DECIMAL(10,2) COMMENT '建议补货量',
-                stock_status VARCHAR(20) COMMENT '状态(normal/warning/danger)',
-                inquiry_1m INT COMMENT '近1个月询价量',
-                inquiry_3m INT COMMENT '近3个月月均询价量',
-                service_level DECIMAL(3,2) DEFAULT 0.95 COMMENT '服务水平',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-                INDEX idx_sku_date (sku, calc_date),
-                INDEX idx_status (stock_status),
-                INDEX idx_calc_date (calc_date)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全库存计算结果表';
-            """
-            cursor.execute(create_table_sql)
-    except Exception as e:
-        print(f"  ✗ 安全库存表: {e}")
-    finally:
-        conn.close()
+
+
 
 
 def init_all_tables():
@@ -836,11 +677,12 @@ def init_all_tables():
         ('开思自动账单', init_ks_auto_bill_table),
         ('询价比价', init_price_inquiry_table),
         ('比价汇总', init_compare_summary_table),
-        ('销量明细', init_sales_history_table),
+        ('销量明细', init_sales_history_detail_table),
         ('询价次数', init_quote_count_ks_table),
         ('采购历史', init_procurement_history_table),
         ('卓之星库存', init_zhuozhixing_table),
         ('安全库存', init_safety_stock_table),
+        ('库存明细', init_inventory_detail_table),
     ]
 
     completed = []

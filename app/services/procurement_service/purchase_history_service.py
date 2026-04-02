@@ -4,7 +4,6 @@
 """
 
 import time
-import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Tuple
 
@@ -21,96 +20,46 @@ CRM_PURCHASE_HISTORY_URL = 'https://crm.gzbbr.com/api/Crm.PurchaseOrder/Purchase
 
 
 class PurchaseHistoryService:
-    """采购历史记录爬取服务类"""
+    """采购历史记录爬取服务类
+    
+    用于爬取近N天的采购历史数据，保存到 crmapp_procurement_history_detail 表
+    """
 
     def __init__(self):
         self.session = None
-        self.total_saved = 0
-        self.total_processed = 0
 
-    def crawl_last_and_current_month(self) -> Dict[str, Any]:
+    def crawl_recent_days(self, days: int = 5) -> Dict[str, Any]:
         """
-        爬取上个月和本月的数据
-        主入口方法，每日定时任务调用
+        爬取近N天的采购历史数据
+
+        Args:
+            days: 天数，默认5天
 
         Returns:
             {
-                'months': ['2026-02', '2026-03'],
+                'date_range': '2026-03-23 ~ 2026-03-28',
                 'total_processed': 总处理数,
                 'saved': 成功保存数,
                 'failed': 失败数
             }
         """
         now = datetime.now()
-        current_year = now.year
-        current_month = now.month
+        start_date = now - timedelta(days=days)
 
-        # 计算上个月
-        if current_month == 1:
-            last_year = current_year - 1
-            last_month = 12
-        else:
-            last_year = current_year
-            last_month = current_month - 1
+        # 计算时间戳范围（毫秒级）
+        start_ts = int(start_date.timestamp() * 1000)
+        end_ts = int(now.timestamp() * 1000)
 
-        all_results = {
-            'months': [],
-            'total_processed': 0,
-            'saved': 0,
-            'failed': 0
-        }
-
-        # 先处理上个月，再处理当月
-        months_to_crawl = [
-            (last_year, last_month),
-            (current_year, current_month)
-        ]
-
-        for year, month in months_to_crawl:
-            month_str = f"{year}-{month:02d}"
-            print(f"\n{'='*60}")
-            print(f"开始爬取 {month_str} 的采购历史数据")
-            print(f"{'='*60}")
-
-            result = self.crawl_month(year, month)
-
-            all_results['months'].append(month_str)
-            all_results['total_processed'] += result['processed']
-            all_results['saved'] += result['saved']
-            all_results['failed'] += result['failed']
-
-            # 月份之间暂停一下
-            time.sleep(2)
-
+        date_range_str = f"{start_date.strftime('%Y-%m-%d')} ~ {now.strftime('%Y-%m-%d')}"
         print(f"\n{'='*60}")
-        print(f"采购历史爬取完成!")
-        print(f"处理月份: {', '.join(all_results['months'])}")
-        print(f"总处理数: {all_results['total_processed']}")
-        print(f"保存记录: {all_results['saved']}")
-        print(f"失败数: {all_results['failed']}")
+        print(f"开始爬取近 {days} 天的采购历史数据")
+        print(f"时间范围: {date_range_str}")
+        print(f"时间戳范围: {start_ts} ~ {end_ts}")
         print(f"{'='*60}")
 
-        return all_results
-
-    def crawl_month(self, year: int, month: int) -> Dict[str, int]:
-        """
-        爬取指定月份的所有数据
-
-        Args:
-            year: 年份
-            month: 月份
-
-        Returns:
-            {'processed': 处理数, 'saved': 保存数, 'failed': 失败数}
-        """
-        # 计算时间戳范围
-        start_ts, end_ts = self._get_month_timestamp(year, month)
-        year_month = f"{year}-{month:02d}"
-
-        print(f"时间范围: {start_ts} ~ {end_ts}")
-
         result = {
-            'processed': 0,
+            'date_range': date_range_str,
+            'total_processed': 0,
             'saved': 0,
             'failed': 0
         }
@@ -124,25 +73,25 @@ class PurchaseHistoryService:
 
             if not records:
                 if page == 1:
-                    print(f"{year_month} 无数据")
+                    print(f"近 {days} 天无数据")
                 break
 
             # 解析并保存记录
             parsed_records = []
             for record in records:
                 try:
-                    parsed = self._parse_record(record)
+                    parsed = self._parse_record_detail(record)
                     if parsed:
                         parsed_records.append(parsed)
                 except Exception as e:
                     print(f"解析记录失败: {e}")
                     result['failed'] += 1
 
-            # 批量保存
+            # 批量保存到新表
             if parsed_records:
-                saved_count = self._save_records(parsed_records, year_month)
+                saved_count = self._save_records_detail(parsed_records)
                 result['saved'] += saved_count
-                result['processed'] += len(parsed_records)
+                result['total_processed'] += len(parsed_records)
                 print(f"本页解析: {len(parsed_records)} 条, 保存: {saved_count} 条")
 
             # 检查是否还有更多页
@@ -152,31 +101,15 @@ class PurchaseHistoryService:
             page += 1
             time.sleep(0.5)
 
+        print(f"\n{'='*60}")
+        print(f"近 {days} 天采购历史爬取完成!")
+        print(f"时间范围: {date_range_str}")
+        print(f"总处理数: {result['total_processed']}")
+        print(f"保存记录: {result['saved']}")
+        print(f"失败数: {result['failed']}")
+        print(f"{'='*60}")
+
         return result
-
-    def _get_month_timestamp(self, year: int, month: int) -> Tuple[int, int]:
-        """
-        获取指定月份的开始和结束时间戳（毫秒级）
-
-        Args:
-            year: 年份
-            month: 月份
-
-        Returns:
-            (开始时间戳, 结束时间戳)
-        """
-        # 月份开始时间
-        start_date = datetime(year, month, 1)
-        start_ts = int(start_date.timestamp() * 1000)
-
-        # 月份结束时间
-        if month == 12:
-            end_date = datetime(year + 1, 1, 1) - timedelta(seconds=1)
-        else:
-            end_date = datetime(year, month + 1, 1) - timedelta(seconds=1)
-        end_ts = int(end_date.timestamp() * 1000)
-
-        return start_ts, end_ts
 
     def _fetch_page(self, page: int, start_ts: int, end_ts: int) -> Tuple[List[Dict], bool]:
         """
@@ -230,40 +163,57 @@ class PurchaseHistoryService:
 
         return [], False
 
-    def _parse_record(self, record: Dict) -> Dict[str, Any]:
+    def _parse_record_detail(self, record: Dict) -> Dict[str, Any]:
         """
-        解析单条记录
+        解析单条记录的详细信息（包含更多字段）
 
         Args:
             record: CRM返回的原始记录
 
         Returns:
-            解析后的记录字典
+            解析后的详细记录字典
         """
-        # 提取create_date并转换为日期
+        # 提取create_date并转换为datetime
         create_date_ts = record.get('create_date', '0')
         if create_date_ts:
-            # Unix秒级时间戳转日期
-            purchase_date = datetime.fromtimestamp(int(create_date_ts)).strftime('%Y-%m-%d')
+            create_date = datetime.fromtimestamp(int(create_date_ts))
         else:
-            purchase_date = datetime.now().strftime('%Y-%m-%d')
+            create_date = datetime.now()
+
+        # 提取expected_delivery_date并转换为datetime
+        expected_delivery_ts = record.get('expected_delivery_date', '0')
+        if expected_delivery_ts:
+            expected_delivery_date = datetime.fromtimestamp(int(expected_delivery_ts))
+        else:
+            expected_delivery_date = None
+
+        # 计算year_month字段
+        year_month = create_date.strftime('%Y-%m')
 
         return {
-            'purchase_date': purchase_date,
-            'supplier_name': record.get('fullname', '').strip(),
-            'oe': record.get('number', '').strip(),
+            'order_no': record.get('order_no', '').strip(),
+            'fullname': record.get('fullname', '').strip(),
+            'l_name_zh_default': record.get('l_name_zh_default', '').strip(),
+            'frey_no': record.get('frey_no', '').strip(),
+            'number': record.get('number', '').strip(),
             'brand': record.get('brand', '').strip(),
-            'unit_price': float(record.get('unit_cost', 0)) if record.get('unit_cost') else 0.0
+            'l_model_zh': record.get('l_model_zh', '').strip(),
+            'purchase_quantity': int(record.get('purchase_quantity', 0)) if record.get('purchase_quantity') else 0,
+            'unit_cost': float(record.get('unit_cost', 0)) if record.get('unit_cost') else 0.0,
+            'create_date': create_date,
+            'expected_delivery_date': expected_delivery_date,
+            'year_month': year_month,
+            'company': COMPANY
         }
 
-    def _save_records(self, records: List[Dict], year_month: str) -> int:
+    def _save_records_detail(self, records: List[Dict]) -> int:
         """
-        批量保存记录到数据库
-        使用 INSERT ... ON DUPLICATE KEY UPDATE 实现去重
+        批量保存详细记录到新表 crmapp_procurement_history_detail
+        使用 INSERT ... ON DUPLICATE KEY UPDATE 实现去重（以新的为准覆盖）
+        唯一键: (order_no, number, brand, company)
 
         Args:
-            records: 记录列表
-            year_month: 年月字符串 (YYYY-MM)
+            records: 详细记录列表
 
         Returns:
             成功保存的记录数
@@ -275,23 +225,39 @@ class PurchaseHistoryService:
         try:
             with conn.cursor() as cursor:
                 sql = """
-                    INSERT INTO crmapp_procurement_history
-                    (`year_month`, purchase_date, supplier_name, oe, brand, unit_price, company)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO crmapp_procurement_history_detail
+                    (order_no, fullname, l_name_zh_default, frey_no, number, brand,
+                     l_model_zh, purchase_quantity, unit_cost, create_date,
+                     expected_delivery_date, year_month, company)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
-                        purchase_date = VALUES(purchase_date)
+                        fullname = VALUES(fullname),
+                        l_name_zh_default = VALUES(l_name_zh_default),
+                        frey_no = VALUES(frey_no),
+                        l_model_zh = VALUES(l_model_zh),
+                        purchase_quantity = VALUES(purchase_quantity),
+                        unit_cost = VALUES(unit_cost),
+                        create_date = VALUES(create_date),
+                        expected_delivery_date = VALUES(expected_delivery_date),
+                        year_month = VALUES(year_month)
                 """
 
                 values = []
                 for record in records:
                     values.append((
-                        year_month,
-                        record['purchase_date'],
-                        record['supplier_name'],
-                        record['oe'],
+                        record['order_no'],
+                        record['fullname'],
+                        record['l_name_zh_default'],
+                        record['frey_no'],
+                        record['number'],
                         record['brand'],
-                        record['unit_price'],
-                        COMPANY
+                        record['l_model_zh'],
+                        record['purchase_quantity'],
+                        record['unit_cost'],
+                        record['create_date'],
+                        record['expected_delivery_date'],
+                        record['year_month'],
+                        record['company']
                     ))
 
                 cursor.executemany(sql, values)
@@ -301,7 +267,7 @@ class PurchaseHistoryService:
 
         except Exception as e:
             conn.rollback()
-            print(f"批量保存失败: {e}")
+            print(f"批量保存详细记录失败: {e}")
             return 0
         finally:
             conn.close()

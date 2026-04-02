@@ -48,13 +48,13 @@ class InventoryDataAggregator:
                 # 查询每日销量
                 sql = """
                     SELECT 
-                        sales_date as sale_day,
+                        DATE(create_date) as sale_day,
                         SUM(quantity) as daily_qty
-                    FROM crmapp_sales_history
-                    WHERE oe = %s 
-                      AND sales_date BETWEEN %s AND %s
-                    GROUP BY sales_date
-                    ORDER BY sales_date
+                    FROM crmapp_sales_history_detail
+                    WHERE number = %s 
+                      AND create_date BETWEEN %s AND %s
+                    GROUP BY DATE(create_date)
+                    ORDER BY DATE(create_date)
                 """
                 cursor.execute(sql, (sku, start_date, end_date))
                 results = cursor.fetchall()
@@ -127,35 +127,35 @@ class InventoryDataAggregator:
         finally:
             self._close_connection()
     
-    def get_inquiry_stats(self, sku: str) -> Dict[str, int]:
+    def get_inquiry_stats(self, sku: str, use_detail_table: bool = False) -> Dict[str, int]:
         """
-        从crmapp_quote_count_ks统计询价数据
-        
-        注意：询价表是按年月统计的，没有具体日期字段
-        这里查询最近1-2个月的询价次数总和
+        统计询价数据
         
         Args:
             sku: SKU编码
+            use_detail_table: 是否使用明细表查询（默认False，使用统计表）
             
         Returns:
             dict: 包含近1个月、近3个月询价量
         """
+        if use_detail_table:
+            return self._get_inquiry_stats_from_detail(sku)
+        else:
+            return self._get_inquiry_stats_from_summary(sku)
+    
+    def _get_inquiry_stats_from_summary(self, sku: str) -> Dict[str, int]:
+        """从统计表 crmapp_quote_count_ks 查询询价数据"""
         conn = self._get_connection()
         try:
             with conn.cursor() as cursor:
-                from datetime import datetime
-                
-                # 获取当前年月和上个月年月
                 now = datetime.now()
                 current_year_month = now.strftime('%Y-%m')
                 
-                # 计算上个月的年月
                 if now.month == 1:
                     last_year_month = f"{now.year - 1}-12"
                 else:
                     last_year_month = f"{now.year}-{now.month - 1:02d}"
                 
-                # 查询最近2个月的询价次数总和（作为近1个月参考）
                 sql_1m = """
                     SELECT SUM(quote_count) as total_count
                     FROM crmapp_quote_count_ks
@@ -166,8 +166,6 @@ class InventoryDataAggregator:
                 result = cursor.fetchone()
                 inquiry_1m = result[0] if result and result[0] else 0
                 
-                # 查询最近3个月的询价次数（作为近3个月参考）
-                # 计算前两个月的年月
                 if now.month == 1:
                     prev2_year_month = f"{now.year - 1}-11"
                 elif now.month == 2:
@@ -182,6 +180,47 @@ class InventoryDataAggregator:
                       AND `year_month` IN (%s, %s, %s)
                 """
                 cursor.execute(sql_3m, (sku, current_year_month, last_year_month, prev2_year_month))
+                result = cursor.fetchone()
+                inquiry_3m = result[0] if result and result[0] else 0
+                
+                return {
+                    'inquiry_1m': inquiry_1m,
+                    'inquiry_3m': inquiry_3m
+                }
+        finally:
+            self._close_connection()
+    
+    def _get_inquiry_stats_from_detail(self, sku: str) -> Dict[str, int]:
+        """从明细表 crmapp_ks_inquiry_detail 查询询价数据"""
+        conn = self._get_connection()
+        try:
+            with conn.cursor() as cursor:
+                now = datetime.now()
+                
+                # 近30天
+                one_month_ago = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+                today = now.strftime('%Y-%m-%d')
+                
+                sql_1m = """
+                    SELECT COUNT(*) as total_count
+                    FROM crmapp_ks_inquiry_detail
+                    WHERE partsNum = %s 
+                      AND quote_date BETWEEN %s AND %s
+                """
+                cursor.execute(sql_1m, (sku, one_month_ago, today))
+                result = cursor.fetchone()
+                inquiry_1m = result[0] if result and result[0] else 0
+                
+                # 近90天
+                three_months_ago = (now - timedelta(days=90)).strftime('%Y-%m-%d')
+                
+                sql_3m = """
+                    SELECT COUNT(*) as total_count
+                    FROM crmapp_ks_inquiry_detail
+                    WHERE partsNum = %s 
+                      AND quote_date BETWEEN %s AND %s
+                """
+                cursor.execute(sql_3m, (sku, three_months_ago, today))
                 result = cursor.fetchone()
                 inquiry_3m = result[0] if result and result[0] else 0
                 

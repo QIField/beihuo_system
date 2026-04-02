@@ -1,0 +1,180 @@
+/**
+ * AG Grid 自定义复选框样式
+ * 使用方法：在使用 AG Grid 的 HTML 文件中引入此 CSS 文件
+ * <link rel="stylesheet" href="/static/ag-grid/ag-custom-checkbox.css">
+ */
+
+/* ==================== 统一复选框尺寸变量 ==================== */
+:root {
+    --ag-checkbox-size: 26px;
+}
+
+/* ==================== 行选择列复选框样式 ==================== */
+
+/* 选择列单元格居中布局 */
+.ag-theme-alpine .ag-cell[col-id="selected"],
+.ag-theme-alpine-dark .ag-cell[col-id="selected"] {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 0 !important;
+}
+
+/* 行复选框 - 26px */
+.ag-theme-alpine .ag-cell[col-id="selected"] .ag-checkbox-input,
+.ag-theme-alpine-dark .ag-cell[col-id="selected"] .ag-checkbox-input {
+    width: var(--ag-checkbox-size) !important;
+    height: var(--ag-checkbox-size) !important;
+    cursor: pointer !important;
+}
+
+/* 行复选框选择器居中 */
+.ag-theme-alpine .ag-cell[col-id="selected"] .ag-selection-checkbox,
+.ag-theme-alpine-dark .ag-cell[col-id="selected"] .ag-selection-checkbox {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* 行复选框包装器居中 */
+.ag-theme-alpine .ag-cell[col-id="selected"] .ag-wrapper.ag-checkbox-input-wrapper,
+.ag-theme-alpine-dark .ag-cell[col-id="selected"] .ag-wrapper.ag-checkbox-input-wrapper,
+.ag-theme-alpine .ag-cell[col-id="selected"] .ag-input-wrapper,
+.ag-theme-alpine-dark .ag-cell[col-id="selected"] .ag-input-wrapper {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+/* ==================== 表头选择列复选框样式 ==================== */
+
+/* 表头选择列居中 - 整个单元格 */
+.ag-theme-alpine .ag-header-cell[col-id="selected"],
+.ag-theme-alpine-dark .ag-header-cell[col-id="selected"] {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 0 !important;
+    position: relative !important;
+}
+
+/* 隐藏表头文字标签，只保留复选框 */
+.ag-theme-alpine .ag-header-cell[col-id="selected"] .ag-header-cell-label,
+.ag-theme-alpine-dark .ag-header-cell[col-id="selected"] .ag-header-cell-label {
+    display: none !important;
+}
+
+/* 表头复选框容器 - 绝对定位居中 */
+.ag-theme-alpine .ag-header-cell[col-id="selected"] .ag-header-select-all,
+.ag-theme-alpine-dark .ag-header-cell[col-id="selected"] .ag-header-select-all {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: var(--ag-checkbox-size) !important;
+    height: var(--ag-checkbox-size) !important;
+}
+
+/* 表头复选框包装器 */
+.ag-theme-alpine .ag-header-cell[col-id="selected"] .ag-wrapper.ag-checkbox-input-wrapper,
+.ag-theme-alpine-dark .ag-header-cell[col-id="selected"] .ag-wrapper.ag-checkbox-input-wrapper {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* 表头复选框 - 继承通用样式，确保与行复选框一致 */
+.ag-theme-alpine .ag-header-cell[col-id="selected"] .ag-checkbox-input,
+.ag-theme-alpine-dark .ag-header-cell[col-id="selected"] .ag-checkbox-input {
+    width: var(--ag-checkbox-size) !important;
+    height: var(--ag-checkbox-size) !important;
+    border: 1px solid #333 !important;
+    border-radius: 3px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: #fff !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+}
+
+/* 表头复选框勾选状态 */
+.ag-theme-alpine .ag-header-cell[col-id="selected"] .ag-checkbox-input:checked,
+.ag-theme-alpine-dark .ag-header-cell[col-id="selected"] .ag-checkbox-input:checked {
+    background-color: #1890ff !important;
+    border-color: #1890ff !important;
+}
+
+/* 表头复选框对勾图标 */
+.ag-theme-alpine .ag-header-cell[col-id="selected"] .ag-checkbox-input:checked::after,
+.ag-theme-alpine-dark .ag-header-cell[col-id="selected"] .ag-checkbox-input:checked::after {
+    content: '' !important;
+    display: block !important;
+    width: 6px !important;
+    height: 10px !important;
+    border: solid white !important;
+    border-width: 0 2px 2px 0 !important;
+    transform: rotate(45deg) !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    margin-top: -5px !important;
+    margin-left: -3px !important;
+}
+
+/* 表头内容包装器 - 不占用空间 */
+.ag-theme-alpine .ag-header-cell[col-id="selected"] .ag-header-cell-comp-wrapper,
+.ag-theme-alpine-dark .ag-header-cell[col-id="selected"] .ag-header-cell-comp-wrapper {
+    display: none !important;
+}
+
+/* ==================== 通用复选框样式 ==================== */
+
+/* 统一所有复选框大小和边框 */
+.ag-theme-alpine .ag-checkbox-input,
+.ag-theme-alpine-dark .ag-checkbox-input {
+    width: var(--ag-checkbox-size) !important;
+    height: var(--ag-checkbox-size) !important;
+    border: 1px solid #333 !important;
+    border-radius: 3px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: #fff !important;
+    margin: 0 !important;
+}
+
+/* 勾选状态下的样式 */
+.ag-theme-alpine .ag-checkbox-input:checked,
+.ag-theme-alpine-dark .ag-checkbox-input:checked {
+    background-color: #1890ff !important;
+    border-color: #1890ff !important;
+}
+
+/* 勾选状态下的对勾图标 */
+.ag-theme-alpine .ag-checkbox-input:checked::after,
+.ag-theme-alpine-dark .ag-checkbox-input:checked::after {
+    content: '' !important;
+    display: block !important;
+    width: 6px !important;
+    height: 10px !important;
+    border: solid white !important;
+    border-width: 0 2px 2px 0 !important;
+    transform: rotate(45deg) !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    margin-top: -5px !important;
+    margin-left: -3px !important;
+}
+
+/* 复选框包装器相对定位，用于对勾图标定位 */
+.ag-theme-alpine .ag-wrapper.ag-checkbox-input-wrapper,
+.ag-theme-alpine-dark .ag-wrapper.ag-checkbox-input-wrapper {
+    position: relative !important;
+}

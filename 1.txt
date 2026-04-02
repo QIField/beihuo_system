@@ -1,1636 +1,831 @@
-index.js?v=6:359 [DEBUG] DataGrid options.rowHeights: ƒ (row) {
-                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
-                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
-index.js?v=6:360 [DEBUG] DataGrid options.rowHeight: 40
-index.js?v=6:361 [DEBUG] DataGrid typeof rowHeights: function
-index.js?v=6:362 [DEBUG] DataGrid virtualScroll: false
-index.js?v=6:421 [DEBUG] finalConfig.rowHeights: ƒ (row) {
-                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
-                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
-index.js?v=6:422 [DEBUG] finalConfig.virtualScroll: true
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
-index.js?v=6:427 [DEBUG] Handsontable actual rowHeights: ƒ (row) {
-                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
-                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
-index.js?v=6:428 [DEBUG] Handsontable actual rowHeight: undefined
-index.js?v=6:359 [DEBUG] DataGrid options.rowHeights: ƒ (row) {
-                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
-                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
-index.js?v=6:360 [DEBUG] DataGrid options.rowHeight: 40
-index.js?v=6:361 [DEBUG] DataGrid typeof rowHeights: function
-index.js?v=6:362 [DEBUG] DataGrid virtualScroll: false
-index.js?v=6:421 [DEBUG] finalConfig.rowHeights: ƒ (row) {
-                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
-                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
-index.js?v=6:422 [DEBUG] finalConfig.virtualScroll: true
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 0, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 1, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 2, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 3, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 4, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 5, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 6, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 7, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 8, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 9, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 10, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 11, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 12, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 13, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 14, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 15, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 16, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 17, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 18, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 19, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 20, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 21, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 22, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 23, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 24, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 25, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 26, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 27, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 28, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 29, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 30, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 31, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 32, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 33, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 34, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 35, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 36, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 37, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 38, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 39, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 40, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 41, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 42, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 43, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 44, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 45, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 46, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 47, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 48, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 49, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 50, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 51, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 52, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 53, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 54, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 55, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 56, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 57, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 58, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 59, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 60, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 61, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 62, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 63, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 64, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 65, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 66, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 67, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 68, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 69, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 70, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 71, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 72, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 73, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 74, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 75, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 76, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 77, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 78, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 79, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 80, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 81, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 82, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 83, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 84, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 85, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 86, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 87, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 88, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 89, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 90, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 91, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 92, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 93, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 94, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 95, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 96, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 97, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 98, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 99, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 100, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 101, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 102, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 103, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 104, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 105, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 106, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 107, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 108, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 109, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 110, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 111, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 112, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 113, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 114, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 115, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 116, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 117, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 118, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 119, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 120, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 121, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 122, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 123, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 124, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 125, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 126, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 127, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 128, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 129, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 130, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 131, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 132, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 133, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 134, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 135, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 136, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 137, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 138, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 139, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 140, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 141, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 142, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 143, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 144, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 145, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 146, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 147, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 148, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 149, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 150, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 151, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 152, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 153, expanded: false, returning: 40
- [DEBUG] rowHeights called for row 154, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 155, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 156, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 157, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 158, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 159, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 160, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 161, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 162, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 163, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 164, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 165, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 166, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 167, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 168, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 169, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 170, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 171, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 172, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 173, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 174, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 175, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 176, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 177, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 178, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 179, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 180, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 181, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 182, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 183, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 184, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 185, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 186, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 187, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 188, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 189, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 190, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 191, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 192, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 193, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 194, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 195, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 196, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 197, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 198, expanded: false, returning: 40
-date_query?start=2026-03-04&end=2026-03-07:448 [DEBUG] rowHeights called for row 199, expanded: false, returning: 40
-index.js?v=6:427 [DEBUG] Handsontable actual rowHeights: ƒ (row) {
-                    const height = expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
-                    console.log(`[DEBUG] rowHeights called for row ${row}, expanded: ${expandedRows.…
-index.js?v=6:428 [DEBUG] Handsontable actual rowHeight: undefined
-date_query?start=2026-03-04&end=2026-03-07:576 [DEBUG] Actual row count: 400
-date_query?start=2026-03-04&end=2026-03-07:581 [DEBUG] First row first cell height: 220
-date_query?start=2026-03-04&end=2026-03-07:582 [DEBUG] First row first cell style: height: 39px;
-date_query?start=2026-03-04&end=2026-03-07:588 [DEBUG] Table height style: 
+{
+    "code": 200,
+    "data": {
+        "content": [
+            {
+                "storeResolveItem": {
+                    "resolveResultId": "976066c6-cd6e-4771-b666-36f6a5abc713",
+                    "quotedPriceItemId": "69ce1438760d1f0001f1b6f1",
+                    "status": "QUOTE",
+                    "source": "AUTO",
+                    "functionAuthority": {
+                        "canAddQuoteResult": true
+                    }
+                },
+                "storeQuoteItemResults": [
+                    {
+                        "userNeedsItemId": "69ce143a760d1f00016d0fbf",
+                        "resolveResultId": "976066c6-cd6e-4771-b666-36f6a5abc713",
+                        "storeId": "FSBBR001",
+                        "inquiryId": "B26040278670",
+                        "productId": "22160020164890296700",
+                        "productType": "FINISHED_GOODS",
+                        "oldPartsNum": "0004212512",
+                        "partsNum": "0004212512",
+                        "partsName": "前刹车碟",
+                        "partType": "BRAND_PARTS",
+                        "brandId": "TEXTAR",
+                        "brandName": "泰克斯塔（泰明顿）",
+                        "storeServiceArea": "LOCAL",
+                        "price": 286.19,
+                        "btPrice": 269.99,
+                        "sellerBtPrice": 269.99,
+                        "sellerPrice": 286.19,
+                        "btBoxFee": 0,
+                        "atBoxFee": 0,
+                        "btSellerAndBoxFee": 269.99,
+                        "atSellerAndBoxFee": 286.19,
+                        "btBuyerAndBoxFee": 269.99,
+                        "atBuyerAndBoxFee": 286.19,
+                        "quantity": 1,
+                        "remark": "坚守品质底线，决不像低价格低头！！！泰明顿授权经销商！！！ 可索源！！！可索赔！！！",
+                        "sellerStatus": "SALABLE",
+                        "source": "AUTO",
+                        "createdBy": "system",
+                        "arrivalTime": 0,
+                        "location": "CN_FSCCC",
+                        "locationName": "佛山禅城仓",
+                        "sellType": "COMMON",
+                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808696321779097601\"},{\"key\":\"JPL0002\",\"value\":\"10\",\"desc\":\"假一赔三\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":true,\"id\":\"1984141261701160962\",\"icon\":\"\",\"title\":\"假一赔十\",\"groupId\":2,\"innerSort\":12,\"scenarioId\":\"1984161093630504962\"},{\"key\":\"PCC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"配套资质范围\",\"display\":false,\"id\":\"1904469166013997058\",\"icon\":\"\",\"title\":\"配套资质范围\",\"groupId\":5,\"innerSort\":2,\"scenarioId\":\"1904470811794657281\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CassQualityAssurePolicy\",\"value\":\"6M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"开思质保6个月\",\"display\":false,\"id\":\"1927054973947441152\",\"icon\":\"https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg\",\"title\":\"开思质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CompensationPolicy\",\"value\":\"10\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":false,\"id\":\"1927054975709048832\",\"icon\":\"https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg\",\"title\":\"假一赔十\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
+                        "afterSalePoliciesInfos": [
+                            {
+                                "key": "THL0001",
+                                "value": "7",
+                                "desc": "专营店7天无理由",
+                                "url": "",
+                                "displayName": "7天无理由退货",
+                                "display": true,
+                                "id": "1570581392623861762",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "JPL0002",
+                                "value": "10",
+                                "desc": "假一赔三",
+                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
+                                "displayName": "假一赔十",
+                                "display": true,
+                                "id": "1984141261701160962",
+                                "icon": "",
+                                "title": "假一赔十"
+                            },
+                            {
+                                "key": "PCC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "配套资质范围",
+                                "display": false,
+                                "id": "1904469166013997058",
+                                "icon": "",
+                                "title": "配套资质范围"
+                            },
+                            {
+                                "key": "BZC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "保装车",
+                                "display": true,
+                                "id": "1692728146474762242",
+                                "icon": "",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "ReturnWithoutReasonPolicy",
+                                "value": "7",
+                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
+                                "displayName": "7天无理由退货",
+                                "display": false,
+                                "id": "20231109001",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "CassQualityAssurePolicy",
+                                "value": "6M",
+                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
+                                "displayName": "开思质保6个月",
+                                "display": false,
+                                "id": "1927054973947441152",
+                                "icon": "https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg",
+                                "title": "开思质保"
+                            },
+                            {
+                                "key": "CompensationPolicy",
+                                "value": "10",
+                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
+                                "displayName": "假一赔十",
+                                "display": false,
+                                "id": "1927054975709048832",
+                                "icon": "https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg",
+                                "title": "假一赔十"
+                            },
+                            {
+                                "key": "InstallAssurePolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "保装车",
+                                "display": false,
+                                "id": "1927054975390281728",
+                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "TechnicalSupportPolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "技术支持",
+                                "display": true,
+                                "id": "1927054975310589952",
+                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
+                                "title": "技术支持"
+                            }
+                        ],
+                        "taxRate": 6,
+                        "openInvoiceType": "BOTH",
+                        "partsBrandQuality": "EXTERNAL_BRAND",
+                        "needPackage": "",
+                        "originalAssort": 0,
+                        "recommend": 0,
+                        "quotationResources": [],
+                        "quotationDescriptions": [],
+                        "orderIds": [],
+                        "functionAuthority": {
+                            "canModifyQuoteResult": false
+                        }
+                    },
+                    {
+                        "userNeedsItemId": "69ce143a760d1f00016d0fc0",
+                        "resolveResultId": "976066c6-cd6e-4771-b666-36f6a5abc713",
+                        "storeId": "FSBBR001",
+                        "inquiryId": "B26040278670",
+                        "productId": "23773572216105657470",
+                        "productType": "FINISHED_GOODS",
+                        "oldPartsNum": "0004212512",
+                        "partsNum": "0004212512",
+                        "partsName": "前刹车碟",
+                        "partType": "BRAND_PARTS",
+                        "brandId": "OTHERS",
+                        "brandName": "其他",
+                        "storeServiceArea": "LOCAL",
+                        "price": 140.98,
+                        "btPrice": 133,
+                        "sellerBtPrice": 133,
+                        "sellerPrice": 140.98,
+                        "btBoxFee": 0,
+                        "atBoxFee": 0,
+                        "btSellerAndBoxFee": 133,
+                        "atSellerAndBoxFee": 140.98,
+                        "btBuyerAndBoxFee": 133,
+                        "atBuyerAndBoxFee": 140.98,
+                        "quantity": 1,
+                        "remark": "",
+                        "sellerStatus": "SALABLE",
+                        "source": "AUTO",
+                        "createdBy": "system",
+                        "arrivalTime": 0,
+                        "location": "CN_GZYXC",
+                        "locationName": "广州越秀仓",
+                        "sellType": "COMMON",
+                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808756778179837953\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"QualityAssurePolicy\",\"value\":\"12M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"商家质保12个月\",\"display\":true,\"id\":\"1927054974513672192\",\"icon\":\"https://fe-static.cassmall.com/assets/images/1fe67d1f27ec5906d8c279d1990c95b1.svg\",\"title\":\"商家质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
+                        "afterSalePoliciesInfos": [
+                            {
+                                "key": "THL0001",
+                                "value": "7",
+                                "desc": "专营店7天无理由",
+                                "url": "",
+                                "displayName": "7天无理由退货",
+                                "display": true,
+                                "id": "1570581392623861762",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "BZC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "保装车",
+                                "display": true,
+                                "id": "1692728146474762242",
+                                "icon": "",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "ReturnWithoutReasonPolicy",
+                                "value": "7",
+                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
+                                "displayName": "7天无理由退货",
+                                "display": false,
+                                "id": "20231109001",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "QualityAssurePolicy",
+                                "value": "12M",
+                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
+                                "displayName": "商家质保12个月",
+                                "display": true,
+                                "id": "1927054974513672192",
+                                "icon": "https://fe-static.cassmall.com/assets/images/1fe67d1f27ec5906d8c279d1990c95b1.svg",
+                                "title": "商家质保"
+                            },
+                            {
+                                "key": "InstallAssurePolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "保装车",
+                                "display": false,
+                                "id": "1927054975390281728",
+                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "TechnicalSupportPolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "技术支持",
+                                "display": true,
+                                "id": "1927054975310589952",
+                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
+                                "title": "技术支持"
+                            }
+                        ],
+                        "taxRate": 6,
+                        "openInvoiceType": "BOTH",
+                        "partsBrandQuality": "OTHER_BRAND",
+                        "needPackage": "",
+                        "originalAssort": 0,
+                        "recommend": 0,
+                        "quotationResources": [],
+                        "quotationDescriptions": [],
+                        "orderIds": [],
+                        "functionAuthority": {
+                            "canModifyQuoteResult": false
+                        }
+                    },
+                    {
+                        "userNeedsItemId": "69ce143a760d1f00016d0fc1",
+                        "resolveResultId": "976066c6-cd6e-4771-b666-36f6a5abc713",
+                        "storeId": "FSBBR001",
+                        "inquiryId": "B26040278670",
+                        "productId": "23799598793798574090",
+                        "productType": "FINISHED_GOODS",
+                        "oldPartsNum": "0004212512",
+                        "partsNum": "0004212512",
+                        "partsName": "前刹车碟",
+                        "partType": "BRAND_PARTS",
+                        "brandId": "BREMBO",
+                        "brandName": "布雷博",
+                        "storeServiceArea": "LOCAL",
+                        "price": 490.78,
+                        "btPrice": 463,
+                        "sellerBtPrice": 463,
+                        "sellerPrice": 490.78,
+                        "btBoxFee": 0,
+                        "atBoxFee": 0,
+                        "btSellerAndBoxFee": 463,
+                        "atSellerAndBoxFee": 490.78,
+                        "btBuyerAndBoxFee": 463,
+                        "atBuyerAndBoxFee": 490.78,
+                        "quantity": 1,
+                        "remark": "",
+                        "sellerStatus": "SALABLE",
+                        "source": "AUTO",
+                        "createdBy": "system",
+                        "arrivalTime": 0,
+                        "location": "CN_GZYXC",
+                        "locationName": "广州越秀仓",
+                        "sellType": "COMMON",
+                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808696321779097601\"},{\"key\":\"JPL0002\",\"value\":\"10\",\"desc\":\"假一赔三\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":true,\"id\":\"1984141261701160962\",\"icon\":\"\",\"title\":\"假一赔十\",\"groupId\":2,\"innerSort\":12,\"scenarioId\":\"1984161093630504962\"},{\"key\":\"PCC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"配套资质范围\",\"display\":false,\"id\":\"1904469166013997058\",\"icon\":\"\",\"title\":\"配套资质范围\",\"groupId\":5,\"innerSort\":2,\"scenarioId\":\"1904470811794657281\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CassQualityAssurePolicy\",\"value\":\"6M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"开思质保6个月\",\"display\":false,\"id\":\"1927054973947441152\",\"icon\":\"https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg\",\"title\":\"开思质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CompensationPolicy\",\"value\":\"10\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":false,\"id\":\"1927054975709048832\",\"icon\":\"https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg\",\"title\":\"假一赔十\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
+                        "afterSalePoliciesInfos": [
+                            {
+                                "key": "THL0001",
+                                "value": "7",
+                                "desc": "专营店7天无理由",
+                                "url": "",
+                                "displayName": "7天无理由退货",
+                                "display": true,
+                                "id": "1570581392623861762",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "JPL0002",
+                                "value": "10",
+                                "desc": "假一赔三",
+                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
+                                "displayName": "假一赔十",
+                                "display": true,
+                                "id": "1984141261701160962",
+                                "icon": "",
+                                "title": "假一赔十"
+                            },
+                            {
+                                "key": "PCC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "配套资质范围",
+                                "display": false,
+                                "id": "1904469166013997058",
+                                "icon": "",
+                                "title": "配套资质范围"
+                            },
+                            {
+                                "key": "BZC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "保装车",
+                                "display": true,
+                                "id": "1692728146474762242",
+                                "icon": "",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "ReturnWithoutReasonPolicy",
+                                "value": "7",
+                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
+                                "displayName": "7天无理由退货",
+                                "display": false,
+                                "id": "20231109001",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "CassQualityAssurePolicy",
+                                "value": "6M",
+                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
+                                "displayName": "开思质保6个月",
+                                "display": false,
+                                "id": "1927054973947441152",
+                                "icon": "https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg",
+                                "title": "开思质保"
+                            },
+                            {
+                                "key": "CompensationPolicy",
+                                "value": "10",
+                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
+                                "displayName": "假一赔十",
+                                "display": false,
+                                "id": "1927054975709048832",
+                                "icon": "https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg",
+                                "title": "假一赔十"
+                            },
+                            {
+                                "key": "InstallAssurePolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "保装车",
+                                "display": false,
+                                "id": "1927054975390281728",
+                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "TechnicalSupportPolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "技术支持",
+                                "display": true,
+                                "id": "1927054975310589952",
+                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
+                                "title": "技术支持"
+                            }
+                        ],
+                        "taxRate": 6,
+                        "openInvoiceType": "BOTH",
+                        "partsBrandQuality": "EXTERNAL_BRAND",
+                        "needPackage": "",
+                        "originalAssort": 0,
+                        "recommend": 0,
+                        "quotationResources": [],
+                        "quotationDescriptions": [],
+                        "orderIds": [],
+                        "functionAuthority": {
+                            "canModifyQuoteResult": false
+                        }
+                    }
+                ]
+            },
+            {
+                "storeResolveItem": {
+                    "resolveResultId": "be749be2-915a-45b2-841c-dcb559180b1c",
+                    "quotedPriceItemId": "69ce1438760d1f0001f1b6f2",
+                    "status": "QUOTE",
+                    "source": "AUTO",
+                    "functionAuthority": {
+                        "canAddQuoteResult": true
+                    }
+                },
+                "storeQuoteItemResults": [
+                    {
+                        "userNeedsItemId": "69ce143a760d1f00016d0fde",
+                        "resolveResultId": "be749be2-915a-45b2-841c-dcb559180b1c",
+                        "storeId": "FSBBR001",
+                        "inquiryId": "B26040278670",
+                        "productId": "22160020164890296700",
+                        "productType": "FINISHED_GOODS",
+                        "oldPartsNum": "0004212512",
+                        "partsNum": "0004212512",
+                        "partsName": "前刹车碟",
+                        "partType": "BRAND_PARTS",
+                        "brandId": "TEXTAR",
+                        "brandName": "泰克斯塔（泰明顿）",
+                        "storeServiceArea": "LOCAL",
+                        "price": 286.19,
+                        "btPrice": 269.99,
+                        "sellerBtPrice": 269.99,
+                        "sellerPrice": 286.19,
+                        "btBoxFee": 0,
+                        "atBoxFee": 0,
+                        "btSellerAndBoxFee": 269.99,
+                        "atSellerAndBoxFee": 286.19,
+                        "btBuyerAndBoxFee": 269.99,
+                        "atBuyerAndBoxFee": 286.19,
+                        "quantity": 1,
+                        "remark": "坚守品质底线，决不像低价格低头！！！泰明顿授权经销商！！！ 可索源！！！可索赔！！！",
+                        "sellerStatus": "SALABLE",
+                        "source": "AUTO",
+                        "createdBy": "system",
+                        "arrivalTime": 0,
+                        "location": "CN_FSCCC",
+                        "locationName": "佛山禅城仓",
+                        "sellType": "COMMON",
+                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808696321779097601\"},{\"key\":\"JPL0002\",\"value\":\"10\",\"desc\":\"假一赔三\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":true,\"id\":\"1984141261701160962\",\"icon\":\"\",\"title\":\"假一赔十\",\"groupId\":2,\"innerSort\":12,\"scenarioId\":\"1984161093630504962\"},{\"key\":\"PCC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"配套资质范围\",\"display\":false,\"id\":\"1904469166013997058\",\"icon\":\"\",\"title\":\"配套资质范围\",\"groupId\":5,\"innerSort\":2,\"scenarioId\":\"1904470811794657281\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CassQualityAssurePolicy\",\"value\":\"6M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"开思质保6个月\",\"display\":false,\"id\":\"1927054973947441152\",\"icon\":\"https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg\",\"title\":\"开思质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CompensationPolicy\",\"value\":\"10\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":false,\"id\":\"1927054975709048832\",\"icon\":\"https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg\",\"title\":\"假一赔十\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
+                        "afterSalePoliciesInfos": [
+                            {
+                                "key": "THL0001",
+                                "value": "7",
+                                "desc": "专营店7天无理由",
+                                "url": "",
+                                "displayName": "7天无理由退货",
+                                "display": true,
+                                "id": "1570581392623861762",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "JPL0002",
+                                "value": "10",
+                                "desc": "假一赔三",
+                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
+                                "displayName": "假一赔十",
+                                "display": true,
+                                "id": "1984141261701160962",
+                                "icon": "",
+                                "title": "假一赔十"
+                            },
+                            {
+                                "key": "PCC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "配套资质范围",
+                                "display": false,
+                                "id": "1904469166013997058",
+                                "icon": "",
+                                "title": "配套资质范围"
+                            },
+                            {
+                                "key": "BZC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "保装车",
+                                "display": true,
+                                "id": "1692728146474762242",
+                                "icon": "",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "ReturnWithoutReasonPolicy",
+                                "value": "7",
+                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
+                                "displayName": "7天无理由退货",
+                                "display": false,
+                                "id": "20231109001",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "CassQualityAssurePolicy",
+                                "value": "6M",
+                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
+                                "displayName": "开思质保6个月",
+                                "display": false,
+                                "id": "1927054973947441152",
+                                "icon": "https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg",
+                                "title": "开思质保"
+                            },
+                            {
+                                "key": "CompensationPolicy",
+                                "value": "10",
+                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
+                                "displayName": "假一赔十",
+                                "display": false,
+                                "id": "1927054975709048832",
+                                "icon": "https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg",
+                                "title": "假一赔十"
+                            },
+                            {
+                                "key": "InstallAssurePolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "保装车",
+                                "display": false,
+                                "id": "1927054975390281728",
+                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "TechnicalSupportPolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "技术支持",
+                                "display": true,
+                                "id": "1927054975310589952",
+                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
+                                "title": "技术支持"
+                            }
+                        ],
+                        "taxRate": 6,
+                        "openInvoiceType": "BOTH",
+                        "partsBrandQuality": "EXTERNAL_BRAND",
+                        "needPackage": "",
+                        "originalAssort": 0,
+                        "recommend": 0,
+                        "quotationResources": [],
+                        "quotationDescriptions": [],
+                        "orderIds": [],
+                        "functionAuthority": {
+                            "canModifyQuoteResult": false
+                        }
+                    },
+                    {
+                        "userNeedsItemId": "69ce143a760d1f00016d0fdf",
+                        "resolveResultId": "be749be2-915a-45b2-841c-dcb559180b1c",
+                        "storeId": "FSBBR001",
+                        "inquiryId": "B26040278670",
+                        "productId": "23773572216105657470",
+                        "productType": "FINISHED_GOODS",
+                        "oldPartsNum": "0004212512",
+                        "partsNum": "0004212512",
+                        "partsName": "前刹车碟",
+                        "partType": "BRAND_PARTS",
+                        "brandId": "OTHERS",
+                        "brandName": "其他",
+                        "storeServiceArea": "LOCAL",
+                        "price": 140.98,
+                        "btPrice": 133,
+                        "sellerBtPrice": 133,
+                        "sellerPrice": 140.98,
+                        "btBoxFee": 0,
+                        "atBoxFee": 0,
+                        "btSellerAndBoxFee": 133,
+                        "atSellerAndBoxFee": 140.98,
+                        "btBuyerAndBoxFee": 133,
+                        "atBuyerAndBoxFee": 140.98,
+                        "quantity": 1,
+                        "remark": "",
+                        "sellerStatus": "SALABLE",
+                        "source": "AUTO",
+                        "createdBy": "system",
+                        "arrivalTime": 0,
+                        "location": "CN_GZYXC",
+                        "locationName": "广州越秀仓",
+                        "sellType": "COMMON",
+                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808756778179837953\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"QualityAssurePolicy\",\"value\":\"12M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"商家质保12个月\",\"display\":true,\"id\":\"1927054974513672192\",\"icon\":\"https://fe-static.cassmall.com/assets/images/1fe67d1f27ec5906d8c279d1990c95b1.svg\",\"title\":\"商家质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
+                        "afterSalePoliciesInfos": [
+                            {
+                                "key": "THL0001",
+                                "value": "7",
+                                "desc": "专营店7天无理由",
+                                "url": "",
+                                "displayName": "7天无理由退货",
+                                "display": true,
+                                "id": "1570581392623861762",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "BZC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "保装车",
+                                "display": true,
+                                "id": "1692728146474762242",
+                                "icon": "",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "ReturnWithoutReasonPolicy",
+                                "value": "7",
+                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
+                                "displayName": "7天无理由退货",
+                                "display": false,
+                                "id": "20231109001",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "QualityAssurePolicy",
+                                "value": "12M",
+                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
+                                "displayName": "商家质保12个月",
+                                "display": true,
+                                "id": "1927054974513672192",
+                                "icon": "https://fe-static.cassmall.com/assets/images/1fe67d1f27ec5906d8c279d1990c95b1.svg",
+                                "title": "商家质保"
+                            },
+                            {
+                                "key": "InstallAssurePolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "保装车",
+                                "display": false,
+                                "id": "1927054975390281728",
+                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "TechnicalSupportPolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "技术支持",
+                                "display": true,
+                                "id": "1927054975310589952",
+                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
+                                "title": "技术支持"
+                            }
+                        ],
+                        "taxRate": 6,
+                        "openInvoiceType": "BOTH",
+                        "partsBrandQuality": "OTHER_BRAND",
+                        "needPackage": "",
+                        "originalAssort": 0,
+                        "recommend": 0,
+                        "quotationResources": [],
+                        "quotationDescriptions": [],
+                        "orderIds": [],
+                        "functionAuthority": {
+                            "canModifyQuoteResult": false
+                        }
+                    },
+                    {
+                        "userNeedsItemId": "69ce143a760d1f00016d0fe0",
+                        "resolveResultId": "be749be2-915a-45b2-841c-dcb559180b1c",
+                        "storeId": "FSBBR001",
+                        "inquiryId": "B26040278670",
+                        "productId": "23799598793798574090",
+                        "productType": "FINISHED_GOODS",
+                        "oldPartsNum": "0004212512",
+                        "partsNum": "0004212512",
+                        "partsName": "前刹车碟",
+                        "partType": "BRAND_PARTS",
+                        "brandId": "BREMBO",
+                        "brandName": "布雷博",
+                        "storeServiceArea": "LOCAL",
+                        "price": 490.78,
+                        "btPrice": 463,
+                        "sellerBtPrice": 463,
+                        "sellerPrice": 490.78,
+                        "btBoxFee": 0,
+                        "atBoxFee": 0,
+                        "btSellerAndBoxFee": 463,
+                        "atSellerAndBoxFee": 490.78,
+                        "btBuyerAndBoxFee": 463,
+                        "atBuyerAndBoxFee": 490.78,
+                        "quantity": 1,
+                        "remark": "",
+                        "sellerStatus": "SALABLE",
+                        "source": "AUTO",
+                        "createdBy": "system",
+                        "arrivalTime": 0,
+                        "location": "CN_GZYXC",
+                        "locationName": "广州越秀仓",
+                        "sellType": "COMMON",
+                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808696321779097601\"},{\"key\":\"JPL0002\",\"value\":\"10\",\"desc\":\"假一赔三\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":true,\"id\":\"1984141261701160962\",\"icon\":\"\",\"title\":\"假一赔十\",\"groupId\":2,\"innerSort\":12,\"scenarioId\":\"1984161093630504962\"},{\"key\":\"PCC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"配套资质范围\",\"display\":false,\"id\":\"1904469166013997058\",\"icon\":\"\",\"title\":\"配套资质范围\",\"groupId\":5,\"innerSort\":2,\"scenarioId\":\"1904470811794657281\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CassQualityAssurePolicy\",\"value\":\"6M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"开思质保6个月\",\"display\":false,\"id\":\"1927054973947441152\",\"icon\":\"https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg\",\"title\":\"开思质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CompensationPolicy\",\"value\":\"10\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":false,\"id\":\"1927054975709048832\",\"icon\":\"https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg\",\"title\":\"假一赔十\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
+                        "afterSalePoliciesInfos": [
+                            {
+                                "key": "THL0001",
+                                "value": "7",
+                                "desc": "专营店7天无理由",
+                                "url": "",
+                                "displayName": "7天无理由退货",
+                                "display": true,
+                                "id": "1570581392623861762",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "JPL0002",
+                                "value": "10",
+                                "desc": "假一赔三",
+                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
+                                "displayName": "假一赔十",
+                                "display": true,
+                                "id": "1984141261701160962",
+                                "icon": "",
+                                "title": "假一赔十"
+                            },
+                            {
+                                "key": "PCC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "配套资质范围",
+                                "display": false,
+                                "id": "1904469166013997058",
+                                "icon": "",
+                                "title": "配套资质范围"
+                            },
+                            {
+                                "key": "BZC0001",
+                                "value": "true",
+                                "desc": "",
+                                "url": "",
+                                "displayName": "保装车",
+                                "display": true,
+                                "id": "1692728146474762242",
+                                "icon": "",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "ReturnWithoutReasonPolicy",
+                                "value": "7",
+                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
+                                "displayName": "7天无理由退货",
+                                "display": false,
+                                "id": "20231109001",
+                                "icon": "",
+                                "title": "7天无理由退货"
+                            },
+                            {
+                                "key": "CassQualityAssurePolicy",
+                                "value": "6M",
+                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
+                                "displayName": "开思质保6个月",
+                                "display": false,
+                                "id": "1927054973947441152",
+                                "icon": "https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg",
+                                "title": "开思质保"
+                            },
+                            {
+                                "key": "CompensationPolicy",
+                                "value": "10",
+                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
+                                "displayName": "假一赔十",
+                                "display": false,
+                                "id": "1927054975709048832",
+                                "icon": "https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg",
+                                "title": "假一赔十"
+                            },
+                            {
+                                "key": "InstallAssurePolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "保装车",
+                                "display": false,
+                                "id": "1927054975390281728",
+                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
+                                "title": "保装车"
+                            },
+                            {
+                                "key": "TechnicalSupportPolicy",
+                                "value": "true",
+                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
+                                "displayName": "技术支持",
+                                "display": true,
+                                "id": "1927054975310589952",
+                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
+                                "title": "技术支持"
+                            }
+                        ],
+                        "taxRate": 6,
+                        "openInvoiceType": "BOTH",
+                        "partsBrandQuality": "EXTERNAL_BRAND",
+                        "needPackage": "",
+                        "originalAssort": 0,
+                        "recommend": 0,
+                        "quotationResources": [],
+                        "quotationDescriptions": [],
+                        "orderIds": [],
+                        "functionAuthority": {
+                            "canModifyQuoteResult": false
+                        }
+                    }
+                ]
+            }
+        ],
+        "page": 1,
+        "size": 50,
+        "total": "2",
+        "userReceivedItemCount": "2"
+    }
+}

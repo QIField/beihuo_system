@@ -521,7 +521,7 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
 
         # 执行查询
         if supplier_name == '腾隆':
-            cursor.execute("SELECT * FROM kucun where shuliang > 0 and gs='腾隆'")
+            cursor.execute("SELECT * FROM kucun where shuliang > 0 and gs='腾隆' and chexing='宝马'")
         elif supplier_name == '宝翼隆':
             cursor.execute("SELECT * FROM kucun where shuliang > 0 and gs='宝翼隆'")
         elif supplier_name == '沐博':

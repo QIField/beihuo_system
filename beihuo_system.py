@@ -26,6 +26,7 @@ from backend.get_order import get_order_bp
 from backend.log_viewer_api import register_log_viewer_routes
 from backend.purchase_plan import register_purchase_plan_routes
 from backend.zhuozhixing_api import register_zhuozhixing_routes
+from backend.purchase_history_api import register_purchase_history_routes
 from backend.region_by_number_query import region_by_number_query_bp
 from backend.ks_inquiry_monitor_api import bp as ks_inquiry_monitor_bp
 from flask_socketio import SocketIO
@@ -49,7 +50,8 @@ init_session_manager()
 app = Flask(__name__, 
             template_folder='./templates',
             static_folder='./static')
-app.secret_key = 'your-very-secret-key' 
+app.secret_key = 'your-very-secret-key'
+
 register_virtual_inventory_routes(app)
 register_excel_process_routes(app)  # 注册Excel处理API
 app.register_blueprint(search_in_crm_bp)
@@ -58,6 +60,7 @@ app.register_blueprint(ks_auto_bill_bp)
 register_log_viewer_routes(app)  # 注册日志查看器路由
 register_purchase_plan_routes(app)  # 注册采购计划模块路由
 register_zhuozhixing_routes(app)  # 注册卓之星同步API路由
+register_purchase_history_routes(app)  # 注册采购历史同步API路由
 app.register_blueprint(region_by_number_query_bp)  # 注册溯源查询蓝图
 app.register_blueprint(ks_inquiry_monitor_bp)  # 注册开思询价单监控蓝图
 # 根据环境选择 async_mode
@@ -418,15 +421,60 @@ def clean_data_date(value):
     if value is None:
         return ""
     if isinstance(value, str):
-        # 处理包含<数字次的格式
         match = re.search(r'<(\d+)次', value)
         if match:
             num = int(match.group(1))
-            # 返回比匹配数字大1的值
             return str(num + 1)
         return value
     return str(value)
 
+
+def map_vehicle_fields_from_compare(data_list):
+    """从crmapp_compare_summary批量映射车型和替换号到beihuo数据列表"""
+    if not data_list:
+        return data_list
+    
+    barcode_set = set()
+    for item in data_list:
+        barcode = item.get('物料条码', '')
+        if barcode:
+            barcode_set.add(barcode)
+    
+    if not barcode_set:
+        return data_list
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    
+    placeholders = ','.join(['%s'] * len(barcode_set))
+    sql = f"""
+    SELECT frey_no, company, l_model_zh, replace_number 
+    FROM crmapp_compare_summary 
+    WHERE frey_no IN ({placeholders})
+    """
+    
+    cursor.execute(sql, list(barcode_set))
+    results = cursor.fetchall()
+    conn.close()
+    
+    mapping = {}
+    for r in results:
+        key = (r['frey_no'], r.get('company', ''))
+        mapping[key] = {
+            'l_model_zh': r.get('l_model_zh', ''),
+            'replace_number': r.get('replace_number', '')
+        }
+    
+    for item in data_list:
+        key = (item.get('物料条码', ''), item.get('company', ''))
+        if key in mapping:
+            item['车型'] = mapping[key]['l_model_zh']
+            item['替换号'] = mapping[key]['replace_number']
+        else:
+            item['车型'] = item.get('车型', '')
+            item['替换号'] = item.get('替换号', '')
+    
+    return data_list
 
 
 def update_all_stores():
@@ -1494,6 +1542,8 @@ def api_beihuo():
         sales_text = f"今/昨/近7天:{today_sales}/{yesterday_sales}/{sales_7d};\n近1/6/12:{sales_month}/{avg_sales_6m}/{avg_sales_12m};"
         row['sales_data'] = sales_text
 
+    result = map_vehicle_fields_from_compare(result)
+
     conn.close()
     return jsonify({
         'code': 0,
@@ -1569,15 +1619,24 @@ def api_car_brands():
 @login_required
 def get_cart():
     """获取购物车数据 - 集成自动清理功能"""
+    from datetime import datetime
+    start_time = datetime.now()
+    
     try:
         # 获取当前用户门店 - 统一使用 get_user_store() 函数
         current_store = get_user_store()
         is_admin = session.get('is_admin', False)
         
+        print(f"[{start_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 收到获取购物车请求: 用户={session.get('username', 'default_user')}, 门店={current_store}")
+        
         # ========== 新增：调用新的请求处理器（包含自动清理）==========
         from app.services.cart_service.cart_request_handler import CartRequestHandler
         handler = CartRequestHandler()
         result = handler.handle_get_cart_request(current_store, is_admin, request.args)
+        
+        end_time = datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        print(f"[{end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 获取购物车完成，数量: {result.get('count', 0)}, 耗时: {elapsed:.3f}s")
         
         # 直接返回处理结果（已包含所有原有功能）
         return jsonify({
@@ -1589,9 +1648,10 @@ def get_cart():
         # =======================================================
         
     except Exception as e:
-        print(f"Debug - Cart Error: {str(e)}")  # 添加错误调试信息
+        error_time = datetime.now()
+        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 获取购物车失败: {str(e)}")  # 添加错误调试信息
         import traceback
-        print(f"Debug - Full traceback: {traceback.format_exc()}")  # 添加完整堆栈跟踪
+        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 错误堆栈: {traceback.format_exc()}")  # 添加完整堆栈跟踪
         return jsonify({'code': 1, 'msg': f'获取购物车数据失败：{str(e)}'})
 
     
@@ -1804,9 +1864,14 @@ def get_cart_items_with_dimension(store, is_admin, dimension='product'):
 @login_required
 def add_to_cart():
     """添加商品到购物车 - 根据 OE 和条码从备货表获取完整数据"""
+    from datetime import datetime
+    start_time = datetime.now()
+    
     try:
         data = request.get_json()
         item_details = data.get('item_details', [])
+        
+        print(f"[{start_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 收到添加购物车请求: 用户={session.get('username', 'default_user')}, 商品数量={len(item_details)}")
 
         if not item_details:
             return jsonify({'code': 1, 'msg': '没有要添加的商品'}), 400
@@ -1995,6 +2060,10 @@ def add_to_cart():
         
         conn.commit()
         conn.close()
+        
+        end_time = datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        print(f"[{end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 添加购物车完成，新增: {len(new_items)}, 跳过: {len(complete_items) - len(new_items)}, 耗时: {elapsed:.3f}s")
 
         return jsonify({
             'code': 0,
@@ -2004,7 +2073,8 @@ def add_to_cart():
         })
         
     except Exception as e:
-        print(f"添加购物车失败：{str(e)}")
+        error_time = datetime.now()
+        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 添加购物车失败：{str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'code': 1, 'msg': f'添加失败：{str(e)}'}), 500
@@ -3472,13 +3542,16 @@ cache_lock = threading.Lock()  # 缓存访问锁
 @app.route('/date_query')
 @login_required
 def date_query():
-    """日期查询页面"""
-    return render_template('date_query.html')
+    """日期查询页面（AG Grid版本）"""
+    return render_template('date_query_ag.html')
 
 @app.route('/api/date_ordercount', methods=['POST'])
 @login_required
 def date_ordercount():
     """根据日期范围查询订单统计"""
+    from datetime import datetime
+    start_time = datetime.now()
+    
     try:
         data = request.get_json()
         start_date = data.get('start')
@@ -3487,6 +3560,8 @@ def date_ordercount():
         page_size = data.get('pageSize', 200)
         sort = data.get('sort', {})
         filter_params = data.get('filter', {})
+        
+        print(f"[{start_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 收到日期查询请求: 用户={session.get('username', 'default_user')}, 开始日期={start_date}, 结束日期={end_date}, 页码={page}, 每页={page_size}")
         
         if not start_date or not end_date:
             return jsonify({'code': 1, 'msg': '缺少日期参数'}), 400
@@ -3500,195 +3575,170 @@ def date_ordercount():
         session['last_date_ordercount_end_date'] = end_date
         session['last_date_ordercount_company'] = company
         
-        print(f"存储到session - 用户: {username}, 开始日期: {start_date}, 结束日期: {end_date}, 页码: {page}, 每页: {page_size}")
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}] 存储到session - 用户: {username}, 开始日期: {start_date}, 结束日期: {end_date}, 页码: {page}, 每页: {page_size}")
         
-        # 检查数据库中是否已有该用户和日期范围的数据
+        # 直接调用外部API获取最新数据
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         
-        check_sql = """
-        SELECT id FROM crmapp_date_search 
-        WHERE username = %s AND start_date = %s AND end_date = %s
-        LIMIT 1
-        """
-        cursor.execute(check_sql, (username, start_date, end_date))
-        existing_data = cursor.fetchone()
-        
-        if existing_data:
-            # 如果已有数据，直接从数据库获取
-            # 先获取总数
-            count_sql = """
-            SELECT COUNT(*) as total FROM crmapp_date_search 
-            WHERE username = %s AND start_date = %s AND end_date = %s
-            """
-            cursor.execute(count_sql, (username, start_date, end_date))
-            total = cursor.fetchone()['total']
-            
-            # 获取分页数据
-            offset = (page - 1) * page_size
-            get_sql = """
-            SELECT * FROM crmapp_date_search 
-            WHERE username = %s AND start_date = %s AND end_date = %s
-            ORDER BY id
-            LIMIT %s OFFSET %s
-            """
-            cursor.execute(get_sql, (username, start_date, end_date, page_size, offset))
-            beihuo_data = cursor.fetchall()
-            print(f"从数据库获取已有数据，总数: {total}, 当前页: {len(beihuo_data)}")
+        api_start_time = datetime.now()
+        url = "http://bi.gzbbr.com/crmapp_api.by_date_xl"
+
+        api_data = {
+            "company": company,
+            "start": start_date,
+            "end": end_date
+        }
+
+        headers = {
+            'Authorization': 'Basic YWRtaW46ODA4OA==',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+
+        import requests
+        print(f"[{api_start_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 开始调用外部API...")
+        response = requests.post(url, data=api_data, headers=headers)
+        api_end_time = datetime.now()
+        api_elapsed = (api_end_time - api_start_time).total_seconds()
+        print(f"[{api_end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 外部API调用完成，状态码: {response.status_code}, 耗时: {api_elapsed:.3f}s")
+
+        if response.status_code != 200:
             conn.close()
-            
-            return jsonify({
-                'code': 0,
-                'msg': '查询成功',
-                'data': beihuo_data,
-                'total': total
-            })
+            return jsonify({'code': 1, 'msg': f'外部API调用失败: {response.text}'}), 400
+
+        try:
+            result = response.json()
+        except Exception as e:
+            conn.close()
+            return jsonify({'code': 1, 'msg': f'API响应解析失败: {str(e)}'}), 400
+
+        if not isinstance(result, list):
+            # 如果返回的是包含数据的字典，需要获取数据列表
+            if isinstance(result, dict) and 'data' in result:
+                data_list = result.get('data', [])
+            else:
+                data_list = []
         else:
-            # 没有缓存数据，调用外部API获取数据
-            url = "http://bi.gzbbr.com/crmapp_api.by_date_xl"
-            
-            api_data = {
-                "company": company,
-                "start": start_date,
-                "end": end_date
-            }
-            
-            headers = {
-                'Authorization': 'Basic YWRtaW46ODA4OA==',
-                'Content-Type': 'application/x-www-form-urlencoded' 
-            }
-            
-            import requests
-            response = requests.post(url, data=api_data, headers=headers)
-            
-            if response.status_code != 200:
-                conn.close()
-                return jsonify({'code': 1, 'msg': f'外部API调用失败: {response.text}'}), 400
-            
-            try:
-                result = response.json()
-            except Exception as e:
-                conn.close()
-                return jsonify({'code': 1, 'msg': f'API响应解析失败: {str(e)}'}), 400
-            
-            if not isinstance(result, list):
-                # 如果返回的是包含数据的字典，需要获取数据列表
-                if isinstance(result, dict) and 'data' in result:
-                    data_list = result.get('data', [])
+            data_list = result
+
+        # 根据物料条码和公司代码查询crmapp_beihuo表中的完整数据
+        # 获取所有查询到的物料条码
+        barcodes = [item.get('物料条码') for item in data_list if item.get('物料条码')]
+
+        if barcodes:
+            placeholders = ','.join(['%s'] * len(barcodes))
+            sql = f"""
+            SELECT `oe`, `今日销量`, `供应商`, `全国近1个月询价量`, `全国近3个月月均询价量`,
+                   `内部备注`, `品牌`, `品牌号`, `库存数量`, `库存金额`, `成品可卖天数`,
+                   `成本价`, `昨日销量`, `本月销量`, `标签`, `物料名称`, `物料条码`,
+                   `车型品牌`, `近12个月月均销量`, `近1个月询价量`, `近3个月月均询价量`,
+                   `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`,`company`
+            FROM crmapp_beihuo
+            WHERE `物料条码` IN ({placeholders}) AND `company` = %s
+            """
+            cursor.execute(sql, barcodes + [company])
+            beihuo_data = cursor.fetchall()
+
+            # 将销量信息添加到返回数据中
+            for item in beihuo_data:
+                barcode = item['物料条码']
+                # 查找对应的销量信息
+                for order_item in data_list:
+                    if order_item.get('物料条码') == barcode:
+                        item['销量'] = order_item.get('自定义销量', 0)
+                        break
                 else:
-                    data_list = []
-            else:
-                data_list = result
-            
-            # 根据物料条码和公司代码查询crmapp_beihuo表中的完整数据
-            # 获取所有查询到的物料条码
-            barcodes = [item.get('物料条码') for item in data_list if item.get('物料条码')]
-            
-            if barcodes:
-                placeholders = ','.join(['%s'] * len(barcodes))
-                sql = f"""
-                SELECT `oe`, `今日销量`, `供应商`, `全国近1个月询价量`, `全国近3个月月均询价量`,
-                       `内部备注`, `品牌`, `品牌号`, `库存数量`, `库存金额`, `成品可卖天数`,
-                       `成本价`, `昨日销量`, `本月销量`, `标签`, `物料名称`, `物料条码`,
-                       `车型品牌`, `近12个月月均销量`, `近1个月询价量`, `近3个月月均询价量`,
-                       `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`,`company`
-                FROM crmapp_beihuo 
-                WHERE `物料条码` IN ({placeholders}) AND `company` = %s
-                """
-                cursor.execute(sql, barcodes + [company])
-                beihuo_data = cursor.fetchall()
-                
-                # 将销量信息添加到返回数据中
-                for item in beihuo_data:
-                    barcode = item['物料条码']
-                    # 查找对应的销量信息
-                    for order_item in data_list:
-                        if order_item.get('物料条码') == barcode:
-                            item['销量'] = order_item.get('自定义销量', 0)
-                            break
-                    else:
-                        item['销量'] = 0  # 如果没有对应的销量数据，则设为0
-            else:
-                beihuo_data = []
-            
-            # 将查询结果批量存储到数据库中
-            if beihuo_data:
-                # 先删除该用户和日期范围的旧数据（如果有）
-                delete_sql = """
-                DELETE FROM crmapp_date_search 
-                WHERE username = %s AND start_date = %s AND end_date = %s
-                """
-                cursor.execute(delete_sql, (username, start_date, end_date))
-                
-                # 准备批量插入的数据
-                batch_data = []
-                for item in beihuo_data:
-                    batch_data.append((
-                        username, start_date, end_date, company, 
-                        item.get('物料条码', ''),
-                        item.get('物料名称', ''),
-                        item.get('品牌', ''),
-                        item.get('品牌号', ''),
-                        item.get('车型品牌', '') or '',  # 添加车型品牌字段
-                        item.get('oe', ''),
-                        item.get('标签', ''),
-                        item.get('车型', '') or '',  # 添加车型字段
-                        item.get('替换号', '') or '',  # 添加替换号字段
-                        item.get('今日销量', 0),
-                        item.get('昨日销量', 0),
-                        item.get('本月销量', 0),
-                        item.get('近7天销量', 0),
-                        item.get('近1个月询价量', 0),
-                        item.get('近3个月月均询价量', 0.00),
-                        item.get('近6个月月均销量', 0.00),
-                        item.get('近12个月月均销量', 0.00),
-                        item.get('成品可卖天数', 0),
-                        item.get('库存数量', 0),
-                        item.get('在途数量', 0),
-                        item.get('成本价', 0.00),
-                        item.get('库存金额', 0.00),
-                        item.get('供应商', '') or '',  # 添加供应商字段
-                        item.get('全国近1个月询价量', 0),  # 添加全国近1个月询价量字段
-                        item.get('全国近3个月月均询价量', 0),  # 添加全国近3个月月均询价量字段
-                        item.get('内部备注', '') or '',  # 添加内部备注字段
-                        item.get('预警状态', '') or '',  # 添加预警状态字段
-                        item.get('销量', 0)
-                    ))
-                
-                # 批量插入数据
-                insert_sql = """
-                INSERT INTO crmapp_date_search (
-                    username, start_date, end_date, company, 物料条码, 物料名称, 品牌, 品牌号, 
-                    车型品牌, oe, 标签, 车型, 替换号, 今日销量, 昨日销量, 本月销量, 近7天销量, 近1个月询价量, 近3个月月均询价量, 
-                    近6个月月均销量, 近12个月月均销量, 成品可卖天数, 库存数量, 在途数量, 成本价, 库存金额, 供应商, 
-                    全国近1个月询价量, 全国近3个月月均询价量, 内部备注, 预警状态, 销量
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """
-                cursor.executemany(insert_sql, batch_data)
-                print(f"批量插入了 {len(batch_data)} 条数据到数据库")
-            else:
-                print("没有数据需要插入到数据库")
-            
-            conn.commit()
-            
-            # 获取总数和分页数据
-            total = len(beihuo_data)
-            offset = (page - 1) * page_size
-            paginated_data = beihuo_data[offset:offset + page_size]
-            
-            conn.close()
-            
-            return jsonify({
-                'code': 0,
-                'msg': '查询成功',
-                'data': paginated_data,
-                'total': total
-            })
-        
+                    item['销量'] = 0  # 如果没有对应的销量数据，则设为0
+        else:
+            beihuo_data = []
+
+        # 将查询结果批量存储到数据库中
+        if beihuo_data:
+            # 先删除该用户和组织的旧数据（如果有）
+            delete_sql = """
+            DELETE FROM crmapp_date_search
+            WHERE username = %s AND company = %s
+            """
+            cursor.execute(delete_sql, (username, company))
+
+            # 准备批量插入的数据
+            batch_data = []
+            for item in beihuo_data:
+                batch_data.append((
+                    username, start_date, end_date, company,
+                    item.get('物料条码', ''),
+                    item.get('物料名称', ''),
+                    item.get('品牌', ''),
+                    item.get('品牌号', ''),
+                    item.get('车型品牌', '') or '',
+                    item.get('oe', ''),
+                    item.get('标签', ''),
+                    item.get('车型', '') or '',
+                    item.get('替换号', '') or '',
+                    item.get('今日销量', 0),
+                    item.get('昨日销量', 0),
+                    item.get('本月销量', 0),
+                    item.get('近7天销量', 0),
+                    item.get('近1个月询价量', 0),
+                    item.get('近3个月月均询价量', 0.00),
+                    item.get('近6个月月均销量', 0.00),
+                    item.get('近12个月月均销量', 0.00),
+                    item.get('成品可卖天数', 0),
+                    item.get('库存数量', 0),
+                    item.get('在途数量', 0),
+                    item.get('成本价', 0.00),
+                    item.get('库存金额', 0.00),
+                    item.get('供应商', '') or '',
+                    item.get('全国近1个月询价量', 0),
+                    item.get('全国近3个月月均询价量', 0),
+                    item.get('内部备注', '') or '',
+                    item.get('预警状态', '') or '',
+                    item.get('销量', 0)
+                ))
+
+            # 批量插入数据
+            insert_sql = """
+            INSERT INTO crmapp_date_search (
+                username, start_date, end_date, company, 物料条码, 物料名称, 品牌, 品牌号,
+                车型品牌, oe, 标签, 车型, 替换号, 今日销量, 昨日销量, 本月销量, 近7天销量, 近1个月询价量, 近3个月月均询价量,
+                近6个月月均销量, 近12个月月均销量, 成品可卖天数, 库存数量, 在途数量, 成本价, 库存金额, 供应商,
+                全国近1个月询价量, 全国近3个月月均询价量, 内部备注, 预警状态, 销量
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.executemany(insert_sql, batch_data)
+            insert_end_time = datetime.now()
+            insert_elapsed = (insert_end_time - api_end_time).total_seconds()
+            print(f"[{insert_end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 批量插入了 {len(batch_data)} 条数据到数据库，耗时: {insert_elapsed:.3f}s")
+        else:
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}] 没有数据需要插入到数据库")
+
+        conn.commit()
+
+        # 获取总数和分页数据
+        total = len(beihuo_data)
+        offset = (page - 1) * page_size
+        paginated_data = beihuo_data[offset:offset + page_size]
+
+        paginated_data = map_vehicle_fields_from_compare(paginated_data)
+
+        conn.close()
+
+        end_time = datetime.now()
+        total_elapsed = (end_time - start_time).total_seconds()
+        print(f"[{end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 请求处理完成，总耗时: {total_elapsed:.3f}s, 返回数据: {len(paginated_data)} 条")
+
+        return jsonify({
+            'code': 0,
+            'msg': '查询成功',
+            'data': paginated_data,
+            'total': total
+        })
+
     except Exception as e:
-        print(f"Debug - date_ordercount函数发生错误: {str(e)}")  # 添加详细错误信息
+        error_time = datetime.now()
+        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] date_ordercount函数发生错误: {str(e)}")  # 添加详细错误信息
         import traceback
-        print(f"Debug - 错误堆栈: {traceback.format_exc()}")  # 添加堆栈跟踪
+        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 错误堆栈: {traceback.format_exc()}")  # 添加堆栈跟踪
         return jsonify({'code': 1, 'msg': f'查询失败: {str(e)}'}), 500
 
 # 新增API：日期查询结果面板的搜索功能
@@ -3708,29 +3758,32 @@ def date_ordercount_search():
         field = data.get('field', '').strip()  # 排序字段
         order = data.get('order', '').strip()  # 排序方向：asc/desc
         
-        # 获取日期范围参数（用于定位特定查询的数据）
-        start_date = session.get('last_date_ordercount_start_date')
-        end_date = session.get('last_date_ordercount_end_date')
+        print(f"[高级搜索] 收到请求: OE={oe}, 条码={barcode}, 名称={material_name}, 品牌={brand}, 标签={tag}")
+        
+        # 获取组织和用户信息（用于定位特定查询的数据）
+        company = session.get('last_date_ordercount_company')
         username = session.get('username', 'default_user')
         
-        # 如果没有日期范围信息，返回提示
-        if not start_date or not end_date:
+        print(f"[高级搜索] 组织: {company}, 用户: {username}")
+        
+        # 如果没有组织信息，返回提示
+        if not company:
             return jsonify({
                 'code': 0,
                 'msg': '请先执行日期范围查询以获取数据',
                 'data': []
             })
         
-        # 从数据库获取该用户和日期范围的缓存数据
+        # 从数据库获取该用户和组织的缓存数据
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         
         get_sql = """
         SELECT * FROM crmapp_date_search 
-        WHERE username = %s AND start_date = %s AND end_date = %s
+        WHERE username = %s AND company = %s
         ORDER BY id
         """
-        cursor.execute(get_sql, (username, start_date, end_date))
+        cursor.execute(get_sql, (username, company))
         cached_data = cursor.fetchall()
         conn.close()
 
@@ -3748,6 +3801,8 @@ def date_ordercount_search():
         material_name_list = process_material_name_search(material_name) if material_name else []
         brand_list = [item.strip() for item in brand.split('\n') if item.strip()] if '\n' in brand else ([brand] if brand else [])
         tag_list = [item.strip() for item in tag.split('\n') if item.strip()] if '\n' in tag else ([tag] if tag else [])
+        
+        print(f"[高级搜索] 解析后: OE列表={oe_list}, 条码列表={barcode_list}, 名称列表={material_name_list}, 品牌列表={brand_list}, 标签列表={tag_list}")
         
         # 在缓存数据中进行搜索
         filtered_data = []
@@ -3814,6 +3869,8 @@ def date_ordercount_search():
             except Exception as e:
                 print(f"排序过程中出现错误: {str(e)}")
                 # 如果排序失败，保持原有顺序
+        
+        print(f"[高级搜索] 过滤完成: 原始数据 {len(cached_data)} 条, 过滤后 {len(filtered_data)} 条")
         
         return jsonify({
             'code': 0,
@@ -4403,83 +4460,6 @@ def init_background_tasks():
         pass
 
 
-# ==================== 安全库存API路由 ====================
-
-@app.route('/api/safety-stock/calculate', methods=['POST'])
-def api_calculate_safety_stock():
-    """计算单个SKU的安全库存"""
-    from app.services.inventory_service import SafetyStockService
-    
-    data = request.get_json()
-    sku = data.get('sku')
-    
-    if not sku:
-        return jsonify({'code': 400, 'msg': '缺少SKU参数', 'data': None})
-    
-    service = SafetyStockService()
-    result = service.calculate_single(sku)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/calculate-pilot', methods=['POST'])
-def api_calculate_pilot():
-    """试点计算（10个SKU）"""
-    from app.services.inventory_service import SafetyStockService
-    
-    service = SafetyStockService()
-    result = service.calculate_pilot(limit=10)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/calculate-all', methods=['POST'])
-def api_calculate_all():
-    """全量计算所有SKU"""
-    from app.services.inventory_service import SafetyStockService
-    
-    service = SafetyStockService()
-    result = service.calculate_all(batch_size=100)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/list', methods=['GET'])
-def api_safety_stock_list():
-    """获取安全库存列表"""
-    from app.services.inventory_service import SafetyStockService
-    
-    page = request.args.get('page', 1, type=int)
-    page_size = request.args.get('page_size', 20, type=int)
-    status = request.args.get('status', None)
-    
-    service = SafetyStockService()
-    result = service.get_list(page=page, page_size=page_size, status=status)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/detail/<sku>', methods=['GET'])
-def api_safety_stock_detail(sku):
-    """获取单个SKU的详情"""
-    from app.services.inventory_service import SafetyStockService
-    
-    service = SafetyStockService()
-    result = service.get_result(sku)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/warning', methods=['GET'])
-def api_safety_stock_warning():
-    """获取预警列表"""
-    from app.services.inventory_service import SafetyStockService
-    
-    status = request.args.get('status', 'danger')
-    service = SafetyStockService()
-    result = service.get_warning_list(status=status)
-    return jsonify(result)
-
-
-@app.route('/safety-stock')
-def safety_stock_page():
-    """安全库存管理页面"""
-    return render_template('safety_stock.html')
 
 
 # 应用启动配置

@@ -110,8 +110,12 @@ class CRMDataCrawlService:
         product_grade = str(product.get('product_grade', '6'))
         product_level = PRODUCT_GRADE_MAP.get(product_grade, '无')
 
-        # 注意：采购记录现在由 PurchaseHistoryService 单独处理
-        # 这里不再解析 purchasing_record 字段，价格字段由同步服务更新
+        # 解析在途库存列表
+        stock_zaitu_list = product.get('stock_zaitu_list', [])
+        if stock_zaitu_list:
+            stock_zaitu_list = json.dumps(stock_zaitu_list, ensure_ascii=False)
+        else:
+            stock_zaitu_list = None
 
         return {
             'oe': product.get('number', ''),
@@ -124,9 +128,12 @@ class CRMDataCrawlService:
             'is_cass': product.get('is_cass', ''),
             'product_remark': product.get('company_remark', ''),
             'product_level': product_level,
-            'supplier_price': 0.0,  # 由 PurchaseSyncService 更新
-            'max_price': 0.0,       # 由 PurchaseSyncService 更新
-            'min_price': 0.0        # 由 PurchaseSyncService 更新
+            'l_model_zh': product.get('l_model_zh', ''),
+            'stock_zaitu_list': stock_zaitu_list,
+            'frey_no': product.get('frey_no', ''),
+            'supplier_price': 0.0,
+            'max_price': 0.0,
+            'min_price': 0.0
         }
 
     def batch_save(self, products: List[Dict]) -> int:
@@ -143,7 +150,8 @@ class CRMDataCrawlService:
                 columns = [
                     'oe', 'brand', 'company', 'product_name', 'vehicle_brand',
                     'replace_number', 'brand_code', 'is_cass', 'product_remark',
-                    'product_level', 'supplier_price', 'max_price', 'min_price'
+                    'product_level', 'l_model_zh', 'stock_zaitu_list', 'frey_no',
+                    'supplier_price', 'max_price', 'min_price'
                 ]
 
                 placeholders = ', '.join(['%s'] * len(columns))
@@ -160,6 +168,11 @@ class CRMDataCrawlService:
 
                 values = []
                 for product in products:
+                    # 确保 stock_zaitu_list 是有效值或 None，避免空字符串导致批量插入失败
+                    stock_zaitu = product.get('stock_zaitu_list')
+                    if not stock_zaitu:
+                        stock_zaitu = None
+
                     row = [
                         product.get('oe', ''),
                         product.get('brand', ''),
@@ -171,6 +184,9 @@ class CRMDataCrawlService:
                         product.get('is_cass', ''),
                         product.get('product_remark', ''),
                         product.get('product_level', ''),
+                        product.get('l_model_zh', ''),
+                        stock_zaitu,
+                        product.get('frey_no', ''),
                         product.get('supplier_price', 0.0),
                         product.get('max_price', 0.0),
                         product.get('min_price', 0.0)

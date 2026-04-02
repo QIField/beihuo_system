@@ -40,9 +40,9 @@ class CartRequestHandler:
             try:
                 page = int(args.get('page', 1))
                 limit = int(args.get('limit', 50))
-                # 限制最大每页数量，防止性能问题
-                if limit > 500:
-                    limit = 500
+                # 限制最大每页数量，防止性能问题（但允许获取全部数据）
+                if limit > 9999:
+                    limit = 9999
                 if limit < 1:
                     limit = 50
                 if page < 1:

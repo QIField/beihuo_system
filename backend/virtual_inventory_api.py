@@ -173,17 +173,13 @@ def refresh_update_status():
 def get_business_date(target_time):
     """
     获取业务日期
-    业务日期定义：从当天下午13:00到第二天下午13:00为一个完整的业务日
+    业务日期定义：使用自然日，即当天00:00:00到23:59:59
     """
     if isinstance(target_time, str):
         target_time = datetime.strptime(target_time, '%Y-%m-%d %H:%M:%S')
     
-    # 如果目标时间的小时数小于13，则属于前一天的业务日
-    if target_time.hour < 13:
-        business_date = target_time.date() - timedelta(days=1)
-    else:
-        # 如果目标时间的小时数大于等于13，则属于当天的业务日
-        business_date = target_time.date()
+    # 直接使用当天的日期作为业务日期
+    business_date = target_time.date()
         
     return business_date
 
