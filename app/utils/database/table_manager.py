@@ -11,6 +11,8 @@ from .tables import (
     init_zhuozhixing_table,
     init_inventory_detail_table,
     init_safety_stock_table,
+    init_ks_inquiry_detail_table,
+    init_weixin_inquiry_detail_table,
 )
 
 
@@ -679,7 +681,10 @@ def init_all_tables():
         ('比价汇总', init_compare_summary_table),
         ('销量明细', init_sales_history_detail_table),
         ('询价次数', init_quote_count_ks_table),
+        ('开思询价明细', init_ks_inquiry_detail_table),
+        ('微信询价明细', init_weixin_inquiry_detail_table),
         ('采购历史', init_procurement_history_table),
+        ('采购历史明细', init_procurement_history_detail_table),
         ('卓之星库存', init_zhuozhixing_table),
         ('安全库存', init_safety_stock_table),
         ('库存明细', init_inventory_detail_table),

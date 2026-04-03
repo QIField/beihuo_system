@@ -288,30 +288,30 @@ class SalesHistorySyncService:
                 SET s.month_sales = COALESCE(h.qty, 0)
             """, (thirty_days_ago, yesterday, self.COMPANY))
 
-            # 5. 更新 avg_sales_6m（近6个月月均）
+            # 5. 更新 sales_6m（近6个月总和）
             six_months_ago = yesterday - timedelta(days=180)
             cursor.execute("""
                 UPDATE crmapp_compare_summary s
                 LEFT JOIN (
-                    SELECT number as oe, brand_name as brand, ROUND(SUM(quantity) / 6) as avg_qty
+                    SELECT number as oe, brand_name as brand, SUM(quantity) as qty
                     FROM crmapp_sales_history_detail
                     WHERE DATE(create_date) BETWEEN %s AND %s AND company = %s
                     GROUP BY number, brand_name
                 ) h ON s.oe = h.oe AND s.brand = h.brand
-                SET s.avg_sales_6m = COALESCE(h.avg_qty, 0)
+                SET s.avg_sales_6m = COALESCE(h.qty, 0)
             """, (six_months_ago, yesterday, self.COMPANY))
 
-            # 6. 更新 avg_sales_12m（近12个月月均）
+            # 6. 更新 sales_12m（近12个月总和）
             twelve_months_ago = yesterday - timedelta(days=365)
             cursor.execute("""
                 UPDATE crmapp_compare_summary s
                 LEFT JOIN (
-                    SELECT number as oe, brand_name as brand, ROUND(SUM(quantity) / 12) as avg_qty
+                    SELECT number as oe, brand_name as brand, SUM(quantity) as qty
                     FROM crmapp_sales_history_detail
                     WHERE DATE(create_date) BETWEEN %s AND %s AND company = %s
                     GROUP BY number, brand_name
                 ) h ON s.oe = h.oe AND s.brand = h.brand
-                SET s.avg_sales_12m = COALESCE(h.avg_qty, 0)
+                SET s.avg_sales_12m = COALESCE(h.qty, 0)
             """, (twelve_months_ago, yesterday, self.COMPANY))
 
             print(f"[更新] 汇总表销量数据更新完成")

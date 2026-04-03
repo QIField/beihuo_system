@@ -196,7 +196,13 @@ def init_daily_crawl_task():
 
 
 def init_ks_quote_count_task():
-    """初始化开思询价次数同步任务（每天9:15执行）"""
+    """初始化询价次数同步任务（每天9:15执行）
+    
+    包含：
+    1. 微信询价解析
+    2. 开思询价爬取
+    3. 合并统计
+    """
     import os
 
     if os.environ.get('AUTO_START_KS_QUOTE_COUNT', 'true').lower() == 'false':
@@ -204,17 +210,47 @@ def init_ks_quote_count_task():
         return
 
     try:
-        from app.services.quote_count_service import QuoteCountSyncService
+        def run_quote_count_pipeline():
+            """询价次数完整流程"""
+            print("\n" + "="*70)
+            print("[询价次数同步] 开始执行")
+            print("="*70)
+            
+            # 1. 先解析微信询价（近7天）
+            print("\n[1/3] 解析微信询价数据...")
+            try:
+                from app.services.quote_count_service.weixin_quote_service import WeixinQuoteParserService
+                weixin_result = WeixinQuoteParserService().parse_recent_days(days=7)
+                print(f"✓ 微信解析完成: {weixin_result.get('saved_count', 0)} 条")
+            except Exception as e:
+                print(f"✗ 微信解析失败: {e}")
+                weixin_result = {'saved_count': 0}
+            
+            # 2. 再爬开思询价
+            print("\n[2/3] 爬取开思询价数据...")
+            from app.services.quote_count_service import QuoteCountSyncService
+            ks_result = QuoteCountSyncService().sync_recent_two_months()
+            
+            # 3. 统计结果
+            print("\n[3/3] 询价次数同步完成")
+            print(f"  - 微信: {weixin_result.get('saved_count', 0)} 条")
+            print(f"  - 开思: {ks_result.get('total_items', 0)} 条")
+            print("="*70 + "\n")
+            
+            return {
+                'weixin': weixin_result,
+                'ks': ks_result
+            }
 
         task_manager.schedule(
-            lambda: QuoteCountSyncService().sync_recent_two_months(),
+            run_quote_count_pipeline,
             'cron',
             'ks_quote_count_task',
             hour=9,
             minute=15,
             replace_existing=True
         )
-        print("[询价次数同步] 定时任务已注册（每天9:15）")
+        print("[询价次数同步] 定时任务已注册（每天9:15，包含微信+开思）")
 
     except Exception as e:
         logger.error(f"[询价次数同步] 失败: {e}")

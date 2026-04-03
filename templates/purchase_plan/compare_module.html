@@ -5,57 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>比价模块 - 采购计划</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='js/handsontable/handsontable.full.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/purchase_plan/common.css') }}">
     <script src="{{ url_for('static', filename='js/handsontable/handsontable.full.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/purchase_plan/common.js') }}"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Microsoft YaHei', Arial, sans-serif;
-            background-color: #f5f5f5;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 100%;
-            margin: 0 auto;
-        }
-
-        h2 {
-            margin-bottom: 20px;
-            color: #333;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background-color: #1890ff;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: #40a9ff;
-        }
-
-        .btn-default {
-            background-color: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-default:hover {
-            background-color: #d9d9d9;
-        }
-
         /* 自定义浮窗样式 - 左右分栏布局 */
         .price-tooltip {
             position: absolute;
@@ -309,128 +262,7 @@
             opacity: 0.4;
         }
 
-        /* 展开按钮样式 - 简约设计，默认隐藏 */
-        .expand-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 16px;
-            height: 16px;
-            margin-left: 4px;
-            background: transparent;
-            color: #999;
-            border: 1px solid #d9d9d9;
-            border-radius: 2px;
-            cursor: pointer;
-            font-size: 10px;
-            line-height: 1;
-            vertical-align: middle;
-            transition: all 0.2s ease;
-            opacity: 0;  /* 默认隐藏 */
-        }
-
-        /* 单元格悬浮时显示展开按钮 */
-        .handsontable .htCore td:hover .expand-btn {
-            opacity: 1;
-        }
-
-        .expand-btn:hover {
-            background: #f0f0f0;
-            border-color: #bfbfbf;
-            color: #666;
-        }
-
-        .expand-btn.expanded {
-            background: #e6f7ff;
-            border-color: #1890ff;
-            color: #1890ff;
-            opacity: 1;  /* 展开状态始终显示 */
-        }
-
-        .data-container {
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: calc(100vh - 120px);
-            min-height: 500px;
-        }
-
-        .data-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid #e8e8e8;
-            flex-shrink: 0;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .search-bar {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .search-input {
-            padding: 8px 12px;
-            border: 1px solid #d9d9d9;
-            border-radius: 4px;
-            font-size: 14px;
-            width: 180px;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #1890ff;
-            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-        }
-
-        #handsontable-container {
-            flex: 1;
-            width: 100%;
-            overflow: hidden;
-        }
-
-        /* Handsontable 自定义样式 */
-        .handsontable .htCore td {
-            border: 1px solid #e8e8e8;
-            color: #000 !important;
-        }
-
-        .handsontable .htCore th {
-            background-color: #fafafa;
-            border: 1px solid #e8e8e8;
-            color: #000 !important;
-        }
-
-        .row-number-cell {
-            background-color: #f5f5f5 !important;
-            text-align: center;
-            font-weight: 500;
-            color: #000 !important;
-        }
-
-        .oe-cell {
-            background-color: #f0f5ff !important;
-            font-weight: 600;
-            text-align: center;
-            vertical-align: middle !important;
-            color: #000 !important;
-        }
-
-        .brand-cell {
-            background-color: #fff7e6 !important;
-            font-weight: 500;
-            text-align: center;
-            vertical-align: middle !important;
-            color: #000 !important;
-        }
-
+        /* 比价模块特有单元格样式 */
         .product-name-cell {
             background-color: #f6ffed !important;
             color: #000 !important;
@@ -439,12 +271,6 @@
         .vehicle-brand-cell {
             background-color: #e6fffb !important;
             color: #000 !important;
-        }
-
-        .price-cell {
-            color: #ff4d4f !important;
-            font-weight: 500;
-            text-align: right;
         }
 
         .quantity-cell {
@@ -472,36 +298,6 @@
             color: #999 !important;
             font-size: 12px;
             text-align: center;
-        }
-
-        .loading-overlay {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 200px;
-            font-size: 16px;
-            color: #666;
-        }
-
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            padding: 15px 20px;
-            border-top: 1px solid #e8e8e8;
-            flex-shrink: 0;
-        }
-
-        .pagination-info {
-            color: #000;
-            font-size: 14px;
-        }
-
-        .pagination select {
-            border: 1px solid #d9d9d9;
-            border-radius: 4px;
-            font-size: 14px;
         }
     </style>
 </head>
@@ -547,31 +343,6 @@
         let currentPage = 1;
         let pageSize = 100;
         let totalPages = 1;
-
-        // 空值处理函数
-        function formatEmptyValue(value) {
-            if (value === null || value === undefined || value === '' || 
-                value === 'nan' || value === 'NaN' || value === 'nane' || value === 'NANE') {
-                return '';
-            }
-            return value;
-        }
-
-        // 格式化价格
-        function formatPrice(value) {
-            if (!value || value === '' || value === null || value === undefined) return '';
-            const num = parseFloat(value);
-            if (isNaN(num)) return value;
-            return '¥' + num.toFixed(2);
-        }
-
-        // 格式化数字
-        function formatNumber(value) {
-            if (!value || value === '' || value === null || value === undefined) return '';
-            const num = parseInt(value);
-            if (isNaN(num)) return value;
-            return num.toLocaleString();
-        }
 
         // 询价历史缓存（Map结构：key为 "oe|brand"，value为询价历史数组）
         const quoteHistoryCache = new Map();
@@ -1522,7 +1293,7 @@
 
                 // 选中复制功能
                 selectionMode: 'multiple',
-                copyPaste: true,
+                copyPaste: false,
                 contextMenu: false,
 
                 // 其他配置
@@ -1573,6 +1344,9 @@
                     }
                 }
             });
+
+            // 添加自定义复制事件监听（使用公共函数，替换号列索引为5）
+            setupCustomCopy(hot, container, 5);
         }
 
         // 搜索条件缓存
@@ -1803,16 +1577,6 @@
                 console.error('导出失败:', error);
                 alert('导出失败: ' + error.message);
             }
-        }
-
-        function formatDate(date) {
-            const year = date.getFullYear();
-            const month = ('0' + (date.getMonth() + 1)).slice(-2);
-            const day = ('0' + date.getDate()).slice(-2);
-            const hour = ('0' + date.getHours()).slice(-2);
-            const minute = ('0' + date.getMinutes()).slice(-2);
-            const second = ('0' + date.getSeconds()).slice(-2);
-            return year + month + day + '_' + hour + minute + second;
         }
 
         document.addEventListener('DOMContentLoaded', function() {

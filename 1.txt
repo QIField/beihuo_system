@@ -1,831 +1,96 @@
-{
-    "code": 200,
-    "data": {
-        "content": [
-            {
-                "storeResolveItem": {
-                    "resolveResultId": "976066c6-cd6e-4771-b666-36f6a5abc713",
-                    "quotedPriceItemId": "69ce1438760d1f0001f1b6f1",
-                    "status": "QUOTE",
-                    "source": "AUTO",
-                    "functionAuthority": {
-                        "canAddQuoteResult": true
-                    }
-                },
-                "storeQuoteItemResults": [
-                    {
-                        "userNeedsItemId": "69ce143a760d1f00016d0fbf",
-                        "resolveResultId": "976066c6-cd6e-4771-b666-36f6a5abc713",
-                        "storeId": "FSBBR001",
-                        "inquiryId": "B26040278670",
-                        "productId": "22160020164890296700",
-                        "productType": "FINISHED_GOODS",
-                        "oldPartsNum": "0004212512",
-                        "partsNum": "0004212512",
-                        "partsName": "前刹车碟",
-                        "partType": "BRAND_PARTS",
-                        "brandId": "TEXTAR",
-                        "brandName": "泰克斯塔（泰明顿）",
-                        "storeServiceArea": "LOCAL",
-                        "price": 286.19,
-                        "btPrice": 269.99,
-                        "sellerBtPrice": 269.99,
-                        "sellerPrice": 286.19,
-                        "btBoxFee": 0,
-                        "atBoxFee": 0,
-                        "btSellerAndBoxFee": 269.99,
-                        "atSellerAndBoxFee": 286.19,
-                        "btBuyerAndBoxFee": 269.99,
-                        "atBuyerAndBoxFee": 286.19,
-                        "quantity": 1,
-                        "remark": "坚守品质底线，决不像低价格低头！！！泰明顿授权经销商！！！ 可索源！！！可索赔！！！",
-                        "sellerStatus": "SALABLE",
-                        "source": "AUTO",
-                        "createdBy": "system",
-                        "arrivalTime": 0,
-                        "location": "CN_FSCCC",
-                        "locationName": "佛山禅城仓",
-                        "sellType": "COMMON",
-                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808696321779097601\"},{\"key\":\"JPL0002\",\"value\":\"10\",\"desc\":\"假一赔三\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":true,\"id\":\"1984141261701160962\",\"icon\":\"\",\"title\":\"假一赔十\",\"groupId\":2,\"innerSort\":12,\"scenarioId\":\"1984161093630504962\"},{\"key\":\"PCC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"配套资质范围\",\"display\":false,\"id\":\"1904469166013997058\",\"icon\":\"\",\"title\":\"配套资质范围\",\"groupId\":5,\"innerSort\":2,\"scenarioId\":\"1904470811794657281\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CassQualityAssurePolicy\",\"value\":\"6M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"开思质保6个月\",\"display\":false,\"id\":\"1927054973947441152\",\"icon\":\"https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg\",\"title\":\"开思质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CompensationPolicy\",\"value\":\"10\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":false,\"id\":\"1927054975709048832\",\"icon\":\"https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg\",\"title\":\"假一赔十\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
-                        "afterSalePoliciesInfos": [
-                            {
-                                "key": "THL0001",
-                                "value": "7",
-                                "desc": "专营店7天无理由",
-                                "url": "",
-                                "displayName": "7天无理由退货",
-                                "display": true,
-                                "id": "1570581392623861762",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "JPL0002",
-                                "value": "10",
-                                "desc": "假一赔三",
-                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
-                                "displayName": "假一赔十",
-                                "display": true,
-                                "id": "1984141261701160962",
-                                "icon": "",
-                                "title": "假一赔十"
-                            },
-                            {
-                                "key": "PCC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "配套资质范围",
-                                "display": false,
-                                "id": "1904469166013997058",
-                                "icon": "",
-                                "title": "配套资质范围"
-                            },
-                            {
-                                "key": "BZC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "保装车",
-                                "display": true,
-                                "id": "1692728146474762242",
-                                "icon": "",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "ReturnWithoutReasonPolicy",
-                                "value": "7",
-                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
-                                "displayName": "7天无理由退货",
-                                "display": false,
-                                "id": "20231109001",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "CassQualityAssurePolicy",
-                                "value": "6M",
-                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
-                                "displayName": "开思质保6个月",
-                                "display": false,
-                                "id": "1927054973947441152",
-                                "icon": "https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg",
-                                "title": "开思质保"
-                            },
-                            {
-                                "key": "CompensationPolicy",
-                                "value": "10",
-                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
-                                "displayName": "假一赔十",
-                                "display": false,
-                                "id": "1927054975709048832",
-                                "icon": "https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg",
-                                "title": "假一赔十"
-                            },
-                            {
-                                "key": "InstallAssurePolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "保装车",
-                                "display": false,
-                                "id": "1927054975390281728",
-                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "TechnicalSupportPolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "技术支持",
-                                "display": true,
-                                "id": "1927054975310589952",
-                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
-                                "title": "技术支持"
-                            }
-                        ],
-                        "taxRate": 6,
-                        "openInvoiceType": "BOTH",
-                        "partsBrandQuality": "EXTERNAL_BRAND",
-                        "needPackage": "",
-                        "originalAssort": 0,
-                        "recommend": 0,
-                        "quotationResources": [],
-                        "quotationDescriptions": [],
-                        "orderIds": [],
-                        "functionAuthority": {
-                            "canModifyQuoteResult": false
-                        }
-                    },
-                    {
-                        "userNeedsItemId": "69ce143a760d1f00016d0fc0",
-                        "resolveResultId": "976066c6-cd6e-4771-b666-36f6a5abc713",
-                        "storeId": "FSBBR001",
-                        "inquiryId": "B26040278670",
-                        "productId": "23773572216105657470",
-                        "productType": "FINISHED_GOODS",
-                        "oldPartsNum": "0004212512",
-                        "partsNum": "0004212512",
-                        "partsName": "前刹车碟",
-                        "partType": "BRAND_PARTS",
-                        "brandId": "OTHERS",
-                        "brandName": "其他",
-                        "storeServiceArea": "LOCAL",
-                        "price": 140.98,
-                        "btPrice": 133,
-                        "sellerBtPrice": 133,
-                        "sellerPrice": 140.98,
-                        "btBoxFee": 0,
-                        "atBoxFee": 0,
-                        "btSellerAndBoxFee": 133,
-                        "atSellerAndBoxFee": 140.98,
-                        "btBuyerAndBoxFee": 133,
-                        "atBuyerAndBoxFee": 140.98,
-                        "quantity": 1,
-                        "remark": "",
-                        "sellerStatus": "SALABLE",
-                        "source": "AUTO",
-                        "createdBy": "system",
-                        "arrivalTime": 0,
-                        "location": "CN_GZYXC",
-                        "locationName": "广州越秀仓",
-                        "sellType": "COMMON",
-                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808756778179837953\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"QualityAssurePolicy\",\"value\":\"12M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"商家质保12个月\",\"display\":true,\"id\":\"1927054974513672192\",\"icon\":\"https://fe-static.cassmall.com/assets/images/1fe67d1f27ec5906d8c279d1990c95b1.svg\",\"title\":\"商家质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
-                        "afterSalePoliciesInfos": [
-                            {
-                                "key": "THL0001",
-                                "value": "7",
-                                "desc": "专营店7天无理由",
-                                "url": "",
-                                "displayName": "7天无理由退货",
-                                "display": true,
-                                "id": "1570581392623861762",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "BZC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "保装车",
-                                "display": true,
-                                "id": "1692728146474762242",
-                                "icon": "",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "ReturnWithoutReasonPolicy",
-                                "value": "7",
-                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
-                                "displayName": "7天无理由退货",
-                                "display": false,
-                                "id": "20231109001",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "QualityAssurePolicy",
-                                "value": "12M",
-                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
-                                "displayName": "商家质保12个月",
-                                "display": true,
-                                "id": "1927054974513672192",
-                                "icon": "https://fe-static.cassmall.com/assets/images/1fe67d1f27ec5906d8c279d1990c95b1.svg",
-                                "title": "商家质保"
-                            },
-                            {
-                                "key": "InstallAssurePolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "保装车",
-                                "display": false,
-                                "id": "1927054975390281728",
-                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "TechnicalSupportPolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "技术支持",
-                                "display": true,
-                                "id": "1927054975310589952",
-                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
-                                "title": "技术支持"
-                            }
-                        ],
-                        "taxRate": 6,
-                        "openInvoiceType": "BOTH",
-                        "partsBrandQuality": "OTHER_BRAND",
-                        "needPackage": "",
-                        "originalAssort": 0,
-                        "recommend": 0,
-                        "quotationResources": [],
-                        "quotationDescriptions": [],
-                        "orderIds": [],
-                        "functionAuthority": {
-                            "canModifyQuoteResult": false
-                        }
-                    },
-                    {
-                        "userNeedsItemId": "69ce143a760d1f00016d0fc1",
-                        "resolveResultId": "976066c6-cd6e-4771-b666-36f6a5abc713",
-                        "storeId": "FSBBR001",
-                        "inquiryId": "B26040278670",
-                        "productId": "23799598793798574090",
-                        "productType": "FINISHED_GOODS",
-                        "oldPartsNum": "0004212512",
-                        "partsNum": "0004212512",
-                        "partsName": "前刹车碟",
-                        "partType": "BRAND_PARTS",
-                        "brandId": "BREMBO",
-                        "brandName": "布雷博",
-                        "storeServiceArea": "LOCAL",
-                        "price": 490.78,
-                        "btPrice": 463,
-                        "sellerBtPrice": 463,
-                        "sellerPrice": 490.78,
-                        "btBoxFee": 0,
-                        "atBoxFee": 0,
-                        "btSellerAndBoxFee": 463,
-                        "atSellerAndBoxFee": 490.78,
-                        "btBuyerAndBoxFee": 463,
-                        "atBuyerAndBoxFee": 490.78,
-                        "quantity": 1,
-                        "remark": "",
-                        "sellerStatus": "SALABLE",
-                        "source": "AUTO",
-                        "createdBy": "system",
-                        "arrivalTime": 0,
-                        "location": "CN_GZYXC",
-                        "locationName": "广州越秀仓",
-                        "sellType": "COMMON",
-                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808696321779097601\"},{\"key\":\"JPL0002\",\"value\":\"10\",\"desc\":\"假一赔三\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":true,\"id\":\"1984141261701160962\",\"icon\":\"\",\"title\":\"假一赔十\",\"groupId\":2,\"innerSort\":12,\"scenarioId\":\"1984161093630504962\"},{\"key\":\"PCC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"配套资质范围\",\"display\":false,\"id\":\"1904469166013997058\",\"icon\":\"\",\"title\":\"配套资质范围\",\"groupId\":5,\"innerSort\":2,\"scenarioId\":\"1904470811794657281\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CassQualityAssurePolicy\",\"value\":\"6M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"开思质保6个月\",\"display\":false,\"id\":\"1927054973947441152\",\"icon\":\"https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg\",\"title\":\"开思质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CompensationPolicy\",\"value\":\"10\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":false,\"id\":\"1927054975709048832\",\"icon\":\"https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg\",\"title\":\"假一赔十\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
-                        "afterSalePoliciesInfos": [
-                            {
-                                "key": "THL0001",
-                                "value": "7",
-                                "desc": "专营店7天无理由",
-                                "url": "",
-                                "displayName": "7天无理由退货",
-                                "display": true,
-                                "id": "1570581392623861762",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "JPL0002",
-                                "value": "10",
-                                "desc": "假一赔三",
-                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
-                                "displayName": "假一赔十",
-                                "display": true,
-                                "id": "1984141261701160962",
-                                "icon": "",
-                                "title": "假一赔十"
-                            },
-                            {
-                                "key": "PCC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "配套资质范围",
-                                "display": false,
-                                "id": "1904469166013997058",
-                                "icon": "",
-                                "title": "配套资质范围"
-                            },
-                            {
-                                "key": "BZC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "保装车",
-                                "display": true,
-                                "id": "1692728146474762242",
-                                "icon": "",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "ReturnWithoutReasonPolicy",
-                                "value": "7",
-                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
-                                "displayName": "7天无理由退货",
-                                "display": false,
-                                "id": "20231109001",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "CassQualityAssurePolicy",
-                                "value": "6M",
-                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
-                                "displayName": "开思质保6个月",
-                                "display": false,
-                                "id": "1927054973947441152",
-                                "icon": "https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg",
-                                "title": "开思质保"
-                            },
-                            {
-                                "key": "CompensationPolicy",
-                                "value": "10",
-                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
-                                "displayName": "假一赔十",
-                                "display": false,
-                                "id": "1927054975709048832",
-                                "icon": "https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg",
-                                "title": "假一赔十"
-                            },
-                            {
-                                "key": "InstallAssurePolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "保装车",
-                                "display": false,
-                                "id": "1927054975390281728",
-                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "TechnicalSupportPolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "技术支持",
-                                "display": true,
-                                "id": "1927054975310589952",
-                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
-                                "title": "技术支持"
-                            }
-                        ],
-                        "taxRate": 6,
-                        "openInvoiceType": "BOTH",
-                        "partsBrandQuality": "EXTERNAL_BRAND",
-                        "needPackage": "",
-                        "originalAssort": 0,
-                        "recommend": 0,
-                        "quotationResources": [],
-                        "quotationDescriptions": [],
-                        "orderIds": [],
-                        "functionAuthority": {
-                            "canModifyQuoteResult": false
-                        }
-                    }
-                ]
-            },
-            {
-                "storeResolveItem": {
-                    "resolveResultId": "be749be2-915a-45b2-841c-dcb559180b1c",
-                    "quotedPriceItemId": "69ce1438760d1f0001f1b6f2",
-                    "status": "QUOTE",
-                    "source": "AUTO",
-                    "functionAuthority": {
-                        "canAddQuoteResult": true
-                    }
-                },
-                "storeQuoteItemResults": [
-                    {
-                        "userNeedsItemId": "69ce143a760d1f00016d0fde",
-                        "resolveResultId": "be749be2-915a-45b2-841c-dcb559180b1c",
-                        "storeId": "FSBBR001",
-                        "inquiryId": "B26040278670",
-                        "productId": "22160020164890296700",
-                        "productType": "FINISHED_GOODS",
-                        "oldPartsNum": "0004212512",
-                        "partsNum": "0004212512",
-                        "partsName": "前刹车碟",
-                        "partType": "BRAND_PARTS",
-                        "brandId": "TEXTAR",
-                        "brandName": "泰克斯塔（泰明顿）",
-                        "storeServiceArea": "LOCAL",
-                        "price": 286.19,
-                        "btPrice": 269.99,
-                        "sellerBtPrice": 269.99,
-                        "sellerPrice": 286.19,
-                        "btBoxFee": 0,
-                        "atBoxFee": 0,
-                        "btSellerAndBoxFee": 269.99,
-                        "atSellerAndBoxFee": 286.19,
-                        "btBuyerAndBoxFee": 269.99,
-                        "atBuyerAndBoxFee": 286.19,
-                        "quantity": 1,
-                        "remark": "坚守品质底线，决不像低价格低头！！！泰明顿授权经销商！！！ 可索源！！！可索赔！！！",
-                        "sellerStatus": "SALABLE",
-                        "source": "AUTO",
-                        "createdBy": "system",
-                        "arrivalTime": 0,
-                        "location": "CN_FSCCC",
-                        "locationName": "佛山禅城仓",
-                        "sellType": "COMMON",
-                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808696321779097601\"},{\"key\":\"JPL0002\",\"value\":\"10\",\"desc\":\"假一赔三\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":true,\"id\":\"1984141261701160962\",\"icon\":\"\",\"title\":\"假一赔十\",\"groupId\":2,\"innerSort\":12,\"scenarioId\":\"1984161093630504962\"},{\"key\":\"PCC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"配套资质范围\",\"display\":false,\"id\":\"1904469166013997058\",\"icon\":\"\",\"title\":\"配套资质范围\",\"groupId\":5,\"innerSort\":2,\"scenarioId\":\"1904470811794657281\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CassQualityAssurePolicy\",\"value\":\"6M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"开思质保6个月\",\"display\":false,\"id\":\"1927054973947441152\",\"icon\":\"https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg\",\"title\":\"开思质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CompensationPolicy\",\"value\":\"10\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":false,\"id\":\"1927054975709048832\",\"icon\":\"https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg\",\"title\":\"假一赔十\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
-                        "afterSalePoliciesInfos": [
-                            {
-                                "key": "THL0001",
-                                "value": "7",
-                                "desc": "专营店7天无理由",
-                                "url": "",
-                                "displayName": "7天无理由退货",
-                                "display": true,
-                                "id": "1570581392623861762",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "JPL0002",
-                                "value": "10",
-                                "desc": "假一赔三",
-                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
-                                "displayName": "假一赔十",
-                                "display": true,
-                                "id": "1984141261701160962",
-                                "icon": "",
-                                "title": "假一赔十"
-                            },
-                            {
-                                "key": "PCC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "配套资质范围",
-                                "display": false,
-                                "id": "1904469166013997058",
-                                "icon": "",
-                                "title": "配套资质范围"
-                            },
-                            {
-                                "key": "BZC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "保装车",
-                                "display": true,
-                                "id": "1692728146474762242",
-                                "icon": "",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "ReturnWithoutReasonPolicy",
-                                "value": "7",
-                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
-                                "displayName": "7天无理由退货",
-                                "display": false,
-                                "id": "20231109001",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "CassQualityAssurePolicy",
-                                "value": "6M",
-                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
-                                "displayName": "开思质保6个月",
-                                "display": false,
-                                "id": "1927054973947441152",
-                                "icon": "https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg",
-                                "title": "开思质保"
-                            },
-                            {
-                                "key": "CompensationPolicy",
-                                "value": "10",
-                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
-                                "displayName": "假一赔十",
-                                "display": false,
-                                "id": "1927054975709048832",
-                                "icon": "https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg",
-                                "title": "假一赔十"
-                            },
-                            {
-                                "key": "InstallAssurePolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "保装车",
-                                "display": false,
-                                "id": "1927054975390281728",
-                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "TechnicalSupportPolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "技术支持",
-                                "display": true,
-                                "id": "1927054975310589952",
-                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
-                                "title": "技术支持"
-                            }
-                        ],
-                        "taxRate": 6,
-                        "openInvoiceType": "BOTH",
-                        "partsBrandQuality": "EXTERNAL_BRAND",
-                        "needPackage": "",
-                        "originalAssort": 0,
-                        "recommend": 0,
-                        "quotationResources": [],
-                        "quotationDescriptions": [],
-                        "orderIds": [],
-                        "functionAuthority": {
-                            "canModifyQuoteResult": false
-                        }
-                    },
-                    {
-                        "userNeedsItemId": "69ce143a760d1f00016d0fdf",
-                        "resolveResultId": "be749be2-915a-45b2-841c-dcb559180b1c",
-                        "storeId": "FSBBR001",
-                        "inquiryId": "B26040278670",
-                        "productId": "23773572216105657470",
-                        "productType": "FINISHED_GOODS",
-                        "oldPartsNum": "0004212512",
-                        "partsNum": "0004212512",
-                        "partsName": "前刹车碟",
-                        "partType": "BRAND_PARTS",
-                        "brandId": "OTHERS",
-                        "brandName": "其他",
-                        "storeServiceArea": "LOCAL",
-                        "price": 140.98,
-                        "btPrice": 133,
-                        "sellerBtPrice": 133,
-                        "sellerPrice": 140.98,
-                        "btBoxFee": 0,
-                        "atBoxFee": 0,
-                        "btSellerAndBoxFee": 133,
-                        "atSellerAndBoxFee": 140.98,
-                        "btBuyerAndBoxFee": 133,
-                        "atBuyerAndBoxFee": 140.98,
-                        "quantity": 1,
-                        "remark": "",
-                        "sellerStatus": "SALABLE",
-                        "source": "AUTO",
-                        "createdBy": "system",
-                        "arrivalTime": 0,
-                        "location": "CN_GZYXC",
-                        "locationName": "广州越秀仓",
-                        "sellType": "COMMON",
-                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808756778179837953\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"QualityAssurePolicy\",\"value\":\"12M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"商家质保12个月\",\"display\":true,\"id\":\"1927054974513672192\",\"icon\":\"https://fe-static.cassmall.com/assets/images/1fe67d1f27ec5906d8c279d1990c95b1.svg\",\"title\":\"商家质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
-                        "afterSalePoliciesInfos": [
-                            {
-                                "key": "THL0001",
-                                "value": "7",
-                                "desc": "专营店7天无理由",
-                                "url": "",
-                                "displayName": "7天无理由退货",
-                                "display": true,
-                                "id": "1570581392623861762",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "BZC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "保装车",
-                                "display": true,
-                                "id": "1692728146474762242",
-                                "icon": "",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "ReturnWithoutReasonPolicy",
-                                "value": "7",
-                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
-                                "displayName": "7天无理由退货",
-                                "display": false,
-                                "id": "20231109001",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "QualityAssurePolicy",
-                                "value": "12M",
-                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
-                                "displayName": "商家质保12个月",
-                                "display": true,
-                                "id": "1927054974513672192",
-                                "icon": "https://fe-static.cassmall.com/assets/images/1fe67d1f27ec5906d8c279d1990c95b1.svg",
-                                "title": "商家质保"
-                            },
-                            {
-                                "key": "InstallAssurePolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "保装车",
-                                "display": false,
-                                "id": "1927054975390281728",
-                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "TechnicalSupportPolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "技术支持",
-                                "display": true,
-                                "id": "1927054975310589952",
-                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
-                                "title": "技术支持"
-                            }
-                        ],
-                        "taxRate": 6,
-                        "openInvoiceType": "BOTH",
-                        "partsBrandQuality": "OTHER_BRAND",
-                        "needPackage": "",
-                        "originalAssort": 0,
-                        "recommend": 0,
-                        "quotationResources": [],
-                        "quotationDescriptions": [],
-                        "orderIds": [],
-                        "functionAuthority": {
-                            "canModifyQuoteResult": false
-                        }
-                    },
-                    {
-                        "userNeedsItemId": "69ce143a760d1f00016d0fe0",
-                        "resolveResultId": "be749be2-915a-45b2-841c-dcb559180b1c",
-                        "storeId": "FSBBR001",
-                        "inquiryId": "B26040278670",
-                        "productId": "23799598793798574090",
-                        "productType": "FINISHED_GOODS",
-                        "oldPartsNum": "0004212512",
-                        "partsNum": "0004212512",
-                        "partsName": "前刹车碟",
-                        "partType": "BRAND_PARTS",
-                        "brandId": "BREMBO",
-                        "brandName": "布雷博",
-                        "storeServiceArea": "LOCAL",
-                        "price": 490.78,
-                        "btPrice": 463,
-                        "sellerBtPrice": 463,
-                        "sellerPrice": 490.78,
-                        "btBoxFee": 0,
-                        "atBoxFee": 0,
-                        "btSellerAndBoxFee": 463,
-                        "atSellerAndBoxFee": 490.78,
-                        "btBuyerAndBoxFee": 463,
-                        "atBuyerAndBoxFee": 490.78,
-                        "quantity": 1,
-                        "remark": "",
-                        "sellerStatus": "SALABLE",
-                        "source": "AUTO",
-                        "createdBy": "system",
-                        "arrivalTime": 0,
-                        "location": "CN_GZYXC",
-                        "locationName": "广州越秀仓",
-                        "sellType": "COMMON",
-                        "afterSaleSnapshot": "[{\"key\":\"THL0001\",\"value\":\"7\",\"desc\":\"专营店7天无理由\",\"url\":\"\",\"displayName\":\"7天无理由退货\",\"display\":true,\"id\":\"1570581392623861762\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":2,\"innerSort\":2,\"scenarioId\":\"1808696321779097601\"},{\"key\":\"JPL0002\",\"value\":\"10\",\"desc\":\"假一赔三\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":true,\"id\":\"1984141261701160962\",\"icon\":\"\",\"title\":\"假一赔十\",\"groupId\":2,\"innerSort\":12,\"scenarioId\":\"1984161093630504962\"},{\"key\":\"PCC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"配套资质范围\",\"display\":false,\"id\":\"1904469166013997058\",\"icon\":\"\",\"title\":\"配套资质范围\",\"groupId\":5,\"innerSort\":2,\"scenarioId\":\"1904470811794657281\"},{\"key\":\"BZC0001\",\"value\":\"true\",\"desc\":\"\",\"url\":\"\",\"displayName\":\"保装车\",\"display\":true,\"id\":\"1692728146474762242\",\"icon\":\"\",\"title\":\"保装车\",\"groupId\":6,\"innerSort\":2,\"scenarioId\":\"1808690101405470722\"},{\"key\":\"ReturnWithoutReasonPolicy\",\"value\":\"7\",\"url\":\"/mall/help-center#/detail/62d675eafcba1500293bc87a\",\"displayName\":\"7天无理由退货\",\"display\":false,\"id\":\"20231109001\",\"icon\":\"\",\"title\":\"7天无理由退货\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CassQualityAssurePolicy\",\"value\":\"6M\",\"url\":\"/mall/help-center#/detail/5e1c26df553e3200251f06c8\",\"displayName\":\"开思质保6个月\",\"display\":false,\"id\":\"1927054973947441152\",\"icon\":\"https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg\",\"title\":\"开思质保\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"CompensationPolicy\",\"value\":\"10\",\"url\":\"/mall/help-center#/detail/5e1c25a7d079e100240d5fa9\",\"displayName\":\"假一赔十\",\"display\":false,\"id\":\"1927054975709048832\",\"icon\":\"https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg\",\"title\":\"假一赔十\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"InstallAssurePolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"保装车\",\"display\":false,\"id\":\"1927054975390281728\",\"icon\":\"https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg\",\"title\":\"保装车\",\"groupId\":6,\"scenarioId\":\"\"},{\"key\":\"TechnicalSupportPolicy\",\"value\":\"true\",\"url\":\"/mall/help-center#/detail/5e1c280b553e3200251f06cf\",\"displayName\":\"技术支持\",\"display\":true,\"id\":\"1927054975310589952\",\"icon\":\"https://m.cassmall.com/assets/aftersale_policy_store/technology.png\",\"title\":\"技术支持\",\"groupId\":6,\"scenarioId\":\"\"}]",
-                        "afterSalePoliciesInfos": [
-                            {
-                                "key": "THL0001",
-                                "value": "7",
-                                "desc": "专营店7天无理由",
-                                "url": "",
-                                "displayName": "7天无理由退货",
-                                "display": true,
-                                "id": "1570581392623861762",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "JPL0002",
-                                "value": "10",
-                                "desc": "假一赔三",
-                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
-                                "displayName": "假一赔十",
-                                "display": true,
-                                "id": "1984141261701160962",
-                                "icon": "",
-                                "title": "假一赔十"
-                            },
-                            {
-                                "key": "PCC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "配套资质范围",
-                                "display": false,
-                                "id": "1904469166013997058",
-                                "icon": "",
-                                "title": "配套资质范围"
-                            },
-                            {
-                                "key": "BZC0001",
-                                "value": "true",
-                                "desc": "",
-                                "url": "",
-                                "displayName": "保装车",
-                                "display": true,
-                                "id": "1692728146474762242",
-                                "icon": "",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "ReturnWithoutReasonPolicy",
-                                "value": "7",
-                                "url": "/mall/help-center#/detail/62d675eafcba1500293bc87a",
-                                "displayName": "7天无理由退货",
-                                "display": false,
-                                "id": "20231109001",
-                                "icon": "",
-                                "title": "7天无理由退货"
-                            },
-                            {
-                                "key": "CassQualityAssurePolicy",
-                                "value": "6M",
-                                "url": "/mall/help-center#/detail/5e1c26df553e3200251f06c8",
-                                "displayName": "开思质保6个月",
-                                "display": false,
-                                "id": "1927054973947441152",
-                                "icon": "https://fe-static.cassmall.com/assets/images/2dc4f1b71047a68b7dc97af0906703ff.svg",
-                                "title": "开思质保"
-                            },
-                            {
-                                "key": "CompensationPolicy",
-                                "value": "10",
-                                "url": "/mall/help-center#/detail/5e1c25a7d079e100240d5fa9",
-                                "displayName": "假一赔十",
-                                "display": false,
-                                "id": "1927054975709048832",
-                                "icon": "https://fe-static.cassmall.com/assets/images/f703554020a277f4dd9fb19887791225.svg",
-                                "title": "假一赔十"
-                            },
-                            {
-                                "key": "InstallAssurePolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "保装车",
-                                "display": false,
-                                "id": "1927054975390281728",
-                                "icon": "https://fe-static.cassmall.com/assets/images/5862d9609973d97be865de55a8988795.svg",
-                                "title": "保装车"
-                            },
-                            {
-                                "key": "TechnicalSupportPolicy",
-                                "value": "true",
-                                "url": "/mall/help-center#/detail/5e1c280b553e3200251f06cf",
-                                "displayName": "技术支持",
-                                "display": true,
-                                "id": "1927054975310589952",
-                                "icon": "https://m.cassmall.com/assets/aftersale_policy_store/technology.png",
-                                "title": "技术支持"
-                            }
-                        ],
-                        "taxRate": 6,
-                        "openInvoiceType": "BOTH",
-                        "partsBrandQuality": "EXTERNAL_BRAND",
-                        "needPackage": "",
-                        "originalAssort": 0,
-                        "recommend": 0,
-                        "quotationResources": [],
-                        "quotationDescriptions": [],
-                        "orderIds": [],
-                        "functionAuthority": {
-                            "canModifyQuoteResult": false
-                        }
-                    }
-                ]
-            }
-        ],
-        "page": 1,
-        "size": 50,
-        "total": "2",
-        "userReceivedItemCount": "2"
-    }
-}
+============================================================
+[开思自动对单] 开始执行: 2026-04-02 19:18:37
+============================================================
+[开思自动对单] 当前时间 19 点，不在运行时间段内，跳过
+[开思自动对单] 任务执行成功
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962024040/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:39 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962024040/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962024040/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:41 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962024040/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败，重试次数耗尽
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962020294/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:42 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962020294/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962020294/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:44 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962020294/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[Thu Apr 2 19:18:19 2026] GET /socket.io/?EIO=4&transport=polling&t=PrDwbWE.0&sid=ghiQb5vumROa1w1KAAGA => 200 in 24997ms
+[Thu Apr 2 19:18:45 2026] POST /socket.io/?EIO=4&transport=polling&t=PrDwiMT&sid=ghiQb5vumROa1w1KAAGA => 200 in 0ms
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962020294/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:46 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962020294/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败，重试次数耗尽
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962019543/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:46 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962019543/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962019543/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:48 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962019543/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962019543/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:50 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962019543/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败，重试次数耗尽
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962018288/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:50 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962018288/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962018288/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:52 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962018288/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962018288/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:54 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962018288/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败，重试次数耗尽
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962014545/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:55 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962014545/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[Thu Apr 2 19:18:31 2026] GET /socket.io/?EIO=4&transport=polling&t=PrDwe-T&sid=1_BcjqqGpbi8Ngx2AAGk => 200 in 25007ms
+[Thu Apr 2 19:18:56 2026] POST /socket.io/?EIO=4&transport=polling&t=PrDwl5X&sid=1_BcjqqGpbi8Ngx2AAGk => 200 in 0ms
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962014545/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:57 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962014545/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
+[请求] 尝试刷新session...
+[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
+[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962014545/quoting/items
+[请求] 状态码: 200
+[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:59 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962014545/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
+[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n bo

@@ -1,6 +1,6 @@
 """
 开思询价相关表
-包含：询价明细表
+包含：开思询价明细表、微信询价明细表
 """
 
 from app.utils.database_connection import get_db_connection
@@ -20,7 +20,8 @@ def init_ks_inquiry_detail_table():
                 inquiryId VARCHAR(50) NOT NULL COMMENT '询价单ID',
                 partsNum VARCHAR(100) NOT NULL COMMENT 'OE号/零件号',
                 partsName VARCHAR(255) DEFAULT NULL COMMENT '零件名称',
-                brandName VARCHAR(100) NOT NULL COMMENT '品牌名称',
+                brandName VARCHAR(100) NOT NULL COMMENT '品牌名称（原始）',
+                brandNormalized VARCHAR(100) DEFAULT NULL COMMENT '品牌名称（标准化，处理宝马/奔驰品质映射后）',
                 brandId VARCHAR(50) DEFAULT NULL COMMENT '品牌ID',
                 partType VARCHAR(50) DEFAULT NULL COMMENT '零件类型',
                 partsBrandQuality VARCHAR(50) DEFAULT NULL COMMENT '配件品质',
@@ -32,6 +33,7 @@ def init_ks_inquiry_detail_table():
                 UNIQUE KEY uk_inquiry_detail (inquiryId, brandName, partsNum, company),
                 INDEX idx_parts_num (partsNum),
                 INDEX idx_brand_name (brandName),
+                INDEX idx_brand_normalized (brandNormalized),
                 INDEX idx_quote_date (quote_date),
                 INDEX idx_company (company)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开思询价明细表';
@@ -39,5 +41,36 @@ def init_ks_inquiry_detail_table():
             cursor.execute(create_table_sql)
     except Exception as e:
         print(f"  ✗ 开思询价明细表: {e}")
+    finally:
+        conn.close()
+
+
+def init_weixin_inquiry_detail_table():
+    """
+    初始化微信询价明细表
+    用于存储从 weixin_decoding_result 表解析的询价明细数据
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS crmapp_weixin_inquiry_detail (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
+                oe VARCHAR(100) NOT NULL COMMENT 'OE号/零件号',
+                brand VARCHAR(100) NOT NULL COMMENT '品牌名称',
+                creation_date DATETIME NOT NULL COMMENT '询价时间（原始记录的完整时间）',
+                company VARCHAR(50) NOT NULL COMMENT '公司标识',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+                UNIQUE KEY uk_weixin_inquiry (oe, brand, creation_date, company),
+                INDEX idx_oe (oe),
+                INDEX idx_brand (brand),
+                INDEX idx_creation_date (creation_date),
+                INDEX idx_company (company)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='微信询价明细表';
+            """
+            cursor.execute(create_table_sql)
+    except Exception as e:
+        print(f"  ✗ 微信询价明细表: {e}")
     finally:
         conn.close()
