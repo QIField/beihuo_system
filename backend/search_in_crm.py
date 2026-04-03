@@ -35,8 +35,8 @@ def get_db_connection():
             host='localhost',  
             port=3306,   
             user='root',      
-            password='123456',  
-            database='test',  
+            password='root',
+            database='fsbbr_data_test',
             charset='utf8mb4',
             cursorclass=pymysql.cursors.DictCursor
         )
