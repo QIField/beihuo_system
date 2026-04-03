@@ -67,16 +67,49 @@ class QuoteCountSyncService:
     RETRY_DELAY = 2
     COMPANY = 'fsbbr'
 
+    # 需要特殊处理的品牌（宝马/奔驰）
+    SPECIAL_BRANDS = {'宝马', '奔驰'}
+    # 品质映射表
+    QUALITY_MAP = {
+        'ORIGINAL_CURRENCY': '原厂',
+        'ORIGINAL_INLAND_4S': '原厂国内4s件'
+    }
+
+    @staticmethod
+    def normalize_brand(brand_name: str, parts_brand_quality: str) -> str:
+        """
+        品牌标准化处理
+        宝马/奔驰直接使用品质映射后的名称（如"原厂"），不加品牌前缀
+        其他品牌保持原样
+
+        Args:
+            brand_name: 原始品牌名称
+            parts_brand_quality: 配件品质
+
+        Returns:
+            标准化后的品牌名称
+        """
+        brand = brand_name.strip() if brand_name else ''
+
+        # 宝马/奔驰直接使用品质名称（如"原厂"）
+        if brand in QuoteCountSyncService.SPECIAL_BRANDS:
+            quality = parts_brand_quality.strip() if parts_brand_quality else ''
+            mapped_quality = QuoteCountSyncService.QUALITY_MAP.get(quality, quality)
+
+            # 返回品质名称，如：原厂
+            if mapped_quality:
+                return mapped_quality
+
+        return brand
+
     def __init__(self):
         self.session = None
-        self.session_source = None
         self._init_session()
 
     def _init_session(self):
         """初始化session，使用API获取cookie"""
         ks_cookies = get_ks_cookies_from_api()
         self.session = self._create_session_from_cookies(ks_cookies)
-        self.session_source = 'api_cookie'
 
     def _refresh_session(self):
         """刷新session"""
@@ -304,8 +337,12 @@ class QuoteCountSyncService:
                     parts_num = item.get('partsNum', '').strip().upper().replace(' ', '')
                     brand_name = item.get('brandName', '').strip()
                     parts_name = item.get('partsName', '').strip()
+                    parts_brand_quality = item.get('partsBrandQuality', '')
                     # 从明细数据中获取inquiryId（如"B26040246308"），如果没有则使用order_id
                     inquiry_id = item.get('inquiryId', '') or order_id
+
+                    # 标准化品牌（处理宝马/奔驰的品质映射）
+                    brand_normalized = self.normalize_brand(brand_name, parts_brand_quality)
 
                     # 只保存有完整数据的记录
                     if parts_num and brand_name and parts_name:
@@ -314,9 +351,10 @@ class QuoteCountSyncService:
                             'partsNum': parts_num,
                             'partsName': parts_name,
                             'brandName': brand_name,
+                            'brandNormalized': brand_normalized,
                             'brandId': item.get('brandId', ''),
                             'partType': item.get('partType', ''),
-                            'partsBrandQuality': item.get('partsBrandQuality', ''),
+                            'partsBrandQuality': parts_brand_quality,
                             'remark': item.get('remark', '')
                         })
 
@@ -338,11 +376,12 @@ class QuoteCountSyncService:
         with db_cursor() as cursor:
             insert_sql = """
                 INSERT INTO crmapp_ks_inquiry_detail 
-                (inquiryId, partsNum, partsName, brandName, brandId, partType, 
+                (inquiryId, partsNum, partsName, brandName, brandNormalized, brandId, partType, 
                  partsBrandQuality, remark, company, quote_date, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     partsName = VALUES(partsName),
+                    brandNormalized = VALUES(brandNormalized),
                     brandId = VALUES(brandId),
                     partType = VALUES(partType),
                     partsBrandQuality = VALUES(partsBrandQuality),
@@ -350,7 +389,7 @@ class QuoteCountSyncService:
                     quote_date = VALUES(quote_date),
                     updated_at = NOW()
             """
-            
+
             values = []
             for item in items:
                 row = (
@@ -358,6 +397,7 @@ class QuoteCountSyncService:
                     item.get('partsNum', ''),
                     item.get('partsName', ''),
                     item.get('brandName', ''),
+                    item.get('brandNormalized', ''),
                     item.get('brandId', ''),
                     item.get('partType', ''),
                     item.get('partsBrandQuality', ''),
@@ -366,7 +406,7 @@ class QuoteCountSyncService:
                     item.get('quote_date', '')
                 )
                 values.append(row)
-            
+
             cursor.executemany(insert_sql, values)
             return len(values)
 
@@ -509,28 +549,55 @@ class QuoteCountSyncService:
                 if deleted > 0:
                     print(f"[统计] 已删除 {year_month} 旧数据 {deleted} 条")
                 
-                # 从明细表统计并插入
+                # 从明细表统计并插入（合并开思和微信数据）
                 stats_sql = """
-                    INSERT INTO crmapp_quote_count_ks 
+                    INSERT INTO crmapp_quote_count_ks
                     (`year_month`, brand, oe, quote_count, company, created_at, updated_at)
-                    SELECT 
+                    SELECT
                         %s as year_month,
-                        brandName as brand,
-                        partsNum as oe,
-                        COUNT(*) as quote_count,
+                        brand,
+                        oe,
+                        SUM(quote_count) as quote_count,
                         company,
                         NOW() as created_at,
                         NOW() as updated_at
-                    FROM crmapp_ks_inquiry_detail
-                    WHERE quote_date >= %s 
-                      AND quote_date < %s
-                      AND company = %s
-                    GROUP BY brandName, partsNum, company
+                    FROM (
+                        -- 开思询价数据
+                        SELECT
+                            COALESCE(brandNormalized, brandName) as brand,
+                            partsNum as oe,
+                            COUNT(*) as quote_count,
+                            company
+                        FROM crmapp_ks_inquiry_detail
+                        WHERE quote_date >= %s
+                          AND quote_date < %s
+                          AND company = %s
+                        GROUP BY COALESCE(brandNormalized, brandName), partsNum, company
+
+                        UNION ALL
+
+                        -- 微信询价数据
+                        SELECT
+                            brand,
+                            oe,
+                            COUNT(*) as quote_count,
+                            company
+                        FROM crmapp_weixin_inquiry_detail
+                        WHERE creation_date >= %s
+                          AND creation_date < %s
+                          AND company = %s
+                        GROUP BY brand, oe, company
+                    ) combined
+                    GROUP BY brand, oe, company
                 """
-                
-                cursor.execute(stats_sql, (year_month, start_date, next_month, self.COMPANY))
+
+                cursor.execute(stats_sql, (
+                    year_month,
+                    start_date, next_month, self.COMPANY,
+                    start_date, next_month, self.COMPANY
+                ))
                 affected = cursor.rowcount
-                
+
                 print(f"[统计] {year_month} 更新完成: {affected} 条记录")
                 
                 results.append({

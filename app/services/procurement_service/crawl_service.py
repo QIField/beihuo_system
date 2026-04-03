@@ -45,11 +45,11 @@ class CRMDataCrawlService:
         同时初始化session
         """
         self.session = create_crm_session()
-        params = {'page': 1, 'limit': LIMIT}
+        payload = {'page': 1, 'limit': LIMIT}
 
         for attempt in range(MAX_RETRY):
             try:
-                response = self.session.get(CRM_PRODUCT_LIST_URL, params=params, timeout=30)
+                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=30)
                 response.raise_for_status()
                 result = response.json()
 
@@ -77,11 +77,11 @@ class CRMDataCrawlService:
 
     def crawl_page(self, page: int) -> List[Dict]:
         """爬取指定页，返回产品列表"""
-        params = {'page': page, 'limit': LIMIT}
+        payload = {'page': page, 'limit': LIMIT}
 
         for attempt in range(MAX_RETRY):
             try:
-                response = self.session.get(CRM_PRODUCT_LIST_URL, params=params, timeout=30)
+                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=30)
                 response.raise_for_status()
                 result = response.json()
 
