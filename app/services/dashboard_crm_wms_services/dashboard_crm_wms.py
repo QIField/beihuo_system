@@ -17,7 +17,7 @@ def crm_mergeOrderList_spider(url0,headers,start_date,end_date):
 
     page = 1  # 第几页
     limit = 200  # 每页返回的数据
-    status = 1  # 状态（1为已调单）
+    # status = 1  # 状态（1为已调单）
     order_type_id = 1  # 表示1为销售订单
     is_wms = 1
 
@@ -29,7 +29,7 @@ def crm_mergeOrderList_spider(url0,headers,start_date,end_date):
 
         # print("参数",page,limit,status,order_type_id,is_wms)
         url = (url0+"?page="+page.__str__()+"&limit="+limit.__str__()
-               +"&status="+status.__str__()+"&order_type_id="+order_type_id.__str__()+"&is_wms="+is_wms.__str__()
+               +"&order_type_id="+order_type_id.__str__()
                +"&orderdate[]="+start_date+"&orderdate[]="+end_date)
 
         print("爬取的api为",url)
@@ -52,11 +52,6 @@ def crm_mergeOrderList_spider(url0,headers,start_date,end_date):
         else:
             continue
 
-        # 查看数据总条数（总行数）
-        # print("数据总数：", len(df))
-        # print(df.head(10))
-
-
 
 
     return df
@@ -65,7 +60,7 @@ def crm_mergeOrderList_spider(url0,headers,start_date,end_date):
 
 
 
-def wms_get_status_orders_spider(url0,headers):
+def wms_get_status_orders_spider(url0,headers,page_num):
 
 
 
@@ -77,6 +72,8 @@ def wms_get_status_orders_spider(url0,headers):
     # status = 1  # 拣货单      0表示未开始，1表示正在拣货，2表示已完成,空表示全部
     page = 1  # 页数空表示第一页
     url = url0
+
+
 
     # 进行循环拣货单状态爬取
     for status in range(0, 2):    # 拣货单      0表示未开始，1表示正在拣货，2表示已完成,空表示全部
@@ -114,9 +111,17 @@ def wms_get_status_orders_spider(url0,headers):
                 break
 
 
-    # 查看数据总条数（总行数）
-    # print("数据总数：", len(df))
-    # print(df.head(10))
+    for i in range(1,page_num+1):
+        print()
+        url = url0 + "?type=3"  + "&status=2" + "&page=" + i.__str__()
+        print("正在爬取的接口", url)
+        json_data = simple_spider(url, headers)
+        data = json_data.get("data", {}).get("data", {}).get("data")
+        if data:
+            df = pd.concat([df, pd.DataFrame(data)], ignore_index=True)
+
+
+
 
 
     return df
@@ -156,13 +161,10 @@ def wms_get_status_orders_keywd_spider(url0,headers,keywd_list):
 
 
 
-
-
-
 def crawl_data_crm_wms(start_date,end_date):
     # 业务函数
 
-        # 每次都会拿最新配置
+    # 每次都会拿最新配置
     config = get_config()
 
     crm_token = config["crm_token"]
@@ -203,7 +205,7 @@ def crawl_data_crm_wms(start_date,end_date):
 
     # 爬取wms的数据
     print("--------------------------------------")
-    df2 = wms_get_status_orders_spider(url_wms,headers_wms)
+    df2 = wms_get_status_orders_spider(url_wms,headers_wms,len(df1)//20+3)
     print("df2爬取的数据总数：", len(df2))
     # 查看数据总条数（总行数）
     # print("df2数据总数：", len(df2))
@@ -212,9 +214,9 @@ def crawl_data_crm_wms(start_date,end_date):
     # fullname为客户名称
     # real_name为业务员
     # name为拣货员
-    # jhdate为拣货日期
-    # print(df2[["pono", "l_name_zh", "fullname", "real_name", "name"]].head(100))
-    # print("df2 的所有列名：", df2.columns.tolist())
+    # jhdate为拣货日期时间戳
+
+
     # 步骤1: 清洗df1数据
     # 删除订单号为空的行
     print("df2数据删除空订单号和重复订单号")
@@ -229,11 +231,11 @@ def crawl_data_crm_wms(start_date,end_date):
     # 执行合并
     print("--------------------------------------")
     # 步骤1：为所有字段添加统一后缀
-    df1_clean = df1_clean.add_suffix('_df1')
-    df2_clean = df2_clean.add_suffix('_df2')
+    df1_clean = df1_clean.add_suffix('_crm')
+    df2_clean = df2_clean.add_suffix('_wms')
 
-    df1_clean = df1_clean.rename(columns={'d_sap_no_df1': 'pono_new'})
-    df2_clean = df2_clean.rename(columns={'pono_df2': 'pono_new'})
+    df1_clean = df1_clean.rename(columns={'d_sap_no_crm': 'pono_new'})
+    df2_clean = df2_clean.rename(columns={'pono_wms': 'pono_new'})
 
     df_merged = pd.merge(
         df1_clean,
@@ -244,26 +246,11 @@ def crawl_data_crm_wms(start_date,end_date):
     )
 
     # 步骤4：验证结果
-    # print(f"合并完成！数据形状: {df_merged.shape}")
-    # print(df_merged.head())
-
     print("df_merged************数据合并后的数据**************数据总数：", len(df_merged))
-    # print(df_merged.head(100))
 
-    # 生成带时间戳的文件名
-    # print("************生成excel")
-    # timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-    # filename = f'合并前订单合并_{timestamp}.xlsx'
-    # df_merged.to_excel(
-    #     filename,
-    #     index=False,
-    #     sheet_name='合并订单数据',
-    #     engine='openpyxl',
-    # )
-    # print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_merged)}")
 
-    # 条件：orders_no_df2 不是空值 且 不是空字符串
-    condition = (df_merged['orders_no_df2'].isna()) | (df_merged['orders_no_df2'] == '')
+    # 条件：orders_no_wms 不是空值 且 不是空字符串
+    condition = (df_merged['orders_no_wms'].isna()) | (df_merged['orders_no_wms'] == '')
     # 提取符合条件的 pono_new 并转成列表
     pono_new_list = df_merged.loc[condition, 'pono_new'].tolist()
 
@@ -289,12 +276,11 @@ def crawl_data_crm_wms(start_date,end_date):
     # df_merged与df3_clean合并
     # 执行合并
     print("--------------------------------------")
-    # print(f"合并前！数据形状: {df_merged.shape}")
-    # print(df_merged[["pono_new", "orders_no_df2"]].head(100))
-    # 步骤1：为所有字段添加统一后缀
-    df3_clean = df3_clean.add_suffix('_df3')
 
-    df3_clean = df3_clean.rename(columns={'pono_df3': 'pono_new'})
+    # 步骤1：为所有字段添加统一后缀
+    df3_clean = df3_clean.add_suffix('_wms_keywd')
+
+    df3_clean = df3_clean.rename(columns={'pono_wms_keywd': 'pono_new'})
 
     df_merged = pd.merge(
         df_merged,
@@ -304,82 +290,52 @@ def crawl_data_crm_wms(start_date,end_date):
         suffixes=('', '')  # 列名冲突后缀
     )
 
-    # 步骤4：验证结果
-    # print(f"合并完成！数据形状: {df_merged.shape}")
-    # print(df_merged[["pono_new", "orders_no_df2"]].head(100))
     print("--------------------------------------")
 
-
-
-
-
-
-
-    # 生成带时间戳的文件名
-    # print("************生成excel")
-    # timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-    # filename = f'合并后订单合并_{timestamp}.xlsx'
-    # df_merged.to_excel(
-    #     filename,
-    #     index=False,
-    #     sheet_name='合并订单数据',
-    #     engine='openpyxl',
-    # )
-    # print(f"导出成功！\n文件: {filename}\n记录数: {len(df_merged)}")
 
     # ==================== 步骤2: 字段筛选 ====================
     keep_columns = [
         'pono_new',
-        'handler_df1',
-        'create_date_df1',
-        'fullname_df1',
-        'customer_phone_df1',
-        'is_data_exists_df3'
+        'handler_crm',
+        'create_date_crm',
+        'fullname_crm',
+        'customer_phone_crm',
+        'is_data_exists_wms_keywd'
     ]
 
-    keep_columns_df2=[
-        'name_df2',
-        'jhdate_df2',
-        'status_df2',
-        'wait_pick_num_df2',
-        'toqty_df2',
-        "orders_no_df2",
-        'l_name_zh_df2',
-        'already_pick_num_df2'
+    keep_columns_wms=[
+        'name_wms',
+        'jhdate_wms',
+        'status_wms',
+        'wait_pick_num_wms',
+        'toqty_wms',
+        "orders_no_wms",
+        'l_name_zh_wms',
+        'already_pick_num_wms'
     ]
 
-    keep_columns_df3=[
-        'name_df3',
-        'jhdate_df3',
-        'status_df3',
-        'wait_pick_num_df3',
-        'toqty_df3',
-        "orders_no_df3",
-        'l_name_zh_df3',
-        'already_pick_num_df3'
+    keep_columns_wms_keywd=[
+        'name_wms_keywd',
+        'jhdate_wms_keywd',
+        'status_wms_keywd',
+        'wait_pick_num_wms_keywd',
+        'toqty_wms_keywd',
+        "orders_no_wms_keywd",
+        'l_name_zh_wms_keywd',
+        'already_pick_num_wms_keywd'
     ]
 
-    keep_columns.extend(keep_columns_df2)
-
-    # # # 生成带时间戳的文件名
-    # print("************生成excel")
-    # timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-    # filename = f'订单df_merged_{timestamp}.xlsx'
-    # df_merged.to_excel(
-    #     filename,
-    #     index=False,
-    #     sheet_name='合并订单数据',
-    #     engine='openpyxl',
-    # )
-    # print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_merged)}")
+    keep_columns.extend(keep_columns_wms)
 
 
 
-    if 'orders_no_df3' in df_merged.columns:
+
+
+    if 'orders_no_wms_keywd' in df_merged.columns:
 
         print("df_merged.columns***************************")
         # 把后缀为df3的字段的数据，复制到后缀为df2
-        df_merged.loc[df_merged['is_data_exists_df3'] != 2, keep_columns_df2] = df_merged.loc[df_merged['is_data_exists_df3'] != 2, keep_columns_df3].values
+        df_merged.loc[df_merged['is_data_exists_wms_keywd'] != 2, keep_columns_wms] = df_merged.loc[df_merged['is_data_exists_wms_keywd'] != 2, keep_columns_wms_keywd].values
 
 
     # 只保留指定字段
@@ -427,42 +383,25 @@ def crawl_data_crm_wms(start_date,end_date):
 
 
 
-    # print("df_merged的字段有",df_merged_new.columns.tolist())
-
-    # 将jhdate_df2转换为Unix时间戳（秒）
-    # 先将jhdate_df2转换为日期时间类型
+    # 将jhdate_wms转换为Unix时间戳（秒）
+    # 先将jhdate_wms转换为日期时间类型
+    # Asia/Shanghai 就是北京时间的标准时区名称
     df_merged_new['jhdate_timestamp'] = (
-            pd.to_datetime(df_merged_new['jhdate_df2'], errors='coerce')
+            pd.to_datetime(df_merged_new['jhdate_wms'], errors='coerce')
             .dt.tz_localize('Asia/Shanghai', nonexistent='shift_forward')
-            .astype('int64') // 10 ** 6
+            .astype('int64') // 10 ** 9
     )
-
-
-
-    print("*******合成后的数据*********",df_merged_new[["jhdate_timestamp", "jhdate_df2","name_df2"]].head(20))
 
 
 
     # 把小于等于0的时间戳，替换为 pandas 专用空值 pd.NA
     df_merged_new.loc[df_merged_new['jhdate_timestamp'] <= 0, 'jhdate_timestamp'] = pd.NA
     #把所有 pandas 空值（pd.NA/np.nan）全局替换为 Python 原生空值 None
-    # df_merged_new = df_merged_new.where(pd.notna(df_merged_new), None)
     df_merged_new = df_merged_new.where(pd.notna(df_merged_new))
     df_merged_new = df_merged_new.astype(object).where(pd.notna(df_merged_new), None)
     # 删除没用字段
-    df_merged_new = df_merged_new.drop(['l_name_zh_df2', 'jhdate_df2','customer_phone_df1'], axis=1)
+    df_merged_new = df_merged_new.drop(['l_name_zh_wms', 'jhdate_wms','customer_phone_crm'], axis=1)
 
-    # # 生成带时间戳的文件名
-    # print("************生成excel")
-    # timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-    # filename = f'订单合并_{timestamp}.xlsx'
-    # df_merged_new.to_excel(
-    #     filename,
-    #     index=False,
-    #     sheet_name='合并订单数据',
-    #     engine='openpyxl',
-    # )
-    # print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_merged_new)}")
 
 
     import json
@@ -473,8 +412,6 @@ def crawl_data_crm_wms(start_date,end_date):
     )
 
     return json.loads(json_str)
-
-
 
 
 
