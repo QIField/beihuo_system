@@ -110,7 +110,7 @@ def wms_get_status_orders_keywd_spider(url0, headers, keywd_list):
     # 使用pandas进行分析，爬取的数据写入DataFrame
     df = pd.DataFrame()
     type_id = 3
-
+    # df["is_data_exists"]=""
     # keywd_list.append("CK0201026032910260508")
     # 进行循环拣货单已完成的数据爬取
     for keywd in keywd_list:
@@ -127,6 +127,13 @@ def wms_get_status_orders_keywd_spider(url0, headers, keywd_list):
 
         if data:
             df = pd.concat([df, pd.DataFrame(data)], ignore_index=True)
+            # 1. 如果没有 is_data_exists 列，就创建一列，默认值 0
+            if 'is_data_exists' not in df.columns:
+                df['is_data_exists'] = 0
+
+            # 2. 找到 pono == keywd 的行，把 is_data_exists 设置为 1
+            df.loc[df['pono'] == keywd, 'is_data_exists'] = 1
+
         else:
 
             # df = pd.concat([df, pd.DataFrame({"pono":keywd,"is_data_exists":2})], ignore_index=True)
@@ -239,7 +246,8 @@ def crawl_data_crm_wms(start_date, end_date):
             'l_name_zh',
             'already_pick_num',
             'is_data_exists',
-             'wait_pick_num'
+             'wait_pick_num',
+             'qty'
              ]
         ] = ""
 
@@ -288,7 +296,8 @@ def crawl_data_crm_wms(start_date, end_date):
         'toqty_wms',
         "orders_no_wms",
         'l_name_zh_wms',
-        'already_pick_num_wms'
+        'already_pick_num_wms',
+        'qty_wms'
     ]
 
     keep_columns_wms_keywd = [
@@ -299,7 +308,8 @@ def crawl_data_crm_wms(start_date, end_date):
         'toqty_wms_keywd',
         "orders_no_wms_keywd",
         'l_name_zh_wms_keywd',
-        'already_pick_num_wms_keywd'
+        'already_pick_num_wms_keywd',
+        'qty_wms_keywd'
     ]
 
     keep_columns.extend(keep_columns_wms)
@@ -308,8 +318,8 @@ def crawl_data_crm_wms(start_date, end_date):
         print("df_merged.columns***************************")
         # 把后缀为df3的字段的数据，复制到后缀为df2
         print(df_merged.columns.tolist())
-        df_merged.loc[df_merged['is_data_exists_wms_keywd'] != 2, keep_columns_wms] = df_merged.loc[
-            df_merged['is_data_exists_wms_keywd'] != 2, keep_columns_wms_keywd].values
+        df_merged.loc[df_merged['is_data_exists_wms_keywd'] == 1, keep_columns_wms] = df_merged.loc[
+            df_merged['is_data_exists_wms_keywd'] == 1, keep_columns_wms_keywd].values
 
     # 只保留指定字段
     df_merged_new = df_merged[keep_columns]
