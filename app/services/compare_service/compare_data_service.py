@@ -20,7 +20,7 @@ class CompareDataService:
         'best_sales_season', 'max_price', 'min_price', 'supplier_price',
         'dealer_purchase_price', 'dealer_sale_price', 'price_update_time',
         'today_sales', 'yesterday_sales', 'month_sales', 'avg_sales_12m',
-        'avg_sales_6m', 'sales_7d', 'product_remark',
+        'avg_sales_6m', 'sales_7d', 'sales_6m', 'sales_12m', 'product_remark',
         'updated_time'
     ]
     
@@ -347,7 +347,7 @@ class CompareDataService:
         'supplier_price', 'dealer_purchase_price', 'dealer_sale_price',
         'max_price', 'min_price', 'inquiry_count',
         'today_sales', 'yesterday_sales', 'month_sales',
-        'avg_sales_12m', 'avg_sales_6m', 'sales_7d',
+        'avg_sales_12m', 'avg_sales_6m', 'sales_7d', 'sales_6m', 'sales_12m',
         'updated_time', 'price_update_time', 'product_level'
     }
 

@@ -104,6 +104,24 @@ class CRMDataCrawlService:
         print(f"[第{page}页] 多次重试后仍失败，跳过该页")
         return []
 
+    def _extract_replace_numbers(self, display_number):
+        """
+        从 display_number 数组中提取通用号，用中文逗号分隔
+        """
+        if not display_number or not isinstance(display_number, list):
+            return ''
+
+        numbers = []
+        for item in display_number:
+            if isinstance(item, dict):
+                num = item.get('number', '').strip()
+                if num:
+                    numbers.append(num)
+
+        # 去重并保持顺序
+        unique_numbers = list(dict.fromkeys(numbers))
+        return '，'.join(unique_numbers)
+
     def parse_product(self, product: Dict) -> Dict[str, Any]:
         """解析单个产品数据"""
         # 转换产品等级
@@ -123,7 +141,7 @@ class CRMDataCrawlService:
             'company': COMPANY,
             'product_name': product.get('l_name_zh', ''),
             'vehicle_brand': product.get('cass_oebrand_name', ''),
-            'replace_number': product.get('number_list', ''),
+            'replace_number': self._extract_replace_numbers(product.get('display_number')),
             'brand_code': product.get('brand_code', ''),
             'is_cass': product.get('is_cass', ''),
             'product_remark': product.get('company_remark', ''),
@@ -293,11 +311,11 @@ class CRMDataCrawlService:
                 'failed': self.total_failed
             }
             
-            # 全量爬取完成后，串行执行销量同步
-            print("\n" + "=" * 80)
-            print("CRM全量爬取完成，开始销量明细同步...")
-            print("=" * 80)
-            self._sync_sales_history()
+            # 全量爬取完成后，从备货表同步销量数据
+            print("\n" + "="*80)
+            print("CRM全量爬取完成，开始从备货表同步销量数据...")
+            print("="*80)
+            self._sync_sales_from_beihuo()
             
             return result
 
@@ -310,24 +328,40 @@ class CRMDataCrawlService:
         finally:
             if self.session:
                 self.session.close()
-    
-    def _sync_sales_history(self):
+
+    def _sync_sales_from_beihuo(self):
         """
-        串行执行销量明细同步
-        在CRM全量爬取完成后自动调用
+        从 crmapp_beihuo 表同步销量数据到 crmapp_compare_summary
         """
         try:
-            from app.services.sales_history_service import SalesHistorySyncService
-            
-            service = SalesHistorySyncService()
-            sync_result = service.sync_recent_days(days=30)
-            
-            print(f"\n[销量同步] 完成:")
-            print(f"  - 总页数: {sync_result['total_pages']}")
-            print(f"  - 总条目: {sync_result['total_items']}")
-            print(f"  - 保存记录: {sync_result['saved']}")
-            
+            from app.utils.database_connection import get_db_connection
+
+            conn = get_db_connection()
+            with conn.cursor() as cursor:
+                sql = """
+                    UPDATE crmapp_compare_summary s
+                    JOIN crmapp_beihuo b ON s.oe = b.oe AND s.brand = b.brand
+                    SET
+                        s.today_sales = b.today_sales,
+                        s.yesterday_sales = b.sales_yesterday,
+                        s.month_sales = b.sales_month,
+                        s.sales_7d = b.sales_7d,
+                        s.avg_sales_6m = b.avg_sales_6m,
+                        s.avg_sales_12m = b.avg_sales_12m,
+                        s.sales_6m = b.`近6个月销量`,
+                        s.sales_12m = b.`近12个月销量`
+                    WHERE s.company = %s
+                """
+                cursor.execute(sql, (COMPANY,))
+                conn.commit()
+                affected = cursor.rowcount
+
+                print(f"\n[销量同步] 完成:")
+                print(f"  - 更新记录数: {affected}")
+
         except Exception as e:
             print(f"\n[销量同步] 失败: {e}")
             import traceback
             traceback.print_exc()
+
+

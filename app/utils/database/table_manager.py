@@ -4,13 +4,10 @@ from app.utils.database_connection import get_db_connection
 
 # 导入各模块表初始化函数
 from .tables import (
-    init_sales_history_detail_table,
-    init_quote_count_ks_table,
     init_procurement_history_table,
     init_procurement_history_detail_table,
     init_zhuozhixing_table,
     init_inventory_detail_table,
-    init_safety_stock_table,
     init_ks_inquiry_detail_table,
     init_weixin_inquiry_detail_table,
 )
@@ -205,9 +202,11 @@ def init_beihuo_table():
                 物料条码 VARCHAR(255) COMMENT '物料条码',
                 车型品牌 VARCHAR(255) COMMENT '车型品牌',
                 近12个月月均销量 INT DEFAULT 0 COMMENT '近12个月月均销量',
+                近12个月销量 INT DEFAULT 0 COMMENT '近12个月销量',
                 近1个月询价量 INT DEFAULT 0 COMMENT '近1个月询价量',
                 近3个月月均询价量 INT DEFAULT 0 COMMENT '近3个月月均询价量',
                 近6个月月均销量 INT DEFAULT 0 COMMENT '近6个月月均销量',
+                近6个月销量 INT DEFAULT 0 COMMENT '近6个月销量',
                 近7天销量 INT DEFAULT 0 COMMENT '近7天销量',
                 预警状态 VARCHAR(255) COMMENT '预警状态',
                 company VARCHAR(100) COMMENT '公司',
@@ -238,6 +237,14 @@ def init_beihuo_table():
         {
             'name': '车型',
             'definition': "TEXT COMMENT '车型'"
+        },
+        {
+            'name': '近12个月销量',
+            'definition': "INT DEFAULT 0 COMMENT '近12个月销量'"
+        },
+        {
+            'name': '近6个月销量',
+            'definition': "INT DEFAULT 0 COMMENT '近6个月销量'"
         }
     ]
     check_and_add_fields('crmapp_beihuo', beihuo_fields_to_check)
@@ -455,7 +462,8 @@ def init_price_inquiry_table():
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 oe VARCHAR(100) NOT NULL COMMENT 'OE号',
                 brand VARCHAR(50) COMMENT '品牌',
-                price DECIMAL(10,2) DEFAULT 0.00 COMMENT '单价',
+                price DECIMAL(10,2) DEFAULT 0.00 COMMENT '单价（加价后）',
+                original_price DECIMAL(10,2) DEFAULT 0.00 COMMENT '原始单价（加价前）',
                 supplier VARCHAR(50) COMMENT '供应商',
                 warehouse VARCHAR(255) COMMENT '仓库',
                 expire_time DATETIME COMMENT '失效时间',
@@ -487,7 +495,8 @@ def init_price_inquiry_table():
                 ("common_number", "VARCHAR(255) COMMENT '通用号'"),
                 ("ks_sync", "TINYINT(1) DEFAULT 0 COMMENT '开思是否同步，0=未同步，1=已同步'"),
                 ("company", "VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码'"),
-                ("import_time", "DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '导入时间'")
+                ("import_time", "DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '导入时间'"),
+                ("original_price", "DECIMAL(10,2) DEFAULT 0.00 COMMENT '原始单价（加价前）'")
             ]
             
             for col_name, col_def in alter_columns:
@@ -595,6 +604,8 @@ def init_compare_summary_table():
                 avg_sales_12m DECIMAL(10,2) DEFAULT 0.00 COMMENT '近12个月月均销量',
                 avg_sales_6m DECIMAL(10,2) DEFAULT 0.00 COMMENT '近6个月月均销量',
                 sales_7d INT DEFAULT 0 COMMENT '近7天销量',
+                sales_6m INT DEFAULT 0 COMMENT '近6个月总销量',
+                sales_12m INT DEFAULT 0 COMMENT '近12个月总销量',
                 product_remark TEXT COMMENT '系统产品备注',
                 is_cass VARCHAR(10) COMMENT '是否同步开思',
                 created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -630,6 +641,8 @@ def init_compare_summary_table():
                 ("l_model_zh", "VARCHAR(255) COMMENT '车型中文名'"),
                 ("stock_zaitu_list", "JSON COMMENT '在途库存列表'"),
                 ("frey_no", "VARCHAR(255) COMMENT 'Frey编号'"),
+                ("sales_6m", "INT DEFAULT 0 COMMENT '近6个月总销量'"),
+                ("sales_12m", "INT DEFAULT 0 COMMENT '近12个月总销量'"),
             ]
             
             for col_name, col_def in alter_columns:
@@ -679,14 +692,12 @@ def init_all_tables():
         ('开思自动账单', init_ks_auto_bill_table),
         ('询价比价', init_price_inquiry_table),
         ('比价汇总', init_compare_summary_table),
-        ('销量明细', init_sales_history_detail_table),
-        ('询价次数', init_quote_count_ks_table),
         ('开思询价明细', init_ks_inquiry_detail_table),
         ('微信询价明细', init_weixin_inquiry_detail_table),
         ('采购历史', init_procurement_history_table),
         ('采购历史明细', init_procurement_history_detail_table),
         ('卓之星库存', init_zhuozhixing_table),
-        ('安全库存', init_safety_stock_table),
+
         ('库存明细', init_inventory_detail_table),
     ]
 

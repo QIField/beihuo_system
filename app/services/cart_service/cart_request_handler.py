@@ -56,7 +56,7 @@ class CartRequestHandler:
             sort_order = args.get('order')  # 排序方向：asc 或 desc
 
             # 提取搜索参数
-            search_keys = ['cart_barcode', 'cart_oe', 'cart_material_name', 'cart_brand', 'cart_tag', 'cart_car_model']
+            search_keys = ['cart_barcode', 'cart_oe', 'cart_material_name', 'cart_brand', 'cart_tag', 'cart_car_model', 'cart_car_brand']
             for key in search_keys:
                 if args.get(key):
                     search_params[key] = args.get(key)

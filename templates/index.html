@@ -863,6 +863,10 @@
 
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
+    <!-- 购物车模块 -->
+    <script src="{{ url_for('static', filename='js/cart/cart-api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cart/cart-table.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cart/cart-manager.js') }}"></script>
 
 <script>
 // 在文件开头添加全局变量来存储购物车缓存
@@ -984,44 +988,8 @@ function initExcelCellSelectionForCart(tableId) {
                     return;
                 }
                 
-                // 逐个删除商品
-                var successCount = 0;
-                var errorCount = 0;
-                
-                itemDetails.forEach(function(item) {
-                    fetch('/api/cart/remove', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ item_oe: item.item_oe, item_barcode: item.item_barcode })
-                    })
-                    .then(response => response.json())
-                    .then(result => {
-                        if (result.code === 0) successCount++;
-                        else errorCount++;
-                        
-                        if (successCount + errorCount === itemDetails.length) {
-                            if (successCount > 0) {
-                                layui.layer.msg(`成功移除 ${successCount} 个商品`, {icon: 1});
-                                updateCartCount();
-                                
-                                if (window.cartTableInstance) {
-                                    var currentDimension = window.currentCartDimension || 'product';
-                                    layui.table.reload('cartTable', {
-                                        url: '/api/cart?' + new Date().getTime() + '&dimension=' + currentDimension,
-                                        page: { curr: 1 }
-                                    });
-                                }
-                            }
-                            if (errorCount > 0) {
-                                layui.layer.msg(`有 ${errorCount} 个商品移除失败`, {icon: 2});
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        errorCount++;
-                        console.error('删除请求失败:', error);
-                    });
-                });
+                // 使用 CartManager 批量删除（前端立即删除 + 后台异步同步）
+                CartManager.removeMultiple(itemDetails);
             }
         });
         return; // 新模块初始化成功，直接返回
@@ -2621,10 +2589,10 @@ window.loadContent = function(type) {
                                     <input type="checkbox" name="cost_price" title="成本价" lay-skin="primary" checked>
                                 </div>
                                 <div class="layui-form-item" style="margin-bottom:5px;">
-                                    <input type="checkbox" name="avg_sales_12m" title="近12个月月均销量" lay-skin="primary" checked>
+                                    <input type="checkbox" name="sales_12m" title="近12个月销量" lay-skin="primary" checked>
                                 </div>
                                 <div class="layui-form-item" style="margin-bottom:5px;">
-                                    <input type="checkbox" name="avg_sales_6m" title="近6个月月均销量" lay-skin="primary" checked>
+                                    <input type="checkbox" name="sales_6m" title="近6个月销量" lay-skin="primary" checked>
                                 </div>
                                 <div class="layui-form-item" style="margin-bottom:5px;">
                                     <input type="checkbox" name="sales_7d" title="近7天销量" lay-skin="primary" checked>
@@ -2808,11 +2776,11 @@ function renderBeihuoTable(table) {
                     var yesterday = d['昨日销量'] || 0;
                     var sales_7d = d['近7天销量'] || 0;
                     var sales_month = d['本月销量'] || 0;
-                    var avg_sales_6m = d['近6个月月均销量'] || 0;
-                    var avg_sales_12m = d['近12个月月均销量'] || 0;
+                    var sales_6m = d['近6个月销量'] || 0;
+                    var sales_12m = d['近12个月销量'] || 0;
 
                     var salesText = '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales_7d + '</div>';
-                    salesText += '<div>近1/6/12月: ' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + '</div>';
+                    salesText += '<div>近1/6/12月: ' + sales_month + '/' + sales_6m + '/' + sales_12m + '</div>';
 
                     return salesText;
                 }
@@ -3836,71 +3804,13 @@ function bindEventHandlers(myTable, form, table) {
                             });
 
                             // 根据处理类型发送不同的请求
-                            var apiUrl = '';
                             if (processType === 'crm') {
-                                // 新建CRM档案使用新的API接口
-                                apiUrl = '/api/excel/process';
+                                // 新建CRM档案使用异步API接口
+                                handleCrmAsyncProcess(formData, processLoading);
                             } else {
                                 // 其他类型使用原有的API接口
-                                apiUrl = '/api/process_bill';
+                                handleSyncProcess(formData, processLoading, processType, files);
                             }
-
-                            // 发送文件到后端处理
-                            fetch(apiUrl, {
-                                method: 'POST',
-                                body: formData
-                            })
-                            .then(response => {
-                                if (processType === 'crm') {
-                                    // CRM处理返回Excel文件
-                                    return response.blob();
-                                } else {
-                                    // 其他处理可能有不同的响应格式
-                                    return response.blob();
-                                }
-                            })
-                            .then(blob => {
-                                layer.close(processLoading);
-
-                                // 创建下载链接
-                                var url = window.URL.createObjectURL(blob);
-                                var a = document.createElement('a');
-                                a.href = url;
-                                
-                                // 根据处理类型决定下载文件名
-                                if (processType === 'crm') {
-                                    // CRM处理返回Excel文件
-                                    a.download = 'CRM处理结果_' + new Date().getTime() + '.xlsx';
-                                } else if (processType === 'order') {
-                                    // 如果是订单处理，应收到ZIP格式的响应
-                                    a.download = 'Processed_Orders_' + new Date().getTime() + '.zip';
-                                } else {
-                                    // 如果是账单处理，根据文件数量决定
-                                    if (files.length > 1) {
-                                        a.download = 'processed_bills.zip';
-                                    } else {
-                                        a.download = files[0].name.replace(/\.[^/.]+$/, "") + '_已处理.xlsx';
-                                    }
-                                }
-                                
-                                document.body.appendChild(a);
-                                a.click();
-
-                                // 清理
-                                window.URL.revokeObjectURL(url);
-                                document.body.removeChild(a);
-
-                                // 根据处理类型显示不同的提示信息
-                                if (processType === 'crm') {
-                                    layer.msg('CRM档案处理完成并已下载', {icon: 1});
-                                } else if (processType === 'order') {
-                                    layer.msg('单据处理完成并已下载', {icon: 1});
-                                } else {
-                                    layer.msg('对账单处理完成并已下载', {icon: 1});
-                                }
-                                console.error('处理失败:', error);
-                                layer.msg('处理失败: ' + error.message, {icon: 2});
-                            });
                         };
                     }
                 });
@@ -3968,6 +3878,115 @@ function bindEventHandlers(myTable, form, table) {
             exportSingleRow(obj.data);
         }
     });
+
+    // CRM异步处理函数
+    function handleCrmAsyncProcess(formData, loadingIndex) {
+        // 步骤1：提交异步任务
+        fetch('/api/excel/async/product_archive', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.code !== 0) {
+                layer.close(loadingIndex);
+                layer.msg('提交失败: ' + result.msg, {icon: 2});
+                return;
+            }
+
+            var taskId = result.data.task_id;
+            layer.msg('任务已提交，处理中...', {icon: 1});
+
+            // 步骤2：轮询查询任务状态
+            var checkInterval = setInterval(function() {
+                fetch('/api/excel/async/status/' + taskId)
+                .then(response => response.json())
+                .then(statusResult => {
+                    if (statusResult.code !== 0) {
+                        clearInterval(checkInterval);
+                        layer.close(loadingIndex);
+                        layer.msg('查询状态失败: ' + statusResult.msg, {icon: 2});
+                        return;
+                    }
+
+                    var status = statusResult.data;
+
+                    if (status.status === 'running') {
+                        // 更新进度提示
+                        var progress = status.progress || 0;
+                        var total = status.total || 0;
+                        var message = status.message || '处理中...';
+                        layer.msg('处理中: ' + progress + '/' + total + ' - ' + message, {icon: 16, time: 1000});
+                    } else if (status.status === 'completed') {
+                        // 任务完成
+                        clearInterval(checkInterval);
+                        layer.close(loadingIndex);
+                        layer.msg('处理完成，开始下载...', {icon: 1});
+
+                        // 下载结果文件
+                        window.location.href = '/api/excel/async/download/' + taskId;
+                    } else if (status.status === 'failed') {
+                        // 任务失败
+                        clearInterval(checkInterval);
+                        layer.close(loadingIndex);
+                        layer.msg('处理失败: ' + (status.error || '未知错误'), {icon: 2});
+                    }
+                })
+                .catch(error => {
+                    clearInterval(checkInterval);
+                    layer.close(loadingIndex);
+                    layer.msg('查询状态失败: ' + error.message, {icon: 2});
+                });
+            }, 2000); // 每2秒查询一次
+        })
+        .catch(error => {
+            layer.close(loadingIndex);
+            layer.msg('提交失败: ' + error.message, {icon: 2});
+        });
+    }
+
+    // 同步处理函数（其他类型）
+    function handleSyncProcess(formData, loadingIndex, processType, files) {
+        var apiUrl = '/api/process_bill';
+
+        fetch(apiUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.blob())
+        .then(blob => {
+            layer.close(loadingIndex);
+
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+
+            if (processType === 'order') {
+                a.download = 'Processed_Orders_' + new Date().getTime() + '.zip';
+            } else {
+                if (files.length > 1) {
+                    a.download = 'processed_bills.zip';
+                } else {
+                    a.download = files[0].name.replace(/\.[^/.]+$/, "") + '_已处理.xlsx';
+                }
+            }
+
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            if (processType === 'order') {
+                layer.msg('单据处理完成并已下载', {icon: 1});
+            } else {
+                layer.msg('对账单处理完成并已下载', {icon: 1});
+            }
+        })
+        .catch(error => {
+            layer.close(loadingIndex);
+            layer.msg('处理失败: ' + error.message, {icon: 2});
+        });
+    }
     
     // 绑定表格排序事件
     table.on('sort(beihuoTable)', function(obj) {
@@ -4274,6 +4293,9 @@ function showCartPanel(table) {
                 <div class="layui-input-inline" style="flex: 1; min-width: 100px; max-width: 180px;">
                     <input type="text" name="cart_car_model" placeholder="车型搜索" autocomplete="off" class="layui-input" style="width: 100%;">
                 </div>
+                <div class="layui-input-inline" style="flex: 1; min-width: 100px; max-width: 180px;">
+                    <input type="text" name="cart_car_brand" placeholder="车型品牌搜索" autocomplete="off" class="layui-input" style="width: 100%;">
+                </div>
                 <button class="layui-btn layui-btn-sm layui-btn-normal" id="cartSearchBtn">搜索</button>
                 <button class="layui-btn layui-btn-sm layui-btn-primary" id="cartResetBtn">重置</button>
             </div>
@@ -4316,6 +4338,7 @@ function showCartPanel(table) {
                     searchParams.cart_brand = layero.find('input[name="cart_brand"]').val();
                     searchParams.cart_tag = layero.find('input[name="cart_tag"]').val();
                     searchParams.cart_car_model = layero.find('input[name="cart_car_model"]').val();
+                    searchParams.cart_car_brand = layero.find('input[name="cart_car_brand"]').val();
                     
                     // 过滤空值
                     for (var key in searchParams) {
@@ -4347,6 +4370,7 @@ function showCartPanel(table) {
                     layero.find('input[name="cart_brand"]').val('');
                     layero.find('input[name="cart_tag"]').val('');
                     layero.find('input[name="cart_car_model"]').val('');
+                    layero.find('input[name="cart_car_brand"]').val('');
                     
                     // 重新加载购物车表格，不带搜索条件
                     cartTable.reload({
@@ -4407,11 +4431,11 @@ function showCartPanel(table) {
                             var yesterday = d['sales_yesterday'] || d['昨日销量'] || 0;
                             var sales_7d = d['sales_7d'] || d['近7天销量'] || 0;
                             var sales_month = d['sales_month'] || d['本月销量'] || 0;
-                            var avg_sales_6m = d['avg_sales_6m'] || d['近6个月月均销量'] || 0;
-                            var avg_sales_12m = d['avg_sales_12m'] || d['近12个月月均销量'] || 0;
+                            var sales_6m = d['sales_6m'] || d['近6个月销量'] || 0;
+                            var sales_12m = d['sales_12m'] || d['近12个月销量'] || 0;
 
                             var salesText = '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales_7d + '</div>';
-                            salesText += '<div>近1/6/12月: ' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + '</div>';
+                            salesText += '<div>近1/6/12月: ' + sales_month + '/' + sales_6m + '/' + sales_12m + '</div>';
 
                             return salesText;
                         }
@@ -4504,11 +4528,11 @@ function showCartPanel(table) {
                             var yesterday = d['sales_yesterday'] || d['昨日销量'] || 0;
                             var sales_7d = d['sales_7d'] || d['近7天销量'] || 0;
                             var sales_month = d['sales_month'] || d['本月销量'] || 0;
-                            var avg_sales_6m = d['avg_sales_6m'] || d['近6个月月均销量'] || 0;
-                            var avg_sales_12m = d['avg_sales_12m'] || d['近12个月月均销量'] || 0;
+                            var sales_6m = d['sales_6m'] || d['近6个月销量'] || 0;
+                            var sales_12m = d['sales_12m'] || d['近12个月销量'] || 0;
 
                             var salesText = '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales_7d + '</div>';
-                            salesText += '<div>近1/6/12月: ' + sales_month + '/' + avg_sales_6m + '/' + avg_sales_12m + '</div>';
+                            salesText += '<div>近1/6/12月: ' + sales_month + '/' + sales_6m + '/' + sales_12m + '</div>';
 
                             return salesText;
                         }
@@ -4705,45 +4729,8 @@ function showCartPanel(table) {
                             });
                         });
 
-                        // 发送批量删除请求
-                        fetch('/api/cart/remove_multiple', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ item_details: itemDetails })
-                        })
-                        .then(response => response.json())
-                        .then(result => {
-                            if (result.code === 0) {
-                                layui.layer.msg('成功删除 ' + result.deleted_count + ' 个商品', {icon: 1});
-                                
-                                // 重新加载表格
-                                if (window.cartTableInstance) {
-                                    var currentDimension = window.currentCartDimension || 'product';
-                                    layui.table.reload('cartTable', {
-                                        url: '/api/cart?' + new Date().getTime() + '&dimension=' + currentDimension,
-                                        page: { curr: 1 },
-                                        done: function(res, curr, count) {
-                                            // 检查是否有清理结果的返回数据
-                                            if (res.cleanup_result && res.cleanup_result.deleted_count > 0) {
-                                                layui.layer.msg(`库存大于20的商品已自动删除 ${res.cleanup_result.deleted_count} 个`, {
-                                                    icon: 1,
-                                                    time: 3000
-                                                });
-                                            }
-                                        }
-                                    });
-                                }
-                                
-                                updateCartCount(); // 更新购物车计数
-                            } else {
-                                layui.layer.msg(result.msg, {icon: 2});
-                            }
-                        })
-                        .catch(error => {
-                            layui.layer.msg('删除失败: ' + error.message, {icon: 2});
-                        });
+                        // 使用 CartManager 批量删除（前端立即删除 + 后台异步同步）
+                        CartManager.removeMultiple(itemDetails);
                         
                         layui.layer.close(index);
                     });
@@ -4978,72 +4965,12 @@ function updateQuantity(input, cartTable) {
 /**
  * 从购物车移除商品
  * @param {string} itemOe 商品OE
+ * @param {string} itemBarcode 商品条码
+ * @param {object} cartTable 购物车表格实例（已废弃，保留参数兼容性）
  */
 function removeFromCart(itemOe, itemBarcode, cartTable) {
-    // 创建请求体，包含OE和物料条码
-    const requestBody = { 
-        item_oe: itemOe
-    };
-    
-    // 如果提供了物料条码，则包含在请求中
-    if (itemBarcode) {
-        requestBody.item_barcode = itemBarcode;
-    }
-    
-    fetch('/api/cart/remove', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.code === 0) {
-            layui.layer.msg('删除成功', {icon: 1});
-            // 重新加载表格，保持当前维度
-            if (window.cartTableInstance) {
-                var currentDimension = window.currentCartDimension || 'product';
-                // 重新加载表格
-                if (window.cartTableInstance) {
-                    var currentDimension = window.currentCartDimension || 'product';
-                    layui.table.reload('cartTable', {
-                        url: '/api/cart?' + new Date().getTime() + '&dimension=' + currentDimension,
-                        page: { curr: 1 },
-                        done: function(res, curr, count) {
-                            // 检查是否有清理结果的返回数据
-                            if (res.cleanup_result && res.cleanup_result.deleted_count > 0) {
-                                layui.layer.msg(`库存大于20的商品已自动删除 ${res.cleanup_result.deleted_count} 个`, {
-                                    icon: 1,
-                                    time: 3000
-                                });
-                            }
-                        }
-                    });
-                }
-            } else {
-                // 如果没有全局表格实例，尝试重新加载当前显示的购物车
-                // 遍历所有可能的表格实例
-                for (var i = 0; i < layui.table.config.instances.length; i++) {
-                    var tableIns = layui.table.config.instances[i];
-                    if (tableIns.config.id === 'cartTable') {
-                        var currentDimension = window.currentCartDimension || 'product';
-                        tableIns.reload({
-                            url: '/api/cart?' + new Date().getTime() + '&dimension=' + currentDimension,
-                            page: { curr: 1 }
-                        });
-                    }
-                }
-            }
-            updateCartCount();
-        } else {
-            layui.layer.msg(result.msg, {icon: 2});
-        }
-    })
-    .catch(error => {
-        console.error('请求错误:', error);
-        layui.layer.msg('删除失败: ' + error.message, {icon: 2});
-    });
+    // 使用 CartManager 进行删除（前端立即删除 + 后台异步同步）
+    CartManager.removeItem(itemOe, itemBarcode);
 }
 
 /**
@@ -5159,8 +5086,8 @@ function applyColumnFilter(myTable) {
     if (checkedColumns.stock_amount) newCols[0].push({field: '库存金额', title: '库存金额', width: 100, sort: true, align: 'right'});
     if (checkedColumns.sellable_days) newCols[0].push({field: '成品可卖天数', title: '成品可卖天数', width: 100, sort: true, align: 'right'});
     if (checkedColumns.cost_price) newCols[0].push({field: '成本价', title: '成本价', width: 100, sort: true, align: 'right'});
-    if (checkedColumns.avg_sales_12m) newCols[0].push({field: '近12个月月均销量', title: '近12个月月均销量', width: 120, sort: true, align: 'right'});
-    if (checkedColumns.avg_sales_6m) newCols[0].push({field: '近6个月月均销量', title: '近6个月月均销量', width: 120, sort: true, align: 'right'});
+    if (checkedColumns.sales_12m) newCols[0].push({field: '近12个月销量', title: '近12个月销量', width: 120, sort: true, align: 'right'});
+    if (checkedColumns.sales_6m) newCols[0].push({field: '近6个月销量', title: '近6个月销量', width: 120, sort: true, align: 'right'});
     if (checkedColumns.sales_7d) newCols[0].push({field: '近7天销量', title: '近7天销量', width: 100, sort: true, align: 'right'});
     if (checkedColumns.warning_status) newCols[0].push({field: '预警状态', title: '预警状态', width: 100, sort: true});
     
@@ -5433,6 +5360,7 @@ function exportCartData(cartTable) {
         var cartBrand = layero.find('input[name="cart_brand"]').val().trim();
         var cartTag = layero.find('input[name="cart_tag"]').val().trim();
         var cartCarModel = layero.find('input[name="cart_car_model"]').val().trim();
+        var cartCarBrand = layero.find('input[name="cart_car_brand"]').val().trim();
 
         if (cartOe) searchParams.append('oe', cartOe);
         if (cartBarcode) searchParams.append('barcode', cartBarcode);
@@ -5440,6 +5368,7 @@ function exportCartData(cartTable) {
         if (cartBrand) searchParams.append('brand', cartBrand);
         if (cartTag) searchParams.append('tag', cartTag);
         if (cartCarModel) searchParams.append('car_model', cartCarModel);
+        if (cartCarBrand) searchParams.append('car_brand', cartCarBrand);
     }
 
     // 构建URL

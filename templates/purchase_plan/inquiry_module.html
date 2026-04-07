@@ -550,13 +550,14 @@
                             oe: index === 0 ? formatEmptyValue(item.oe) : '',
                             brand: index === 0 ? formatEmptyValue(item.brand) : '',
                             supplier: formatEmptyValue(item.supplier),
-                            price: item.price ? '¥' + parseFloat(item.price).toFixed(2) : '',
+                            original_price: item.original_price ? '¥' + parseFloat(item.original_price).toFixed(2) : '',
                             warehouse: formatEmptyValue(item.warehouse),
                             expire_time: formatEmptyValue(item.expire_time),
                             remark: formatEmptyValue(item.remark),
                             stock_quantity: formatEmptyValue(item.stock_quantity),
                             common_number: formatEmptyValue(item.common_number),
                             ks_sync: item.ks_sync ? '是' : '否',
+                            import_time: formatEmptyValue(item.import_time),
                             _oeGroup: oe,
                             _brandGroup: brand
                         });
@@ -718,13 +719,14 @@
                     { data: 'oe', title: 'OE号', width: 150, className: 'oe-cell', readOnly: true },
                     { data: 'brand', title: '品牌', width: 120, className: 'brand-cell', readOnly: true },
                     { data: 'supplier', title: '供应商', width: 150, readOnly: true, renderer: createExpandableRenderer(10) },
-                    { data: 'price', title: '单价', width: 100, className: 'price-cell', readOnly: true },
+                    { data: 'original_price', title: '单价', width: 100, className: 'price-cell', readOnly: true },
                     { data: 'warehouse', title: '仓库', width: 120, readOnly: true, renderer: createExpandableRenderer(8) },
                     { data: 'expire_time', title: '失效时间', width: 160, readOnly: true },
                     { data: 'remark', title: '备注', width: 150, readOnly: true, renderer: createExpandableRenderer(8) },
                     { data: 'stock_quantity', title: '库存数量', width: 100, readOnly: true },
                     { data: 'common_number', title: '通用号', width: 150, readOnly: true, renderer: createCommonNumberRenderer(10) },
-                    { data: 'ks_sync', title: '开思是否同步', width: 120, readOnly: true }
+                    { data: 'ks_sync', title: '开思是否同步', width: 120, readOnly: true },
+                    { data: 'import_time', title: '上传时间', width: 160, readOnly: true }
                 ],
                 mergeCells: mergeCells,
                 rowHeaders: false,
@@ -907,57 +909,86 @@
             // 初始化加价弹窗事件
             initMarkupModalEvents();
 
-            // 实际执行文件上传
+            // 实际执行文件上传（异步版本）
             async function handleFileUpload(file, markupRate) {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('markup_rate', markupRate);
 
-                uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">上传中...</div>';
+                uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">提交任务中...</div>';
 
                 try {
+                    // 步骤1：提交异步任务
                     const response = await fetch('/api/purchase_plan/inquiry/import', {
                         method: 'POST',
                         body: formData
                     });
                     const result = await response.json();
 
-                    if (result.code === 0) {
-                        let html = '<div class="result-info result-success">' +
-                                   '<strong>导入成功！</strong><br>' +
-                                   '插入：' + (result.data.inserted_count || 0) + ' 条，' +
-                                   '更新：' + (result.data.updated_count || 0) + ' 条';
-                        if (result.data.errors && result.data.errors.length > 0) {
-                            html += '，错误：' + result.data.errors.length + ' 条';
-                        }
-                        html += '</div>';
-
-                        // 添加B2B上传提示
-                        if (result.data.b2b_upload) {
-                            html += '<div class="result-info" style="background-color: #f6ffed; border: 1px solid #b7eb8f; color: #52c41a; margin-top: 10px;">' +
-                                   '<strong>📤 B2B上传任务</strong><br>' +
-                                   result.data.b2b_upload.message +
-                                   '<br><small>上传完成后可在"上传历史"中下载结果</small>' +
-                                   '</div>';
-                        }
-
-                        if (result.data.errors && result.data.errors.length > 0) {
-                            html += '<div class="result-info result-error" style="margin-top: 10px;">' +
-                                    '<strong>错误信息：</strong><br>' +
-                                    result.data.errors.slice(0, 10).join('<br>') +
-                                    '</div>';
-                        }
-
-                        uploadResult.innerHTML = html;
-                        loadData();
-                    } else {
+                    if (result.code !== 0) {
                         uploadResult.innerHTML = '<div class="result-info result-error">' +
-                                                 '<strong>导入失败：</strong>' + result.msg +
+                                                 '<strong>提交失败：</strong>' + result.msg +
                                                  '</div>';
+                        return;
                     }
+
+                    const taskId = result.data.task_id;
+                    uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">任务已提交，处理中...</div>';
+
+                    // 步骤2：轮询查询任务状态
+                    const checkStatus = setInterval(async () => {
+                        try {
+                            const statusRes = await fetch('/api/purchase_plan/inquiry/import/status/' + taskId);
+                            const statusResult = await statusRes.json();
+
+                            if (statusResult.code !== 0) {
+                                clearInterval(checkStatus);
+                                uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                                         '<strong>查询状态失败：</strong>' + statusResult.msg +
+                                                         '</div>';
+                                return;
+                            }
+
+                            const status = statusResult.data;
+
+                            if (status.status === 'running') {
+                                // 更新进度
+                                const progress = status.progress || 0;
+                                const total = status.total || 0;
+                                const message = status.message || '处理中...';
+                                uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">' +
+                                                         '<strong>处理中：</strong>' + progress + '/' + total + ' - ' + message +
+                                                         '</div>';
+                            } else if (status.status === 'completed') {
+                                // 任务完成，下载结果
+                                clearInterval(checkStatus);
+                                uploadResult.innerHTML = '<div class="result-info result-success">' +
+                                                         '<strong>处理完成！</strong><br>正在下载结果文件...' +
+                                                         '</div>';
+
+                                // 下载结果文件
+                                window.location.href = '/api/purchase_plan/inquiry/import/download/' + taskId;
+
+                                // 刷新数据列表
+                                loadData();
+                            } else if (status.status === 'failed') {
+                                // 任务失败
+                                clearInterval(checkStatus);
+                                uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                                         '<strong>处理失败：</strong>' + (status.error || '未知错误') +
+                                                         '</div>';
+                            }
+                        } catch (error) {
+                            clearInterval(checkStatus);
+                            uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                                     '<strong>查询状态失败：</strong>' + error.message +
+                                                     '</div>';
+                        }
+                    }, 2000); // 每2秒查询一次
+
                 } catch (error) {
                     uploadResult.innerHTML = '<div class="result-info result-error">' +
-                                             '<strong>导入失败：</strong>' + error.message +
+                                             '<strong>提交失败：</strong>' + error.message +
                                              '</div>';
                 }
 

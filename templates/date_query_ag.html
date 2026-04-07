@@ -112,6 +112,49 @@
             font-weight: 600;
         }
 
+        /* 高级搜索区域 */
+        .advanced-search-row {
+            background: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            flex-wrap: nowrap;
+        }
+
+        .search-field {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .search-field label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .search-field textarea {
+            width: 100%;
+            height: 50px;
+            padding: 6px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 12px;
+            resize: none;
+            line-height: 1.4;
+        }
+
+        .search-field textarea:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
         /* 分页条数选择器 */
         .ag-paging-panel {
             position: relative;
@@ -244,19 +287,40 @@
         
         <div class="toolbar">
             <input type="text" id="dateRange" class="date-input" placeholder="请选择日期范围" readonly>
-            
-            <div class="divider"></div>
-            
-            <input type="text" id="searchOe" class="search-input" placeholder="搜索OE号">
-            <input type="text" id="searchBrand" class="search-input" placeholder="搜索品牌">
-            <button class="btn btn-primary" onclick="searchData()">搜索</button>
-            <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
-            <button class="btn btn-primary" onclick="openAdvancedSearch()">高级搜索</button>
 
             <div class="flex-spacer"></div>
 
+            <button class="btn btn-primary" onclick="searchData()">搜索</button>
+            <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
             <button class="btn btn-primary" onclick="addSelectedToCart()">加入购物车</button>
             <button class="btn btn-primary" onclick="exportData()">导出</button>
+        </div>
+
+        <div class="advanced-search-row">
+            <div class="search-field">
+                <label>OE号</label>
+                <textarea id="advSearchOe" placeholder="多行输入"></textarea>
+            </div>
+            <div class="search-field">
+                <label>物料条码</label>
+                <textarea id="advSearchBarcode" placeholder="多行输入"></textarea>
+            </div>
+            <div class="search-field">
+                <label>物料名称</label>
+                <textarea id="advSearchMaterialName" placeholder="多行输入"></textarea>
+            </div>
+            <div class="search-field">
+                <label>品牌</label>
+                <textarea id="advSearchBrand" placeholder="多行输入"></textarea>
+            </div>
+            <div class="search-field">
+                <label>车型品牌</label>
+                <textarea id="advSearchCarBrand" placeholder="多行输入"></textarea>
+            </div>
+            <div class="search-field">
+                <label>标签</label>
+                <textarea id="advSearchTag" placeholder="多行输入"></textarea>
+            </div>
         </div>
         
         <div class="table-container">
@@ -359,12 +423,12 @@
                     const yesterday = parseInt(data['昨日销量'] || 0);
                     const sales7d = parseInt(data['近7天销量'] || 0);
                     const salesMonth = parseInt(data['本月销量'] || 0);
-                    const avg6m = parseInt(data['近6个月月均销量'] || 0);
-                    const avg12m = parseInt(data['近12个月月均销量'] || 0);
-                    
+                    const sales6m = parseInt(data['近6个月销量'] || 0);
+                    const sales12m = parseInt(data['近12个月销量'] || 0);
+
                     return `<div style="font-size: 11px; line-height: 1.3;">
                         <div>今/昨/近7天: ${today}/${yesterday}/${sales7d}</div>
-                        <div>近1/6/12月: ${salesMonth}/${avg6m}/${avg12m}</div>
+                        <div>近1/6/12月: ${salesMonth}/${sales6m}/${sales12m}</div>
                     </div>`;
                 }
             },
@@ -1197,26 +1261,14 @@
         function initDatePicker() {
             layui.use(['laydate', 'layer'], function() {
                 const laydate = layui.laydate;
-                
-                // 设置默认日期范围（最近7天）
-                const end = new Date();
-                const start = new Date();
-                start.setDate(start.getDate() - 7);
-                
-                const formatDate = (date) => {
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    return `${year}-${month}-${day}`;
-                };
-                
+
                 laydate.render({
                     elem: '#dateRange',
                     trigger: 'click',
                     format: 'yyyy-MM-dd',
                     range: true,
                     max: 0, // 限制最大日期不能超过今天
-                    value: `${formatDate(start)} - ${formatDate(end)}`,
+                    value: '', // 默认值为空，不自动选择日期
                     done: function(value, date, endDate) {
                         // 日期选择后自动触发查询
                         if (value) {
@@ -1224,11 +1276,9 @@
                         }
                     }
                 });
-                
-                // 先加载购物车数据，再加载表格数据
-                loadCartCache().then(() => {
-                    setTimeout(() => loadData(), 100);
-                });
+
+                // 只加载购物车数据，不自动加载表格数据
+                loadCartCache();
             });
         }
         
@@ -1330,148 +1380,41 @@
         }
         
         // 搜索数据
-        function searchData() {
-            const oe = document.getElementById('searchOe').value.trim();
-            const brand = document.getElementById('searchBrand').value.trim();
-            
-            if (!oe && !brand) {
-                filteredData = [...currentData];
-            } else {
-                filteredData = currentData.filter(item => {
-                    const matchOe = !oe || (item.oe && item.oe.toLowerCase().includes(oe.toLowerCase()));
-                    const matchBrand = !brand || (item.品牌 && item.品牌.toLowerCase().includes(brand.toLowerCase()));
-                    return matchOe && matchBrand;
-                });
-            }
-            
-            if (gridApi && gridApi.setRowData) {
-                gridApi.setRowData(filteredData);
-            }
-            updateStats();
-            layui.layer.msg(`找到 ${filteredData.length} 条记录`);
-        }
-        
-        // 重置搜索 - 清空所有搜索条件并刷新表格
-        function resetSearch() {
-            console.log('[重置] 清空所有搜索条件');
-            
-            // 清空普通搜索条件
-            document.getElementById('searchOe').value = '';
-            document.getElementById('searchBrand').value = '';
-            
-            // 清空高级搜索条件（如果弹窗是打开的，也清空）
-            const advOe = document.getElementById('advSearchOe');
-            const advBarcode = document.getElementById('advSearchBarcode');
-            const advMaterialName = document.getElementById('advSearchMaterialName');
-            const advBrand = document.getElementById('advSearchBrand');
-            const advTag = document.getElementById('advSearchTag');
-            
-            if (advOe) advOe.value = '';
-            if (advBarcode) advBarcode.value = '';
-            if (advMaterialName) advMaterialName.value = '';
-            if (advBrand) advBrand.value = '';
-            if (advTag) advTag.value = '';
-            
-            // 清空勾选状态
-            if (gridApi) {
-                gridApi.deselectAll();
-            }
-            
-            // 重新加载数据（从服务器获取最新数据）
-            loadData();
-            
-            layui.layer.msg('已重置搜索条件', {icon: 1});
-        }
-        
-        // 高级搜索 - 完善版，与旧代码一致
-        function openAdvancedSearch() {
-            layui.layer.open({
-                type: 1,
-                title: '高级搜索',
-                area: ['600px', '550px'],
-                content: `
-                    <div style="padding: 20px;">
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">OE号（多行）</label>
-                            <textarea id="advSearchOe" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个OE号"></textarea>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">物料条码（多行）</label>
-                            <textarea id="advSearchBarcode" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个条码"></textarea>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">物料名称（多行）</label>
-                            <textarea id="advSearchMaterialName" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个名称"></textarea>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">品牌（多行）</label>
-                            <textarea id="advSearchBrand" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个品牌"></textarea>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">标签（多行）</label>
-                            <textarea id="advSearchTag" style="width: 100%; height: 60px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; resize: vertical;" placeholder="支持多行输入，每行一个标签"></textarea>
-                        </div>
-                    </div>
-                `,
-                btn: ['搜索', '重置', '取消'],
-                yes: function(index, layero) {
-                    // 搜索按钮
-                    performAdvancedSearch();
-                    layui.layer.close(index);
-                },
-                btn2: function(index, layero) {
-                    // 重置按钮
-                    document.getElementById('advSearchOe').value = '';
-                    document.getElementById('advSearchBarcode').value = '';
-                    document.getElementById('advSearchMaterialName').value = '';
-                    document.getElementById('advSearchBrand').value = '';
-                    document.getElementById('advSearchTag').value = '';
-                    return false; // 不关闭弹窗
-                },
-                btn3: function(index, layero) {
-                    // 取消按钮
-                    layui.layer.close(index);
-                }
-            });
-        }
-        
-        // 处理多行搜索输入
-        function process_multiline_search(input) {
-            if (!input) return [];
-            return input.split(/\r?\n/).map(item => item.trim()).filter(item => item !== '');
-        }
-        
-        // 执行高级搜索
-        async function performAdvancedSearch() {
+        async function searchData() {
             const oe = document.getElementById('advSearchOe').value.trim();
             const barcode = document.getElementById('advSearchBarcode').value.trim();
             const materialName = document.getElementById('advSearchMaterialName').value.trim();
             const brand = document.getElementById('advSearchBrand').value.trim();
+            const carBrand = document.getElementById('advSearchCarBrand').value.trim();
             const tag = document.getElementById('advSearchTag').value.trim();
-            
+
             // 构建搜索参数
             const searchParams = {};
             if (oe) searchParams.oe = oe;
             if (barcode) searchParams.barcode = barcode;
             if (materialName) searchParams.material_name = materialName;
             if (brand) searchParams.brand = brand;
+            if (carBrand) searchParams.car_brand = carBrand;
             if (tag) searchParams.tag = tag;
-            
-            // 如果没有输入任何搜索条件，提示用户
+
+            // 如果没有输入任何搜索条件，使用当前日期范围的数据
             if (Object.keys(searchParams).length === 0) {
-                layui.layer.msg('请输入至少一个搜索条件', {icon: 0});
+                filteredData = [...currentData];
+                if (gridApi && gridApi.setRowData) {
+                    gridApi.setRowData(filteredData);
+                }
+                updateStats();
+                layui.layer.msg(`找到 ${filteredData.length} 条记录`);
                 return;
             }
-            
+
             // 显示加载中
             const loadingIndex = layui.layer.load(2, {
                 content: '正在搜索...',
                 shade: [0.3, '#000']
             });
-            
+
             try {
-                console.log('[高级搜索] 发送请求:', searchParams);
-                
                 const response = await fetch('/api/date_ordercount_search', {
                     method: 'POST',
                     headers: {
@@ -1479,26 +1422,23 @@
                     },
                     body: JSON.stringify(searchParams)
                 });
-                
+
                 const result = await response.json();
-                
+
                 layui.layer.close(loadingIndex);
-                
+
                 if (result.code === 0) {
-                    console.log('[高级搜索] 数据条数:', result.data ? result.data.length : 0);
-                    
-                    // 更新表格数据
                     currentData = result.data.map((item, index) => ({
                         ...item,
                         selected: false,
                         id: index
                     }));
                     filteredData = [...currentData];
-                    
+
                     if (gridApi && gridApi.setRowData) {
                         gridApi.setRowData(filteredData);
                     }
-                    
+
                     updateStats();
                     layui.layer.msg(`搜索完成，找到 ${result.data.length} 条记录`, {icon: 1});
                 } else {
@@ -1506,9 +1446,37 @@
                 }
             } catch (error) {
                 layui.layer.close(loadingIndex);
-                console.error('[高级搜索] 搜索失败:', error);
                 layui.layer.msg('搜索失败: ' + error.message, {icon: 2});
             }
+        }
+        
+        // 重置搜索 - 清空所有搜索条件并刷新表格
+        function resetSearch() {
+            console.log('[重置] 清空所有搜索条件');
+
+            // 清空高级搜索条件
+            document.getElementById('advSearchOe').value = '';
+            document.getElementById('advSearchBarcode').value = '';
+            document.getElementById('advSearchMaterialName').value = '';
+            document.getElementById('advSearchBrand').value = '';
+            document.getElementById('advSearchCarBrand').value = '';
+            document.getElementById('advSearchTag').value = '';
+
+            // 清空勾选状态
+            if (gridApi) {
+                gridApi.deselectAll();
+            }
+
+            // 重新加载数据（从服务器获取最新数据）
+            loadData();
+
+            layui.layer.msg('已重置搜索条件', {icon: 1});
+        }
+        
+        // 处理多行搜索输入
+        function process_multiline_search(input) {
+            if (!input) return [];
+            return input.split(/\r?\n/).map(item => item.trim()).filter(item => item !== '');
         }
         
         // 更新统计信息

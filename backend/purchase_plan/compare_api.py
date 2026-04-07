@@ -151,13 +151,12 @@ def export_compare_data():
                         params.append(item.get('oe', ''))
                         params.append(item.get('brand', ''))
                     if company:
-                        placeholders = f"({placeholders})"
                         # 查询每月最低价（与悬浮窗逻辑一致）
                         sql = f"""
                             SELECT oe, brand, supplier_name, unit_price, purchase_date
                             FROM crmapp_procurement_history t1
                             WHERE company = %s 
-                            AND (oe, brand) IN {placeholders}
+                            AND (oe, brand) IN ({placeholders})
                             AND purchase_date >= '2024-01-01'
                             AND purchase_date <= '2026-12-31'
                             AND unit_price = (
@@ -257,8 +256,8 @@ def export_compare_data():
                 '昨日销量': format_number(item.get('yesterday_sales')),
                 '近7天销量': format_number(item.get('sales_7d')),
                 '本月销量': format_number(item.get('month_sales')),
-                '近6个月月均销量': format_number(item.get('avg_sales_6m')),
-                '近12个月月均销量': format_number(item.get('avg_sales_12m')),
+                '近6个月总销量': format_number(item.get('sales_6m')),
+                '近12个月总销量': format_number(item.get('sales_12m')),
                 '系统产品备注': item.get('product_remark', ''),
                 '品牌编码': item.get('brand_code', '')
             }
@@ -315,8 +314,8 @@ def export_compare_data():
                     'P': 10,  # 昨日销量
                     'Q': 12,  # 近7天销量
                     'R': 12,  # 本月销量
-                    'S': 16,  # 近6个月月均销量
-                    'T': 16,  # 近12个月月均销量
+                    'S': 16,  # 近6个月总销量
+                    'T': 16,  # 近12个月总销量
                     'U': 25,  # 系统产品备注
                     'V': 12   # 品牌编码
                 }
