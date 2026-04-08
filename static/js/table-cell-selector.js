@@ -549,6 +549,42 @@
     }
 
     /**
+     * 处理单元格双击事件 - 复制单元格内容
+     */
+    function handleCellDblClick(e) {
+        // 获取双击的单元格元素
+        const cell = e.target.closest('.layui-table-cell');
+        if (!cell) return;
+
+        // 获取单元格文本内容
+        const text = cell.innerText.trim();
+        if (!text) return;
+
+        // 复制到剪贴板
+        copyText(text, (success) => {
+            if (layui.layer) {
+                const displayText = text.length > 30 ? text.substring(0, 30) + '...' : text;
+                layui.layer.msg(success ? '已复制: ' + displayText : '复制失败', {
+                    icon: success ? 1 : 2,
+                    time: 1200,
+                    offset: 't'
+                });
+            }
+        });
+    }
+
+    /**
+     * 为指定表格绑定双击事件
+     */
+    function bindDblClickEvent(tableId) {
+        const tableView = getTableView(tableId);
+        if (!tableView) return;
+
+        // 使用事件委托监听双击事件
+        tableView.addEventListener('dblclick', handleCellDblClick);
+    }
+
+    /**
      * 绑定全局事件（只执行一次）
      */
     function bindGlobalEvents() {
@@ -586,6 +622,9 @@
 
         // 清除之前的选中状态
         clearSelection(tableId);
+
+        // 绑定双击复制事件
+        bindDblClickEvent(tableId);
 
         console.log(`TableCellSelector: 表格 ${tableId} 初始化完成`);
     }

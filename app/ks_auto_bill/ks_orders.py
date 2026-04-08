@@ -278,29 +278,34 @@ def save_order_info_to_db(order_info_list, order_details_map=None):
                         pass
                 else:
                     # 订单不存在，需要插入
+                    # 判断是否为非处理状态订单，如果是则设置crm订单状态
+                    crm_order_status = None
+                    if order_status_desc != '等待商家确认':
+                        crm_order_status = f'状态为"{order_status_desc}"'
+                    
                     if order_details_map and order_id in order_details_map:
                         # 如果提供了详情映射且当前订单有详情，则使用详情数据
                         detail = order_details_map[order_id]
                         quantity = detail.get('total_quantity', None)
                         amount = detail.get('total_amount', None)
-                        to_insert.append((order_date, order_id, order_status_desc, buyer_company_name, quantity, amount))
+                        to_insert.append((order_date, order_id, order_status_desc, buyer_company_name, quantity, amount, crm_order_status))
                     else:
                         # 不包含数量和金额字段的插入
-                        to_insert.append((order_date, order_id, order_status_desc, buyer_company_name))
+                        to_insert.append((order_date, order_id, order_status_desc, buyer_company_name, crm_order_status))
             
             # 批量插入新订单
             inserted_count = 0
             if to_insert:
-                # 检查是否包含数量和金额字段
-                if to_insert and len(to_insert[0]) == 6:  # 包含数量和金额
+                # 检查是否包含数量和金额字段（现在统一为7个字段：日期、订单号、执行日志、客户、数量、金额、crm订单状态）
+                if to_insert and len(to_insert[0]) == 7:  # 包含数量和金额
                     insert_sql = """
-                    INSERT INTO crmapp_ks_auto_bill (`日期`, `开思订单号`, `执行日志`, `客户`, `数量`, `金额`)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO crmapp_ks_auto_bill (`日期`, `开思订单号`, `执行日志`, `客户`, `数量`, `金额`, `crm订单状态`)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """
                 else:  # 不包含数量和金额
                     insert_sql = """
-                    INSERT INTO crmapp_ks_auto_bill (`日期`, `开思订单号`, `执行日志`, `客户`)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO crmapp_ks_auto_bill (`日期`, `开思订单号`, `执行日志`, `客户`, `crm订单状态`)
+                    VALUES (%s, %s, %s, %s, %s)
                     """
                 cursor.executemany(insert_sql, to_insert)
                 inserted_count = len(to_insert)

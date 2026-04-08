@@ -1092,5 +1092,79 @@ def _save_excel_results_with_return(df, results, oe_col, original_file_path):
     return output_path
 
 
+def process_excel_async_wrapper(file_path: str, mode: str, progress_callback=None):
+    """
+    Excel异步处理包装器
+    支持进度回调，供异步任务调用
+    """
+    from config import create_crm_session
+    
+    # 创建 Session
+    session = create_crm_session()
+    
+    # 加载 Excel 数据
+    from .excel_data_loader import load_product_data, load_alias_data
+    product_df = load_product_data()
+    alias_df = load_alias_data()
+    
+    # 读取所有工作表
+    if file_path.endswith('.csv'):
+        all_sheets = {'Sheet1': pd.read_csv(file_path, dtype=str)}
+    else:
+        all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str)
+    
+    # 筛选工作表
+    valid_sheets = _filter_sheets_by_mode(all_sheets, mode)
+    if not valid_sheets:
+        raise ValueError("没有找到符合要求的工作表")
+    
+    # 计算总项目数
+    total_items = sum(len(sheet['df']) for sheet in valid_sheets.values())
+    processed = 0
+    all_results = {}
+    
+    # 处理每个工作表
+    for sheet_name, sheet_info in valid_sheets.items():
+        df = sheet_info['df']
+        columns = sheet_info['columns']
+        oe_col = columns[0]
+        brand_col = columns[1]
+        
+        # 准备处理项
+        items = []
+        for _, row in df.iterrows():
+            oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
+            brand = str(row[brand_col]).strip() if pd.notna(row[brand_col]) else ''
+            if oe and brand:
+                item = {
+                    'oe_number': oe,
+                    'brand': brand,
+                    'mode': mode
+                }
+                # 三列模式添加 brand_code
+                if mode == 'three_column' and len(columns) > 2:
+                    brand_code_col = columns[2]
+                    brand_code = str(row[brand_code_col]).strip() if pd.notna(row[brand_code_col]) else ''
+                    item['brand_code'] = brand_code
+                items.append(item)
+        
+        # 处理并更新进度
+        results = _process_with_loop(items, product_df, alias_df, None)
+        all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
+        
+        processed += len(items)
+        if progress_callback:
+            progress_callback(processed, total_items, f"已处理工作表: {sheet_name}")
+    
+    # 保存结果
+    result_path = _save_multi_sheet_results(all_results, file_path)
+    
+    # 清理临时文件
+    import os
+    os.remove(file_path)
+    
+    return result_path
+
+
 if __name__ == "__main__":
     main()

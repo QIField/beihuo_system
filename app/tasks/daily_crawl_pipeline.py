@@ -4,11 +4,12 @@
 
 执行顺序：
 1. CRM全量爬取
-2. 销量同步
-3. 采购历史爬取（近5天）+ 聚合到旧表
-4. 采购数据同步到比价表（旧表数据同步到比价汇总表）
+2. 采购历史爬取（近5天）+ 聚合到旧表
+3. 采购数据同步到比价表（旧表数据同步到比价汇总表）
 
-注：询价次数同步已移至独立的 9:15 定时任务 ks_quote_count_task
+注：
+- 销量同步已移除
+- 询价次数同步已移至独立的 9:15 定时任务 ks_quote_count_task
 """
 
 import sys
@@ -63,34 +64,10 @@ def execute_daily_pipeline():
         all_results['tasks']['crm_crawl'] = {'error': str(e)}
         all_results['total_failed'] += 1
 
-    # 2. 销量同步（近5天明细）
+    # 2. 采购历史爬取（近5天）+ 聚合到旧表
     try:
         print(f"\n{'='*60}")
-        print(f"2. 开始销量同步（近5天明细）")
-        print(f"{'='*60}")
-
-        from app.services.sales_history_service.data_sync_service import SalesHistorySyncService
-        service = SalesHistorySyncService()
-        sales_result = service.sync_recent_days(days=5)
-
-        all_results['tasks']['sales_sync'] = sales_result
-        all_results['total_synced'] += sales_result.get('saved', 0)
-
-        print(f"\n[销量同步] 结束:")
-        print(f"  - 总页数: {sales_result.get('total_pages', 0)}")
-        print(f"  - 总条目: {sales_result.get('total_items', 0)}")
-        print(f"  - 保存记录: {sales_result.get('saved', 0)}")
-
-    except Exception as e:
-        print(f"\n[销量同步] 出现异常: {e}")
-        traceback.print_exc()
-        all_results['tasks']['sales_sync'] = {'error': str(e)}
-        all_results['total_failed'] += 1
-
-    # 3. 采购历史爬取（近5天）+ 聚合到旧表
-    try:
-        print(f"\n{'='*60}")
-        print(f"3. 开始采购历史爬取（近5天）+ 聚合到旧表")
+        print(f"2. 开始采购历史爬取（近5天）+ 聚合到旧表")
         print(f"{'='*60}")
 
         from app.services.procurement_service.purchase_history_main import run
@@ -117,10 +94,10 @@ def execute_daily_pipeline():
         all_results['tasks']['purchase_history'] = {'error': str(e)}
         all_results['total_failed'] += 1
 
-    # 4. 采购数据同步到比价表
+    # 3. 采购数据同步到比价表
     try:
         print(f"\n{'='*60}")
-        print(f"4. 开始采购数据同步到比价表")
+        print(f"3. 开始采购数据同步到比价表")
         print(f"{'='*60}")
 
         from app.services.procurement_service.purchase_sync_service import PurchaseSyncService

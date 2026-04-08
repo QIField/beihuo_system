@@ -588,8 +588,8 @@
             const yesterday = formatNumber(salesData.yesterdaySales) || '-';
             const sales7d = formatNumber(salesData.sales7d) || '-';
             const month = formatNumber(salesData.monthSales) || '-';
-            const avg6m = formatNumber(salesData.avgSales6m) || '-';
-            const avg12m = formatNumber(salesData.avgSales12m) || '-';
+            const sales6m = formatNumber(salesData.sales6m) || '-';
+            const sales12m = formatNumber(salesData.sales12m) || '-';
 
             // 构建询价次数矩阵
             const quoteMatrix = buildQuoteCountMatrix(quoteHistory);
@@ -614,12 +614,12 @@
                         <span class="price-tooltip-value">${month}</span>
                     </div>
                     <div class="price-tooltip-row">
-                        <span class="price-tooltip-label">近6月月均:</span>
-                        <span class="price-tooltip-value">${avg6m}</span>
+                        <span class="price-tooltip-label">近6个月总:</span>
+                        <span class="price-tooltip-value">${sales6m}</span>
                     </div>
                     <div class="price-tooltip-row">
-                        <span class="price-tooltip-label">近12月月均:</span>
-                        <span class="price-tooltip-value">${avg12m}</span>
+                        <span class="price-tooltip-label">近12个月总:</span>
+                        <span class="price-tooltip-value">${sales12m}</span>
                     </div>
                 </div>
                 <div class="sales-tooltip-right">
@@ -862,8 +862,8 @@
                             todaySales: formatNumber(item.today_sales),
                             yesterdaySales: formatNumber(item.yesterday_sales),
                             monthSales: formatNumber(item.month_sales),
-                            avgSales12m: formatNumber(item.avg_sales_12m),
-                            avgSales6m: formatNumber(item.avg_sales_6m),
+                            sales12m: formatNumber(item.sales_12m),
+                            sales6m: formatNumber(item.sales_6m),
                             sales7d: formatNumber(item.sales_7d),
                             productRemark: formatEmptyValue(item.product_remark),
                             brandCode: formatEmptyValue(item.brand_code),
@@ -1154,10 +1154,10 @@
                     { data: 'dealerSalePrice', title: '4S含税售价', width: 110, className: 'price-cell', readOnly: true },
                     // 更新价格时间
                     { data: 'priceUpdateTime', title: '更新价格时间', width: 140, className: 'date-cell', readOnly: true },
-                    // 销量及月均销量（合并显示，带悬浮窗）
+                    // 销量及总销量（合并显示，带悬浮窗）
                     {
                         data: 'salesData',
-                        title: '销量及月均销量',
+                        title: '销量及总销量',
                         width: 160,
                         className: 'quantity-cell',
                         readOnly: true,
@@ -1167,12 +1167,12 @@
                             const yesterday = formatNumber(data.yesterdaySales) || '-';
                             const sales7d = formatNumber(data.sales7d) || '-';
                             const month = formatNumber(data.monthSales) || '-';
-                            const avg6m = formatNumber(data.avgSales6m) || '-';
-                            const avg12m = formatNumber(data.avgSales12m) || '-';
+                            const sales6m = formatNumber(data.sales6m) || '-';
+                            const sales12m = formatNumber(data.sales12m) || '-';
 
                             td.innerHTML = '<div style="line-height:1.4;padding:4px;text-align:center;">' +
                                            '<div>今/昨/近7天: ' + today + '/' + yesterday + '/' + sales7d + '</div>' +
-                                           '<div>近1/6/12月: ' + month + '/' + avg6m + '/' + avg12m + '</div>' +
+                                           '<div>近1/6/12月: ' + month + '/' + sales6m + '/' + sales12m + '</div>' +
                                            '</div>';
                             td.style.textAlign = 'center';
                             td.style.verticalAlign = 'middle';
@@ -1184,8 +1184,8 @@
                                 yesterdaySales: data.yesterdaySales,
                                 sales7d: data.sales7d,
                                 monthSales: data.monthSales,
-                                avgSales6m: data.avgSales6m,
-                                avgSales12m: data.avgSales12m
+                                sales6m: data.sales6m,
+                                sales12m: data.sales12m
                             };
 
                             // 从缓存获取询价历史，如果没有则异步加载

@@ -249,7 +249,104 @@ def register_excel_process_routes(app):
                 }
             ]
         })
+
+    # ========== 异步处理接口 ==========
     
+    @app.route('/api/excel/async/product_archive', methods=['POST'])
+    def async_product_archive():
+        """
+        新建档案-异步提交接口
+        提交任务后立即返回task_id，前端通过task_id轮询状态
+        """
+        try:
+            # 检查文件
+            if 'file' not in request.files:
+                return jsonify({'code': 1, 'msg': '没有上传文件'}), 400
+            
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'code': 1, 'msg': '文件名为空'}), 400
+            
+            # 验证文件类型
+            allowed_extensions = {'.xlsx', '.xls', '.csv'}
+            file_ext = os.path.splitext(file.filename)[1].lower()
+            if file_ext not in allowed_extensions:
+                return jsonify({
+                    'code': 1,
+                    'msg': f'不支持的文件格式，仅支持: {", ".join(allowed_extensions)}'
+                }), 400
+            
+            # 获取处理模式
+            mode = request.form.get('mode', 'two_column')
+            if mode not in ['two_column', 'three_column']:
+                return jsonify({
+                    'code': 1,
+                    'msg': '无效的处理模式，支持: two_column, three_column'
+                }), 400
+            
+            # 保存临时文件
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            temp_filename = f"async_{timestamp}_{file.filename}"
+            temp_file_path = os.path.join(tempfile.gettempdir(), temp_filename)
+            file.save(temp_file_path)
+            
+            # 提交异步任务
+            from app.core.async_task_store import submit_excel_task
+            from app.utils.crm_product.crm_productAdd.main import process_excel_async_wrapper
+            
+            task_id = submit_excel_task(process_excel_async_wrapper, temp_file_path, mode)
+            
+            return jsonify({
+                'code': 0,
+                'msg': '任务已提交',
+                'data': {'task_id': task_id}
+            })
+            
+        except Exception as e:
+            return jsonify({'code': 1, 'msg': f'提交失败: {str(e)}'}), 500
+
+    @app.route('/api/excel/async/status/<task_id>', methods=['GET'])
+    def get_async_task_status(task_id):
+        """
+        查询异步任务状态
+        前端轮询调用此接口获取进度
+        """
+        from app.core.async_task_store import get_task_status
+        
+        status = get_task_status(task_id)
+        if not status:
+            return jsonify({'code': 1, 'msg': '任务不存在'}), 404
+        
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': status
+        })
+
+    @app.route('/api/excel/async/download/<task_id>', methods=['GET'])
+    def download_async_result(task_id):
+        """
+        下载异步任务结果文件
+        任务完成后调用此接口下载结果
+        """
+        from app.core.async_task_store import get_task_status
+        
+        status = get_task_status(task_id)
+        if not status:
+            return jsonify({'code': 1, 'msg': '任务不存在'}), 404
+        
+        if status['status'] != 'completed':
+            return jsonify({'code': 1, 'msg': '任务尚未完成'}), 400
+        
+        result_file = status.get('result_file')
+        if not result_file or not os.path.exists(result_file):
+            return jsonify({'code': 1, 'msg': '结果文件不存在'}), 404
+        
+        return send_file(
+            result_file,
+            as_attachment=True,
+            download_name=os.path.basename(result_file)
+        )
 
 
 def process_excel_concurrent(file_path, process_type, mode='two_column'):

@@ -1,6 +1,6 @@
 """
 库存相关表
-包含：卓之星库存表、库存明细表、安全库存表
+包含：卓之星库存表、库存明细表
 """
 
 from app.utils.database_connection import get_db_connection
@@ -84,49 +84,5 @@ def init_inventory_detail_table():
             cursor.execute(create_table_sql)
     except Exception as e:
         print(f"  ✗ 库存明细表: {e}")
-    finally:
-        conn.close()
-
-
-def init_safety_stock_table():
-    """
-    初始化安全库存计算结果表
-    用于存储安全库存、库存上下限等计算结果
-    """
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            create_table_sql = """
-            CREATE TABLE IF NOT EXISTS crmapp_safety_stock (
-                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                sku VARCHAR(50) NOT NULL COMMENT 'SKU编码/OE号',
-                sku_name VARCHAR(200) COMMENT '产品名称',
-                calc_date DATE NOT NULL COMMENT '计算日期',
-                demand_avg DECIMAL(10,2) COMMENT '日均需求量',
-                demand_max DECIMAL(10,2) COMMENT '需求峰值',
-                demand_std DECIMAL(10,2) COMMENT '需求标准差',
-                lead_time_avg DECIMAL(5,1) COMMENT '平均交货期(天)',
-                lead_time_max DECIMAL(5,1) COMMENT '最长交货期(天)',
-                safety_stock DECIMAL(10,2) COMMENT '安全库存',
-                inventory_min DECIMAL(10,2) COMMENT '库存下限(紧急预警线)',
-                reorder_point DECIMAL(10,2) COMMENT '再订货点',
-                inventory_max DECIMAL(10,2) COMMENT '库存上限',
-                target_inventory DECIMAL(10,2) COMMENT '目标库存水位',
-                current_stock DECIMAL(10,2) COMMENT '当前库存数量',
-                suggested_qty DECIMAL(10,2) COMMENT '建议补货量',
-                stock_status VARCHAR(20) COMMENT '状态(normal/warning/danger)',
-                inquiry_1m INT COMMENT '近1个月询价量',
-                inquiry_3m INT COMMENT '近3个月月均询价量',
-                service_level DECIMAL(3,2) DEFAULT 0.95 COMMENT '服务水平',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-                INDEX idx_sku_date (sku, calc_date),
-                INDEX idx_status (stock_status),
-                INDEX idx_calc_date (calc_date)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全库存计算结果表';
-            """
-            cursor.execute(create_table_sql)
-    except Exception as e:
-        print(f"  ✗ 安全库存表: {e}")
     finally:
         conn.close()

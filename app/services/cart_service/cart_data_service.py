@@ -145,6 +145,18 @@ class CartDataService:
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
                         count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
+                # 车型品牌搜索 (cart_car_brand) - 支持多行
+                if search_params.get('cart_car_brand'):
+                    car_brand_list = parse_space(search_params['cart_car_brand'])
+                    if car_brand_list:
+                        or_conditions = []
+                        for car_brand in car_brand_list:
+                            or_conditions.append("car_brand LIKE %s")
+                            params.append(f'%{car_brand}%')
+                            count_params.append(f'%{car_brand}%')
+                        sql += " AND (" + " OR ".join(or_conditions) + ")"
+                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
+
             # 处理排序
             order_clause = self._build_order_clause(sort_field, sort_order)
             sql += order_clause

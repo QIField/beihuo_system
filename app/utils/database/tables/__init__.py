@@ -3,11 +3,6 @@
 按功能分类管理各模块的表结构
 """
 
-from .sales_tables import (
-    init_sales_history_detail_table,
-    init_quote_count_ks_table,
-)
-
 from .procurement_tables import (
     init_procurement_history_table,
 )
@@ -19,7 +14,6 @@ from .procurement_detail_tables import (
 from .inventory_tables import (
     init_zhuozhixing_table,
     init_inventory_detail_table,
-    init_safety_stock_table,
 )
 
 from .inquiry_tables import (
@@ -28,13 +22,10 @@ from .inquiry_tables import (
 )
 
 __all__ = [
-    'init_sales_history_detail_table',
-    'init_quote_count_ks_table',
     'init_procurement_history_table',
     'init_procurement_history_detail_table',
     'init_zhuozhixing_table',
     'init_inventory_detail_table',
-    'init_safety_stock_table',
     'init_ks_inquiry_detail_table',
     'init_weixin_inquiry_detail_table',
 ]

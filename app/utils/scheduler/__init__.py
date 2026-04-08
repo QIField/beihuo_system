@@ -5,19 +5,17 @@
 使用方式:
     from app.utils.scheduler import register_cleanup_tasks
     from app.core.task_manager import task_manager
-    
+
     register_cleanup_tasks(task_manager)
 """
 
 from .cleanup_tasks import (
-    sales_history_sync_task,
     register_cleanup_tasks,
     start_scheduler,  # 已废弃，保留兼容
     stop_scheduler    # 已废弃，保留兼容
 )
 
 __all__ = [
-    'sales_history_sync_task',
     'register_cleanup_tasks',
     'start_scheduler',  # 已废弃
     'stop_scheduler'    # 已废弃

@@ -7,88 +7,22 @@ import os
 from urllib.parse import unquote
 from functools import partial
 from pathlib import Path
-from app.utils.database_connection import get_db_connection  # 使用统一的连接池实现
 from app.utils.search import parse_mixed  # 使用搜索工具包
 from app.utils.session_manager import SessionManager  # 使用线程安全的 Session 管理器
 from config import create_crm_session  # 使用统一的 CRM session 创建函数
+from config.db_config import get_mysql_config  # 使用统一的数据库配置
 
 # 创建蓝图
 search_in_crm_bp = Blueprint('search_in_crm', __name__)
 
 # 从主应用获取数据库连接管理函数
 def get_db_connection():
-    # 从主应用获取数据库配置
-    current_file_path = Path(__file__).resolve()
-    # 判断是否为本地开发环境 - 使用更灵活的路径检测
-    current_path_str = str(current_file_path).lower().replace('\\', '/')  # 将反斜杠替换为正斜杠
-
-    is_local_development = (
-        current_path_str.startswith('g:/work/') or          
-        current_path_str.startswith('e:/work download/') or  
-        os.environ.get('FLASK_ENV') == 'development' or   
-        'localhost' in os.environ.get('HOSTNAME', '').lower()
-    )
-
-    if is_local_development:
-        # 本地开发环境配置
-        connection = pymysql.connect(
-            host='localhost',  
-            port=3306,   
-            user='root',      
-            password='root',
-            database='fsbbr_data_test',
-            charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        print("CRM模块使用本地数据库配置")
-    else:
-        # 生产环境配置
-        connection = pymysql.connect(
-            host='113.45.176.129',  
-            port=3306,         
-            user='fsbbr_data',  
-            password='wRCA8AGn3a568f4X',  
-            database='fsbbr_data',  
-            charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        print("CRM模块使用线上数据库配置")
-    
-    # 测试连接是否有效
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-        return connection
-    except Exception as e:
-        print(f"数据库连接测试失败: {e}")
-        # 如果连接失败，尝试重新连接
-        try:
-            if is_local_development:
-                connection = pymysql.connect(
-                    host='localhost',  
-                    port=3306,   
-                    user='root',      
-                    password='123456',  
-                    database='test',  
-                    charset='utf8mb4',
-                    cursorclass=pymysql.cursors.DictCursor
-                )
-            else:
-                connection = pymysql.connect(
-                    host='113.45.176.129',  
-                    port=3306,         
-                    user='fsbbr_data',  
-                    password='wRCA8AGn3a568f4X',  
-                    database='fsbbr_data',  
-                    charset='utf8mb4',
-                    cursorclass=pymysql.cursors.DictCursor
-                )
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1")
-            return connection
-        except Exception as e2:
-            print(f"重新连接数据库也失败: {e2}")
-            raise e2
+    """使用统一的 db_config.py 配置获取数据库连接"""
+    config = get_mysql_config()
+    # 添加 cursorclass 到配置
+    config['cursorclass'] = pymysql.cursors.DictCursor
+    connection = pymysql.connect(**config)
+    return connection
 
 # ========================================
 # 数据库初始化

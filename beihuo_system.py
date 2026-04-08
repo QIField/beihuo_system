@@ -39,9 +39,6 @@ from app.utils.database.table_manager import init_all_tables
 # 导入轻量级任务管理器（延迟初始化）
 from app.core.task_manager import task_manager
 
-# 导入安全库存定时任务
-from app.services.inventory_service.safety_stock_service import run_safety_stock_task
-
 # 导入并初始化全局Session管理器
 from app.core.session_init import init_session_manager
 init_session_manager()
@@ -2032,7 +2029,7 @@ def add_to_cart():
             placeholders = ','.join(['%s'] * len(barcodes))
             check_sql = f"SELECT barcode FROM crmapp_cart WHERE store = %s AND barcode IN ({placeholders})"
             cursor.execute(check_sql, [store] + barcodes)
-            existing_barcodes = {row[0] for row in cursor.fetchall()}
+            existing_barcodes = {row['barcode'] for row in cursor.fetchall()}
         else:
             existing_barcodes = set()
         
@@ -3257,14 +3254,16 @@ def fetch_data_api():
             "内部备注", "品牌", "品牌号", "库存数量", "库存金额", "成品可卖天数",
             "成本价", "昨日销量", "本月销量", "标签", "物料名称", "物料条码",
             "车型品牌", "近12个月月均销量", "近1个月询价量", "近3个月月均询价量",
-            "近6个月月均销量", "近7天销量", "预警状态", "在途数量", "车型", "company"
+            "近6个月月均销量", "近7天销量", "预警状态", "在途数量", "车型", "company",
+            "近12个月销量", "近6个月销量"
         ]
         JSON_KEYS = [
             "OE", "今日销量", "供应商", "全国近1个月询价量", "全国近3个月月均询价量",
             "内部备注", "品牌", "品牌号", "库存数量", "库存金额", "成品可卖天数",
             "成本价", "昨日销量", "本月销量", "标签", "物料名称", "物料条码",
             "车型品牌", "近12个月月均销量", "近1个月询价量", "近3个月月均询价量",
-            "近6个月月均销量", "近7天销量", "预警状态", "在途数量", "车型"
+            "近6个月月均销量", "近7天销量", "预警状态", "在途数量", "车型",
+            "近12个月销量", "近6个月销量"
         ]
 
         
@@ -3762,12 +3761,13 @@ def date_ordercount_search():
         barcode = data.get('barcode', '').strip()
         material_name = data.get('material_name', '').strip()
         brand = data.get('brand', '').strip()
+        car_brand = data.get('car_brand', '').strip()
         tag = data.get('tag', '').strip()
         # 获取排序参数
         field = data.get('field', '').strip()  # 排序字段
         order = data.get('order', '').strip()  # 排序方向：asc/desc
-        
-        print(f"[高级搜索] 收到请求: OE={oe}, 条码={barcode}, 名称={material_name}, 品牌={brand}, 标签={tag}")
+
+        print(f"[高级搜索] 收到请求: OE={oe}, 条码={barcode}, 名称={material_name}, 品牌={brand}, 车型品牌={car_brand}, 标签={tag}")
         
         # 获取组织和用户信息（用于定位特定查询的数据）
         company = session.get('last_date_ordercount_company')
@@ -3809,9 +3809,10 @@ def date_ordercount_search():
         barcode_list = process_barcode_search(barcode) if barcode else []
         material_name_list = process_material_name_search(material_name) if material_name else []
         brand_list = [item.strip() for item in brand.split('\n') if item.strip()] if '\n' in brand else ([brand] if brand else [])
+        car_brand_list = [item.strip() for item in car_brand.split('\n') if item.strip()] if '\n' in car_brand else ([car_brand] if car_brand else [])
         tag_list = [item.strip() for item in tag.split('\n') if item.strip()] if '\n' in tag else ([tag] if tag else [])
-        
-        print(f"[高级搜索] 解析后: OE列表={oe_list}, 条码列表={barcode_list}, 名称列表={material_name_list}, 品牌列表={brand_list}, 标签列表={tag_list}")
+
+        print(f"[高级搜索] 解析后: OE列表={oe_list}, 条码列表={barcode_list}, 名称列表={material_name_list}, 品牌列表={brand_list}, 车型品牌列表={car_brand_list}, 标签列表={tag_list}")
         
         # 在缓存数据中进行搜索
         filtered_data = []
@@ -3851,7 +3852,17 @@ def date_ordercount_search():
                         break
                 if not brand_match:
                     match = False
-                    
+
+            # 检查车型品牌搜索条件
+            if car_brand_list:
+                car_brand_match = False
+                for car_brand_item in car_brand_list:
+                    if car_brand_item in item.get('车型品牌', ''):
+                        car_brand_match = True
+                        break
+                if not car_brand_match:
+                    match = False
+
             # 检查标签搜索条件
             if tag_list:
                 tag_match = False
@@ -4427,7 +4438,7 @@ def init_background_tasks():
             replace_existing=True
         )
 
-        # 注册清理和销量同步任务
+        # 注册清理任务
         register_cleanup_tasks(task_manager)
 
         # 注册自动更新任务
@@ -4451,17 +4462,6 @@ def init_background_tasks():
         # 初始化开思询价次数同步任务（每天9:15）
         from app.core.task_manager import init_ks_quote_count_task
         init_ks_quote_count_task()
-
-        # 安全库存定时任务已暂停
-        # task_manager.schedule(
-        #     run_safety_stock_task,
-        #     'cron',
-        #     'safety_stock_daily',
-        #     hour=3,
-        #     minute=0,
-        #     replace_existing=True
-        # )
-        print("[系统] 安全库存定时任务已暂停")
 
         print("[系统] 定时任务已启动")
 
@@ -4503,80 +4503,4 @@ if IS_UWSGI or not __name__ == '__main__':
     init_thread.start()
 
 
-# ==================== 安全库存API路由 ====================
 
-@app.route('/api/safety-stock/calculate', methods=['POST'])
-def api_calculate_safety_stock():
-    """计算单个SKU的安全库存"""
-    from app.services.inventory_service import SafetyStockService
-    
-    data = request.get_json()
-    sku = data.get('sku')
-    
-    if not sku:
-        return jsonify({'code': 400, 'msg': '缺少SKU参数', 'data': None})
-    
-    service = SafetyStockService()
-    result = service.calculate_single(sku)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/calculate-pilot', methods=['POST'])
-def api_calculate_pilot():
-    """试点计算（10个SKU）"""
-    from app.services.inventory_service import SafetyStockService
-    
-    service = SafetyStockService()
-    result = service.calculate_pilot(limit=10)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/calculate-all', methods=['POST'])
-def api_calculate_all():
-    """全量计算所有SKU"""
-    from app.services.inventory_service import SafetyStockService
-    
-    service = SafetyStockService()
-    result = service.calculate_all(batch_size=100)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/list', methods=['GET'])
-def api_safety_stock_list():
-    """获取安全库存列表"""
-    from app.services.inventory_service import SafetyStockService
-    
-    page = request.args.get('page', 1, type=int)
-    page_size = request.args.get('page_size', 20, type=int)
-    status = request.args.get('status', None)
-    
-    service = SafetyStockService()
-    result = service.get_list(page=page, page_size=page_size, status=status)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/detail/<sku>', methods=['GET'])
-def api_safety_stock_detail(sku):
-    """获取单个SKU的详情"""
-    from app.services.inventory_service import SafetyStockService
-    
-    service = SafetyStockService()
-    result = service.get_result(sku)
-    return jsonify(result)
-
-
-@app.route('/api/safety-stock/warning', methods=['GET'])
-def api_safety_stock_warning():
-    """获取预警列表"""
-    from app.services.inventory_service import SafetyStockService
-    
-    status = request.args.get('status', 'danger')
-    service = SafetyStockService()
-    result = service.get_warning_list(status=status)
-    return jsonify(result)
-
-
-@app.route('/safety-stock')
-def safety_stock_page():
-    """安全库存管理页面"""
-    return render_template('safety_stock.html')
