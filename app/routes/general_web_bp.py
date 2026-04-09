@@ -20,4 +20,4 @@ general_web_bp = Blueprint(
 @general_web_bp.route("/dashboard_crm_wms")
 def dashboard_crm_wms():
     """仓库大屏"""
-    return render_template("crm_wms_web_data.html")
+    return render_template("crm_wms_web.html")

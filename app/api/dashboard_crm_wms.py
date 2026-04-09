@@ -9,7 +9,7 @@ import json
 from flask import request, Response, jsonify
 
 from app.api import api_bp
-from app.services.dashboard_crm_wms_services.dashboard_crm_wms import crawl_data_crm_wms
+from app.services.dashboard_crm_wms_services.dashboard_crm_wms_data import crawl_data_crm_wms
 
 
 @api_bp.route('/dashboard_crm_wms')
