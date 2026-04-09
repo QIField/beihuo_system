@@ -86,19 +86,19 @@ def api_fetch_data():
         if count >= 0:
             return jsonify({
                 'code': 0,
-                'message': f'成功拉取 {count} 条数据',
+                'msg': f'成功拉取 {count} 条数据',
                 'data': {'company': current_store, 'count': count}
             })
         else:
             return jsonify({
                 'code': -1,
-                'message': '拉取数据失败',
+                'msg': '拉取数据失败',
                 'data': {'company': current_store}
             }), 500
             
     except Exception as e:
         return jsonify({
             'code': -1,
-            'message': f'拉取失败: {str(e)}',
+            'msg': f'拉取失败: {str(e)}',
             'data': None
         }), 500

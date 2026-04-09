@@ -616,4 +616,31 @@ class QuoteCountSyncService:
             'details': results
         }
 
+    def sync_recent_two_months(self) -> Dict[str, Any]:
+        """
+        同步近两个月的询价数据（开思+微信）
+        1. 爬取近60天的开思询价明细
+        2. 更新统计表（上月+本月）
+        
+        Returns:
+            dict: 包含开思爬取结果和统计更新结果
+        """
+        print(f"\n{'='*70}")
+        print(f"开思询价同步服务")
+        print(f"开始时间: {datetime.now()}")
+        print(f"{'='*70}")
+        
+        # 1. 爬取近60天的开思询价明细（覆盖两个月）
+        crawl_result = self.sync_recent_days(days=60)
+        
+        # 2. 更新统计表（上月+本月）
+        stats_result = self.update_stats_from_details()
+        
+        return {
+            'total_items': crawl_result.get('total_items', 0),
+            'saved': crawl_result.get('saved', 0),
+            'dates': crawl_result.get('dates', []),
+            'stats': stats_result
+        }
+
 

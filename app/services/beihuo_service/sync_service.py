@@ -19,28 +19,6 @@ _updating_lock = threading.Lock()
 _is_updating_flag = False
 
 
-def _post_fetch_async(company: str, saved_count: int):
-    """异步执行后续操作（车型映射 + 购物车更新）"""
-    print(f"[{company}] 开始异步后续处理...")
-    
-    # 1. 车型映射
-    if saved_count > 0:
-        print(f"[{company}] 开始车型映射...")
-        updated = db_service.update_vehicle_fields(company)
-        if updated == 0:
-            print(f"ℹ️ [{company}] 没有匹配到车型映射数据")
-        elif updated > 0:
-            print(f"✅ [{company}] 车型映射完成，更新 {updated} 条")
-    
-    # 2. 购物车更新
-    print(f"🛒 [{company}] 开始更新购物车...")
-    from beihuo_system import update_cart_data
-    update_cart_data()
-    print(f"✅ [{company}] 购物车更新完成")
-    
-    print(f"[{company}] 异步后续处理完成")
-
-
 def update_company(company: str) -> Dict[str, Any]:
     """
     更新单个门店数据
@@ -118,60 +96,12 @@ def _post_update_cleanup():
         print(f"❌ 定时更新后清理失败: {e}")
 
 
-def fetch_company(company: str) -> int:
-    """
-    拉取单个门店数据
-    
-    调用拉取 API 获取数据，合并车型映射后保存到数据库
-    
-    Args:
-        company: 门店代码
-        
-    Returns:
-        成功插入的记录数，失败返回 -1
-    """
-    print(f"📥 开始拉取门店 {company} 数据...")
-    
-    # 1. 调用 API 获取数据
-    api_result = api_client.fetch_company(company)
-    
-    if not api_result['success']:
-        print(f"❌ 门店 {company} 拉取失败: {api_result['message']}")
-        return -1
-    
-    raw_data = api_result['data']
-    gx_date = api_result['gx_date']
-    
-    if not raw_data:
-        print(f"⚠️ 门店 {company} 没有数据")
-        return 0
-    
-    print(f"📊 门店 {company} 获取到 {len(raw_data)} 条原始数据")
-    
-    # 2. 数据处理
-    records = data_processor.transform_fetch_data(raw_data, company, gx_date)
-    
-    # 3. 获取车型映射数据并合并到 records
-    print(f"🚗 门店 {company} 开始获取车型映射...")
-    records = _merge_vehicle_mapping(company, records)
-    
-    # 4. 保存到数据库（已包含车型和替换号）
-    saved_count = db_service.save_company_data(company, records)
-    
-    if saved_count >= 0:
-        print(f"✅ 门店 {company} 数据保存完成，共 {saved_count} 条")
-        
-        # 5. 异步执行购物车更新（车型映射已完成，不需要再执行）
-        threading.Thread(target=_update_cart_only, args=(company,), daemon=True).start()
-    else:
-        print(f"❌ 门店 {company} 数据保存失败")
-    
-    return saved_count
-
-
 def _merge_vehicle_mapping(company: str, records: list) -> list:
     """
     从 crmapp_compare_summary 获取车型映射，合并到 records 中
+    
+    优化策略：使用INNER JOIN只查询beihuo表中实际存在的条码的映射数据
+    性能提升：从扫描12万条减少到几千条
     
     Args:
         company: 门店代码
@@ -231,6 +161,57 @@ def _merge_vehicle_mapping(company: str, records: list) -> list:
     finally:
         cursor.close()
         conn.close()
+
+
+def fetch_company(company: str) -> int:
+    """
+    拉取单个门店数据
+    
+    调用拉取 API 获取数据，合并车型映射后保存到数据库
+    
+    Args:
+        company: 门店代码
+        
+    Returns:
+        成功插入的记录数，失败返回 -1
+    """
+    print(f"📥 开始拉取门店 {company} 数据...")
+    
+    # 1. 调用 API 获取数据
+    api_result = api_client.fetch_company(company)
+    
+    if not api_result['success']:
+        print(f"❌ 门店 {company} 拉取失败: {api_result['message']}")
+        return -1
+    
+    raw_data = api_result['data']
+    gx_date = api_result['gx_date']
+    
+    if not raw_data:
+        print(f"⚠️ 门店 {company} 没有数据")
+        return 0
+    
+    print(f"📊 门店 {company} 获取到 {len(raw_data)} 条原始数据")
+    
+    # 2. 数据处理
+    records = data_processor.transform_fetch_data(raw_data, company, gx_date)
+    
+    # 3. 获取车型映射数据并合并到 records
+    print(f"🚗 门店 {company} 开始获取车型映射...")
+    records = _merge_vehicle_mapping(company, records)
+    
+    # 4. 保存到数据库（已包含车型和替换号）
+    saved_count = db_service.save_company_data(company, records)
+    
+    if saved_count >= 0:
+        print(f"✅ 门店 {company} 数据保存完成，共 {saved_count} 条")
+        
+        # 5. 异步执行购物车更新（车型映射已完成，不需要再执行）
+        threading.Thread(target=_update_cart_only, args=(company,), daemon=True).start()
+    else:
+        print(f"❌ 门店 {company} 数据保存失败")
+    
+    return saved_count
 
 
 def _update_cart_only(company: str):

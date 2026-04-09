@@ -20,23 +20,15 @@ def clear_company_data(company: str) -> bool:
     Returns:
         是否成功
     """
-    from datetime import datetime
-    print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] 开始清空门店 {company} 数据...")
-    
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] 执行 DELETE...")
             cursor.execute("DELETE FROM crmapp_beihuo WHERE company = %s", (company,))
-            print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] DELETE 完成，提交事务...")
             conn.commit()
-            print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] 清空门店 {company} 数据完成")
             return True
     except Exception as e:
         conn.rollback()
-        print(f"❌ [{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] 清空门店 {company} 数据失败: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ 清空门店 {company} 数据失败: {e}")
         return False
     finally:
         conn.close()
@@ -139,8 +131,7 @@ def update_vehicle_fields(company: str) -> int:
     """
     从 crmapp_compare_summary 表更新车型和替换号信息
     
-    优化策略：使用INNER JOIN只查询beihuo表中实际存在的条码的映射数据，批量更新
-    性能提升：从扫描12万条减少到几千条，避免长时间锁表
+    根据物料条码匹配，补充 crmapp_beihuo 表中的车型和替换号字段
     
     Args:
         company: 门店代码
@@ -148,61 +139,80 @@ def update_vehicle_fields(company: str) -> int:
     Returns:
         成功更新的记录数
     """
-    from datetime import datetime
-    import threading
     import pymysql.cursors
-    
-    thread_id = threading.current_thread().ident
-    start_time = datetime.now()
-    print(f"[{start_time.strftime('%H:%M:%S.%f')[:-3]}] [线程{thread_id}] 开始车型映射...")
-    
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
     try:
-        # 优化：使用INNER JOIN只获取beihuo表中存在的条码的映射数据
-        # 避免扫描全部12万条映射记录
-        # 使用BINARY强制统一字符集比较，避免collation冲突
+        # 1. 获取该门店在 crmapp_compare_summary 中的车型映射数据
         cursor.execute("""
-            SELECT DISTINCT b.物料条码, c.l_model_zh, c.replace_number
-            FROM crmapp_beihuo b
-            INNER JOIN crmapp_compare_summary c 
-                ON BINARY b.company = BINARY c.company 
-                AND BINARY b.物料条码 = BINARY c.frey_no
-            WHERE b.company = %s
-              AND c.frey_no IS NOT NULL 
-              AND c.frey_no != ''
+            SELECT frey_no, l_model_zh, replace_number 
+            FROM crmapp_compare_summary 
+            WHERE company = %s AND frey_no IS NOT NULL AND frey_no != ''
         """, (company,))
         
-        mappings = cursor.fetchall()
+        mapping_results = cursor.fetchall()
         
-        if not mappings:
-            print(f"ℹ️ [线程{thread_id}] 门店 {company} 没有匹配到车型映射数据")
+        if not mapping_results:
+            print(f"ℹ️ 门店 {company} 没有车型映射数据")
             return 0
         
-        # 批量更新
-        updates = [
-            (m['l_model_zh'] or '', m['replace_number'] or '', m['物料条码'], company)
-            for m in mappings
-        ]
+        # 2. 构建映射字典
+        mapping = {}
+        for row in mapping_results:
+            frey_no = row['frey_no']
+            mapping[frey_no] = {
+                'l_model_zh': row['l_model_zh'] or '',  # 车型
+                'replace_number': row['replace_number'] or ''  # 替换号
+            }
         
-        cursor.executemany("""
-            UPDATE crmapp_beihuo 
-            SET 车型 = %s, 替换号 = %s 
-            WHERE 物料条码 = %s AND company = %s
-        """, updates)
+        # 3. 获取该门店在 crmapp_beihuo 中的物料条码列表
+        cursor.execute("""
+            SELECT id, 物料条码 
+            FROM crmapp_beihuo 
+            WHERE company = %s AND 物料条码 IS NOT NULL AND 物料条码 != ''
+        """, (company,))
         
-        conn.commit()
+        beihuo_records = cursor.fetchall()
         
-        elapsed = (datetime.now() - start_time).total_seconds()
-        print(f"🚗 [线程{thread_id}] 门店 {company} 车型映射完成，更新 {len(updates)} 条记录，耗时: {elapsed:.3f}s")
+        if not beihuo_records:
+            print(f"ℹ️ 门店 {company} 没有需要更新的备货数据")
+            return 0
         
-        return len(updates)
+        # 4. 批量更新匹配的记录（使用 executemany 提升性能）
+        update_data = []
+        for record in beihuo_records:
+            record_id = record['id']
+            barcode = record['物料条码']
+            
+            if barcode in mapping:
+                update_data.append((
+                    mapping[barcode]['l_model_zh'],
+                    mapping[barcode]['replace_number'],
+                    record_id
+                ))
+        
+        if update_data:
+            cursor.executemany("""
+                UPDATE crmapp_beihuo 
+                SET 车型 = %s, 替换号 = %s 
+                WHERE id = %s
+            """, update_data)
+            conn.commit()
+        
+        updated_count = len(update_data)
+        
+        if updated_count > 0:
+            print(f"🚗 门店 {company} 车型映射完成，更新 {updated_count} 条记录")
+        else:
+            print(f"ℹ️ 门店 {company} 没有匹配到车型数据")
+        
+        return updated_count
         
     except Exception as e:
         conn.rollback()
         import traceback
-        print(f"❌ [线程{thread_id}] 更新门店 {company} 车型信息失败: {e}")
+        print(f"❌ 更新门店 {company} 车型信息失败: {e}")
         traceback.print_exc()
         return -1
     finally:
