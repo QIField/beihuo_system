@@ -3530,7 +3530,11 @@ function bindEventHandlers(myTable, form, table) {
             layui.layer.close(loadingIndex);
             
             if (result.code === 0) {
-                layui.layer.msg(result.msg, {icon: 1, time: 3000});
+                layui.layer.msg(result.msg, {
+                    icon: 1, 
+                    time: 3000,
+                    area: ['250px', 'auto']  // 增加弹窗宽度
+                });
                 
                 // 更新显示的更新时间
                 fetch('/api/latest_update_time')
@@ -3544,7 +3548,11 @@ function bindEventHandlers(myTable, form, table) {
                         console.error('获取更新时间失败:', error);
                     });
             } else {
-                layui.layer.msg(result.msg, {icon: 2, time: 5000}); // 错误信息显示时间稍长
+                layui.layer.msg(result.msg, {
+                    icon: 2, 
+                    time: 5000,
+                    area: ['250px', 'auto']  // 增加弹窗宽度
+                }); // 错误信息显示时间稍长
             }
         })
         .catch(error => {
@@ -3837,7 +3845,11 @@ function bindEventHandlers(myTable, form, table) {
             layui.layer.close(loadingIndex);
             
             if (result.code === 0) {
-                layui.layer.msg(result.msg, {icon: 1, time: 3000});
+                layui.layer.msg(result.msg, {
+                    icon: 1, 
+                    time: 3000,
+                    area: ['250px', 'auto']  // 增加弹窗宽度
+                });
                 // 刷新表格数据
                 myTable.reload({
                     page: {curr: 1}
@@ -3853,7 +3865,6 @@ function bindEventHandlers(myTable, form, table) {
         });
     };
 
-    // 页面加载完成后获取最新的更新时间
     // 页面加载完成后获取最新的更新时间
     window.addEventListener('load', function() {
         // 获取最近的更新时间
