@@ -269,7 +269,7 @@ def fetch_all_companies() -> Dict[str, Any]:
 def _update_cart_data():
     """更新购物车数据"""
     try:
-        from app.services.cart_service.cart_data_service import update_cart_data
+        from app.services.cart_service.cart_update_service import update_cart_data
         update_cart_data()
         print("🛒 购物车数据更新完成")
     except Exception as e:
