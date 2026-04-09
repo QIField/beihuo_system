@@ -1,0 +1,211 @@
+/**
+ * DataGrid 组件样式
+ * Enterprise DataGrid Component Styles
+ * @version 1.0.0
+ */
+
+/* ==================== 基础容器 ==================== */
+.datagrid-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.datagrid-toolbar {
+    padding: 15px 20px;
+    border-bottom: 1px solid #e8e8e8;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.datagrid-table {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.datagrid-pagination {
+    padding: 15px 20px;
+    border-top: 1px solid #e8e8e8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ==================== 按钮样式 ==================== */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+    background: #f0f0f0;
+    color: #333;
+}
+
+.btn:hover {
+    background: #d9d9d9;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.btn-primary {
+    background: #1890ff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #40a9ff;
+}
+
+/* ==================== 骨架屏 ==================== */
+.datagrid-skeleton {
+    padding: 20px;
+    height: 100%;
+}
+
+.skeleton-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    height: 40px;
+    align-items: center;
+}
+
+.skeleton-cell {
+    background: #f0f0f0;
+    border-radius: 4px;
+    height: 20px;
+    flex: 1;
+}
+
+.skeleton-cell.shine {
+    background: linear-gradient(
+        90deg,
+        #f0f0f0 25%,
+        #e0e0e0 50%,
+        #f0f0f0 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shine 1.5s infinite;
+}
+
+@keyframes skeleton-shine {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ==================== 分页 ==================== */
+.pagination-info {
+    color: #666;
+    font-size: 14px;
+}
+
+.page-size-select {
+    padding: 6px 12px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+}
+
+.page-size-select:focus {
+    outline: none;
+    border-color: #1890ff;
+}
+
+/* ==================== 错误提示 ==================== */
+.datagrid-error {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    color: #ff4d4f;
+    font-size: 14px;
+}
+
+/* ==================== 加载状态 ==================== */
+.datagrid-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+}
+
+.datagrid-loading::after {
+    content: '';
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #1890ff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==================== Handsontable 自定义样式 ==================== */
+.handsontable .htCore td {
+    border: 1px solid #e8e8e8;
+    color: #000 !important;
+}
+
+.handsontable .htCore th {
+    background: #fafafa;
+    border: 1px solid #e8e8e8;
+    color: #000 !important;
+    font-weight: 600;
+}
+
+.handsontable .htCore tbody tr:hover td {
+    background: #f0f5ff !important;
+}
+
+/* 固定列样式 */
+.handsontable .ht_clone_left,
+.handsontable .ht_clone_right {
+    z-index: 100;
+}
+
+/* 滚动优化 */
+.handsontable .wtHolder {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ==================== 响应式 ==================== */
+@media (max-width: 768px) {
+    .datagrid-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .datagrid-pagination {
+        flex-wrap: wrap;
+    }
+    
+    .pagination-info {
+        width: 100%;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+}

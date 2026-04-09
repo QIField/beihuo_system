@@ -61,6 +61,12 @@ register_purchase_history_routes(app)  # 注册采购历史同步API路由
 app.register_blueprint(region_by_number_query_bp)  # 注册溯源查询蓝图
 app.register_blueprint(ks_inquiry_monitor_bp)  # 注册开思询价单监控蓝图
 
+# 注册备货数据API蓝图
+from app.api.beihuo_api import bp as beihuo_bp
+app.register_blueprint(beihuo_bp)
+
+# 从配置导入门店信息
+from app.services.beihuo_service.config import STORES, COMPANIES
 
 #扩展总蓝图
 from app import expansion_app
@@ -112,14 +118,7 @@ try:
 except ImportError:
     XLSX_SUPPORT = False
 
-# 门店映射
-STORES = {
-    'fsbbr': '佛山门店',
-    'zsbbr': '中山门店',
-    'zhbbr': '珠海门店',
-    'dgby': '百业门店',
-    'dghf': '合峰门店'
-}
+# 门店信息已从 app.services.beihuo_service.config 导入
 
 #前置函数====================================================================================================================
 def get_valid_db_connection():
@@ -379,6 +378,14 @@ def print_task_debug_info():
 
 
 #定时更新========================================================================================================================================
+# [已重构] 以下代码已迁移到 app/services/beihuo_service/ 模块
+# 新的实现：
+#   - 服务层: app/services/beihuo_service/sync_service.py
+#   - API层: app/api/beihuo_api.py
+#   - 定时任务: app/tasks/beihuo_tasks.py
+# 保留旧代码仅供参考，不再使用
+
+'''
 import time
 from threading import Timer
 from datetime import datetime, timedelta
@@ -421,7 +428,9 @@ def auto_update_and_fetch():
     finally:
         # 重置执行标志
         is_updating_flag = False
+'''
 
+'''
 def clean_data_date(value):
     """清理数据，处理特殊格式"""
     if value is None:
@@ -433,7 +442,7 @@ def clean_data_date(value):
             return str(num + 1)
         return value
     return str(value)
-
+'''
 
 def map_vehicle_fields_from_compare(data_list):
     """从crmapp_compare_summary批量映射车型和替换号到beihuo数据列表"""
@@ -695,23 +704,34 @@ def fetch_data_for_company(company):
                         print(f"📅 接口数据更新时间 (company={company}): {gx_date}")
 
                         # 使用与手动拉取相同的字段定义和SQL构造方式
-                        FIELDS = [
+                        # 定义字段映射：API字段名 -> 数据库字段名
+                        FIELD_MAPPING = {
+                            "OE": "oe", "今日销量": "今日销量", "供应商": "供应商",
+                            "全国近1个月询价量": "全国近1个月询价量", "全国近3个月月均询价量": "全国近3个月月均询价量",
+                            "内部备注": "内部备注", "品牌": "品牌", "品牌号": "品牌号",
+                            "库存数量": "库存数量", "库存金额": "库存金额", "成品可卖天数": "成品可卖天数",
+                            "成本价": "成本价", "昨日销量": "昨日销量", "本月销量": "本月销量",
+                            "标签": "标签", "物料名称": "物料名称", "物料条码": "物料条码",
+                            "车型品牌": "车型品牌", "近12个月月均销量": "近12个月月均销量",
+                            "近12个月销量": "近12个月销量", "近1个月询价量": "近1个月询价量",
+                            "近3个月月均询价量": "近3个月月均询价量", "近6个月月均销量": "近6个月月均销量",
+                            "近6个月销量": "近6个月销量", "近7天销量": "近7天销量",
+                            "预警状态": "预警状态", "在途数量": "在途数量", "车型": "车型",
+                        }
+
+                        # 数据库字段列表（按数据库表 crmapp_beihuo 实际字段顺序）
+                        # 注意：必须与表结构完全一致，否则会导致数据错位
+                        DB_FIELDS = [
                             "oe", "今日销量", "供应商", "全国近1个月询价量", "全国近3个月月均询价量",
                             "内部备注", "品牌", "品牌号", "库存数量", "库存金额", "成品可卖天数",
                             "成本价", "昨日销量", "本月销量", "标签", "物料名称", "物料条码",
-                            "车型品牌", "近12个月月均销量", "近1个月询价量", "近3个月月均询价量",
-                            "近6个月月均销量", "近7天销量", "预警状态", "在途数量", "车型", "company"
-                        ]
-                        JSON_KEYS = [
-                            "OE", "今日销量", "供应商", "全国近1个月询价量", "全国近3个月月均询价量",
-                            "内部备注", "品牌", "品牌号", "库存数量", "库存金额", "成品可卖天数",
-                            "成本价", "昨日销量", "本月销量", "标签", "物料名称", "物料条码",
-                            "车型品牌", "近12个月月均销量", "近1个月询价量", "近3个月月均询价量",
-                            "近6个月月均销量", "近7天销量", "预警状态", "在途数量", "车型"
+                            "车型品牌", "近12个月月均销量", "近12个月销量", "近1个月询价量",
+                            "近3个月月均询价量", "近6个月月均销量", "近6个月销量", "近7天销量",
+                            "预警状态", "company", "更新时间", "今日销售", "在途数量", "车型", "替换号"
                         ]
 
-                        COLUMNS_STR = ", ".join([f"`{f}`" for f in FIELDS])
-                        PLACEHOLDERS_STR = ", ".join(["%s"] * (len(FIELDS) + 1))  # FIELDS数量+1个更新时间
+                        COLUMNS_STR = ", ".join([f"`{f}`" for f in DB_FIELDS])
+                        PLACEHOLDERS_STR = ", ".join(["%s"] * len(DB_FIELDS))
 
                         def clean_data(value):
                             if isinstance(value, str):
@@ -720,83 +740,83 @@ def fetch_data_for_company(company):
                                     return str(int(match.group(1)) - 3)
                             return value
 
+                        def build_row(item, company, gx_date):
+                            """构建插入数据的行，使用字典映射确保字段对应正确"""
+                            data = {field: None for field in DB_FIELDS}
+                            for api_key, db_key in FIELD_MAPPING.items():
+                                value = item.get(api_key)
+                                if value is not None:
+                                    data[db_key] = clean_data(value)
+                            data["company"] = company
+
+                            # 特殊处理品牌逻辑
+                            current_brand = item.get("品牌", "")
+                            current_barcode = item.get("物料条码", "")
+                            if current_brand == "原厂 SJZX":
+                                if current_barcode and current_barcode.startswith("P"):
+                                    data["品牌"] = "原厂国内4s件"
+                                elif current_barcode and current_barcode.startswith("Y"):
+                                    data["品牌"] = "原厂"
+                            if current_brand in ["菲尔", "菲尔 FREY"]:
+                                data["品牌号"] = data.get("物料条码")
+
+                            # 设置更新时间
+                            if gx_date:
+                                try:
+                                    parsed_date = datetime.strptime(gx_date, '%Y-%m-%d %H:%M:%S') if ' ' in gx_date else datetime.strptime(gx_date, '%Y-%m-%d')
+                                    data["更新时间"] = parsed_date
+                                except ValueError:
+                                    data["更新时间"] = datetime.now()
+                            else:
+                                data["更新时间"] = datetime.now()
+
+                            # 设置默认值
+                            data["今日销售"] = None
+                            data["替换号"] = None
+
+                            return [data[field] for field in DB_FIELDS]
+
                         # 建立数据库连接
                         conn = get_db_connection()
                         cursor = conn.cursor()
 
-                        # 优化：增大批次大小，减少commit频率
-                        batch_size = 10000  # 从5000增大到10000
-                        commit_interval = 5  # 每5批次commit一次
+                        batch_size = 10000
+                        commit_interval = 5
                         total = len(data_list)
                         processed = 0
 
                         try:
-                            # 1. 清空当前门店的数据
                             cursor.execute("DELETE FROM crmapp_beihuo WHERE company = %s", (company,))
                             print(f"🗑️ 已清空门店 {company} 的现有数据，准备插入 {total} 条记录")
 
-                            # 2. 构造INSERT SQL（不需要ON DUPLICATE KEY UPDATE）
-                            INSERT_SQL = f"""
-                            INSERT INTO `crmapp_beihuo` ({COLUMNS_STR}, `更新时间`)
-                            VALUES ({PLACEHOLDERS_STR})
-                            """
-
+                            # 批量插入新数据 - 使用字典列表，完全避免顺序依赖
                             batch_count = 0
                             for i in range(0, total, batch_size):
                                 batch = data_list[i:i + batch_size]
-                                values_batch = []
+                                # 构建字典列表，每个字典是一条记录
+                                records = [build_row(item, company, gx_date) for item in batch]
 
-                                for item in batch:
-                                    row = [clean_data(item.get(key)) for key in JSON_KEYS]
-                                    row.append(company)
+                                if records:
+                                    # 从第一条记录获取字段名（所有记录字段相同）
+                                    columns = list(records[0].keys())
+                                    columns_str = ", ".join([f"`{c}`" for c in columns])
+                                    placeholders = ", ".join([f"%({c})s" for c in columns])
 
-                                    # 获取当前记录的品牌值和物料条码
-                                    current_brand = item.get("品牌", "")
-                                    current_barcode = item.get("物料条码", "")
+                                    # 构建INSERT SQL
+                                    insert_sql = f"""
+                                    INSERT INTO `crmapp_beihuo` ({columns_str})
+                                    VALUES ({placeholders})
+                                    """
 
-                                    # 如果品牌是"原厂 SJZX"且物料条码以"P"或"Y"开头，则根据条码前缀修改品牌
-                                    if current_brand == "原厂 SJZX":
-                                        if current_barcode and current_barcode.startswith("P"):
-                                            brand_index = JSON_KEYS.index("品牌")
-                                            row[brand_index] = "原厂国内4s件"
-                                        elif current_barcode and current_barcode.startswith("Y"):
-                                            brand_index = JSON_KEYS.index("品牌")
-                                            row[brand_index] = "原厂"
+                                    # 使用executemany插入字典列表
+                                    cursor.executemany(insert_sql, records)
+                                    processed += len(records)
+                                    batch_count += 1
 
-                                    # 如果品牌是"菲尔"或者"菲尔 FREY"，将物料条码复制到品牌号
-                                    if current_brand in ["菲尔", "菲尔 FREY"]:
-                                        barcode_index = JSON_KEYS.index("物料条码")
-                                        brand_code_index = JSON_KEYS.index("品牌号")
-                                        row[brand_code_index] = row[barcode_index]
-
-                                    # 添加更新时间到每行数据（最后一个元素）
-                                    if gx_date:
-                                        try:
-                                            # 尝试解析日期字符串
-                                            if ' ' in gx_date:
-                                                parsed_date = datetime.strptime(gx_date, '%Y-%m-%d %H:%M:%S')
-                                            else:
-                                                parsed_date = datetime.strptime(gx_date, '%Y-%m-%d')
-                                            row.append(parsed_date)
-                                        except ValueError:
-                                            # 如果解析失败，使用当前时间
-                                            row.append(datetime.now())
-                                    else:
-                                        # 如果没有更新时间，使用当前时间
-                                        row.append(datetime.now())
-
-                                    values_batch.append(row)
-
-                                cursor.executemany(INSERT_SQL, values_batch)
-                                processed += len(values_batch)
-                                batch_count += 1
-
-                                # 优化：每commit_interval批次才commit一次
                                 if batch_count % commit_interval == 0:
                                     conn.commit()
                                     print(f"📊 门店 {company} 插入进度: {processed}/{total} ({processed*100//total}%)")
 
-                            # 最后提交剩余数据
                             conn.commit()
                             print(f"✅ 门店 {company} 数据插入完成，共 {processed} 条记录")
 
@@ -867,6 +887,10 @@ def cleanup_timers():
 
 # 注册清理函数
 atexit.register(cleanup_timers)
+
+# [重构结束] 旧代码注释结束
+# 新的实现请参见 app/services/beihuo_service/ 模块
+
 
 #路由====================================================================================================================
 @app.route('/')
@@ -1486,11 +1510,11 @@ def api_beihuo():
         
         # 获取所有符合条件的数据
         all_data_sql = f"""
-            SELECT `物料名称`, `品牌`, `物料条码`, `oe`, `车型品牌`, `标签`, `库存金额`, `成本价`, 
-                `库存数量`, `近12个月月均销量`, `近6个月月均销量`, `本月销量`, `近7天销量`, 
-                `昨日销量`, `今日销量`, `成品可卖天数`, `预警状态`, `供应商`, `近1个月询价量`, 
-                `近3个月月均询价量`, `全国近1个月询价量`, `全国近3个月月均询价量`, 
-                `品牌号`, `内部备注`, `company`, `在途数量`, `车型`
+            SELECT `物料名称`, `品牌`, `物料条码`, `oe`, `车型品牌`, `标签`, `库存金额`, `成本价`,
+                `库存数量`, `近12个月月均销量`, `近6个月月均销量`, `本月销量`, `近7天销量`,
+                `昨日销量`, `今日销量`, `成品可卖天数`, `预警状态`, `供应商`, `近1个月询价量`,
+                `近3个月月均询价量`, `全国近1个月询价量`, `全国近3个月月均询价量`,
+                `品牌号`, `内部备注`, `company`, `在途数量`, `车型`, `近12个月销量`, `近6个月销量`
             FROM crmapp_beihuo
             {where_clause}
             ORDER BY `oe`  -- 使用一个稳定排序避免结果顺序变化
@@ -1515,11 +1539,11 @@ def api_beihuo():
     else:
         # 使用数据库排序和分页
         sql = f"""
-            SELECT `物料名称`, `品牌`, `物料条码`, `oe`, `车型品牌`, `标签`, `库存金额`, `成本价`, 
-                `库存数量`, `近12个月月均销量`, `近6个月月均销量`, `本月销量`, `近7天销量`, 
-                `昨日销量`, `今日销量`, `成品可卖天数`, `预警状态`, `供应商`, `近1个月询价量`, 
-                `近3个月月均询价量`, `全国近1个月询价量`, `全国近3个月月均询价量`, 
-                `品牌号`, `内部备注`, `company`, `在途数量`, `车型`
+            SELECT `物料名称`, `品牌`, `物料条码`, `oe`, `车型品牌`, `标签`, `库存金额`, `成本价`,
+                `库存数量`, `近12个月月均销量`, `近6个月月均销量`, `本月销量`, `近7天销量`,
+                `昨日销量`, `今日销量`, `成品可卖天数`, `预警状态`, `供应商`, `近1个月询价量`,
+                `近3个月月均询价量`, `全国近1个月询价量`, `全国近3个月月均询价量`,
+                `品牌号`, `内部备注`, `company`, `在途数量`, `车型`, `近12个月销量`, `近6个月销量`
             FROM crmapp_beihuo
             {where_clause}
             {order_clause}
@@ -3161,7 +3185,7 @@ def update_cart_data():
                         SELECT `供应商`, `品牌`, `物料名称`, `物料条码`, `车型品牌`, `标签`, 
                                `近1个月询价量`, `近3个月月均询价量`, `库存数量`, `昨日销量`, `本月销量`, `今日销量`,
                                `全国近1个月询价量`, `全国近3个月月均询价量`, `内部备注`, `品牌号`, `库存金额`,
-                               `成品可卖天数`, `成本价`, `近12个月月均销量`, `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`
+                               `成品可卖天数`, `成本价`, `近12个月月均销量`, `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`, `替换号`
                         FROM crmapp_beihuo 
                         WHERE `物料条码` IN ({placeholders}) AND `company` = %s
                     """
@@ -3202,6 +3226,7 @@ def update_cart_data():
                                 latest_data['预警状态'],
                                 latest_data['在途数量'],
                                 latest_data['车型'],  # 不限制长度，完整保存数据
+                                latest_data['替换号'],  # 添加替换号字段
                                 item['id']  # 使用购物车记录的ID进行更新
                             ))
                     
@@ -3214,7 +3239,7 @@ def update_cart_data():
                                 sales_month = %s, today_sales = %s, national_inquiry_1m = %s, 
                                 national_inquiry_3m = %s, internal_remarks = %s, brand_code = %s, 
                                 stock_amount = %s, sellable_days = %s, cost_price = %s, 
-                                avg_sales_12m = %s, avg_sales_6m = %s, sales_7d = %s, warning_status = %s, on_way = %s, car_model = %s
+                                avg_sales_12m = %s, avg_sales_6m = %s, sales_7d = %s, warning_status = %s, on_way = %s, car_model = %s, replace_number = %s
                             WHERE id = %s
                         """
                         cursor.executemany(update_sql, update_data_for_batch)
@@ -3229,6 +3254,10 @@ def update_cart_data():
     finally:
         conn.close()
 
+# [已重构] 旧的手动拉取数据API，已迁移到 app/api/beihuo_api.py
+# 新的实现使用 app/services/beihuo_service/ 模块
+# 保留仅供参考
+'''
 # 修改拉取数据API，在拉取数据后更新购物车数据
 @app.route('/api/fetch_data', methods=['POST'])
 @login_required
@@ -3248,34 +3277,39 @@ def fetch_data_api():
         # 所有用户都只拉取当前门店的数据
         companies = [current_store]
         
-        # 定义字段
-        FIELDS = [
-            "oe", "今日销量", "供应商", "全国近1个月询价量", "全国近3个月月均询价量",
-            "内部备注", "品牌", "品牌号", "库存数量", "库存金额", "成品可卖天数",
-            "成本价", "昨日销量", "本月销量", "标签", "物料名称", "物料条码",
-            "车型品牌", "近12个月月均销量", "近1个月询价量", "近3个月月均询价量",
-            "近6个月月均销量", "近7天销量", "预警状态", "在途数量", "车型", "company",
-            "近12个月销量", "近6个月销量"
-        ]
-        JSON_KEYS = [
-            "OE", "今日销量", "供应商", "全国近1个月询价量", "全国近3个月月均询价量",
-            "内部备注", "品牌", "品牌号", "库存数量", "库存金额", "成品可卖天数",
-            "成本价", "昨日销量", "本月销量", "标签", "物料名称", "物料条码",
-            "车型品牌", "近12个月月均销量", "近1个月询价量", "近3个月月均询价量",
-            "近6个月月均销量", "近7天销量", "预警状态", "在途数量", "车型",
-            "近12个月销量", "近6个月销量"
-        ]
-
-        
-        
-        COLUMNS_STR = ", ".join([f"`{f}`" for f in FIELDS])
-        PLACEHOLDERS_STR = ", ".join(["%s"] * (len(FIELDS) + 1))  # FIELDS数量+1个更新时间
-
-        # 使用INSERT SQL（先DELETE再INSERT，不需要UPSERT）
-        INSERT_SQL = f"""
-        INSERT INTO `crmapp_beihuo` ({COLUMNS_STR}, `更新时间`)
-        VALUES ({PLACEHOLDERS_STR})
-        """
+        # 定义字段映射：API字段名 -> 数据库字段名
+        # 使用字典映射而非列表顺序，避免顺序错误导致的插入问题
+        FIELD_MAPPING = {
+            # API返回的字段名: 数据库字段名
+            "OE": "oe",
+            "今日销量": "今日销量",
+            "供应商": "供应商",
+            "全国近1个月询价量": "全国近1个月询价量",
+            "全国近3个月月均询价量": "全国近3个月月均询价量",
+            "内部备注": "内部备注",
+            "品牌": "品牌",
+            "品牌号": "品牌号",
+            "库存数量": "库存数量",
+            "库存金额": "库存金额",
+            "成品可卖天数": "成品可卖天数",
+            "成本价": "成本价",
+            "昨日销量": "昨日销量",
+            "本月销量": "本月销量",
+            "标签": "标签",
+            "物料名称": "物料名称",
+            "物料条码": "物料条码",
+            "车型品牌": "车型品牌",
+            "近12个月月均销量": "近12个月月均销量",
+            "近12个月销量": "近12个月销量",
+            "近1个月询价量": "近1个月询价量",
+            "近3个月月均询价量": "近3个月月均询价量",
+            "近6个月月均销量": "近6个月月均销量",
+            "近6个月销量": "近6个月销量",
+            "近7天销量": "近7天销量",
+            "预警状态": "预警状态",
+            "在途数量": "在途数量",
+            "车型": "车型",
+        }
 
         def clean_data(value):
             if isinstance(value, str):
@@ -3283,6 +3317,54 @@ def fetch_data_api():
                 if match:
                     return str(int(match.group(1)) - 3)
             return value
+
+        def build_record(item, company, gx_date):
+            """
+            构建单条记录的字典，完全使用字段名映射，不依赖顺序
+            """
+            from datetime import datetime
+
+            # 直接使用字典，key为数据库字段名
+            record = {}
+
+            # 从API数据填充字段
+            for api_key, db_key in FIELD_MAPPING.items():
+                value = item.get(api_key)
+                if value is not None:
+                    record[db_key] = clean_data(value)
+
+            # 特殊处理：添加company字段
+            record["company"] = company
+
+            # 特殊处理：品牌逻辑
+            current_brand = item.get("品牌", "")
+            current_barcode = item.get("物料条码", "")
+
+            # 如果品牌是"原厂 SJZX"且物料条码以"P"或"Y"开头，则根据条码前缀修改品牌
+            if current_brand == "原厂 SJZX":
+                if current_barcode and current_barcode.startswith("P"):
+                    record["品牌"] = "原厂国内4s件"
+                elif current_barcode and current_barcode.startswith("Y"):
+                    record["品牌"] = "原厂"
+
+            # 如果品牌是"菲尔"或者"菲尔 FREY"，将物料条码复制到品牌号
+            if current_brand in ["菲尔", "菲尔 FREY"]:
+                record["品牌号"] = record.get("物料条码")
+
+            # 设置更新时间（使用API返回的gx_date或当前时间）
+            if gx_date:
+                try:
+                    if ' ' in gx_date:
+                        parsed_date = datetime.strptime(gx_date, '%Y-%m-%d %H:%M:%S')
+                    else:
+                        parsed_date = datetime.strptime(gx_date, '%Y-%m-%d')
+                    record["更新时间"] = parsed_date
+                except ValueError:
+                    record["更新时间"] = datetime.now()
+            else:
+                record["更新时间"] = datetime.now()
+
+            return record
 
         def fetch_and_save_company(company, cursor, conn):
             try:
@@ -3330,53 +3412,29 @@ def fetch_data_api():
                 cursor.execute("DELETE FROM crmapp_beihuo WHERE company = %s", (company,))
                 print(f"🗑️ 已清空门店 {company} 的现有数据，准备插入 {total} 条记录")
 
-                # 2. 批量插入新数据
+                # 2. 批量插入新数据 - 使用字典列表，完全避免顺序依赖
                 batch_count = 0
                 for i in range(0, total, batch_size):
                     batch = data_list[i:i + batch_size]
-                    values_batch = []
-                    for item in batch:
-                        row = [clean_data(item.get(key)) for key in JSON_KEYS]
-                        row.append(company)
+                    # 构建字典列表，每个字典是一条记录
+                    records = [build_record(item, company, gx_date) for item in batch]
 
-                        # 获取当前记录的品牌值和物料条码
-                        current_brand = item.get("品牌", "")
-                        current_barcode = item.get("物料条码", "")
+                    if records:
+                        # 从第一条记录获取字段名（所有记录字段相同）
+                        columns = list(records[0].keys())
+                        columns_str = ", ".join([f"`{c}`" for c in columns])
+                        placeholders = ", ".join([f"%({c})s" for c in columns])
 
-                        # 如果品牌是"原厂 SJZX"且物料条码以"P"或"Y"开头，则根据条码前缀修改品牌
-                        if current_brand == "原厂 SJZX":
-                            if current_barcode and current_barcode.startswith("P"):
-                                brand_index = JSON_KEYS.index("品牌")
-                                row[brand_index] = "原厂国内4s件"
-                            elif current_barcode and current_barcode.startswith("Y"):
-                                brand_index = JSON_KEYS.index("品牌")
-                                row[brand_index] = "原厂"
+                        # 构建INSERT SQL
+                        insert_sql = f"""
+                        INSERT INTO `crmapp_beihuo` ({columns_str})
+                        VALUES ({placeholders})
+                        """
 
-                        # 如果品牌是"菲尔"或者"菲尔 FREY"，将物料条码复制到品牌号
-                        if current_brand in ["菲尔", "菲尔 FREY"]:
-                            barcode_index = JSON_KEYS.index("物料条码")
-                            brand_code_index = JSON_KEYS.index("品牌号")
-                            row[brand_code_index] = row[barcode_index]
-
-                        # 添加更新时间到每行数据
-                        if gx_date:
-                            from datetime import datetime
-                            try:
-                                if ' ' in gx_date:
-                                    parsed_date = datetime.strptime(gx_date, '%Y-%m-%d %H:%M:%S')
-                                else:
-                                    parsed_date = datetime.strptime(gx_date, '%Y-%m-%d')
-                                row.append(parsed_date)
-                            except ValueError:
-                                row.append(datetime.now())
-                        else:
-                            row.append(datetime.now())
-
-                        values_batch.append(row)
-
-                    cursor.executemany(INSERT_SQL, values_batch)
-                    processed += len(values_batch)
-                    batch_count += 1
+                        # 使用executemany插入字典列表
+                        cursor.executemany(insert_sql, records)
+                        processed += len(records)
+                        batch_count += 1
 
                     # 每commit_interval批次才commit一次
                     if batch_count % commit_interval == 0:
@@ -3417,7 +3475,12 @@ def fetch_data_api():
         
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'拉取数据失败: {str(e)}'}), 500
-    
+'''
+
+# 新的拉取数据API由 app/api/beihuo_api.py 中的蓝图提供
+# @app.route('/api/fetch_data', methods=['POST'])
+
+
 @app.route('/api/latest_update_time', methods=['GET'])
 @login_required
 def get_latest_update_time():
@@ -3428,10 +3491,18 @@ def get_latest_update_time():
 
         # 获取当前用户所在门店的更新时间（不管是谁，都用当前门店）
         user_store = get_user_store()
-        cursor.execute("SELECT MAX(更新时间) FROM crmapp_beihuo WHERE company = %s", (user_store,))
+        cursor.execute("SELECT MAX(更新时间) as latest_time FROM crmapp_beihuo WHERE company = %s", (user_store,))
 
         result = cursor.fetchone()
-        latest_time = result[0] if result[0] is not None else None
+        
+        # 处理字典游标返回的结果
+        if result:
+            if isinstance(result, dict):
+                latest_time = result.get('latest_time')
+            else:
+                latest_time = result[0]
+        else:
+            latest_time = None
 
         conn.close()
 
@@ -3640,7 +3711,8 @@ def date_ordercount():
                    `内部备注`, `品牌`, `品牌号`, `库存数量`, `库存金额`, `成品可卖天数`,
                    `成本价`, `昨日销量`, `本月销量`, `标签`, `物料名称`, `物料条码`,
                    `车型品牌`, `近12个月月均销量`, `近1个月询价量`, `近3个月月均询价量`,
-                   `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`,`company`
+                   `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`, `company`,
+                   `近6个月销量`, `近12个月销量`
             FROM crmapp_beihuo
             WHERE `物料条码` IN ({placeholders}) AND `company` = %s
             """
@@ -3691,6 +3763,8 @@ def date_ordercount():
                     item.get('近3个月月均询价量', 0.00),
                     item.get('近6个月月均销量', 0.00),
                     item.get('近12个月月均销量', 0.00),
+                    item.get('近6个月销量', 0),
+                    item.get('近12个月销量', 0),
                     item.get('成品可卖天数', 0),
                     item.get('库存数量', 0),
                     item.get('在途数量', 0),
@@ -3709,9 +3783,9 @@ def date_ordercount():
             INSERT INTO crmapp_date_search (
                 username, start_date, end_date, company, 物料条码, 物料名称, 品牌, 品牌号,
                 车型品牌, oe, 标签, 车型, 替换号, 今日销量, 昨日销量, 本月销量, 近7天销量, 近1个月询价量, 近3个月月均询价量,
-                近6个月月均销量, 近12个月月均销量, 成品可卖天数, 库存数量, 在途数量, 成本价, 库存金额, 供应商,
+                近6个月月均销量, 近12个月月均销量, 近6个月销量, 近12个月销量, 成品可卖天数, 库存数量, 在途数量, 成本价, 库存金额, 供应商,
                 全国近1个月询价量, 全国近3个月月均询价量, 内部备注, 预警状态, 销量
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.executemany(insert_sql, batch_data)
             insert_end_time = datetime.now()
@@ -4441,8 +4515,9 @@ def init_background_tasks():
         # 注册清理任务
         register_cleanup_tasks(task_manager)
 
-        # 注册自动更新任务
-        setup_scheduled_tasks()
+        # 注册备货数据定时任务（新的模块化实现）
+        from app.tasks.beihuo_tasks import register_beihuo_tasks
+        register_beihuo_tasks(task_manager)
 
         # 初始化开思自动对单
         init_ks_bill_monitor()

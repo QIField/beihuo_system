@@ -15,8 +15,8 @@ from flask import Blueprint, request, jsonify, session, render_template, send_fr
 from functools import wraps
 import pandas as pd
 import math
-import json
 import os
+import tempfile
 from datetime import datetime, timedelta
 from app.utils.database_connection import get_db_connection
 from app.services.procurement_service import add_inquiry_record
@@ -63,65 +63,6 @@ def inquiry_permission_required(f):
     return decorated_function
 
 
-def classify_nine_category(update_msg, create_result=None):
-    """
-    根据update_msg和create_result判断九大类
-    
-    九大类：
-    1. 上传成功 - B2B直接上传成功
-    2. 新建成功-已存在 - B2B失败+新建时发现已存在
-    3. 新建成功-新创建 - B2B失败+新建成功
-    4. 新建失败-未找到产品名称 - 新建失败（无产品名）
-    5. 新建失败-车型不能为空 - 新建失败（无车型）
-    6. 上传失败-过期时间错误 - B2B返回过期时间错误
-    7. 上传失败-品牌不存在 - B2B返回品牌不存在
-    8. 上传失败-产品不存在 - B2B返回产品不存在但没走新建
-    9. 其他 - 其他错误
-    """
-    if not update_msg:
-        return '其他'
-    
-    # 上传成功
-    if '成功' in update_msg and ('上传' in update_msg or 'update' in update_msg.lower() or 'add' in update_msg.lower()):
-        return '上传成功'
-    
-    # 有新建结果的情况
-    if create_result:
-        if '已存在' in create_result:
-            return '新建成功-已存在'
-        elif '成功' in create_result and '失败' not in create_result:
-            return '新建成功-新创建'
-        elif '未找到产品名称' in create_result:
-            return '新建失败-未找到产品名称'
-        elif '车型不能为空' in create_result:
-            return '新建失败-车型不能为空'
-        else:
-            return '新建失败-其他'
-    
-    # 无新建结果，根据B2B错误分类
-    # 注意：判定顺序很重要，先判定特定的，再判定通用的
-    if '过期时间' in update_msg or '失效时间' in update_msg:
-        return '上传失败-过期时间错误'
-    elif '产品数据不存在' in update_msg or '物料所属品牌' in update_msg and '产品数据不存在' in update_msg:
-        # 格式：物料所属品牌【XXX】OE号【XXX】产品数据不存在
-        return '上传失败-产品不存在'
-    elif '品牌名称' in update_msg and '总部不存在' in update_msg:
-        # 格式：品牌名称【XXX】总部不存在
-        return '上传失败-品牌不存在'
-    else:
-        return '其他'
-
-
-def get_detail_message(update_msg, create_result=None):
-    """
-    生成详情列内容
-    如果有新建结果，用新建结果覆盖；否则用update_msg
-    """
-    if create_result:
-        return create_result
-    return update_msg
-
-
 @inquiry_bp.route('/import', methods=['POST'])
 @login_required
 def import_price_data():
@@ -142,10 +83,6 @@ def import_price_data():
 
     try:
         # 保存临时文件
-        import tempfile
-        import os
-        from datetime import datetime
-        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         temp_path = os.path.join(tempfile.gettempdir(), f"inquiry_async_{timestamp}_{file.filename}")
         file.save(temp_path)
@@ -223,11 +160,6 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     询价导入异步处理函数（完整版）
     支持进度回调，包含完整8步流程
     """
-    import pandas as pd
-    import math
-    import os
-    from datetime import datetime, timedelta
-    
     # 读取文件
     if file_path.endswith('.csv'):
         df = pd.read_csv(file_path, encoding='utf-8', dtype=str)
@@ -663,9 +595,20 @@ def get_inquiry_list():
         # 转换为字典列表并格式化日期
         data_list = []
         for row in rows:
-            item = dict(zip(columns, row))
-            if item.get('expire_time'):
-                item['expire_time'] = item['expire_time'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(item['expire_time'], 'strftime') else str(item['expire_time'])
+            # 如果row已经是字典，直接使用；否则进行zip转换
+            if isinstance(row, dict):
+                item = row
+            else:
+                item = dict(zip(columns, row))
+            # 格式化失效时间（仅当是datetime类型时）
+            if item.get('expire_time') and hasattr(item['expire_time'], 'strftime'):
+                item['expire_time'] = item['expire_time'].strftime('%Y-%m-%d %H:%M:%S')
+            # 格式化上传时间（仅当是datetime类型时）
+            if item.get('import_time') and hasattr(item['import_time'], 'strftime'):
+                item['import_time'] = item['import_time'].strftime('%Y-%m-%d %H:%M:%S')
+            # 处理备注字段：如果是None或'None'字符串，设为空值
+            if item.get('remark') is None or item.get('remark') == 'None':
+                item['remark'] = ''
             data_list.append(item)
 
         cursor.close()

@@ -4,6 +4,8 @@ from app.utils.database_connection import get_db_connection
 
 # 导入各模块表初始化函数
 from .tables import (
+    init_sales_history_detail_table,
+    init_quote_count_ks_table,
     init_procurement_history_table,
     init_procurement_history_detail_table,
     init_zhuozhixing_table,
@@ -29,6 +31,43 @@ def check_and_add_fields(table_name, fields_to_check):
                     added.append(field['name'])
     except:
         pass
+    finally:
+        conn.close()
+
+
+def modify_field_type(table_name, field_name, new_definition):
+    """修改表字段类型（如果字段存在且类型不匹配）"""
+    import pymysql.cursors
+    conn = get_db_connection()
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # 检查字段是否存在
+            cursor.execute("""
+                SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s
+            """, (table_name, field_name))
+            result = cursor.fetchone()
+            
+            if result:
+                current_type = result['DATA_TYPE'].upper() if result else None
+                # 检查当前类型是否已经是 TEXT
+                if current_type != 'TEXT':
+                    alter_sql = f"ALTER TABLE `{table_name}` MODIFY COLUMN `{field_name}` {new_definition}"
+                    cursor.execute(alter_sql)
+                    conn.commit()
+                    print(f"  ✓ 修改 {table_name}.{field_name} 字段类型为 TEXT")
+                else:
+                    print(f"  ✓ {table_name}.{field_name} 字段已是 TEXT 类型")
+            else:
+                # 字段不存在，添加字段
+                alter_sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{field_name}` {new_definition}"
+                cursor.execute(alter_sql)
+                conn.commit()
+                print(f"  ✓ 添加 {table_name}.{field_name} 字段")
+    except Exception as e:
+        print(f"  ✗ 修改 {table_name}.{field_name} 字段失败: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         conn.close()
 
@@ -82,7 +121,8 @@ def init_cart_table():
                 sales_7d INT DEFAULT 0 COMMENT '近7天销量',
                 warning_status VARCHAR(255) COMMENT '预警状态',
                 on_way INT DEFAULT 0 COMMENT '在途数量',
-                car_model VARCHAR(255) COMMENT '车型',
+                car_model TEXT COMMENT '车型',
+                replace_number TEXT COMMENT '替换号',
                 quantity INT DEFAULT 1 COMMENT '数量',
                 added_time DATETIME COMMENT '加入时间',
                 added_by VARCHAR(255) COMMENT '加入账户名',
@@ -103,6 +143,10 @@ def init_cart_table():
         print(f"  ✗ 购物车表: {e}")
     finally:
         conn.close()
+    
+    # 修改购物车表字段类型
+    modify_field_type('crmapp_cart', 'car_model', "TEXT COMMENT '车型'")
+    modify_field_type('crmapp_cart', 'replace_number', "TEXT COMMENT '替换号'")
 
 
 def init_user_table():
@@ -214,7 +258,7 @@ def init_beihuo_table():
                 今日销售 VARCHAR(255) COMMENT '今日销售',
                 在途数量 INT DEFAULT 0 COMMENT '在途数量',
                 车型 TEXT COMMENT '车型',
-                替换号 VARCHAR(255) COMMENT '替换号',
+                替换号 TEXT COMMENT '替换号',
                 INDEX idx_oe (oe),
                 INDEX idx_barcode (物料条码),
                 INDEX idx_company (company),
@@ -248,6 +292,9 @@ def init_beihuo_table():
         }
     ]
     check_and_add_fields('crmapp_beihuo', beihuo_fields_to_check)
+    
+    # 修改替换号字段类型为 TEXT（如果存在且不是 TEXT）
+    modify_field_type('crmapp_beihuo', '替换号', "TEXT COMMENT '替换号'")
 
 
 def init_date_search_table():
@@ -271,7 +318,7 @@ def init_date_search_table():
                 oe TEXT COMMENT 'OE码',
                 标签 VARCHAR(255) COMMENT '标签',
                 车型 TEXT COMMENT '车型',
-                替换号 VARCHAR(255) COMMENT '替换号',
+                替换号 TEXT COMMENT '替换号',
                 今日销量 INT DEFAULT 0 COMMENT '今日销量',
                 昨日销量 INT DEFAULT 0 COMMENT '昨日销量',
                 本月销量 INT DEFAULT 0 COMMENT '本月销量',
@@ -280,6 +327,8 @@ def init_date_search_table():
                 近3个月月均询价量 DECIMAL(10,2) DEFAULT 0.00 COMMENT '近3个月月均询价量',
                 近6个月月均销量 DECIMAL(10,2) DEFAULT 0.00 COMMENT '近6个月月均销量',
                 近12个月月均销量 DECIMAL(10,2) DEFAULT 0.00 COMMENT '近12个月月均销量',
+                近6个月销量 INT DEFAULT 0 COMMENT '近6个月销量',
+                近12个月销量 INT DEFAULT 0 COMMENT '近12个月销量',
                 成品可卖天数 INT DEFAULT 0 COMMENT '成品可卖天数',
                 库存数量 INT DEFAULT 0 COMMENT '库存数量',
                 在途数量 INT DEFAULT 0 COMMENT '在途数量',
@@ -304,6 +353,23 @@ def init_date_search_table():
         print(f"  ✗ 日期搜索表: {e}")
     finally:
         conn.close()
+
+    # 检查并添加缺失的字段
+    date_search_fields_to_check = [
+        {
+            'name': '近6个月销量',
+            'definition': "INT DEFAULT 0 COMMENT '近6个月销量'"
+        },
+        {
+            'name': '近12个月销量',
+            'definition': "INT DEFAULT 0 COMMENT '近12个月销量'"
+        }
+    ]
+    check_and_add_fields('crmapp_date_search', date_search_fields_to_check)
+    
+    # 修改日期查询表字段类型
+    modify_field_type('crmapp_date_search', '车型', "TEXT COMMENT '车型'")
+    modify_field_type('crmapp_date_search', '替换号', "TEXT COMMENT '替换号'")
 
 
 def init_ks_auto_bill_table():
@@ -692,12 +758,13 @@ def init_all_tables():
         ('开思自动账单', init_ks_auto_bill_table),
         ('询价比价', init_price_inquiry_table),
         ('比价汇总', init_compare_summary_table),
+        ('销量明细', init_sales_history_detail_table),
+        ('询价次数', init_quote_count_ks_table),
         ('开思询价明细', init_ks_inquiry_detail_table),
         ('微信询价明细', init_weixin_inquiry_detail_table),
         ('采购历史', init_procurement_history_table),
         ('采购历史明细', init_procurement_history_detail_table),
         ('卓之星库存', init_zhuozhixing_table),
-
         ('库存明细', init_inventory_detail_table),
     ]
 
