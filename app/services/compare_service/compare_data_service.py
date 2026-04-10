@@ -4,6 +4,7 @@
 """
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
+import pymysql
 from app.utils.database_connection import get_db_connection
 from app.utils.search.parser import parse_space, parse_comma
 
@@ -29,7 +30,7 @@ class CompareDataService:
         """创建比价数据汇总表（如果不存在）"""
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 create_table_sql = """
                 CREATE TABLE IF NOT EXISTS crmapp_compare_summary (
                     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
@@ -106,7 +107,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 # 过滤掉不存在的字段
                 valid_data = {k: v for k, v in data.items() if k in CompareDataService.FIELDS}
                 
@@ -143,7 +144,7 @@ class CompareDataService:
             
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 # 获取第一条数据的所有字段
                 valid_data = {k: v for k, v in data_list[0].items() if k in CompareDataService.FIELDS}
                 columns = ', '.join(valid_data.keys())
@@ -180,7 +181,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 # 过滤掉不存在的字段和id字段
                 valid_data = {k: v for k, v in data.items() 
                              if k in CompareDataService.FIELDS and k != 'id'}
@@ -215,7 +216,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 valid_data = {k: v for k, v in data.items() 
                              if k in CompareDataService.FIELDS and k != 'id'}
                 
@@ -248,7 +249,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 sql = f"DELETE FROM {CompareDataService.TABLE_NAME} WHERE oe = %s"
                 cursor.execute(sql, [oe])
                 conn.commit()
@@ -273,7 +274,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 sql = f"DELETE FROM {CompareDataService.TABLE_NAME} WHERE id = %s"
                 cursor.execute(sql, [record_id])
                 conn.commit()
@@ -298,7 +299,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 sql = f"SELECT * FROM {CompareDataService.TABLE_NAME} WHERE oe = %s LIMIT 1"
                 cursor.execute(sql, [oe])
                 result = cursor.fetchone()
@@ -326,7 +327,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 sql = f"SELECT * FROM {CompareDataService.TABLE_NAME} WHERE id = %s LIMIT 1"
                 cursor.execute(sql, [record_id])
                 result = cursor.fetchone()
@@ -385,112 +386,112 @@ class CompareDataService:
             (数据列表, 总记录数)
         """
         conn = get_db_connection()
-        try:
-            with conn.cursor() as cursor:
-                # 构建WHERE条件
-                where_conditions = []
-                params = []
+        with conn.cursor(pymysql.cursors.Cursor) as cursor:
+            # 构建WHERE条件
+            where_conditions = []
+            params = []
 
-                # 必须按公司/组织过滤
-                if company:
-                    where_conditions.append("company = %s")
-                    params.append(company)
+            # 必须按公司/组织过滤
+            if company:
+                where_conditions.append("company = %s")
+                params.append(company)
 
-                # 处理多行搜索
-                oe_list = parse_space(oe) if oe else []
-                brand_list = parse_comma(brand) if brand else []
-                product_name_list = parse_comma(product_name) if product_name else []
-                vehicle_brand_list = parse_comma(vehicle_brand) if vehicle_brand else []
+            # 处理多行搜索
+            oe_list = parse_space(oe) if oe else []
+            brand_list = parse_comma(brand) if brand else []
+            product_name_list = parse_comma(product_name) if product_name else []
+            vehicle_brand_list = parse_comma(vehicle_brand) if vehicle_brand else []
 
-                if oe_list:
-                    or_conditions = []
-                    for item in oe_list:
-                        or_conditions.append("oe LIKE %s")
-                        params.append(f"%{item}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+            if oe_list:
+                or_conditions = []
+                for item in oe_list:
+                    or_conditions.append("oe LIKE %s")
+                    params.append(f"%{item}%")
+                where_conditions.append("(" + " OR ".join(or_conditions) + ")")
 
-                if brand_list:
-                    or_conditions = []
-                    for item in brand_list:
-                        or_conditions.append("brand LIKE %s")
-                        params.append(f"%{item}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+            if brand_list:
+                or_conditions = []
+                for item in brand_list:
+                    or_conditions.append("brand LIKE %s")
+                    params.append(f"%{item}%")
+                where_conditions.append("(" + " OR ".join(or_conditions) + ")")
 
-                if product_name_list:
-                    or_conditions = []
-                    for item in product_name_list:
-                        or_conditions.append("product_name LIKE %s")
-                        params.append(f"%{item}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+            if product_name_list:
+                or_conditions = []
+                for item in product_name_list:
+                    or_conditions.append("product_name LIKE %s")
+                    params.append(f"%{item}%")
+                where_conditions.append("(" + " OR ".join(or_conditions) + ")")
 
-                if vehicle_brand_list:
-                    or_conditions = []
-                    for item in vehicle_brand_list:
-                        or_conditions.append("vehicle_brand LIKE %s")
-                        params.append(f"%{item}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+            if vehicle_brand_list:
+                or_conditions = []
+                for item in vehicle_brand_list:
+                    or_conditions.append("vehicle_brand LIKE %s")
+                    params.append(f"%{item}%")
+                where_conditions.append("(" + " OR ".join(or_conditions) + ")")
 
-                where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+            where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
-                # 查询总数
-                count_sql = f"SELECT COUNT(*) FROM {CompareDataService.TABLE_NAME} {where_clause}"
-                cursor.execute(count_sql, params)
-                total = cursor.fetchone()[0]
+            # 查询总数
+            count_sql = f"SELECT COUNT(*) FROM {CompareDataService.TABLE_NAME} {where_clause}"
+            cursor.execute(count_sql, params)
+            total = cursor.fetchone()[0]
 
-                # 确定排序字段（优先使用用户指定的排序字段）
-                if sort_field and sort_field in CompareDataService.ALLOWED_SORT_FIELDS:
-                    final_order_by = sort_field
-                    final_order_desc = sort_order == 'desc'
-                else:
-                    final_order_by = order_by
-                    final_order_desc = order_desc
+            # 确定排序字段（优先使用用户指定的排序字段）
+            if sort_field and sort_field in CompareDataService.ALLOWED_SORT_FIELDS:
+                final_order_by = sort_field
+                final_order_desc = sort_order == 'desc'
+            else:
+                final_order_by = order_by
+                final_order_desc = order_desc
 
-                # 查询数据
-                order_direction = "DESC" if final_order_desc else "ASC"
-                offset = (page - 1) * limit
+            # 查询数据
+            order_direction = "DESC" if final_order_desc else "ASC"
+            offset = (page - 1) * limit
 
-                # 价格字段特殊处理：NULL 和 0 放在最后，确保按有效价格排序
-                price_fields = {'supplier_price', 'dealer_purchase_price', 'dealer_sale_price', 'max_price', 'min_price'}
-                if sort_field in price_fields:
-                    # 使用 CASE WHEN 将 NULL 和 0 排在最后
-                    nulls_last = "DESC" if final_order_desc else "ASC"
-                    order_clause = f"CASE WHEN {sort_field} IS NULL OR {sort_field} = 0 THEN 1 ELSE 0 END ASC, {sort_field} {order_direction}"
-                else:
-                    order_clause = f"{final_order_by} {order_direction}"
+            # 价格字段特殊处理：NULL 和 0 放在最后，确保按有效价格排序
+            price_fields = {'supplier_price', 'dealer_purchase_price', 'dealer_sale_price', 'max_price', 'min_price'}
+            if sort_field in price_fields:
+                # 使用 CASE WHEN 将 NULL 和 0 排在最后
+                nulls_last = "DESC" if final_order_desc else "ASC"
+                order_clause = f"CASE WHEN {sort_field} IS NULL OR {sort_field} = 0 THEN 1 ELSE 0 END ASC, {sort_field} {order_direction}"
+            else:
+                order_clause = f"{final_order_by} {order_direction}"
 
-                data_sql = f"""
-                    SELECT * FROM {CompareDataService.TABLE_NAME}
-                    {where_clause}
-                    ORDER BY {order_clause}
-                    LIMIT %s OFFSET %s
-                """
-                cursor.execute(data_sql, params + [limit, offset])
+            data_sql = f"""
+                SELECT * FROM {CompareDataService.TABLE_NAME}
+                {where_clause}
+                ORDER BY {order_clause}
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(data_sql, params + [limit, offset])
 
-                columns = [desc[0] for desc in cursor.description]
-                rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            rows = cursor.fetchall()
 
-                data = []
-                for row in rows:
-                    item = dict(zip(columns, row))
-                    # 格式化时间字段
-                    for time_field in ['price_update_time', 'updated_time']:
-                        if item.get(time_field):
-                            if hasattr(item[time_field], 'strftime'):
-                                item[time_field] = item[time_field].strftime('%Y-%m-%d %H:%M:%S')
-                    # 格式化价格字段
-                    for price_field in ['max_price', 'min_price', 'supplier_price',
-                                       'dealer_purchase_price', 'dealer_sale_price',
-                                       'avg_sales_12m', 'avg_sales_6m']:
-                        if item.get(price_field) is not None:
-                            item[price_field] = float(item[price_field])
-                    data.append(item)
+            data = []
+            for row in rows:
+                item = dict(zip(columns, row))
+                # 格式化时间字段
+                for time_field in ['price_update_time', 'updated_time']:
+                    if item.get(time_field):
+                        if hasattr(item[time_field], 'strftime'):
+                            item[time_field] = item[time_field].strftime('%Y-%m-%d %H:%M:%S')
+                # 格式化价格字段
+                for price_field in ['max_price', 'min_price', 'supplier_price',
+                                   'dealer_purchase_price', 'dealer_sale_price',
+                                   'avg_sales_12m', 'avg_sales_6m']:
+                    if item.get(price_field) is not None:
+                        item[price_field] = float(item[price_field])
+                data.append(item)
+                
+                # 调试：打印前3条数据的供应商价格
+                if len(data) <= 3:
+                    print(f"[DEBUG] supplier_price 调试: oe={item.get('oe')}, supplier_price={item.get('supplier_price')}, type={type(item.get('supplier_price'))}")
 
-                return data, total
-        except Exception as e:
-            print(f"查询列表时出错: {str(e)}")
-            raise
-        finally:
-            conn.close()
+            return data, total
+        
+        conn.close()
     
     @staticmethod
     def get_all_data() -> List[Dict]:
@@ -502,7 +503,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 sql = f"SELECT * FROM {CompareDataService.TABLE_NAME} ORDER BY updated_time DESC"
                 cursor.execute(sql)
                 
@@ -546,7 +547,7 @@ class CompareDataService:
         # 根据 oe + brand + company 查询是否已存在
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 cursor.execute(f"""
                     SELECT id FROM {CompareDataService.TABLE_NAME} 
                     WHERE oe = %s AND brand = %s AND company = %s LIMIT 1
@@ -574,7 +575,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 sql = f"DELETE FROM {CompareDataService.TABLE_NAME}"
                 cursor.execute(sql)
                 conn.commit()
@@ -596,7 +597,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 stats = {}
                 
                 # 总记录数
@@ -666,7 +667,7 @@ class CompareDataService:
         
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 # 计算起始年月（最近N个月）
                 from datetime import datetime, timedelta
                 now = datetime.now()
@@ -728,7 +729,7 @@ class CompareDataService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 # 计算起始年月
                 from datetime import datetime, timedelta
                 now = datetime.now()

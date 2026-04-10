@@ -2021,6 +2021,31 @@ def main_process(skip_table_creation=False):
         import traceback
         traceback.print_exc()
 
+    # ===== 保存当日统计数据到日志 =====
+    print("\n" + "="*60)
+    print("开始保存当日统计数据")
+    print("="*60)
+    try:
+        from app.services.virtual_inventory_stats_service import save_daily_statistics
+
+        # 获取业务日期范围
+        current_time = datetime.now()
+        if current_time.hour >= 13:
+            business_start = current_time.replace(hour=13, minute=0, second=0, microsecond=0)
+            business_end = business_start + timedelta(days=1)
+        else:
+            business_start = (current_time - timedelta(days=1)).replace(hour=13, minute=0, second=0, microsecond=0)
+            business_end = business_start + timedelta(days=1)
+
+        result = save_daily_statistics(business_start, business_end)
+        if result['code'] == 0:
+            print(f"[统计日志] 保存成功: {result['data']['business_date']}")
+        else:
+            print(f"[统计日志] 保存失败: {result['msg']}")
+    except Exception as e:
+        print(f"[统计日志] 保存时出错: {e}")
+    print("="*60)
+
 
 if __name__ == '__main__':
     main_process()

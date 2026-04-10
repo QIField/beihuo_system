@@ -154,10 +154,26 @@ class CRMDataCrawlService:
             'min_price': 0.0
         }
 
+    def clear_table(self) -> bool:
+        """清空 crmapp_compare_summary 表（重置自增ID）"""
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("TRUNCATE TABLE crmapp_compare_summary")
+                conn.commit()
+                print("✅ 已清空 crmapp_compare_summary 表")
+                return True
+        except Exception as e:
+            conn.rollback()
+            print(f"❌ 清空表失败: {e}")
+            return False
+        finally:
+            conn.close()
+
     def batch_save(self, products: List[Dict]) -> int:
         """
         批量保存到数据库
-        使用 INSERT ... ON DUPLICATE KEY UPDATE
+        使用 INSERT（表已清空，无需处理重复）
         """
         if not products:
             return 0
@@ -175,13 +191,9 @@ class CRMDataCrawlService:
                 placeholders = ', '.join(['%s'] * len(columns))
                 columns_str = ', '.join(columns)
 
-                update_parts = [f"{col} = VALUES({col})" for col in columns if col not in ['oe', 'brand', 'company']]
-                update_str = ', '.join(update_parts)
-
                 sql = f"""
                     INSERT INTO crmapp_compare_summary ({columns_str})
                     VALUES ({placeholders})
-                    ON DUPLICATE KEY UPDATE {update_str}
                 """
 
                 values = []
@@ -240,6 +252,10 @@ class CRMDataCrawlService:
             print(f"\n📊 总记录数: {total}")
             print(f"📄 总页数: {last_page}")
             print(f"📦 每页数量: {LIMIT}")
+
+            # 清空表（全量爬取前清空旧数据）
+            if not self.clear_table():
+                return {'total': 0, 'saved': 0, 'failed': 0}
 
             batch_buffer = []
             total_processed = 0

@@ -12,6 +12,7 @@ from .tables import (
     init_inventory_detail_table,
     init_ks_inquiry_detail_table,
     init_weixin_inquiry_detail_table,
+    init_virtual_inventory_stats_log_table,
 )
 
 
@@ -766,6 +767,7 @@ def init_all_tables():
         ('采购历史明细', init_procurement_history_detail_table),
         ('卓之星库存', init_zhuozhixing_table),
         ('库存明细', init_inventory_detail_table),
+        ('虚拟库存统计日志', init_virtual_inventory_stats_log_table),
     ]
 
     completed = []

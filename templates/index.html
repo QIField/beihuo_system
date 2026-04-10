@@ -830,6 +830,12 @@
                             <dd><a href="javascript:void(0);" onclick="openSuyuanQuery()">溯源查询</a></dd>
                         </dl>
                     </li>
+                    <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:;">仓库</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="javascript:void(0);" onclick="openWarehouseDashboardInNewTab()">仓库看板</a></dd>
+                        </dl>
+                    </li>
                     <li class="layui-nav-item layui-nav-itemed" id="purchasePlanMenu" style="display: none;">
                         <a href="javascript:;">采购计划</a>
                         <dl class="layui-nav-child">
@@ -1488,6 +1494,12 @@ function openSearchInCrmInNewTab() {
 function openSuyuanQuery() {
     // 在新标签页中打开溯源查询页面
     window.open('/region_by_number_query_page', '_blank');
+}
+
+// 添加打开仓库看板新标签页的函数
+function openWarehouseDashboardInNewTab() {
+    // 在新标签页中打开仓库看板页面
+    window.open('/dashboard_crm_wms', '_blank');
 }
 
 // 添加打开日期查询新标签页的函数

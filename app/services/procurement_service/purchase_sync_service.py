@@ -4,6 +4,7 @@
 """
 
 import json
+import pymysql
 from datetime import datetime
 from typing import List, Dict, Any, Tuple
 
@@ -114,9 +115,9 @@ class PurchaseSyncService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 sql = """
-                    SELECT MAX(unit_price), MIN(unit_price)
+                    SELECT MAX(unit_price) as max_price, MIN(unit_price) as min_price
                     FROM crmapp_procurement_history
                     WHERE oe = %s AND brand = %s AND company = %s
                     AND unit_price > 0
@@ -125,7 +126,7 @@ class PurchaseSyncService:
                 result = cursor.fetchone()
 
                 if result:
-                    return float(result[0] or 0.0), float(result[1] or 0.0)
+                    return float(result['max_price'] or 0.0), float(result['min_price'] or 0.0)
                 return 0.0, 0.0
         finally:
             conn.close()
@@ -144,7 +145,7 @@ class PurchaseSyncService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 sql = """
                     SELECT unit_price
                     FROM crmapp_procurement_history
@@ -156,7 +157,7 @@ class PurchaseSyncService:
                 result = cursor.fetchone()
 
                 if result:
-                    return float(result[0] or 0.0)
+                    return float(result['unit_price'] or 0.0)
                 return 0.0
         finally:
             conn.close()
@@ -233,7 +234,7 @@ class PurchaseSyncService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # 检查记录是否存在
                 check_sql = """
                     SELECT id FROM crmapp_compare_summary

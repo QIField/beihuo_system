@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify, session, Response, render_templat
 from functools import wraps
 import pandas as pd
 import io
+import pymysql
 from datetime import datetime
 from app.utils.database_connection import get_db_connection
 from app.services.compare_service.compare_data_service import CompareDataService
@@ -500,7 +501,7 @@ def get_procurement_history():
         # 查询采购历史
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 sql = """
                     SELECT supplier_name, unit_price, purchase_date
                     FROM crmapp_procurement_history
@@ -512,9 +513,9 @@ def get_procurement_history():
                 records = []
                 for row in rows:
                     records.append({
-                        'supplier_name': row[0],
-                        'purchase_price': float(row[1]) if row[1] else 0.0,
-                        'purchase_date': row[2].strftime('%Y-%m-%d') if hasattr(row[2], 'strftime') else str(row[2])
+                        'supplier_name': row['supplier_name'],
+                        'purchase_price': float(row['unit_price']) if row['unit_price'] else 0.0,
+                        'purchase_date': row['purchase_date'].strftime('%Y-%m-%d') if hasattr(row['purchase_date'], 'strftime') else str(row['purchase_date'])
                     })
                 return jsonify({
                     'code': 0,
@@ -570,7 +571,7 @@ def get_procurement_history_batch():
         # 批量查询采购历史
         conn = get_db_connection()
         try:
-            with conn.cursor() as cursor:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # 构建查询条件
                 placeholders = ', '.join(['(%s, %s)'] * len(product_keys))
                 params = []
@@ -591,13 +592,13 @@ def get_procurement_history_batch():
                 # 按产品分组
                 result = {}
                 for row in rows:
-                    key = f"{row[0]}|{row[1]}"
+                    key = f"{row['oe']}|{row['brand']}"
                     if key not in result:
                         result[key] = []
                     result[key].append({
-                        'supplier_name': row[2],
-                        'purchase_price': float(row[3]) if row[3] else 0.0,
-                        'purchase_date': row[4].strftime('%Y-%m-%d') if hasattr(row[4], 'strftime') else str(row[4])
+                        'supplier_name': row['supplier_name'],
+                        'purchase_price': float(row['unit_price']) if row['unit_price'] else 0.0,
+                        'purchase_date': row['purchase_date'].strftime('%Y-%m-%d') if hasattr(row['purchase_date'], 'strftime') else str(row['purchase_date'])
                     })
                 
                 return jsonify({

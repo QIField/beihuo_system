@@ -177,11 +177,11 @@ def extract_order_info(session, status=""):
         status: 订单状态ID，默认为空（获取所有状态的订单）
     
     返回:
-        list: 包含字典的列表，每个字典有 'orderId' 和 'orderStatusDesc' 两个键
+        list: 包含字典的列表，每个字典有 'orderId'、'orderStatusDesc'、'orderStatusId' 等键
     
     说明:
         - 自动调用 get_all_orders 获取所有订单
-        - 提取每个订单的 orderId、orderStatusDesc 和 orderDate 字段
+        - 提取每个订单的 orderId、orderStatusDesc、orderStatusId 和 orderDate 字段
     """
     orders = get_all_orders(session, status=status)
     order_info_list = []
@@ -189,12 +189,14 @@ def extract_order_info(session, status=""):
     for order in orders:
         order_id = order.get('orderId')
         status_desc = order.get('orderStatusDesc')
+        status_id = order.get('orderStatusId')
         order_date = order.get('orderDate')
         buyer_company_name = order.get('buyerCompanyName')  
         
         order_info = {
             'orderId': order_id,
             'orderStatusDesc': status_desc,
+            'orderStatusId': status_id,
             'orderDate': order_date,
             'buyerCompanyName': buyer_company_name 
         }
@@ -279,8 +281,10 @@ def save_order_info_to_db(order_info_list, order_details_map=None):
                 else:
                     # 订单不存在，需要插入
                     # 判断是否为非处理状态订单，如果是则设置crm订单状态
+                    # ORDER_APPROVED 和 ORDER_CANCELLING 状态的订单不开单
+                    EXCLUDED_STATUS_IDS = {'ORDER_APPROVED', 'ORDER_CANCELLING'}
                     crm_order_status = None
-                    if order_status_desc != '等待商家确认':
+                    if info.get('orderStatusId') in EXCLUDED_STATUS_IDS:
                         crm_order_status = f'状态为"{order_status_desc}"'
                     
                     if order_details_map and order_id in order_details_map:
@@ -454,10 +458,12 @@ def extract_and_save_order_info(session, status=""):
     # 保存订单信息到数据库（包括新订单的详情）
     save_order_info_to_db(order_info_list, order_details_map)
     
-    # 筛选出状态为'等待商家确认'的订单ID
+    # 筛选出需要开单的订单ID
+    # ORDER_APPROVED 和 ORDER_CANCELLING 状态的订单不开单，其余全部开单
+    EXCLUDED_STATUS_IDS = {'ORDER_APPROVED', 'ORDER_CANCELLING'}
     pending_confirmation_orders = [
         info['orderId'] for info in order_info_list 
-        if info.get('orderStatusDesc') == '等待商家确认'
+        if info.get('orderStatusId') not in EXCLUDED_STATUS_IDS
     ]
     
     return order_info_list, pending_confirmation_orders

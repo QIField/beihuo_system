@@ -26,6 +26,10 @@ from .inquiry_tables import (
     init_weixin_inquiry_detail_table,
 )
 
+from .virtual_inventory_stats_tables import (
+    init_virtual_inventory_stats_log_table,
+)
+
 __all__ = [
     'init_sales_history_detail_table',
     'init_quote_count_ks_table',
@@ -35,4 +39,5 @@ __all__ = [
     'init_inventory_detail_table',
     'init_ks_inquiry_detail_table',
     'init_weixin_inquiry_detail_table',
+    'init_virtual_inventory_stats_log_table',
 ]
