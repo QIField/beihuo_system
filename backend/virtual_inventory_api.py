@@ -1669,6 +1669,44 @@ def trigger_virtual_inventory_task():
         }), 500
 
 
+# ==================== 统计日志API ====================
+
+@virtual_inventory_bp.route('/api/virtual_inventory_stats_log', methods=['GET'])
+@login_required
+def get_stats_log_list():
+    """获取统计日志列表（最近30天）"""
+    try:
+        from app.services.virtual_inventory_stats_service import get_stats_log_list as get_stats_list
+
+        days = request.args.get('days', 30, type=int)
+        rows = get_stats_list(days)
+
+        return jsonify({
+            'code': 0,
+            'msg': '',
+            'count': len(rows),
+            'data': rows
+        })
+
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取统计日志失败: {str(e)}'}), 500
+
+
+@virtual_inventory_bp.route('/api/virtual_inventory_stats_log/save', methods=['POST'])
+@login_required
+def manual_save_stats():
+    """手动保存今日统计数据"""
+    try:
+        from app.services.virtual_inventory_stats_service import save_daily_statistics
+
+        start_time, end_time = get_business_date_range()
+        result = save_daily_statistics(start_time, end_time)
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'保存失败: {str(e)}'}), 500
+
+
 # 导入到主应用的函数============================================================================================
 def register_virtual_inventory_routes(app):
     # 注册蓝图

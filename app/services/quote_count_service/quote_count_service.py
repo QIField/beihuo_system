@@ -146,16 +146,7 @@ class QuoteCountSyncService:
 
                 response.raise_for_status()
                 
-                try:
-                    result = response.json()
-                except Exception as json_err:
-                    print(f"[请求] JSON解析失败: {json_err}")
-                    self._refresh_session()
-                    if attempt < self.MAX_RETRY - 1:
-                        time.sleep(self.RETRY_DELAY)
-                        continue
-                    else:
-                        return None
+                result = response.json()
 
                 if result.get('code') == 401 or result.get('msg') == '登录已过期':
                     print(f"[请求] 登录状态失效，尝试刷新cookie...")

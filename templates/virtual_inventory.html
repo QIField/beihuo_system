@@ -97,6 +97,36 @@
             vertical-align: middle;
             width: 100%;
         }
+
+        /* 统一按钮样式 */
+        .search-buttons .layui-btn {
+            background-color: #f8f9fa;
+            color: #333;
+            border: 1px solid #dcdfe6;
+            height: 32px;
+            line-height: 30px;
+            padding: 0 16px;
+            font-size: 13px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .search-buttons .layui-btn:hover {
+            background-color: #e9ecef;
+            border-color: #c0c4cc;
+        }
+        .search-buttons .layui-btn:active {
+            background-color: #dee2e6;
+        }
+        /* 搜索按钮稍微突出 */
+        .search-buttons button[lay-submit] {
+            background-color: #409eff;
+            color: #fff;
+            border-color: #409eff;
+        }
+        .search-buttons button[lay-submit]:hover {
+            background-color: #66b1ff;
+            border-color: #66b1ff;
+        }
         
         /* 添加业务日期选择样式 */
         .business-date-item {
@@ -162,13 +192,12 @@
                 </div>
             </div>
             <div class="search-buttons">
-                <button type="button" class="layui-btn layui-btn-normal" id="summaryBtn">各供应商汇总</button>
-                <button type="button" class="layui-btn layui-btn-warm" id="blacklistBtn">
-                    <i class="layui-icon layui-icon-senior"></i> 黑名单管理
-                </button>
-                <button type="submit" class="layui-btn layui-btn-normal" lay-submit lay-filter="search">搜索</button>
-                <button type="button" class="layui-btn layui-btn-normal" id="resetBtn">重置</button>
-                <button type="button" class="layui-btn layui-btn-danger" id="adminRefreshBtn" style="display:none;">刷新状态</button>
+                <button type="button" class="layui-btn" id="summaryBtn">各供应商汇总</button>
+                <button type="button" class="layui-btn" id="blacklistBtn">黑名单管理</button>
+                <button type="button" class="layui-btn" id="statsLogBtn">历史统计</button>
+                <button type="submit" class="layui-btn" lay-submit lay-filter="search">搜索</button>
+                <button type="button" class="layui-btn" id="resetBtn">重置</button>
+                <button type="button" class="layui-btn" id="adminRefreshBtn" style="display:none;">刷新状态</button>
             </div>
         </form>
     </div>
@@ -582,7 +611,13 @@
                     app.openBlacklistModal();
                     return false;
                 });
-                
+
+                // 历史统计按钮点击事件
+                $('#statsLogBtn').on('click', function() {
+                    app.openStatsLogModal();
+                    return false;
+                });
+
                 // 监听业务日期类型变化
                 form.on('select(businessDateTypeSelect)', function(data) {
                     var selectedValue = data.value;
@@ -895,6 +930,94 @@
                             }
                             $('#blacklistStats').html(html);
                         }
+                    }
+                });
+            });
+        },
+
+        // ==================== 历史统计功能 ====================
+
+        // 打开历史统计弹窗
+        openStatsLogModal: function() {
+            layui.use(['layer', 'table', 'jquery'], function() {
+                var layer = layui.layer;
+                var table = layui.table;
+                var $ = layui.jquery;
+
+                var contentHtml = `
+                    <div style="padding: 15px;">
+                        <div style="margin-bottom: 15px;">
+                            <span style="color: #666;">显示最近30天的统计数据</span>
+                            <button type="button" class="layui-btn layui-btn-xs layui-btn-normal" id="refreshStatsBtn" style="float: right;">
+                                <i class="layui-icon layui-icon-refresh"></i> 刷新今日数据
+                            </button>
+                        </div>
+                        <table class="layui-table" id="statsLogTable" lay-filter="statsLogTable"></table>
+                    </div>
+                `;
+
+                layer.open({
+                    type: 1,
+                    title: '历史统计数据',
+                    area: ['900px', '500px'],
+                    content: contentHtml,
+                    shade: 0.3,
+                    success: function() {
+                        app.renderStatsLogTable();
+                        $('#refreshStatsBtn').on('click', function() {
+                            app.refreshTodayStats();
+                        });
+                    }
+                });
+            });
+        },
+
+        // 渲染历史统计表格
+        renderStatsLogTable: function() {
+            layui.use(['table'], function() {
+                var table = layui.table;
+                table.render({
+                    elem: '#statsLogTable',
+                    url: '/api/virtual_inventory_stats_log',
+                    method: 'get',
+                    page: false,
+                    height: 380,
+                    cols: [[
+                        {field: 'business_date', title: '业务日期', width: 110, sort: true},
+                        {field: 'total_count', title: '总记录', width: 90, sort: true},
+                        {field: 'upload_success_count', title: '上传成功', width: 90},
+                        {field: 'new_create_success_count', title: '新建成功', width: 90},
+                        {field: 'new_create_fail_count', title: '新建失败', width: 90},
+                        {field: 'upload_fail_count', title: '上传失败', width: 90},
+                        {field: 'no_record_count', title: '没有档案', width: 90},
+                        {field: 'created_at', title: '记录时间', width: 160}
+                    ]]
+                });
+            });
+        },
+
+        // 手动刷新今日统计数据
+        refreshTodayStats: function() {
+            layui.use(['jquery', 'layer'], function() {
+                var $ = layui.jquery;
+                var layer = layui.layer;
+                var loadIndex = layer.load(2, {shade: 0.3});
+
+                $.ajax({
+                    url: '/api/virtual_inventory_stats_log/save',
+                    type: 'POST',
+                    success: function(res) {
+                        layer.close(loadIndex);
+                        if(res.code === 0) {
+                            layer.msg('今日统计数据已更新', {icon: 1});
+                            layui.table.reload('statsLogTable');
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    },
+                    error: function() {
+                        layer.close(loadIndex);
+                        layer.msg('更新失败', {icon: 2});
                     }
                 });
             });

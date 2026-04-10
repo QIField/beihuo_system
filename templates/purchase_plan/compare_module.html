@@ -359,7 +359,7 @@
             }
 
             // 发起请求
-            fetch(`/purchase_plan/compare/quote_history?oe=${encodeURIComponent(oe)}&brand=${encodeURIComponent(brand)}`)
+            fetch(`/api/purchase_plan/compare/quote_history?oe=${encodeURIComponent(oe)}&brand=${encodeURIComponent(brand)}`)
                 .then(response => response.json())
                 .then(result => {
                     if (result.code === 0 && result.data && result.data.history) {
@@ -398,7 +398,7 @@
             // 限制单次请求数量
             const batch = uncachedProducts.slice(0, 100);
 
-            fetch('/purchase_plan/compare/quote_history/batch', {
+            fetch('/api/purchase_plan/compare/quote_history/batch', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -439,7 +439,7 @@
             }
 
             // 发起请求
-            fetch(`/purchase_plan/compare/procurement_history?oe=${encodeURIComponent(oe)}&brand=${encodeURIComponent(brand)}`)
+            fetch(`/api/purchase_plan/compare/procurement_history?oe=${encodeURIComponent(oe)}&brand=${encodeURIComponent(brand)}`)
                 .then(response => response.json())
                 .then(result => {
                     if (result.code === 0 && result.data && result.data.history) {
@@ -478,7 +478,7 @@
             // 限制单次请求数量
             const batch = uncachedProducts.slice(0, 100);
 
-            fetch('/purchase_plan/compare/procurement_history/batch', {
+            fetch('/api/purchase_plan/compare/procurement_history/batch', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

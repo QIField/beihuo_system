@@ -1,6 +1,6 @@
 import os
 import pymysql
-from pymysql.cursors import DictCursor
+from pymysql.cursors import DictCursor, Cursor
 from pathlib import Path
 from dbutils.pooled_db import PooledDB
 from config.db_config import get_mysql_config  # 导入配置文件中的函数

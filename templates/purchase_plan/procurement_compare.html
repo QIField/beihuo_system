@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>采购历史比价表 - AG Grid</title>
+    
+    <!-- AG Grid CSS - 使用本地文件 -->
+    <link rel="stylesheet" href="/static/ag-grid/ag-grid.css">
+    <link rel="stylesheet" href="/static/ag-grid/ag-theme-alpine.css">
+    
+    <!-- LayUI -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <script src="/static/layui/layui.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container { max-width: 100%; margin: 0 auto; }
+        h2 { margin-bottom: 20px; color: #333; }
+        
+        .toolbar {
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .date-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            width: 220px;
+            cursor: pointer;
+        }
+        
+        .search-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            width: 180px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary { background-color: #1890ff; color: white; }
+        .btn-primary:hover { background-color: #40a9ff; }
+        .btn-secondary { background-color: #f0f0f0; color: #333; border: 1px solid #d9d9d9; }
+        .btn-secondary:hover { background-color: #e0e0e0; }
+        
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #myGrid {
+            height: calc(100vh - 280px);
+            min-height: 500px;
+            width: 100%;
+        }
+        
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: #d9d9d9;
+            margin: 0 10px;
+        }
+        
+        .flex-spacer {
+            flex: 1;
+        }
+        
+        /* 统计信息 */
+        .stats-bar {
+            background: #f5f5f5;
+            padding: 10px 20px;
+            border-bottom: 1px solid #e8e8e8;
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .stats-bar span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .stats-bar .highlight {
+            color: #1890ff;
+            font-weight: 600;
+        }
+
+        /* 高级搜索区域 */
+        .advanced-search-row {
+            background: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            flex-wrap: nowrap;
+        }
+
+        .search-field {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .search-field label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .search-field textarea {
+            width: 100%;
+            height: 50px;
+            padding: 6px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 12px;
+            resize: none;
+            line-height: 1.4;
+        }
+
+        .search-field textarea:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        /* 分页条数选择器 */
+        .page-size-selector {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #666;
+            margin-right: 15px;
+        }
+
+        .page-size-selector select {
+            padding: 4px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            background: #fff;
+        }
+
+        .page-size-selector select:hover {
+            border-color: #1890ff;
+        }
+
+        .page-size-selector select:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        /* 页码跳转器 */
+        .page-jumper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .page-jumper input {
+            width: 50px;
+            padding: 4px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .page-jumper input:hover {
+            border-color: #1890ff;
+        }
+
+        .page-jumper input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .page-jumper button {
+            padding: 4px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .page-jumper button:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+        }
+
+        /* AG Grid 自定义样式 - 紧凑版 */
+        .ag-theme-alpine {
+            --ag-font-size: 12px;
+            --ag-font-family: 'Microsoft YaHei', Arial, sans-serif;
+            --ag-header-height: 36px;
+            --ag-row-height: 36px;
+            --ag-header-background-color: #fafafa;
+            --ag-odd-row-background-color: #fff;
+            --ag-even-row-background-color: #fafafa;
+            --ag-cell-horizontal-padding: 6px;
+        }
+        
+        .ag-theme-alpine .ag-header-cell-text {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .ag-theme-alpine .ag-cell {
+            font-size: 12px;
+            line-height: 36px;
+        }
+        
+        /* 价格单元格样式 */
+        .price-cell {
+            color: #ff4d4f;
+            font-weight: 500;
+        }
+        
+        /* 日期单元格样式 */
+        .date-cell {
+            color: #666;
+        }
+        
+        /* 供应商单元格样式 */
+        .supplier-cell {
+            color: #1890ff;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>采购历史比价表</h2>
+        
+        <div class="toolbar">
+            <input type="text" id="dateRange" class="date-input" placeholder="请选择日期范围" readonly>
+            <div class="divider"></div>
+            <button class="btn btn-primary" onclick="searchData()">搜索</button>
+            <button class="btn btn-secondary" onclick="resetSearch()">重置</button>
+            <div class="flex-spacer"></div>
+            <button class="btn btn-primary" onclick="exportData()">导出</button>
+        </div>
+
+        <div class="advanced-search-row">
+            <div class="search-field">
+                <label>OE号（支持多行/空格分隔）</label>
+                <textarea id="searchOe" placeholder="例如：5Q0413031AH&#10;8K0413031AA&#10;（多个OE请换行或空格分隔）"></textarea>
+            </div>
+            <div class="search-field">
+                <label>供应商名称（支持模糊搜索）</label>
+                <textarea id="searchSupplier" placeholder="例如：巴博&#10;怡庆&#10;（支持模糊匹配，多个请换行）"></textarea>
+            </div>
+            <div class="search-field">
+                <label>品牌（支持多行/逗号分隔）</label>
+                <textarea id="searchBrand" placeholder="例如：大众&#10;奥迪&#10;（多个品牌请换行或逗号分隔）"></textarea>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <div class="stats-bar">
+                <span>总记录: <b id="totalCount" class="highlight">0</b></span>
+                <span>唯一OE: <b id="uniqueOeCount" class="highlight">0</b></span>
+                <span>唯一供应商: <b id="uniqueSupplierCount" class="highlight">0</b></span>
+                <span>当前显示: <b id="displayCount">0</b></span>
+            </div>
+            <div id="myGrid" class="ag-theme-alpine"></div>
+        </div>
+    </div>
+
+    <!-- AG Grid JS - 使用本地文件 -->
+    <script src="/static/ag-grid/ag-grid-community.min.js"></script>
+    
+    <script>
+        // 全局变量
+        let gridApi = null;
+        let gridColumnApi = null;
+        let currentData = [];
+        let filteredData = [];
+        
+        // 列定义
+        const columnDefs = [
+            {
+                headerName: '行号',
+                field: 'rowNumber',
+                width: 80,
+                pinned: 'left',
+                sortable: false,
+                filter: false,
+                valueGetter: params => {
+                    const rowIndex = params.node?.rowIndex;
+                    return rowIndex !== undefined ? rowIndex + 1 : '';
+                }
+            },
+            { 
+                field: 'oe', 
+                headerName: 'OE号', 
+                width: 150, 
+                pinned: 'left', 
+                sortable: true, 
+                filter: true 
+            },
+            { 
+                field: 'brand', 
+                headerName: '品牌', 
+                width: 100, 
+                pinned: 'left', 
+                sortable: true, 
+                filter: true 
+            },
+            { 
+                field: 'supplier_name', 
+                headerName: '供应商', 
+                width: 180, 
+                pinned: 'left',
+                sortable: true, 
+                filter: true,
+                cellClass: 'supplier-cell'
+            },
+            { 
+                field: 'purchase_date', 
+                headerName: '采购日期', 
+                width: 120, 
+                sortable: true, 
+                filter: true,
+                cellClass: 'date-cell'
+            },
+            { 
+                field: 'unit_price', 
+                headerName: '单价', 
+                width: 100, 
+                sortable: true, 
+                filter: 'agNumberColumnFilter',
+                cellClass: 'price-cell',
+                valueGetter: params => parseFloat(params.data['unit_price']) || 0,
+                comparator: (valueA, valueB) => valueA - valueB,
+                valueFormatter: params => {
+                    const value = params.value;
+                    return value ? '¥' + value.toFixed(2) : '';
+                }
+            },
+            { 
+                field: 'year_month', 
+                headerName: '年月', 
+                width: 100, 
+                sortable: true, 
+                filter: true 
+            },
+            { 
+                field: 'company', 
+                headerName: '公司', 
+                width: 100, 
+                sortable: true, 
+                filter: true 
+            },
+            {
+                field: 'created_at',
+                headerName: '记录创建时间',
+                width: 135,
+                sortable: true,
+                filter: true,
+                cellClass: 'date-cell'
+            }
+        ];
+        
+        // Grid 配置
+        const gridOptions = {
+            columnDefs: columnDefs,
+            rowData: [],
+            defaultColDef: {
+                sortable: true,
+                filter: true,
+                resizable: true,
+                suppressMenu: true
+            },
+            rowHeight: 36,
+            headerHeight: 36,
+            pagination: true,
+            paginationPageSize: 200,
+            animateRows: true,
+            onGridReady: function(event) {
+                console.log('[AG Grid] onGridReady 触发');
+                
+                gridApi = event.api;
+                gridColumnApi = event.columnApi;
+                
+                console.log('[AG Grid] API 获取成功', { gridApi, gridColumnApi });
+                
+                // 自动调整列宽以适应内容
+                gridApi.sizeColumnsToFit();
+                
+                // 初始化分页条数选择器
+                setTimeout(initPageSizeSelector, 500);
+            }
+        };
+        
+        // 初始化 Grid
+        document.addEventListener('DOMContentLoaded', function() {
+            const gridDiv = document.querySelector('#myGrid');
+            
+            // 使用旧版 API 创建 Grid
+            gridApi = new agGrid.Grid(gridDiv, gridOptions);
+            gridColumnApi = gridOptions.columnApi;
+            
+            console.log('[AG Grid] 初始化完成', gridApi);
+
+            // 初始化日期选择器
+            initDatePicker();
+        });
+
+        // 初始化分页条数选择器
+        function initPageSizeSelector() {
+            const pagingPanel = document.querySelector('.ag-paging-panel');
+            console.log('[分页选择器调试] pagingPanel:', pagingPanel);
+            console.log('[分页选择器调试] pagingPanel innerHTML:', pagingPanel ? pagingPanel.innerHTML.substring(0, 500) : 'null');
+
+            if (!pagingPanel) {
+                console.log('[分页选择器] 未找到分页面板，稍后重试');
+                setTimeout(initPageSizeSelector, 500);
+                return;
+            }
+
+            // 检查是否已存在
+            if (pagingPanel.querySelector('.page-size-selector')) {
+                console.log('[分页选择器调试] 已存在，跳过');
+                return;
+            }
+
+            // 创建选择器容器
+            const selectorContainer = document.createElement('div');
+            selectorContainer.className = 'page-size-selector';
+            selectorContainer.innerHTML = `
+                <span>每页显示:</span>
+                <select id="pageSizeSelect">
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="200" selected>200</option>
+                </select>
+                <span>条</span>
+            `;
+
+            // 调试：打印分页面板的子元素
+            console.log('[分页选择器调试] pagingPanel children:', pagingPanel.children);
+            console.log('[分页选择器调试] pagingPanel child count:', pagingPanel.children.length);
+
+            // 找到右侧分页摘要面板（包含跳转按钮的区域）
+            const pageSummaryPanel = pagingPanel.querySelector('.ag-paging-page-summary-panel');
+            console.log('[分页选择器调试] pageSummaryPanel:', pageSummaryPanel);
+
+            if (pageSummaryPanel) {
+                // 插入到右侧分页面板的最前面
+                pageSummaryPanel.insertBefore(selectorContainer, pageSummaryPanel.firstChild);
+                console.log('[分页选择器调试] 已添加到 pageSummaryPanel 开头');
+
+                // 延迟打印最终的 DOM 结构
+                setTimeout(() => {
+                    console.log('[分页选择器调试] pageSummaryPanel 最终 innerHTML:', pageSummaryPanel.innerHTML);
+                    console.log('[分页选择器调试] selectorContainer 父元素:', selectorContainer.parentElement);
+                    console.log('[分页选择器调试] selectorContainer 在父元素中的位置:', Array.from(pageSummaryPanel.children).indexOf(selectorContainer));
+                }, 100);
+            } else {
+                // 如果找不到，退回到添加到 pagingPanel
+                pagingPanel.appendChild(selectorContainer);
+                console.log('[分页选择器调试] 已添加到 pagingPanel（备用）');
+            }
+
+            // 绑定事件
+            const select = selectorContainer.querySelector('#pageSizeSelect');
+            select.addEventListener('change', function() {
+                const newPageSize = parseInt(this.value);
+                if (gridApi) {
+                    gridApi.paginationSetPageSize(newPageSize);
+                    console.log('[分页选择器] 切换到每页', newPageSize, '条');
+                }
+            });
+
+            // 添加页码跳转器到左侧统计信息位置
+            addPageJumper();
+
+            console.log('[分页选择器] 初始化完成');
+        }
+
+        // 添加页码跳转器
+        function addPageJumper() {
+            const pagingPanel = document.querySelector('.ag-paging-panel');
+            const rowSummaryPanel = pagingPanel.querySelector('.ag-paging-row-summary-panel');
+
+            if (!rowSummaryPanel) return;
+
+            // 清空原有内容
+            rowSummaryPanel.innerHTML = '';
+
+            // 创建跳转器
+            const jumperDiv = document.createElement('div');
+            jumperDiv.className = 'page-jumper';
+            jumperDiv.innerHTML = `
+                <span>跳至</span>
+                <input type="number" id="pageJumperInput" min="1" placeholder="页码">
+                <span>页</span>
+                <button id="pageJumperBtn">跳转</button>
+            `;
+
+            rowSummaryPanel.appendChild(jumperDiv);
+
+            // 绑定事件
+            const input = jumperDiv.querySelector('#pageJumperInput');
+            const btn = jumperDiv.querySelector('#pageJumperBtn');
+
+            const doJump = function() {
+                const pageNum = parseInt(input.value);
+                if (!pageNum || pageNum < 1) {
+                    layui.layer.msg('请输入有效的页码', {icon: 0});
+                    return;
+                }
+
+                const totalPages = gridApi.paginationGetTotalPages();
+                if (pageNum > totalPages) {
+                    layui.layer.msg('页码超出范围，最大页码: ' + totalPages, {icon: 0});
+                    return;
+                }
+
+                // AG Grid 页码从0开始，所以减1
+                gridApi.paginationGoToPage(pageNum - 1);
+                input.value = '';
+                console.log('[页码跳转] 跳转到第', pageNum, '页');
+            };
+
+            btn.addEventListener('click', doJump);
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    doJump();
+                }
+            });
+
+            console.log('[页码跳转器] 初始化完成');
+        }
+
+        // 初始化日期选择器
+        function initDatePicker() {
+            layui.use(['laydate', 'layer'], function() {
+                const laydate = layui.laydate;
+
+                laydate.render({
+                    elem: '#dateRange',
+                    trigger: 'click',
+                    format: 'yyyy-MM-dd',
+                    range: true,
+                    max: 0,
+                    value: '',
+                    done: function(value, date, endDate) {
+                        if (value) {
+                            // 日期选择后自动触发查询
+                            // loadData();
+                        }
+                    }
+                });
+            });
+        }
+
+        // 解析多行输入
+        function parseMultilineInput(input) {
+            if (!input) return [];
+            // 支持换行、空格、逗号分隔
+            return input.split(/[\r\n,，\s]+/).map(item => item.trim()).filter(item => item !== '');
+        }
+        
+        // 搜索数据
+        async function searchData() {
+            const dateRange = document.getElementById('dateRange').value;
+            const oeInput = document.getElementById('searchOe').value.trim();
+            const supplierInput = document.getElementById('searchSupplier').value.trim();
+            const brandInput = document.getElementById('searchBrand').value.trim();
+            
+            let startDate = '', endDate = '';
+            if (dateRange) {
+                const dates = dateRange.split(' - ');
+                if (dates.length === 2) {
+                    startDate = dates[0];
+                    endDate = dates[1];
+                }
+            }
+            
+            // 解析多行输入
+            const oeList = parseMultilineInput(oeInput);
+            const supplierList = parseMultilineInput(supplierInput);
+            const brandList = parseMultilineInput(brandInput);
+            
+            // 构建搜索参数
+            const searchParams = {
+                start_date: startDate,
+                end_date: endDate,
+                oe_list: oeList,
+                supplier_list: supplierList,
+                brand_list: brandList
+            };
+            
+            console.log('[搜索] 参数:', searchParams);
+            
+            // 显示加载中
+            const loadingIndex = layui.layer.load(2, {
+                content: '正在搜索...',
+                shade: [0.3, '#000']
+            });
+
+            try {
+                // TODO: 替换为实际API地址
+                const response = await fetch('/api/purchase_plan/procurement_compare/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(searchParams)
+                });
+
+                const result = await response.json();
+
+                layui.layer.close(loadingIndex);
+
+                if (result.code === 0) {
+                    currentData = result.data.map((item, index) => ({
+                        ...item,
+                        id: index
+                    }));
+                    filteredData = [...currentData];
+
+                    if (gridApi && gridApi.setRowData) {
+                        gridApi.setRowData(filteredData);
+                    }
+
+                    updateStats();
+                    layui.layer.msg(`搜索完成，找到 ${result.data.length} 条记录`, {icon: 1});
+                } else {
+                    layui.layer.msg(result.msg || '搜索失败', {icon: 2});
+                }
+            } catch (error) {
+                layui.layer.close(loadingIndex);
+                layui.layer.msg('搜索失败: ' + error.message, {icon: 2});
+                console.error('[搜索] 失败:', error);
+            }
+        }
+        
+        // 重置搜索
+        function resetSearch() {
+            console.log('[重置] 清空所有搜索条件');
+
+            // 清空搜索条件
+            document.getElementById('dateRange').value = '';
+            document.getElementById('searchOe').value = '';
+            document.getElementById('searchSupplier').value = '';
+            document.getElementById('searchBrand').value = '';
+
+            // 清空表格数据
+            currentData = [];
+            filteredData = [];
+            if (gridApi && gridApi.setRowData) {
+                gridApi.setRowData([]);
+            }
+
+            updateStats();
+            layui.layer.msg('已重置搜索条件', {icon: 1});
+        }
+        
+        // 更新统计信息
+        function updateStats() {
+            document.getElementById('totalCount').textContent = currentData.length;
+            document.getElementById('displayCount').textContent = filteredData.length;
+            
+            // 计算唯一OE和供应商数量
+            const uniqueOes = new Set(currentData.map(item => item.oe));
+            const uniqueSuppliers = new Set(currentData.map(item => item.supplier_name));
+            
+            document.getElementById('uniqueOeCount').textContent = uniqueOes.size;
+            document.getElementById('uniqueSupplierCount').textContent = uniqueSuppliers.size;
+        }
+        
+        // 导出数据
+        function exportData() {
+            const data = filteredData;
+            if (data.length === 0) {
+                layui.layer.msg('没有数据可导出', {icon: 0});
+                return;
+            }
+            
+            // 使用 AG Grid 的 CSV 导出功能
+            gridApi.exportDataAsCsv({
+                fileName: `采购历史比价_${new Date().toISOString().slice(0, 10)}.csv`
+            });
+            
+            layui.layer.msg('导出成功', {icon: 1});
+        }
+    </script>
+</body>
+</html>

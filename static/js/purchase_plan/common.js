@@ -23,7 +23,8 @@ function formatEmptyValue(value) {
  * @returns {string} - 格式化后的价格
  */
 function formatPrice(value) {
-    if (!value || value === '' || value === null || value === undefined) return '';
+    // 只过滤 null、undefined 和空字符串，0 是有效值
+    if (value === '' || value === null || value === undefined) return '';
     const num = parseFloat(value);
     if (isNaN(num)) return value;
     return '¥' + num.toFixed(2);

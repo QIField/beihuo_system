@@ -1,96 +1,134 @@
-============================================================
-[开思自动对单] 开始执行: 2026-04-02 19:18:37
-============================================================
-[开思自动对单] 当前时间 19 点，不在运行时间段内，跳过
-[开思自动对单] 任务执行成功
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962024040/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:39 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962024040/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962024040/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:41 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962024040/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败，重试次数耗尽
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962020294/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:42 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962020294/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962020294/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:44 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962020294/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[Thu Apr 2 19:18:19 2026] GET /socket.io/?EIO=4&transport=polling&t=PrDwbWE.0&sid=ghiQb5vumROa1w1KAAGA => 200 in 24997ms
-[Thu Apr 2 19:18:45 2026] POST /socket.io/?EIO=4&transport=polling&t=PrDwiMT&sid=ghiQb5vumROa1w1KAAGA => 200 in 0ms
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962020294/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:46 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962020294/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败，重试次数耗尽
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962019543/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:46 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962019543/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962019543/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:48 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962019543/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962019543/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:50 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962019543/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败，重试次数耗尽
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962018288/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:50 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962018288/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962018288/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:52 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962018288/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962018288/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:54 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962018288/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败，重试次数耗尽
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962014545/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:55 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962014545/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[Thu Apr 2 19:18:31 2026] GET /socket.io/?EIO=4&transport=polling&t=PrDwe-T&sid=1_BcjqqGpbi8Ngx2AAGk => 200 in 25007ms
-[Thu Apr 2 19:18:56 2026] POST /socket.io/?EIO=4&transport=polling&t=PrDwl5X&sid=1_BcjqqGpbi8Ngx2AAGk => 200 in 0ms
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962014545/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:57 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962014545/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n body {\n font-family: Tahoma, Verdana, Arial, sans-serif;\n text-alig'
-[请求] 尝试刷新session...
-[请求] JSON解析失败: Expecting value: line 1 column 1 (char 0)
-[请求] URL: https://www.cassmall.com/archiveinquiry/quotation/2962014545/quoting/items
-[请求] 状态码: 200
-[请求] 响应头: {'Date': 'Thu, 02 Apr 2026 11:18:59 GMT', 'Content-Type': 'text/html', 'Transfer-Encoding': 'chunked', 'Connection': 'keep-alive', 'Set-Cookie': 'BENSESSCC_TAG=0582a9da9c84051854; path=/, cloudwaf_baseurl=9610f5209174445298bd5ed592ff11fa; path=/, preurl=/archiveinquiry/quotation/2962014545/quoting/items; path=/, WAFSESSCC_TAG=d3d3LmNhc3NtYWxsLmNvbTk2MTBmNTIwOTE3NDQ0NTI5OGJkNWVkNTkyZmYxMWZhXzA1ODJhOWRhOWM4NDA1MTg1NA==; path=/', 'Server': 'CW', 'Content-Encoding': 'gzip'}
-[请求] 响应内容: 'ï»¿<html>\n<script type="text/javascript">\n function show(id1, id2) {\n document.getElementById(id1).style.display = "block";\n document.getElementById(id2).value = "";\n }\n</script>\n<head>\n <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n <meta http-equiv="Server" content="HuaweiCloudWAF"/>\n <title>Access Verification</title>\n <style type="text/css">\n bo
+Welcome to Ubuntu 22.04.2 LTS (GNU/Linux 5.15.0-76-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Thu Apr  9 07:31:03 PM CST 2026
+
+  System load:  0.33984375         Processes:             128
+  Usage of /:   21.2% of 48.91GB   Users logged in:       0
+  Memory usage: 42%                IPv4 address for eth0: 192.168.8.19
+  Swap usage:   0%
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+307 updates can be applied immediately.
+211 of these updates are standard security updates.
+To see these additional updates run: apt list --upgradable
+
+9 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+New release '24.04.4 LTS' available.
+Run 'do-release-upgrade' to upgrade to it.
+
+
+
+        Welcome to Huawei Cloud Service
+
+Last login: Thu Apr  9 19:26:46 2026 from 127.0.0.1
+root@hcss-ecs-5274:~# # 1. 检查8111端口是否有进程在监听
+netstat -tlnp | grep 8111
+
+# 2. 查看宝塔Python项目的进程
+ps aux | grep -E "uwsgi|beihuo"
+
+# 3. 检查Nginx配置文件，看代理配置是否正确
+cat /www/server/panel/vhost/nginx/python_beihuo_system_test.conf
+
+# 4. 检查Nginx错误日志
+tail -50 /www/server/nginx/logs/error.log
+
+# 5. 尝试直接访问8111端口看服务是否正常
+curl -s http://127.0.0.1:8111 || echo "无法连接到8111端口"
+tcp        0      0 0.0.0.0:8111            0.0.0.0:*               LISTEN      653603/uwsgi        
+root      573530  0.0  0.2  57808  9036 ?        S    Apr08   0:05 /www/server/pyporject_evn/beihuo_system_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system/uwsgi.ini
+root      573531  0.7 16.9 1756860 645616 ?      Sl   Apr08  12:28 /www/server/pyporject_evn/beihuo_system_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system/uwsgi.ini
+root      573532  0.0  0.1  58572  6604 ?        S    Apr08   0:04 /www/server/pyporject_evn/beihuo_system_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system/uwsgi.ini
+www       653603  0.7  2.9 545920 113384 ?       Sl   19:28   0:01 /www/server/pyporject_evn/beihuo_system_test_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system_test/uwsgi.ini
+www       653648  0.0  2.2 1471460 85164 ?       Sl   19:28   0:00 /www/server/pyporject_evn/beihuo_system_test_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system_test/uwsgi.ini
+www       653678  0.0  2.1 333152 82072 ?        S    19:28   0:00 /www/server/pyporject_evn/beihuo_system_test_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system_test/uwsgi.ini
+root      655416  0.0  0.0   6612  2384 pts/1    S+   19:31   0:00 grep --color=auto -E uwsgi|beihuo
+server
+{
+    listen 7005;
+    listen 80;
+    server_name 113.46.196.69 x.fsbbrTest.net;
+    index index.html index.htm default.htm default.html;
+    root /www/wwwroot/beihuo_system_test;
+
+    #SSL-START SSL相关配置
+    #error_page 404/404.html;
+    
+    #SSL-END
+
+    #ERROR-PAGE-START  错误页相关配置
+    #error_page 404 /404.html;
+    #error_page 502 /502.html;
+    #ERROR-PAGE-END
+
+
+    #REWRITE-START 伪静态相关配置
+    include /www/server/panel/vhost/rewrite/python_beihuo_system_test.conf;
+    #REWRITE-END
+
+    #禁止访问的文件或目录
+    location ~ ^/(\.user.ini|\.htaccess|\.git|\.svn|\.project|LICENSE|README.md|package.json|package-lock.json|\.env) {
+        return 404;
+    }
+
+    #一键申请SSL证书验证目录相关设置
+    location /.well-known/ {
+        root /www/wwwroot/java_node_ssl;
+    }
+
+    #禁止在证书验证目录放入敏感文件
+    if ( $uri ~ "^/\.well-known/.*\.(php|jsp|py|js|css|lua|ts|go|zip|tar\.gz|rar|7z|sql|bak)$" ) {
+        return 403;
+    }
+
+    # HTTP反向代理相关配置开始 >>>
+    location ~ /purge(/.*) {
+        proxy_cache_purge cache_one 127.0.0.1$request_uri$is_args$args;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8111;
+        proxy_set_header Host 127.0.0.1:$server_port;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header REMOTE-HOST $remote_addr;
+        add_header X-Cache $upstream_cache_status;
+        proxy_set_header X-Host $host:$server_port;
+        proxy_set_header X-Scheme $scheme;
+        proxy_connect_timeout 30s;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 30s;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    # HTTP反向代理相关配置结束 <<<
+
+    access_log  /www/wwwlogs/beihuo_system_test.log;
+    error_log  /www/wwwlogs/beihuo_system_test.error.log;
+}2026/03/18 19:37:01 [notice] 49107#0: signal process started
+2026/03/18 19:41:59 [notice] 50777#0: signal process started
+2026/03/18 19:57:41 [notice] 52423#0: signal process started
+2026/03/18 19:58:43 [notice] 52462#0: signal process started
+2026/04/09 17:42:34 [notice] 630759#0: signal process started
+2026/04/09 17:53:43 [notice] 631341#0: signal process started
+2026/04/09 17:57:58 [notice] 631692#0: signal process started
+2026/04/09 17:59:12 [notice] 631737#0: signal process started
+2026/04/09 19:15:43 [notice] 649656#0: signal process started
+2026/04/09 19:18:58 [notice] 649997#0: signal process started
+2026/04/09 19:19:09 [notice] 650031#0: signal process started
+2026/04/09 19:19:45 [notice] 650096#0: signal process started
+2026/04/09 19:19:48 [notice] 650115#0: signal process started
+2026/04/09 19:31:01 [notice] 655309#0: signal pr
