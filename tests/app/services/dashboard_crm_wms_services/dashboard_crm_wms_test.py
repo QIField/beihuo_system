@@ -8,9 +8,13 @@ import datetime
 import sys
 import os
 
+from app.services.dashboard_crm_wms_services.dashboard_crm_wms_data import wms_get_status_orders_spider, \
+    crawl_data_crm_wms
+from app.services.dashboard_crm_wms_services.load_config import get_config
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
 
-from app.services.dashboard_crm_wms_services.dashboard_crm_wms import wms_get_status_orders_spider, get_config, crawl_data_crm_wms
+
 import pandas as pd
 
 def wms_get_status_orders_spider_test():
@@ -50,8 +54,8 @@ def crawl_data_crm_wms_test():
     print("开始测试 crawl_data_crm_wms 函数")
     print("=" * 50)
     
-    start_date = "1775491200000"
-    end_date = "1775577599000"
+    start_date = "1775750400000"
+    end_date = "1775836799000"
     
     print(f"开始时间: {start_date}")
     print(f"结束时间: {end_date}")

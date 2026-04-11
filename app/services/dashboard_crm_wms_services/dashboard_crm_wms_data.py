@@ -6,10 +6,12 @@
 # @Software: PyCharm
 
 import pandas as pd
+from datetime import datetime
 
 from app.services.dashboard_crm_wms_services import wms_orders
 from app.services.dashboard_crm_wms_services.load_config import get_config
 from app.utils.spider_utli import simple_spider
+from app.models.raw_sql_models.wms_status_orders_raw import WmsStatusOrders
 
 
 def crm_mergeOrderList_spider(url0, headers, start_date, end_date):
@@ -94,51 +96,133 @@ def wms_get_status_orders_spider(url0, headers, page_num):
             if len(json_data) < 20:
                 break
 
-    for i in range(1, page_num + 1):
-        print()
-        url = url0 + "?type=3" + "&status=2" + "&page=" + i.__str__()
-        print("正在爬取的接口", url)
-        json_data = simple_spider(url, headers)
-        data = json_data.get("data", {}).get("data", {}).get("data")
-        if data:
-            df = pd.concat([df, pd.DataFrame(data)], ignore_index=True)
+    # 原有爬虫代码已注释，改为直接从数据库获取数据
+    # for i in range(1, page_num + 1):
+    #     print()
+    #     url = url0 + "?type=3" + "&status=2" + "&page=" + i.__str__()
+    #     print("正在爬取的接口", url)
+    #     json_data = simple_spider(url, headers)
+    #     data = json_data.get("data", {}).get("data", {}).get("data")
+    #     if data:
+    #         df = pd.concat([df, pd.DataFrame(data)], ignore_index=True)
+    
+    # 直接从数据库获取当天的所有数据
+    today_date = datetime.now().strftime('%Y-%m-%d')
+    print(f"正在从数据库获取 {today_date} 的拣货单数据...")
+    df_today = WmsStatusOrders.get_by_orderdate_to_df(today_date)
+    # df_today=WmsStatusOrders.get_by_orderdate_range_to_df("2026-04-09", "2026-04-10")
+    if not df_today.empty:
+        df = pd.concat([df, df_today], ignore_index=True)
+        print(f"从数据库获取到 {len(df_today)} 条 {today_date} 的拣货单数据")
 
     return df
 
 
 def wms_get_status_orders_keywd_spider(url0, headers, keywd_list):
-    # 使用pandas进行分析，爬取的数据写入DataFrame
+    # ==================== 原代码已注释 ====================
+    # # 使用pandas进行分析，爬取的数据写入DataFrame
+    # df = pd.DataFrame()
+    # type_id = 3
+    #
+    #
+    # # 进行循环拣货单已完成的数据爬取
+    # for keywd in keywd_list:
+    #
+    #     url = url0 + "?type=" + type_id.__str__() + "&keywd=" + keywd
+    #     print("爬取接口" + url)
+    #     print("爬取中请等待")
+    #
+    #     json_data = simple_spider(url, headers)
+    #
+    #     data = json_data.get("data", {}).get("data", {}).get("data")
+    #
+    #     print("数据为", json_data)
+    #
+    #     if data:
+    #
+    #         df = pd.concat([df, pd.DataFrame(data)], ignore_index=True)
+    #         # 1. 如果没有 is_data_exists 列，就创建一列，默认值 0
+    #         if 'is_data_exists' not in df.columns:
+    #             df['is_data_exists'] = 0
+    #
+    #         # 2. 找到 pono == keywd 的行，把 is_data_exists 设置为 1
+    #         df.loc[df['pono'] == keywd, 'is_data_exists'] = 1
+    #
+    #     else:
+    #
+    #         # df = pd.concat([df, pd.DataFrame({"pono":keywd,"is_data_exists":2})], ignore_index=True)
+    #         df = pd.concat([df, pd.DataFrame({"pono": [keywd], "is_data_exists": [2]})], ignore_index=True)
+    # return df
+    # ==================== 原代码结束 ====================
+    
+    # ==================== 新代码开始 ====================
+    # 初始化DataFrame
     df = pd.DataFrame()
     type_id = 3
-    # df["is_data_exists"]=""
-    # keywd_list.append("CK0201026032910260508")
-    # 进行循环拣货单已完成的数据爬取
-    for keywd in keywd_list:
-
+    
+    # 1. 先在数据库中搜索 keywd_list 中的数据
+    print(f"正在从数据库中查询 {len(keywd_list)} 个订单号...")
+    existing_orders = WmsStatusOrders.get_by_ponos(keywd_list)
+    
+    # 创建一个集合，用于记录已经在数据库中找到的订单号
+    found_ponos = set()
+    
+    # 2. 将数据库中已有的数据添加到df中
+    if existing_orders:
+        existing_data = [order.to_dict() for order in existing_orders]
+        df = pd.concat([df, pd.DataFrame(existing_data)], ignore_index=True)
+        found_ponos = {order.pono for order in existing_orders}
+        print(f"从数据库找到 {len(found_ponos)} 条已有数据")
+    
+    # 3. 从 keywd_list 中删除已经找到的订单号，只保留需要爬虫的
+    remaining_keywd_list = [keywd for keywd in keywd_list if keywd not in found_ponos]
+    print(f"剩余 {len(remaining_keywd_list)} 个订单号需要爬虫")
+    
+    # 4. 对剩余的订单号进行循环爬取
+    for keywd in remaining_keywd_list:
         url = url0 + "?type=" + type_id.__str__() + "&keywd=" + keywd
         print("爬取接口" + url)
         print("爬取中请等待")
-        # time.sleep(1)
+        
         json_data = simple_spider(url, headers)
-        # json_data=json_data["data"]
         data = json_data.get("data", {}).get("data", {}).get("data")
-
         print("数据为", json_data)
-
+        
         if data:
+            # 4.1 爬虫有数据的情况
+            # 将数据添加到df中
             df = pd.concat([df, pd.DataFrame(data)], ignore_index=True)
-            # 1. 如果没有 is_data_exists 列，就创建一列，默认值 0
+            
+            # 如果没有 is_data_exists 列，就创建一列
             if 'is_data_exists' not in df.columns:
                 df['is_data_exists'] = 0
-
-            # 2. 找到 pono == keywd 的行，把 is_data_exists 设置为 1
+            
+            # 设置 is_data_exists 为 1
             df.loc[df['pono'] == keywd, 'is_data_exists'] = 1
-
+            
+            # 准备插入/更新到数据库的数据
+            data_list = []
+            for item in data:
+                item_dict = dict(item)
+                item_dict['is_data_exists'] = 1
+                data_list.append(item_dict)
+            
+            # 批量插入/更新到数据库
+            if data_list:
+                WmsStatusOrders.batch_upsert(data_list)
+                print(f"已将 {len(data_list)} 条数据更新到数据库，is_data_exists=1")
+        
         else:
-
-            # df = pd.concat([df, pd.DataFrame({"pono":keywd,"is_data_exists":2})], ignore_index=True)
+            # 4.2 爬虫没有数据的情况
+            # 将订单号添加到df中，is_data_exists 设置为 2
             df = pd.concat([df, pd.DataFrame({"pono": [keywd], "is_data_exists": [2]})], ignore_index=True)
+            
+            # 插入/更新到数据库，is_data_exists 设置为 2
+            WmsStatusOrders.batch_upsert([{"pono": keywd, "is_data_exists": 2}])
+            print(f"已将订单号 {keywd} 更新到数据库，is_data_exists=2")
+    
     return df
+    # ==================== 新代码结束 ====================
 
 
 def crawl_data_crm_wms(start_date, end_date):

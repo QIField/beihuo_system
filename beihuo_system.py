@@ -4519,6 +4519,16 @@ def init_background_tasks():
         from app.tasks.beihuo_tasks import register_beihuo_tasks
         register_beihuo_tasks(task_manager)
 
+
+
+
+        #定时业务扩展注册
+        from app.scripts.tasks import expansion_tasks
+        expansion_tasks(task_manager)
+
+
+
+
         # 初始化开思自动对单
         init_ks_bill_monitor()
 
