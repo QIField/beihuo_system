@@ -170,70 +170,79 @@ class CRMDataCrawlService:
         finally:
             conn.close()
 
-    def batch_save(self, products: List[Dict]) -> int:
+    def batch_save(self, products: List[Dict]) -> Dict[str, int]:
         """
-        批量保存到数据库
-        使用 INSERT（表已清空，无需处理重复）
+        批量保存到数据库 - 分块处理，异常块逐条重试
+        将大批量分成小块，哪块失败就单独处理那块
         """
         if not products:
-            return 0
+            return {'saved': 0, 'failed': 0}
 
+        CHUNK_SIZE = 500
+        total_saved = 0
+        total_failed = 0
         conn = get_db_connection()
+
+        columns = [
+            'oe', 'brand', 'company', 'product_name', 'vehicle_brand',
+            'replace_number', 'brand_code', 'is_cass', 'product_remark',
+            'product_level', 'l_model_zh', 'stock_zaitu_list', 'frey_no',
+            'supplier_price', 'max_price', 'min_price'
+        ]
+        sql = f"INSERT INTO crmapp_compare_summary ({', '.join(columns)}) VALUES ({', '.join(['%s'] * len(columns))})"
+
+        def make_row(p):
+            return (
+                p.get('oe', ''),
+                p.get('brand', ''),
+                p.get('company', COMPANY),
+                p.get('product_name', ''),
+                p.get('vehicle_brand', ''),
+                p.get('replace_number', ''),
+                p.get('brand_code', ''),
+                p.get('is_cass', ''),
+                p.get('product_remark', ''),
+                p.get('product_level', ''),
+                p.get('l_model_zh', ''),
+                p.get('stock_zaitu_list') or None,
+                p.get('frey_no', ''),
+                p.get('supplier_price', 0.0),
+                p.get('max_price', 0.0),
+                p.get('min_price', 0.0)
+            )
+
         try:
             with conn.cursor() as cursor:
-                columns = [
-                    'oe', 'brand', 'company', 'product_name', 'vehicle_brand',
-                    'replace_number', 'brand_code', 'is_cass', 'product_remark',
-                    'product_level', 'l_model_zh', 'stock_zaitu_list', 'frey_no',
-                    'supplier_price', 'max_price', 'min_price'
-                ]
+                for i in range(0, len(products), CHUNK_SIZE):
+                    chunk = products[i:i + CHUNK_SIZE]
 
-                placeholders = ', '.join(['%s'] * len(columns))
-                columns_str = ', '.join(columns)
+                    try:
+                        # 整块批量插入
+                        cursor.executemany(sql, [make_row(p) for p in chunk])
+                        total_saved += len(chunk)
 
-                sql = f"""
-                    INSERT INTO crmapp_compare_summary ({columns_str})
-                    VALUES ({placeholders})
-                """
+                    except Exception:
+                        # 整块失败，逐条重试
+                        conn.rollback()
+                        for p in chunk:
+                            try:
+                                cursor.execute(sql, make_row(p))
+                                total_saved += 1
+                            except Exception:
+                                total_failed += 1
 
-                values = []
-                for product in products:
-                    # 确保 stock_zaitu_list 是有效值或 None，避免空字符串导致批量插入失败
-                    stock_zaitu = product.get('stock_zaitu_list')
-                    if not stock_zaitu:
-                        stock_zaitu = None
-
-                    row = [
-                        product.get('oe', ''),
-                        product.get('brand', ''),
-                        product.get('company', COMPANY),
-                        product.get('product_name', ''),
-                        product.get('vehicle_brand', ''),
-                        product.get('replace_number', ''),
-                        product.get('brand_code', ''),
-                        product.get('is_cass', ''),
-                        product.get('product_remark', ''),
-                        product.get('product_level', ''),
-                        product.get('l_model_zh', ''),
-                        stock_zaitu,
-                        product.get('frey_no', ''),
-                        product.get('supplier_price', 0.0),
-                        product.get('max_price', 0.0),
-                        product.get('min_price', 0.0)
-                    ]
-                    values.append(row)
-
-                cursor.executemany(sql, values)
                 conn.commit()
-
-                return len(products)
 
         except Exception as e:
             conn.rollback()
             print(f"批量保存失败: {e}")
-            return 0
         finally:
             conn.close()
+
+        if total_failed > 0:
+            print(f"  📊 保存统计: 成功{total_saved}条, 失败{total_failed}条")
+
+        return {'saved': total_saved, 'failed': total_failed}
 
     def crawl_all(self) -> Dict[str, int]:
         """
@@ -294,9 +303,9 @@ class CRMDataCrawlService:
                 # 检查是否需要批量保存
                 if len(batch_buffer) >= BATCH_SIZE:
                     print(f"\n💾 批量保存 {len(batch_buffer)} 条数据...")
-                    saved = self.batch_save(batch_buffer)
-                    self.total_saved += saved
-                    print(f"✅ 保存成功: {saved} 条")
+                    result = self.batch_save(batch_buffer)
+                    self.total_saved += result['saved']
+                    print(f"✅ 保存成功: {result['saved']} 条")
                     batch_buffer = []
 
                 # 每10页暂停
@@ -307,9 +316,9 @@ class CRMDataCrawlService:
             # 保存最后一批
             if batch_buffer:
                 print(f"\n💾 保存最后一批数据: {len(batch_buffer)} 条...")
-                saved = self.batch_save(batch_buffer)
-                self.total_saved += saved
-                print(f"✅ 保存成功: {saved} 条")
+                result = self.batch_save(batch_buffer)
+                self.total_saved += result['saved']
+                print(f"✅ 保存成功: {result['saved']} 条")
 
             # 输出统计
             print("\n" + "=" * 80)

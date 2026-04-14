@@ -13,6 +13,7 @@ from .tables import (
     init_ks_inquiry_detail_table,
     init_weixin_inquiry_detail_table,
     init_virtual_inventory_stats_log_table,
+    init_ks_inquiry_monitor_table,
 )
 
 
@@ -705,7 +706,7 @@ def init_compare_summary_table():
             # 检查并添加缺失的字段（兼容旧表）
             alter_columns = [
                 ("is_cass", "VARCHAR(10) COMMENT '是否同步开思'"),
-                ("l_model_zh", "VARCHAR(255) COMMENT '车型中文名'"),
+                ("l_model_zh", "TEXT COMMENT '车型中文名'"),
                 ("stock_zaitu_list", "JSON COMMENT '在途库存列表'"),
                 ("frey_no", "VARCHAR(255) COMMENT 'Frey编号'"),
                 ("sales_6m", "INT DEFAULT 0 COMMENT '近6个月总销量'"),
@@ -719,6 +720,31 @@ def init_compare_summary_table():
                 except Exception as e:
                     if "Duplicate column name" not in str(e):
                         pass  # 静默处理字段添加错误
+            
+            # 检查并修改字段类型为 TEXT（如果需要）
+            text_fields = [
+                ('l_model_zh', "TEXT COMMENT '车型中文名'"),
+            ]
+            
+            for field_name, field_def in text_fields:
+                try:
+                    cursor.execute("""
+                        SELECT DATA_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'crmapp_compare_summary' 
+                        AND COLUMN_NAME = %s
+                    """, (field_name,))
+                    result = cursor.fetchone()
+                    
+                    if result and result[0].upper() != 'TEXT':
+                        cursor.execute(f"""
+                            ALTER TABLE crmapp_compare_summary 
+                            MODIFY COLUMN `{field_name}` {field_def}
+                        """)
+                        print(f"已修改 {field_name} 字段类型为 TEXT")
+                except Exception as e:
+                    print(f"修改 {field_name} 字段类型时出错: {e}")
             
             # 检查并删除冗余字段 procurement_records
             try:
@@ -737,16 +763,38 @@ def init_compare_summary_table():
         conn.close()
 
 
-
-
-
-
-
-
-
-
-
-
+def auto_fix_all_tables_collation():
+    """
+    自动修复所有表的字符集排序规则为 utf8mb4_unicode_ci
+    解决字符集冲突问题，静默执行
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT TABLE_NAME, TABLE_COLLATION 
+                FROM INFORMATION_SCHEMA.TABLES 
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_TYPE = 'BASE TABLE'
+            """)
+            tables = cursor.fetchall()
+            
+            for table_name, current_collation in tables:
+                if current_collation != 'utf8mb4_unicode_ci':
+                    try:
+                        cursor.execute(f"""
+                            ALTER TABLE `{table_name}` 
+                            CONVERT TO CHARACTER SET utf8mb4 
+                            COLLATE utf8mb4_unicode_ci
+                        """)
+                    except Exception:
+                        pass
+            
+            conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
 
 
 def init_all_tables():
@@ -768,6 +816,7 @@ def init_all_tables():
         ('卓之星库存', init_zhuozhixing_table),
         ('库存明细', init_inventory_detail_table),
         ('虚拟库存统计日志', init_virtual_inventory_stats_log_table),
+        ('开思询价单监控', init_ks_inquiry_monitor_table),
     ]
 
     completed = []
@@ -783,6 +832,9 @@ def init_all_tables():
     ensure_table_structure()
     ensure_cart_indexes()
     check_and_create_default_users()
+    
+    # 自动修复所有表的字符集
+    auto_fix_all_tables_collation()
 
     # 简洁输出
     print(f"[数据库] {sum(1 for c in completed if c == '✓')}/{len(tables)} 表初始化完成")

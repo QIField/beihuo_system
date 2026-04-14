@@ -73,18 +73,22 @@
     <div class="cards" id="cards"></div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ks_inquiry_monitor/alert-sound.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ks_inquiry_monitor/test-button.js') }}"></script>
     <script>
         const ALERT_THRESHOLD = 7;
         let lastAlert = false;
 
-        function playAlertSound() {
-            document.getElementById('alertSound').play().catch(() => {});
-        }
-
         function render(data) {
             let html = '';
+            let maxUnclaimedCount = 0;
+            
             data.stores.forEach(item => {
                 const isAlert = item.unclaimed_count > ALERT_THRESHOLD;
+                if (item.unclaimed_count > maxUnclaimedCount) {
+                    maxUnclaimedCount = item.unclaimed_count;
+                }
                 html += `
                     <div class="card ${isAlert ? 'alert' : ''}">
                         <div class="card-header">
@@ -113,9 +117,11 @@
             document.getElementById('cards').innerHTML = html;
             document.getElementById('checkTime').textContent = '最新检查时间: ' + data.update_time;
 
-            // 播放提示音：当alert从false变为true时
+            // 使用新的报警声音模块
             if (data.alert && !lastAlert) {
-                playAlertSound();
+                if (window.KsInquiryAlert) {
+                    window.KsInquiryAlert.play(maxUnclaimedCount);
+                }
             }
             lastAlert = data.alert;
         }
@@ -130,7 +136,14 @@
 
         socket.on('ks_inquiry_update', function(data) {
             console.log('[WebSocket] 收到数据:', data);
-            render(data);
+            console.log('[WebSocket] stores数量:', data.stores ? data.stores.length : 0);
+            console.log('[WebSocket] 第一条数据:', data.stores && data.stores[0]);
+            try {
+                render(data);
+                console.log('[WebSocket] render执行完成');
+            } catch(e) {
+                console.error('[WebSocket] render执行出错:', e);
+            }
         });
 
         socket.on('notification', function(data) {

@@ -112,16 +112,12 @@ def get_db_connection():
 
 def get_current_day_time_range():
     """
-    获取当前日期 13:00 到第二天 13:00 的时间范围
-    例如：今天是 16 号，则返回 16 号 13:00 到 17 号 13:00
+    获取当前日期 00:00 到 23:59 的时间范围
+    例如：今天是 16 号，则返回 16 号 00:00 到 16 号 23:59
     """
     now = datetime.now()
-    start_time = now.replace(hour=13, minute=0, second=0, microsecond=0)
-    
-    if now < start_time:
-        start_time = start_time - timedelta(days=1)
-    
-    end_time = start_time + timedelta(hours=24)
+    start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_time = now.replace(hour=23, minute=59, second=59, microsecond=0)
     
     return start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S')
 

@@ -97,7 +97,7 @@ class PurchaseSyncService:
                     WHERE company = %s
                 """
                 cursor.execute(sql, (company,))
-                return [(row[0], row[1]) for row in cursor.fetchall()]
+                return [(row['oe'], row['brand']) for row in cursor.fetchall()]
         finally:
             conn.close()
 

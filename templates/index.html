@@ -841,6 +841,7 @@
                         <dl class="layui-nav-child">
                             <dd id="inquiryModuleMenuItem" style="display: none;"><a href="javascript:void(0);" onclick="openInquiryModule()">询价模块</a></dd>
                             <dd id="compareModuleMenuItem" style="display: none;"><a href="javascript:void(0);" onclick="openCompareModule()">比价模块</a></dd>
+                            <dd id="compareFunctionMenuItem" style="display: none;"><a href="javascript:void(0);" onclick="openCompareFunction()">比价功能</a></dd>
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed" id="permissionManagement" style="display: none;">
@@ -1443,6 +1444,10 @@ fetch('/api/current_user')
             document.getElementById('compareModuleMenuItem').style.display =
                 result.can_compare_module ? 'block' : 'none';
 
+            // 控制比价功能菜单项的显示（与比价模块使用相同权限）
+            document.getElementById('compareFunctionMenuItem').style.display =
+                result.can_compare_module ? 'block' : 'none';
+
             // 将用户权限存储到全局变量中
             window.currentUserPermissions = {
                 username: result.username,
@@ -1528,6 +1533,17 @@ function openCompareModule() {
     }
     // 在新标签页中打开比价模块页面
     window.open('/api/purchase_plan/compare/compare_module', '_blank');
+}
+
+// 添加打开比价功能的函数
+function openCompareFunction() {
+    // 检查用户是否有权限访问比价功能
+    if (!window.currentUserPermissions || !window.currentUserPermissions.can_compare_module) {
+        layui.layer.msg('您没有权限访问比价功能', {icon: 2});
+        return;
+    }
+    // 在新标签页中打开比价功能页面
+    window.open('/api/purchase_plan/procurement_compare_module', '_blank');
 }
 
 // 专门用于加载使用说明书的函数

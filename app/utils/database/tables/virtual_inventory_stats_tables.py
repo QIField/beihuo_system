@@ -1,6 +1,7 @@
 """
 虚拟库存统计日志表
 记录每天虚拟库存的统计数据
+业务时间：当天00:00到23:59
 """
 import pymysql
 from app.utils.database_connection import get_db_connection

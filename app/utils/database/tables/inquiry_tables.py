@@ -1,9 +1,38 @@
 """
 开思询价相关表
-包含：开思询价明细表、微信询价明细表
+包含：开思询价明细表、微信询价明细表、询价单监控数据表
 """
 
 from app.utils.database_connection import get_db_connection
+
+
+def init_ks_inquiry_monitor_table():
+    """
+    初始化开思询价单监控数据表
+    用于存储各门店的询价单实时统计数据（每次更新清空后插入新数据）
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS crmapp_ks_inquiry_monitor (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
+                store_code VARCHAR(10) NOT NULL COMMENT '门店代码(fs/zs/zh/hf/by)',
+                store_name VARCHAR(50) NOT NULL COMMENT '门店名称',
+                unclaimed_count INT DEFAULT 0 COMMENT '待认领询价单数量',
+                quoted_count INT DEFAULT 0 COMMENT '已报价数量',
+                unquoted_count INT DEFAULT 0 COMMENT '未报价数量',
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                UNIQUE KEY uk_store (store_code),
+                INDEX idx_updated_at (updated_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开思询价单监控数据表';
+            """
+            cursor.execute(create_table_sql)
+            print("  ✓ 开思询价单监控数据表")
+    except Exception as e:
+        print(f"  ✗ 开思询价单监控数据表: {e}")
+    finally:
+        conn.close()
 
 
 def init_ks_inquiry_detail_table():

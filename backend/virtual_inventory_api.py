@@ -1148,8 +1148,8 @@ def get_virtual_inventory_by_date():
         else:
             try:
                 business_date = datetime.strptime(business_date_str, '%Y-%m-%d').date()
-                start_time = datetime.combine(business_date, datetime.min.time().replace(hour=13))
-                end_time = start_time + timedelta(days=1)
+                start_time = datetime.combine(business_date, datetime.min.time())
+                end_time = datetime.combine(business_date, datetime.max.time().replace(microsecond=0))
             except ValueError:
                 return jsonify({'code': 1, 'msg': '日期格式错误，请使用 YYYY-MM-DD 格式'}), 400
 

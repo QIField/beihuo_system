@@ -1,499 +1,242 @@
-<<<<<<< HEAD
-2026-04-10T17:53:47.883+08:00 [info] [main] 日志级别: Info
-2026-04-10T17:53:47.883+08:00 [info] [main] 正在验证在以下位置找到的 git: "C:\Program Files\Git\cmd\git.exe"
-2026-04-10T17:53:47.883+08:00 [info] [main] 使用来自 "C:\Program Files\Git\cmd\git.exe" 的 git "2.53.0.windows.2"
-2026-04-10T17:53:47.883+08:00 [info] [Model][doInitialScan] Initial repository scan started
-2026-04-10T17:53:47.883+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:47.883+08:00 [info] > git rev-parse --show-toplevel [307ms]
-2026-04-10T17:53:47.899+08:00 [info] > git rev-parse --git-dir --git-common-dir --show-superproject-working-tree (started)
-2026-04-10T17:53:48.192+08:00 [info] > git rev-parse --git-dir --git-common-dir --show-superproject-working-tree [293ms]
-2026-04-10T17:53:48.205+08:00 [info] [Model][openRepository] Opened repository (path): g:\work\BBR\FLASK\beihuo_system
-2026-04-10T17:53:48.205+08:00 [info] [Model][openRepository] Opened repository (real path): g:\work\BBR\FLASK\beihuo_system
-2026-04-10T17:53:48.205+08:00 [info] [Model][openRepository] Opened repository (kind): repository
-2026-04-10T17:53:48.299+08:00 [info] > git config --get commit.template (started)
-2026-04-10T17:53:48.301+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:48.472+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T17:53:48.832+08:00 [info] > git config --get commit.template [533ms]
-2026-04-10T17:53:48.832+08:00 [info] > git rev-parse --show-toplevel [531ms]
-2026-04-10T17:53:48.850+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:48.861+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [390ms]
-2026-04-10T17:53:48.871+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T17:53:48.878+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T17:53:48.983+08:00 [info] > git rev-parse --show-toplevel [134ms]
-2026-04-10T17:53:48.985+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:49.036+08:00 [info] > git rev-parse --show-toplevel [50ms]
-2026-04-10T17:53:49.039+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:49.086+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [215ms]
-2026-04-10T17:53:49.105+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [226ms]
-2026-04-10T17:53:49.108+08:00 [info] > git rev-parse --show-toplevel [70ms]
-2026-04-10T17:53:49.111+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:49.114+08:00 [info] > git status -z -uall [246ms]
-2026-04-10T17:53:49.124+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T17:53:49.131+08:00 [info] > git config --get commit.template (started)
-2026-04-10T17:53:49.135+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T17:53:49.181+08:00 [info] > git rev-parse --show-toplevel [69ms]
-2026-04-10T17:53:49.183+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:49.194+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [69ms]
-2026-04-10T17:53:49.198+08:00 [info] > git config --get --local branch.main.vscode-merge-base (started)
-2026-04-10T17:53:49.200+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [66ms]
-2026-04-10T17:53:49.216+08:00 [info] > git config --get commit.template [84ms]
-2026-04-10T17:53:49.221+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T17:53:49.239+08:00 [info] > git rev-parse --show-toplevel [56ms]
-2026-04-10T17:53:49.242+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:49.265+08:00 [info] > git config --get --local branch.main.vscode-merge-base [67ms]
-2026-04-10T17:53:49.266+08:00 [warning] [Git][config] git config failed: Failed to execute git
-2026-04-10T17:53:49.268+08:00 [info] > git reflog main --grep-reflog=branch: Created from *. (started)
-2026-04-10T17:53:49.290+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [69ms]
-2026-04-10T17:53:49.302+08:00 [info] > git status -z -uall [84ms]
-2026-04-10T17:53:49.311+08:00 [info] > git rev-parse --show-toplevel [68ms]
-2026-04-10T17:53:49.314+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:49.350+08:00 [info] > git check-ignore -v -z --stdin [69ms]
-2026-04-10T17:53:49.382+08:00 [info] > git rev-parse --show-toplevel [67ms]
-2026-04-10T17:53:49.384+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:49.439+08:00 [info] > git rev-parse --show-toplevel [54ms]
-2026-04-10T17:53:49.442+08:00 [info] > git rev-parse --show-toplevel (started)
-2026-04-10T17:53:49.544+08:00 [info] > git rev-parse --show-toplevel [102ms]
-2026-04-10T17:53:49.544+08:00 [info] [Model][doInitialScan] Initial repository scan completed - repositories (1), closed repositories (0), parent repositories (0), unsafe repositories (0)
-2026-04-10T17:53:49.552+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T17:53:49.620+08:00 [info] > git reflog main --grep-reflog=branch: Created from *. [351ms]
-2026-04-10T17:53:49.623+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/FETCH_HEAD refs/remotes/FETCH_HEAD (started)
-2026-04-10T17:53:49.625+08:00 [info] > git ls-files --stage -- beihuo_system.py [72ms]
-2026-04-10T17:53:49.627+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T17:53:49.699+08:00 [info] > git show --textconv :beihuo_system.py [149ms]
-2026-04-10T17:53:49.717+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/FETCH_HEAD refs/remotes/FETCH_HEAD [95ms]
-2026-04-10T17:53:49.717+08:00 [warning] [Git][getBranch] No such branch: FETCH_HEAD
-2026-04-10T17:53:49.720+08:00 [info] > git symbolic-ref --short refs/remotes/origin/HEAD (started)
-2026-04-10T17:53:49.721+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [94ms]
-2026-04-10T17:53:49.788+08:00 [info] > git symbolic-ref --short refs/remotes/origin/HEAD [68ms]
-2026-04-10T17:53:49.788+08:00 [info] fatal: ref refs/remotes/origin/HEAD is not a symbolic ref
-2026-04-10T17:53:49.788+08:00 [warning] [Repository][getDefaultBranch] Failed to get default branch details: Failed to execute git.
-2026-04-10T17:53:49.814+08:00 [info] > git blame --root --incremental a87e6b91317390397022069366e16232c6506aab -- beihuo_system.py (started)
-2026-04-10T17:53:50.059+08:00 [info] > git blame --root --incremental a87e6b91317390397022069366e16232c6506aab -- beihuo_system.py [244ms]
-2026-04-10T17:53:50.118+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T17:53:50.170+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [51ms]
-2026-04-10T17:58:43.663+08:00 [info] > git ls-files --stage -- scripts/init_virtual_inventory_stats_log.py (started)
-2026-04-10T17:58:43.857+08:00 [info] > git ls-files --stage -- scripts/init_virtual_inventory_stats_log.py [194ms]
-2026-04-10T17:58:43.859+08:00 [info] > git cat-file -s 721a23128391ba130290e37d69f8d78b7798c827 (started)
-2026-04-10T17:58:43.878+08:00 [info] > git show --textconv :scripts/init_virtual_inventory_stats_log.py [219ms]
-2026-04-10T17:58:43.900+08:00 [info] > git check-ignore -v -z --stdin [44ms]
-2026-04-10T17:58:43.901+08:00 [info] > git cat-file -s 721a23128391ba130290e37d69f8d78b7798c827 [42ms]
-2026-04-10T17:58:44.436+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T17:58:44.493+08:00 [info] > git ls-files --stage -- beihuo_system.py [57ms]
-2026-04-10T17:58:44.495+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T17:58:44.505+08:00 [info] > git show --textconv :beihuo_system.py [72ms]
-2026-04-10T17:58:44.548+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [53ms]
-2026-04-10T17:58:45.291+08:00 [info] > git ls-files --stage -- templates/purchase_plan/procurement_compare.html (started)
-2026-04-10T17:58:45.548+08:00 [info] > git ls-files --stage -- templates/purchase_plan/procurement_compare.html [258ms]
-2026-04-10T17:58:45.550+08:00 [info] > git cat-file -s e41948a0458afb37d7c963fc9fecda1bda5a67b0 (started)
-2026-04-10T17:58:45.569+08:00 [info] > git show --textconv :templates/purchase_plan/procurement_compare.html [281ms]
-2026-04-10T17:58:45.578+08:00 [info] > git check-ignore -v -z --stdin [57ms]
-2026-04-10T17:58:45.605+08:00 [info] > git cat-file -s e41948a0458afb37d7c963fc9fecda1bda5a67b0 [55ms]
-2026-04-10T17:58:46.408+08:00 [info] > git ls-files --stage -- app/ks_auto_bill/ks_orders.py (started)
-2026-04-10T17:58:46.476+08:00 [info] > git ls-files --stage -- app/ks_auto_bill/ks_orders.py [68ms]
-2026-04-10T17:58:46.478+08:00 [info] > git cat-file -s f81935c2572c40e5bcfda7db25491ea42db99244 (started)
-2026-04-10T17:58:46.492+08:00 [info] > git show --textconv :app/ks_auto_bill/ks_orders.py [86ms]
-2026-04-10T17:58:46.526+08:00 [info] > git cat-file -s f81935c2572c40e5bcfda7db25491ea42db99244 [48ms]
-2026-04-10T17:58:46.570+08:00 [info] > git blame --root --incremental a87e6b91317390397022069366e16232c6506aab -- app/ks_auto_bill/ks_orders.py (started)
-2026-04-10T17:58:46.647+08:00 [info] > git blame --root --incremental a87e6b91317390397022069366e16232c6506aab -- app/ks_auto_bill/ks_orders.py [77ms]
-2026-04-10T17:58:46.684+08:00 [info] > git check-ignore -v -z --stdin [37ms]
-2026-04-10T17:58:47.428+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T17:58:47.490+08:00 [info] > git ls-files --stage -- beihuo_system.py [62ms]
-2026-04-10T17:58:47.492+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T17:58:47.493+08:00 [info] > git show --textconv :beihuo_system.py [68ms]
-2026-04-10T17:58:47.645+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [152ms]
-2026-04-10T18:03:06.120+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:03:06.175+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [55ms]
-2026-04-10T18:03:06.362+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:03:06.485+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [123ms]
-2026-04-10T18:03:18.417+08:00 [info] > git push (started)
-2026-04-10T18:03:18.695+08:00 [info] > git push [278ms]
-2026-04-10T18:03:18.695+08:00 [info] fatal: The current branch main has no upstream branch.
-To push the current branch and set the remote as upstream, use
-
-    git push --set-upstream origin main
-
-To have this happen automatically for branches without a tracking
-upstream, see 'push.autoSetupRemote' in 'git help config'.
-2026-04-10T18:03:18.702+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:03:18.705+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T18:03:18.747+08:00 [info] > git config --get commit.template [46ms]
-2026-04-10T18:03:18.752+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [48ms]
-2026-04-10T18:03:18.757+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:03:18.805+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [48ms]
-2026-04-10T18:03:18.807+08:00 [info] > git status -z -uall [53ms]
-2026-04-10T18:03:19.032+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:03:19.075+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [43ms]
-2026-04-10T18:04:14.318+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) (started)
-2026-04-10T18:04:14.370+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) [51ms]
-2026-04-10T18:06:38.328+08:00 [info] > git remote add git@github.com-QIField/beihuo_system.git https://github.com/QIField/beihuo_system.git (started)
-2026-04-10T18:06:38.382+08:00 [info] > git remote add git@github.com-QIField/beihuo_system.git https://github.com/QIField/beihuo_system.git [54ms]
-2026-04-10T18:06:38.385+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:06:38.388+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T18:06:38.428+08:00 [info] > git config --get commit.template [43ms]
-2026-04-10T18:06:38.437+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [48ms]
-2026-04-10T18:06:38.444+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:06:38.502+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [58ms]
-2026-04-10T18:06:38.506+08:00 [info] > git status -z -uall [66ms]
-2026-04-10T18:06:38.511+08:00 [info] > git fetch git@github.com-QIField/beihuo_system.git (started)
-2026-04-10T18:06:38.726+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:06:38.773+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [47ms]
-2026-04-10T18:06:39.810+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T18:06:39.862+08:00 [info] > git ls-files --stage -- beihuo_system.py [53ms]
-2026-04-10T18:06:39.864+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T18:06:39.904+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [40ms]
-2026-04-10T18:06:39.950+08:00 [info] > git show --textconv :beihuo_system.py [42ms]
-2026-04-10T18:06:44.279+08:00 [info] > git push (started)
-2026-04-10T18:06:44.324+08:00 [info] > git push [45ms]
-2026-04-10T18:06:44.324+08:00 [info] fatal: The current branch main has no upstream branch.
-To push the current branch and set the remote as upstream, use
-
-    git push --set-upstream origin main
-
-To have this happen automatically for branches without a tracking
-upstream, see 'push.autoSetupRemote' in 'git help config'.
-2026-04-10T18:06:44.329+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:06:44.335+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T18:06:44.389+08:00 [info] > git config --get commit.template [59ms]
-2026-04-10T18:06:44.394+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [59ms]
-2026-04-10T18:06:44.402+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:06:44.450+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [48ms]
-2026-04-10T18:06:44.453+08:00 [info] > git status -z -uall [56ms]
-2026-04-10T18:06:44.701+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:06:44.757+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [57ms]
-2026-04-10T18:06:56.996+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) (started)
-2026-04-10T18:06:57.046+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) [49ms]
-2026-04-10T18:06:59.841+08:00 [info] > git fetch git@github.com-QIField/beihuo_system.git [21330ms]
-2026-04-10T18:06:59.841+08:00 [info] fatal: unable to access 'https://github.com/QIField/beihuo_system.git/': Failed to connect to github.com port 443 after 21105 ms: Could not connect to server
-2026-04-10T18:06:59.845+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:06:59.849+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T18:06:59.893+08:00 [info] > git config --get commit.template [48ms]
-2026-04-10T18:06:59.895+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [46ms]
-2026-04-10T18:06:59.901+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:06:59.941+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [40ms]
-2026-04-10T18:06:59.945+08:00 [info] > git status -z -uall [47ms]
-2026-04-10T18:07:00.157+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:07:00.360+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [203ms]
-2026-04-10T18:07:28.092+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) (started)
-2026-04-10T18:07:28.140+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) [48ms]
-2026-04-10T18:07:55.139+08:00 [info] > git remote remove origin (started)
-2026-04-10T18:07:55.182+08:00 [info] > git remote remove origin [44ms]
-2026-04-10T18:07:55.185+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:07:55.188+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T18:07:55.229+08:00 [info] > git config --get commit.template [44ms]
-2026-04-10T18:07:55.233+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [46ms]
-2026-04-10T18:07:55.240+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:07:55.312+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [73ms]
-2026-04-10T18:07:55.313+08:00 [info] > git status -z -uall [76ms]
-2026-04-10T18:07:55.530+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:07:55.617+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [88ms]
-2026-04-10T18:07:56.375+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T18:07:56.427+08:00 [info] > git ls-files --stage -- beihuo_system.py [51ms]
-2026-04-10T18:07:56.429+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T18:07:56.475+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [46ms]
-2026-04-10T18:07:56.525+08:00 [info] > git show --textconv :beihuo_system.py [46ms]
-2026-04-10T18:08:05.135+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) (started)
-2026-04-10T18:08:05.202+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) [67ms]
-2026-04-10T18:08:12.525+08:00 [info] > git checkout -q backup-main (started)
-2026-04-10T18:08:12.909+08:00 [info] > git checkout -q backup-main [384ms]
-2026-04-10T18:08:12.913+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:08:12.919+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:08:12.966+08:00 [info] > git config --get commit.template [53ms]
-2026-04-10T18:08:12.968+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [50ms]
-2026-04-10T18:08:12.973+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:08:13.021+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [49ms]
-2026-04-10T18:08:13.035+08:00 [info] > git status -z -uall [65ms]
-2026-04-10T18:08:13.042+08:00 [info] > git blame --root --incremental 55a06065a129d4e3abd4d56ae75ab8e65ff1b5b1 -- beihuo_system.py (started)
-2026-04-10T18:08:13.042+08:00 [info] > git show -s --decorate=full --shortstat --format=%H%n%aN%n%aE%n%at%n%ct%n%P%n%D%n%B -z 55a06065a129d4e3abd4d56ae75ab8e65ff1b5b1 -- (started)
-2026-04-10T18:08:13.045+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:08:13.157+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [111ms]
-2026-04-10T18:08:13.160+08:00 [info] > git config --get --local branch.backup-main.vscode-merge-base (started)
-2026-04-10T18:08:13.161+08:00 [info] > git show -s --decorate=full --shortstat --format=%H%n%aN%n%aE%n%at%n%ct%n%P%n%D%n%B -z 55a06065a129d4e3abd4d56ae75ab8e65ff1b5b1 -- [119ms]
-2026-04-10T18:08:13.165+08:00 [info] > git config --get --local remote.origin.url (started)
-2026-04-10T18:08:13.165+08:00 [info] > git blame --root --incremental 55a06065a129d4e3abd4d56ae75ab8e65ff1b5b1 -- beihuo_system.py [126ms]
-2026-04-10T18:08:13.246+08:00 [info] > git config --get --local branch.backup-main.vscode-merge-base [87ms]
-2026-04-10T18:08:13.246+08:00 [warning] [Git][config] git config failed: Failed to execute git
-2026-04-10T18:08:13.250+08:00 [info] > git reflog backup-main --grep-reflog=branch: Created from *. (started)
-2026-04-10T18:08:13.255+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:08:13.255+08:00 [info] > git config --get --local remote.origin.url [90ms]
-2026-04-10T18:08:13.255+08:00 [warning] [Git][config] git config failed: Failed to execute git
-2026-04-10T18:08:13.319+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [65ms]
-2026-04-10T18:08:13.363+08:00 [info] > git reflog backup-main --grep-reflog=branch: Created from *. [113ms]
-2026-04-10T18:08:13.367+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main (started)
-2026-04-10T18:08:13.428+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [60ms]
-2026-04-10T18:08:13.431+08:00 [info] > git symbolic-ref --short refs/remotes/git@github.com-QIField/beihuo_system.git/HEAD (started)
-2026-04-10T18:08:13.484+08:00 [info] > git symbolic-ref --short refs/remotes/git@github.com-QIField/beihuo_system.git/HEAD [53ms]
-2026-04-10T18:08:13.484+08:00 [info] fatal: ref refs/remotes/git@github.com-QIField/beihuo_system.git/HEAD is not a symbolic ref
-2026-04-10T18:08:13.484+08:00 [warning] [Repository][getDefaultBranch] Failed to get default branch details: Failed to execute git.
-2026-04-10T18:08:14.077+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:08:14.081+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:08:14.126+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [45ms]
-2026-04-10T18:08:14.131+08:00 [info] > git config --get commit.template [54ms]
-2026-04-10T18:08:14.136+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:08:14.187+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T18:08:14.280+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [143ms]
-2026-04-10T18:08:14.297+08:00 [info] > git status -z -uall [163ms]
-2026-04-10T18:08:14.357+08:00 [info] > git ls-files --stage -- beihuo_system.py [170ms]
-2026-04-10T18:08:14.360+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T18:08:14.453+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [92ms]
-2026-04-10T18:08:14.503+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:08:14.575+08:00 [info] > git show --textconv :beihuo_system.py [118ms]
-2026-04-10T18:08:14.597+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [94ms]
-2026-04-10T18:08:22.130+08:00 [info] > git check-ignore -v -z --stdin [120ms]
-2026-04-10T18:08:22.873+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T18:08:23.062+08:00 [info] > git show --textconv :beihuo_system.py [192ms]
-2026-04-10T18:08:23.071+08:00 [info] > git ls-files --stage -- beihuo_system.py [198ms]
-2026-04-10T18:08:23.073+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T18:08:23.145+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [72ms]
-2026-04-10T18:08:41.163+08:00 [info] > git ls-files --stage -- app/services/beihuo_service/__init__.py (started)
-2026-04-10T18:08:41.225+08:00 [info] > git ls-files --stage -- app/services/beihuo_service/__init__.py [62ms]
-2026-04-10T18:08:41.227+08:00 [info] > git cat-file -s 41713ec8a9556217cfad5d367074e50d06e8914b (started)
-2026-04-10T18:08:41.242+08:00 [info] > git show --textconv :app/services/beihuo_service/__init__.py [81ms]
-2026-04-10T18:08:41.275+08:00 [info] > git cat-file -s 41713ec8a9556217cfad5d367074e50d06e8914b [48ms]
-2026-04-10T18:08:41.544+08:00 [info] > git check-ignore -v -z --stdin [120ms]
-2026-04-10T18:08:42.056+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T18:08:42.153+08:00 [info] > git ls-files --stage -- beihuo_system.py [97ms]
-2026-04-10T18:08:42.155+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T18:08:42.168+08:00 [info] > git show --textconv :beihuo_system.py [115ms]
-2026-04-10T18:08:42.377+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [222ms]
-2026-04-10T18:09:00.178+08:00 [info] > git push git@github.com-QIField/beihuo_system.git backup-main (started)
-2026-04-10T18:09:19.789+08:00 [info] > git push git@github.com-QIField/beihuo_system.git backup-main [19611ms]
-2026-04-10T18:09:19.789+08:00 [info] fatal: unable to access 'https://github.com/QIField/beihuo_system.git/': Recv failure: Connection was reset
-2026-04-10T18:09:19.803+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:09:19.811+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:09:19.870+08:00 [info] > git config --get commit.template [67ms]
-2026-04-10T18:09:19.873+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [62ms]
-2026-04-10T18:09:19.877+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:09:19.928+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [50ms]
-2026-04-10T18:09:19.943+08:00 [info] > git status -z -uall [68ms]
-2026-04-10T18:09:20.158+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:09:20.287+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [129ms]
-2026-04-10T18:10:09.237+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T18:10:09.473+08:00 [info] > git show --textconv :beihuo_system.py [238ms]
-2026-04-10T18:10:09.483+08:00 [info] > git ls-files --stage -- beihuo_system.py [246ms]
-2026-04-10T18:10:09.486+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T18:10:09.576+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [90ms]
-2026-04-10T18:10:20.366+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) (started)
-2026-04-10T18:10:20.413+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname)%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)%00%(upstream:track) [46ms]
-2026-04-10T18:14:18.014+08:00 [info] > git remote add https-//github.com/QIField/beihuo_system.git origin (started)
-2026-04-10T18:14:18.061+08:00 [info] > git remote add https-//github.com/QIField/beihuo_system.git origin [47ms]
-2026-04-10T18:14:18.061+08:00 [info] fatal: 'https-//github.com/QIField/beihuo_system.git' is not a valid remote name
-2026-04-10T18:14:18.064+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:14:18.068+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:14:18.122+08:00 [info] > git config --get commit.template [58ms]
-2026-04-10T18:14:18.123+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [54ms]
-2026-04-10T18:14:18.130+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:14:18.177+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [48ms]
-2026-04-10T18:14:18.191+08:00 [info] > git status -z -uall [65ms]
-2026-04-10T18:14:18.408+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:14:18.524+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [116ms]
-2026-04-10T18:14:47.880+08:00 [info] > git remote add beihuo_system origin (started)
-2026-04-10T18:14:47.926+08:00 [info] > git remote add beihuo_system origin [46ms]
-2026-04-10T18:14:47.930+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:14:47.933+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:14:47.988+08:00 [info] > git config --get commit.template [59ms]
-2026-04-10T18:14:47.989+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [56ms]
-2026-04-10T18:14:47.995+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:14:48.040+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [45ms]
-2026-04-10T18:14:48.053+08:00 [info] > git status -z -uall [61ms]
-2026-04-10T18:14:48.057+08:00 [info] > git fetch beihuo_system (started)
-2026-04-10T18:14:48.223+08:00 [info] > git fetch beihuo_system [165ms]
-2026-04-10T18:14:48.223+08:00 [info] fatal: 'origin' does not appear to be a git repository
-fatal: Could not read from remote repository.
-
-Please make sure you have the correct access rights
-and the repository exists.
-2026-04-10T18:14:48.225+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:14:48.227+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:14:48.265+08:00 [info] > git config --get commit.template [40ms]
-2026-04-10T18:14:48.267+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [40ms]
-2026-04-10T18:14:48.271+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:14:48.275+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:14:48.314+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [42ms]
-2026-04-10T18:14:48.318+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [43ms]
-2026-04-10T18:14:48.327+08:00 [info] > git status -z -uall [58ms]
-2026-04-10T18:14:48.540+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:14:48.727+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [187ms]
-2026-04-10T18:14:51.044+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T18:14:51.091+08:00 [info] > git ls-files --stage -- beihuo_system.py [48ms]
-2026-04-10T18:14:51.093+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T18:14:51.141+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [47ms]
-2026-04-10T18:14:51.193+08:00 [info] > git show --textconv :beihuo_system.py [49ms]
-2026-04-10T18:16:43.554+08:00 [info] > git push (started)
-2026-04-10T18:16:43.604+08:00 [info] > git push [49ms]
-2026-04-10T18:16:43.604+08:00 [info] fatal: No configured push destination.
-Either specify the URL from the command-line or configure a remote repository using
-
-    git remote add <name> <url>
-
-and then push using the remote name
-
-    git push <name>
-2026-04-10T18:16:43.607+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:16:43.610+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:16:43.663+08:00 [info] > git config --get commit.template [56ms]
-2026-04-10T18:16:43.669+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [59ms]
-2026-04-10T18:16:43.674+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:16:43.725+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [50ms]
-2026-04-10T18:16:43.739+08:00 [info] > git status -z -uall [66ms]
-2026-04-10T18:16:43.944+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:16:44.103+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [159ms]
-2026-04-10T18:17:07.222+08:00 [info] > git push (started)
-2026-04-10T18:17:07.271+08:00 [info] > git push [49ms]
-2026-04-10T18:17:07.271+08:00 [info] fatal: No configured push destination.
-Either specify the URL from the command-line or configure a remote repository using
-
-    git remote add <name> <url>
-
-and then push using the remote name
-
-    git push <name>
-2026-04-10T18:17:07.275+08:00 [info] > git config --get commit.template (started)
-2026-04-10T18:17:07.278+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main (started)
-2026-04-10T18:17:07.360+08:00 [info] > git config --get commit.template [85ms]
-2026-04-10T18:17:07.372+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/backup-main refs/remotes/backup-main [94ms]
-2026-04-10T18:17:07.377+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:17:07.440+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [63ms]
-2026-04-10T18:17:07.454+08:00 [info] > git status -z -uall [79ms]
-2026-04-10T18:17:07.662+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) (started)
-2026-04-10T18:17:07.708+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [46ms]
-2026-04-10T18:17:16.031+08:00 [info] > git ls-files --stage -- beihuo_system.py (started)
-2026-04-10T18:17:16.135+08:00 [info] > git ls-files --stage -- beihuo_system.py [104ms]
-2026-04-10T18:17:16.137+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb (started)
-2026-04-10T18:17:16.139+08:00 [info] > git show --textconv :beihuo_system.py [111ms]
-2026-04-10T18:17:16.188+08:00 [info] > git cat-file -s be3273e73525d2e6659a3adf63f9643034c84ddb [51ms]
-=======
-Welcome to Ubuntu 22.04.2 LTS (GNU/Linux 5.15.0-76-generic x86_64)
-
- * Documentation:  https://help.ubuntu.com
- * Management:     https://landscape.canonical.com
- * Support:        https://ubuntu.com/advantage
-
-  System information as of Thu Apr  9 07:31:03 PM CST 2026
-
-  System load:  0.33984375         Processes:             128
-  Usage of /:   21.2% of 48.91GB   Users logged in:       0
-  Memory usage: 42%                IPv4 address for eth0: 192.168.8.19
-  Swap usage:   0%
-
- * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
-   just raised the bar for easy, resilient and secure K8s cluster deployment.
-
-   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
-
-Expanded Security Maintenance for Applications is not enabled.
-
-307 updates can be applied immediately.
-211 of these updates are standard security updates.
-To see these additional updates run: apt list --upgradable
-
-9 additional security updates can be applied with ESM Apps.
-Learn more about enabling ESM Apps service at https://ubuntu.com/esm
-
-New release '24.04.4 LTS' available.
-Run 'do-release-upgrade' to upgrade to it.
+💾 批量保存 5000 条数据...
+批量保存失败: (1062, "Duplicate entry '6420901642-巴博瑞-fsbbr' for key 'uk_oe_brand_company'")
+✅ 保存成功: 0 条
 
 
 
-        Welcome to Huawei Cloud Service
+💾 批量保存 5000 条数据...
+批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 86")
+✅ 保存成功: 0 条
 
-Last login: Thu Apr  9 19:26:46 2026 from 127.0.0.1
-root@hcss-ecs-5274:~# # 1. 检查8111端口是否有进程在监听
-netstat -tlnp | grep 8111
+💾 批量保存 5000 条数据...
+批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 315")
+✅ 保存成功: 0 条
 
-# 2. 查看宝塔Python项目的进程
-ps aux | grep -E "uwsgi|beihuo"
-
-# 3. 检查Nginx配置文件，看代理配置是否正确
-cat /www/server/panel/vhost/nginx/python_beihuo_system_test.conf
-
-# 4. 检查Nginx错误日志
-tail -50 /www/server/nginx/logs/error.log
-
-# 5. 尝试直接访问8111端口看服务是否正常
-curl -s http://127.0.0.1:8111 || echo "无法连接到8111端口"
-tcp        0      0 0.0.0.0:8111            0.0.0.0:*               LISTEN      653603/uwsgi        
-root      573530  0.0  0.2  57808  9036 ?        S    Apr08   0:05 /www/server/pyporject_evn/beihuo_system_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system/uwsgi.ini
-root      573531  0.7 16.9 1756860 645616 ?      Sl   Apr08  12:28 /www/server/pyporject_evn/beihuo_system_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system/uwsgi.ini
-root      573532  0.0  0.1  58572  6604 ?        S    Apr08   0:04 /www/server/pyporject_evn/beihuo_system_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system/uwsgi.ini
-www       653603  0.7  2.9 545920 113384 ?       Sl   19:28   0:01 /www/server/pyporject_evn/beihuo_system_test_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system_test/uwsgi.ini
-www       653648  0.0  2.2 1471460 85164 ?       Sl   19:28   0:00 /www/server/pyporject_evn/beihuo_system_test_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system_test/uwsgi.ini
-www       653678  0.0  2.1 333152 82072 ?        S    19:28   0:00 /www/server/pyporject_evn/beihuo_system_test_venv/bin/uwsgi -d --ini /www/wwwroot/beihuo_system_test/uwsgi.ini
-root      655416  0.0  0.0   6612  2384 pts/1    S+   19:31   0:00 grep --color=auto -E uwsgi|beihuo
-server
-{
-    listen 7005;
-    listen 80;
-    server_name 113.46.196.69 x.fsbbrTest.net;
-    index index.html index.htm default.htm default.html;
-    root /www/wwwroot/beihuo_system_test;
-
-    #SSL-START SSL相关配置
-    #error_page 404/404.html;
-    
-    #SSL-END
-
-    #ERROR-PAGE-START  错误页相关配置
-    #error_page 404 /404.html;
-    #error_page 502 /502.html;
-    #ERROR-PAGE-END
+💾 批量保存 5000 条数据...
+批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 1783")
+✅ 保存成功: 0 条
 
 
-    #REWRITE-START 伪静态相关配置
-    include /www/server/panel/vhost/rewrite/python_beihuo_system_test.conf;
-    #REWRITE-END
+💾 批量保存 5000 条数据...
+批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 2164")
+✅ 保存成功: 0 条
 
-    #禁止访问的文件或目录
-    location ~ ^/(\.user.ini|\.htaccess|\.git|\.svn|\.project|LICENSE|README.md|package.json|package-lock.json|\.env) {
-        return 404;
-    }
+💾 批量保存 5000 条数据...
+批量保存失败: (1062, "Duplicate entry '13908665236-菲尔-fsbbr' for key 'uk_oe_brand_company'")
+✅ 保存成功: 0 条
 
-    #一键申请SSL证书验证目录相关设置
-    location /.well-known/ {
-        root /www/wwwroot/java_node_ssl;
-    }
+💾 批量保存 5000 条数据...
+批量保存失败: (1062, "Duplicate entry '11318648732，11317592877，11317592850，11318685091-盖茨-fsb' for key 'uk_oe_brand_company'")
+✅ 保存成功: 0 条
 
-    #禁止在证书验证目录放入敏感文件
-    if ( $uri ~ "^/\.well-known/.*\.(php|jsp|py|js|css|lua|ts|go|zip|tar\.gz|rar|7z|sql|bak)$" ) {
-        return 403;
-    }
+💾 批量保存 5000 条数据...
+批量保存失败: (1062, "Duplicate entry '18407646681-菲尔-fsbbr' for key 'uk_oe_brand_company'")
+✅ 保存成功: 0 条
 
-    # HTTP反向代理相关配置开始 >>>
-    location ~ /purge(/.*) {
-        proxy_cache_purge cache_one 127.0.0.1$request_uri$is_args$args;
-    }
+💾 保存最后一批数据: 3135 条...
+批量保存失败: (1062, "Duplicate entry '11287530314-依纳-fsbbr' for key 'uk_oe_brand_company'")
+✅ 保存成功: 0 条
 
-    location / {
-        proxy_pass http://127.0.0.1:8111;
-        proxy_set_header Host 127.0.0.1:$server_port;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header REMOTE-HOST $remote_addr;
-        add_header X-Cache $upstream_cache_status;
-        proxy_set_header X-Host $host:$server_port;
-        proxy_set_header X-Scheme $scheme;
-        proxy_connect_timeout 30s;
-        proxy_read_timeout 86400s;
-        proxy_send_timeout 30s;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-    # HTTP反向代理相关配置结束 <<<
+================================================================================
+爬取完成统计
+================================================================================
+📊 总记录数: 403135
+✅ 成功保存: 85000 条
+❌ 失败: 0 条
+📄 总页数: 807
+⚠️  失败页数: 0
 
-    access_log  /www/wwwlogs/beihuo_system_test.log;
-    error_log  /www/wwwlogs/beihuo_system_test.error.log;
-}2026/03/18 19:37:01 [notice] 49107#0: signal process started
-2026/03/18 19:41:59 [notice] 50777#0: signal process started
-2026/03/18 19:57:41 [notice] 52423#0: signal process started
-2026/03/18 19:58:43 [notice] 52462#0: signal process started
-2026/04/09 17:42:34 [notice] 630759#0: signal process started
-2026/04/09 17:53:43 [notice] 631341#0: signal process started
-2026/04/09 17:57:58 [notice] 631692#0: signal process started
-2026/04/09 17:59:12 [notice] 631737#0: signal process started
-2026/04/09 19:15:43 [notice] 649656#0: signal process started
-2026/04/09 19:18:58 [notice] 649997#0: signal process started
-2026/04/09 19:19:09 [notice] 650031#0: signal process started
-2026/04/09 19:19:45 [notice] 650096#0: signal process started
-2026/04/09 19:19:48 [notice] 650115#0: signal process started
-2026/04/09 19:31:01 [notice] 655309#0: signal pr
->>>>>>> main
+================================================================================
+CRM全量爬取完成，开始从备货表同步销量数据...
+================================================================================
+
+[销量同步] 失败: (1267, "Illegal mix of collations (utf8mb4_unicode_ci,IMPLICIT) and (utf8mb4_general_ci,IMPLICIT) for operation '='")
+Traceback (most recent call last):
+  File "./app/services/procurement_service/crawl_service.py", line 371, in _sync_sales_from_beihuo
+    cursor.execute(sql, (COMPANY,))
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 682, in tough_method
+    raise error  # re-raise the original error again
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 605, in tough_method
+    result = method(*args, **kwargs)  # try to execute
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 575, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 826, in _read_query_result
+    result.read()
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 1203, in read
+    first_packet = self.connection._read_packet()
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 782, in _read_packet
+    packet.raise_for_error()
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/err.py", line 150, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.OperationalError: (1267, "Illegal mix of collations (utf8mb4_unicode_ci,IMPLICIT) and (utf8mb4_general_ci,IMPLICIT) for operation '='")
+
+[CRM全量爬取] 结束:
+  - 总记录数: 403135
+  - 成功保存: 85000
+  - 失败: 0
+
+
+  ============================================================
+2. 开始采购历史爬取（近5天）+ 聚合到旧表
+============================================================
+[PurchaseHistoryMain] 开始执行采购历史数据同步, company=fsbbr, days=5
+[PurchaseHistoryMain] 第1步: 爬取近5天数据...
+
+============================================================
+开始爬取近 5 天的采购历史数据
+时间范围: 2026-04-08 ~ 2026-04-13
+时间戳范围: 1775599272489 ~ 1776031272489
+============================================================
+
+正在获取第 1 页数据...
+
+[定时任务] WMS已完成订单自动拉取任务开始 - 2026-04-13 06:01:30 ====================================================================================================
+--------------------------------------------------
+get_status_orders_complete
+
+============================================================
+[开思自动对单] 开始执行: 2026-04-13 06:01:30
+============================================================
+[开思自动对单] 当前时间 6 点，不在运行时间段内，跳过
+[开思自动对单] 任务执行成功
+正在爬取第 1 页
+正在爬取的接口 https://wms.gzbbr.com/api/Wms.Orders/get_status_orders?type=3&status=2&page=1
+[Mon Apr 13 06:01:06 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jdOO.0&sid=nRVoT6JvLzj3loZmAAAB => 200 in 25023ms
+[Mon Apr 13 06:01:31 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jjVd&sid=nRVoT6JvLzj3loZmAAAB => 200 in 5ms
+批量保存详细记录失败: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month, company)\n                    VALUES ('CGRK002202604120047', '上海' at line 4")
+本页解析: 500 条, 保存: 0 条
+
+正在获取第 2 页数据...
+[Mon Apr 13 06:01:08 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jdsA&sid=xifiRNkehYBQUZO6AAAO => 200 in 25022ms
+[Mon Apr 13 06:01:33 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jjzN&sid=xifiRNkehYBQUZO6AAAO => 200 in 0ms
+[Mon Apr 13 06:01:10 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jeLi&sid=h9hpIihiuby_W_V8AAAY => 200 in 25025ms
+[Mon Apr 13 06:01:35 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jkSt&sid=h9hpIihiuby_W_V8AAAY => 200 in 0ms
+请求成功！
+状态码： 200
+网页编码： utf-8
+第 1 页已保存 20 条数据
+正在爬取第 2 页
+正在爬取的接口 https://wms.gzbbr.com/api/Wms.Orders/get_status_orders?type=3&status=2&page=2
+请求成功！
+状态码： 200
+网页编码： utf-8
+第 2 页已保存 20 条数据
+总共保存 40 条数据到数据库
+--------------------------------------------------
+
+[定时任务] WMS已完成订单自动拉取任务完成 - 2026-04-13 06:01:46 ====================================================================================================
+批量保存详细记录失败: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month, company)\n                    VALUES ('CGRK002202604100031', '广州' at line 4")
+本页解析: 495 条, 保存: 0 条
+
+============================================================
+近 5 天采购历史爬取完成!
+时间范围: 2026-04-08 ~ 2026-04-13
+总处理数: 995
+保存记录: 0
+失败数: 0
+============================================================
+[PurchaseHistoryMain] 爬取完成: {'date_range': '2026-04-08 ~ 2026-04-13', 'total_processed': 995, 'saved': 0, 'failed': 0}
+[PurchaseHistoryMain] 第2步: 聚合数据并更新旧表...
+
+============================================================
+开始采购历史数据聚合
+============================================================
+处理月份: 2026-03, 2026-04
+时间范围: 2026-03-01 ~ 2026-04-30
+
+[采购历史爬取] 出现异常: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month,\n                        purchase_date,\n                        suppl' at line 2")
+Traceback (most recent call last):
+  File "./app/tasks/daily_crawl_pipeline.py", line 74, in execute_daily_pipeline
+    purchase_history_result = run(company='fsbbr', days=5)
+  File "./app/services/procurement_service/purchase_history_main.py", line 25, in run
+    aggregate_result = PurchaseHistoryAggregateService().aggregate_and_update(company)
+  File "./app/services/procurement_service/purchase_history_aggregate_service.py", line 45, in aggregate_and_update
+    records = self._aggregate_from_detail(company, start_date, end_date)
+  File "./app/services/procurement_service/purchase_history_aggregate_service.py", line 138, in _aggregate_from_detail
+    cursor.execute(sql, (company, start_date, end_date))
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 605, in tough_method
+    result = method(*args, **kwargs)  # try to execute
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 575, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 826, in _read_query_result
+    result.read()
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 1203, in read
+    first_packet = self.connection._read_packet()
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 782, in _read_packet
+    packet.raise_for_error()
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/err.py", line 150, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.ProgrammingError: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month,\n                        purchase_date,\n                        suppl' at line 2")
+
+============================================================
+3. 开始采购数据同步到比价表
+============================================================
+
+============================================================
+开始采购数据同步到比价表
+============================================================
+
+[采购数据同步] 出现异常: 0
+Traceback (most recent call last):
+  File "./app/tasks/daily_crawl_pipeline.py", line 105, in execute_daily_pipeline
+    sync_result = service.sync_to_compare_summary(company='fsbbr')
+  File "./app/services/procurement_service/purchase_sync_service.py", line 45, in sync_to_compare_summary
+    oe_brand_list = self._get_all_oe_brand(company)
+  File "./app/services/procurement_service/purchase_sync_service.py", line 100, in _get_all_oe_brand
+    return [(row[0], row[1]) for row in cursor.fetchall()]
+  File "./app/services/procurement_service/purchase_sync_service.py", line 100, in <listcomp>
+    return [(row[0], row[1]) for row in cursor.fetchall()]
+KeyError: 0
+
+============================================================
+4. 开始销量明细爬取（近5天）
+============================================================
+
+============================================================
+开始同步近5天销量明细数据
+============================================================
+
+[同步] 日期范围: 2026-04-09 至 2026-04-13 (5天)
+[同步] 总页数: 4
+[保存] 第1页: 500 条
+[保存] 第2/4页: 500 条
+[保存] 第3/4页: 500 条
+[Mon Apr 13 06:01:31 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jjVd.0&sid=nRVoT6JvLzj3loZmAAAB => 200 in 25029ms
+[Mon Apr 13 06:01:56 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jpcx&sid=nRVoT6JvLzj3loZmAAAB => 200 in 0ms
+[保存] 第4/4页: 290 条
+[同步完成] 共4页, 1790条, 保存500条
+============================================================
+
+
+[销量明细爬取] 结束:
+  - 总页数: 4
+  - 总条目: 1790
+  - 保存记录: 500
+
+================================================================================
+每日定时任务执行报告
+开始时间: 2026-04-13 02:00:00.001592
+结束时间: 2026-04-13 06:01:56.608161
+总耗时: 4:01:56.606569
+================================================================================
+
+📊 总同步记录数: 85500
+❌ 总失败数: 2
+
+⚠️  检测到部分任务失败，详见上方错误日志。
+
+================================================================================
+每日定时任务执行完毕
+================================================================================

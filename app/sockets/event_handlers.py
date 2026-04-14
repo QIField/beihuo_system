@@ -117,5 +117,8 @@ def register_socket_events(socketio):
     def handle_request_ks_inquiry():
         """处理询价单数据请求"""
         from app.external_services.ks_inquiry_monitor.inquiry_service import get_cached_stats
+        print(f"[WebSocket] 收到 request_ks_inquiry 请求, sid={request.sid}")
         data = get_cached_stats()
-        socketio.emit('ks_inquiry_update', data, room=request.sid)
+        print(f"[WebSocket] 准备发送 ks_inquiry_update, stores={len(data.get('stores', []))}")
+        socketio.emit('ks_inquiry_update', data, room=request.sid, namespace='/notifications')
+        print(f"[WebSocket] 已发送 ks_inquiry_update 到 {request.sid}")

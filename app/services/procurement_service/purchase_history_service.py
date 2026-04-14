@@ -228,7 +228,7 @@ class PurchaseHistoryService:
                     INSERT INTO crmapp_procurement_history_detail
                     (order_no, fullname, l_name_zh_default, frey_no, number, brand,
                      l_model_zh, purchase_quantity, unit_cost, create_date,
-                     expected_delivery_date, year_month, company)
+                     expected_delivery_date, `year_month`, company)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
                         fullname = VALUES(fullname),
@@ -239,7 +239,7 @@ class PurchaseHistoryService:
                         unit_cost = VALUES(unit_cost),
                         create_date = VALUES(create_date),
                         expected_delivery_date = VALUES(expected_delivery_date),
-                        year_month = VALUES(year_month)
+                        `year_month` = VALUES(`year_month`)
                 """
 
                 values = []
