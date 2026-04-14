@@ -590,19 +590,14 @@ def process_oe_number_with_timeout(session, oe_number, brand, timeout=30):
 
 def get_current_day_time_range():
     """
-    获取当前日期13:00到第二天13:00的时间范围
-    例如：今天是16号，则返回16号13:00到17号13:00的时间范围
+    获取当前日期00:00到23:59的时间范围
+    例如：今天是16号，则返回16号00:00到16号23:59的时间范围
     """
     now = datetime.now()
-    # 当天13:00
-    start_time = now.replace(hour=13, minute=0, second=0, microsecond=0)
-    
-    # 如果当前时间小于当天13:00，则使用前一天13:00到当天13:00
-    if now < start_time:
-        start_time = start_time - timedelta(days=1)
-    
-    # 结束时间为start_time + 24小时
-    end_time = start_time + timedelta(hours=24)
+    # 当天00:00
+    start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # 当天23:59:59
+    end_time = now.replace(hour=23, minute=59, second=59, microsecond=0)
     
     return start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S')
 

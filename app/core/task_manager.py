@@ -68,29 +68,33 @@ class LightweightTaskManager:
         
         return self._executor.submit(wrapped_task)
     
-    def schedule(self, func: Callable, trigger: str, job_id: str, 
-                 replace_existing: bool = True, **trigger_args) -> None:
+    def schedule(self, func: Callable, trigger: str, job_id: str,
+                 replace_existing: bool = True, next_run_time=None, **trigger_args) -> None:
         """添加定时任务"""
         self._ensure_initialized()
-        
+
         def wrapper():
             self.submit(func)
-        
+
         if trigger == 'cron':
             trig = CronTrigger(**trigger_args)
         elif trigger == 'interval':
             trig = IntervalTrigger(**trigger_args)
         else:
             raise ValueError(f"不支持的触发器: {trigger}")
-        
-        self._scheduler.add_job(
-            wrapper,
-            trigger=trig,
-            id=job_id,
-            name=func.__name__,
-            replace_existing=replace_existing
-        )
-        
+
+        job_kwargs = {
+            'func': wrapper,
+            'trigger': trig,
+            'id': job_id,
+            'name': func.__name__,
+            'replace_existing': replace_existing
+        }
+        if next_run_time:
+            job_kwargs['next_run_time'] = next_run_time
+
+        self._scheduler.add_job(**job_kwargs)
+
         logger.info(f"[TaskManager] 任务已添加 [{job_id}]")
     
     def get_jobs(self):
@@ -257,8 +261,9 @@ def init_ks_quote_count_task():
 
 
 def init_ks_inquiry_monitor_task():
-    """初始化开思询价单监控任务（8:30-19:00每10分钟）"""
+    """初始化开思询价单监控任务（8:30-19:00每5分钟，首次立即执行）"""
     import os
+    from datetime import datetime
 
     auto_start = os.environ.get('AUTO_START_KS_INQUIRY', 'true').lower() != 'false'
     if not auto_start:
@@ -271,7 +276,6 @@ def init_ks_inquiry_monitor_task():
 
         def crawl_and_broadcast():
             """爬取数据并广播"""
-            from datetime import datetime
             now = datetime.now()
             # 8:30-19:00运行
             if not (8 <= now.hour < 19 or (now.hour == 8 and now.minute >= 30)):
@@ -288,10 +292,11 @@ def init_ks_inquiry_monitor_task():
             crawl_and_broadcast,
             'interval',
             'ks_inquiry_monitor_task',
-            minutes=10,
+            minutes=5,
+            next_run_time=datetime.now(),  # 立即执行第一次
             replace_existing=True
         )
-        print("[询价单监控] 定时任务已注册（8:30-19:00每10分钟）")
+        print("[询价单监控] 定时任务已注册（8:30-19:00每5分钟，首次立即执行）")
 
     except Exception as e:
         logger.error(f"[询价单监控] 失败: {e}")

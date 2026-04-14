@@ -181,7 +181,7 @@ class PurchaseHistoryAggregateService:
                 placeholders = ', '.join(['%s'] * len(year_months))
                 delete_sql = f"""
                     DELETE FROM crmapp_procurement_history 
-                    WHERE company = %s AND year_month IN ({placeholders})
+                    WHERE company = %s AND `year_month` IN ({placeholders})
                 """
                 delete_params = [company] + year_months
                 cursor.execute(delete_sql, delete_params)

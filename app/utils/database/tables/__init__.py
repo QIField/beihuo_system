@@ -24,6 +24,7 @@ from .inventory_tables import (
 from .inquiry_tables import (
     init_ks_inquiry_detail_table,
     init_weixin_inquiry_detail_table,
+    init_ks_inquiry_monitor_table,
 )
 
 from .virtual_inventory_stats_tables import (
@@ -40,4 +41,5 @@ __all__ = [
     'init_ks_inquiry_detail_table',
     'init_weixin_inquiry_detail_table',
     'init_virtual_inventory_stats_log_table',
+    'init_ks_inquiry_monitor_table',
 ]

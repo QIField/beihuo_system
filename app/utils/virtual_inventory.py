@@ -23,18 +23,10 @@ DB_CONFIG = {
 def get_business_time_range(current_time):
     """
     计算给定时间所属的业务时间范围
-    业务时间：每天下午13点到第二天下午13点
+    业务时间：当天00:00到23:59
     """
-    # 如果当前时间在当天13:00之后，则属于当前业务周期（当天13:00到明天13:00）
-    # 如果当前时间在当天13:00之前，则属于上一个业务周期（昨天13:00到今天13:00）
-    if current_time.hour >= 13:
-        # 当前时间 >= 13:00，业务周期为今天13:00 到 明天13:00
-        business_start = current_time.replace(hour=13, minute=0, second=0, microsecond=0)
-        business_end = business_start + timedelta(days=1)
-    else:
-        # 当前时间 < 13:00，业务周期为昨天13:00 到 今天13:00
-        business_start = (current_time - timedelta(days=1)).replace(hour=13, minute=0, second=0, microsecond=0)
-        business_end = business_start + timedelta(days=1)
+    business_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+    business_end = business_start.replace(hour=23, minute=59, second=59, microsecond=0)
     
     return business_start, business_end
 
@@ -2028,14 +2020,10 @@ def main_process(skip_table_creation=False):
     try:
         from app.services.virtual_inventory_stats_service import save_daily_statistics
 
-        # 获取业务日期范围
+        # 获取业务日期范围（当天00:00到23:59）
         current_time = datetime.now()
-        if current_time.hour >= 13:
-            business_start = current_time.replace(hour=13, minute=0, second=0, microsecond=0)
-            business_end = business_start + timedelta(days=1)
-        else:
-            business_start = (current_time - timedelta(days=1)).replace(hour=13, minute=0, second=0, microsecond=0)
-            business_end = business_start + timedelta(days=1)
+        business_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        business_end = business_start.replace(hour=23, minute=59, second=59, microsecond=0)
 
         result = save_daily_statistics(business_start, business_end)
         if result['code'] == 0:

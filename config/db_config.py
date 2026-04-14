@@ -55,11 +55,11 @@ def _create_config(choice):
     """根据选择创建数据库配置"""
     if choice == "local":
         return {
-            'host': os.environ.get('DB_HOST', 'localhost'),
+            'host': os.environ.get('DB_HOST', '113.46.196.69'),
             'port': int(os.environ.get('DB_PORT', 3306)),
-            'user': os.environ.get('DB_USER', 'root'),
-            'password': os.environ.get('DB_PASSWORD', '123456'),
-            'database': os.environ.get('DB_NAME', 'test'),
+            'user': os.environ.get('DB_USER', 'BBR_test'),
+            'password': os.environ.get('DB_PASSWORD', 'SkYwiC5DDhZA8XtH'),
+            'database': os.environ.get('DB_NAME', 'bbr_test'),
             'charset': 'utf8mb4',
             'autocommit': True,
             'use_unicode': True

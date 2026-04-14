@@ -17,12 +17,12 @@ from app.utils.database_connection import get_db_connection
 def get_business_date_range_for_date(target_date):
     """
     获取指定日期的业务时间范围
-    业务时间：每天下午13点到第二天下午13点
+    业务时间：当天00:00到23:59
     """
-    # 当天13:00
-    start_time = datetime.combine(target_date, datetime.min.time().replace(hour=13))
-    # 第二天13:00
-    end_time = start_time + timedelta(days=1)
+    # 当天00:00
+    start_time = datetime.combine(target_date, datetime.min.time())
+    # 当天23:59:59
+    end_time = datetime.combine(target_date, datetime.max.time().replace(microsecond=0))
     return start_time, end_time
 
 
