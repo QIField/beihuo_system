@@ -55,3 +55,6 @@ docker/logs/
 # uWSGI
 *.pid
 *.sock
+
+# Custom
+1.txt

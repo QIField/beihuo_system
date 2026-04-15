@@ -1,242 +1,319 @@
-💾 批量保存 5000 条数据...
-批量保存失败: (1062, "Duplicate entry '6420901642-巴博瑞-fsbbr' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
+{
+    "code": 200,
+    "errorMessage": null,
+    "data": [
+        {
+            "eventCount": 29,
+            "eventDate": "04-08"
+        },
+        {
+            "eventCount": 30,
+            "eventDate": "04-09"
+        },
+        {
+            "eventCount": 29,
+            "eventDate": "04-10"
+        },
+        {
+            "eventCount": 31,
+            "eventDate": "04-11"
+        },
+        {
+            "eventCount": 77,
+            "eventDate": "04-12"
+        },
+        {
+            "eventCount": 15,
+            "eventDate": "04-13"
+        },
+        {
+            "eventCount": 19,
+            "eventDate": "04-14"
+        }
+    ]
+}
+
+{
+    "code": 200,
+    "errorMessage": null,
+    "data": [
+        {
+            "eventTypeKey": "QUOTATION_SUBMIT_OVERDUE",
+            "eventTypeName": "报价单超10分钟未报价",
+            "eventCount": 11,
+            "statisticsUnit": "单",
+            "eventDate": "2026-04-14",
+            "eventInfluence": "报价不及时，可能错失成交机会。",
+            "eventSuggest": "系统报出为主，人工报出为辅。\\n1、提升店铺成员对平台的重视度；\\n2、人工重点补充系统报出缺失的品类、品质。"
+        },
+        {
+            "eventTypeKey": "ORDER_PAYMENT_OVERDUE",
+            "eventTypeName": "订单超10分钟未支付",
+            "eventCount": 7,
+            "statisticsUnit": "单",
+            "eventDate": "2026-04-14",
+            "eventInfluence": "客户已下单未付款，可能找其他商家采购。",
+            "eventSuggest": "1、主动跟单，解决客户因商品品质、价格等疑虑促进成交； \\n2、如客户遇到因支付、挂账额度等平台因素无法支付，可联系平台协助解决。"
+        },
+        {
+            "eventTypeKey": "INVOICE_TIPS",
+            "eventTypeName": "月度开票",
+            "eventCount": 1,
+            "statisticsUnit": "次",
+            "eventDate": "2026-04-14",
+            "eventInfluence": "影响店铺绩效和对账回款。",
+            "eventSuggest": "及时盘点待开票账单，及时开票并上传至商家工作台。"
+        }
+    ]
+}
 
 
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 86")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 315")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 1783")
-✅ 保存成功: 0 条
-
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 2164")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1062, "Duplicate entry '13908665236-菲尔-fsbbr' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1062, "Duplicate entry '11318648732，11317592877，11317592850，11318685091-盖茨-fsb' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1062, "Duplicate entry '18407646681-菲尔-fsbbr' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-💾 保存最后一批数据: 3135 条...
-批量保存失败: (1062, "Duplicate entry '11287530314-依纳-fsbbr' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-================================================================================
-爬取完成统计
-================================================================================
-📊 总记录数: 403135
-✅ 成功保存: 85000 条
-❌ 失败: 0 条
-📄 总页数: 807
-⚠️  失败页数: 0
-
-================================================================================
-CRM全量爬取完成，开始从备货表同步销量数据...
-================================================================================
-
-[销量同步] 失败: (1267, "Illegal mix of collations (utf8mb4_unicode_ci,IMPLICIT) and (utf8mb4_general_ci,IMPLICIT) for operation '='")
-Traceback (most recent call last):
-  File "./app/services/procurement_service/crawl_service.py", line 371, in _sync_sales_from_beihuo
-    cursor.execute(sql, (COMPANY,))
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 682, in tough_method
-    raise error  # re-raise the original error again
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 605, in tough_method
-    result = method(*args, **kwargs)  # try to execute
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 153, in execute
-    result = self._query(query)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 322, in _query
-    conn.query(q)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 575, in query
-    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 826, in _read_query_result
-    result.read()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 1203, in read
-    first_packet = self.connection._read_packet()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 782, in _read_packet
-    packet.raise_for_error()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/protocol.py", line 219, in raise_for_error
-    err.raise_mysql_exception(self._data)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/err.py", line 150, in raise_mysql_exception
-    raise errorclass(errno, errval)
-pymysql.err.OperationalError: (1267, "Illegal mix of collations (utf8mb4_unicode_ci,IMPLICIT) and (utf8mb4_general_ci,IMPLICIT) for operation '='")
-
-[CRM全量爬取] 结束:
-  - 总记录数: 403135
-  - 成功保存: 85000
-  - 失败: 0
-
-
-  ============================================================
-2. 开始采购历史爬取（近5天）+ 聚合到旧表
-============================================================
-[PurchaseHistoryMain] 开始执行采购历史数据同步, company=fsbbr, days=5
-[PurchaseHistoryMain] 第1步: 爬取近5天数据...
-
-============================================================
-开始爬取近 5 天的采购历史数据
-时间范围: 2026-04-08 ~ 2026-04-13
-时间戳范围: 1775599272489 ~ 1776031272489
-============================================================
-
-正在获取第 1 页数据...
-
-[定时任务] WMS已完成订单自动拉取任务开始 - 2026-04-13 06:01:30 ====================================================================================================
---------------------------------------------------
-get_status_orders_complete
-
-============================================================
-[开思自动对单] 开始执行: 2026-04-13 06:01:30
-============================================================
-[开思自动对单] 当前时间 6 点，不在运行时间段内，跳过
-[开思自动对单] 任务执行成功
-正在爬取第 1 页
-正在爬取的接口 https://wms.gzbbr.com/api/Wms.Orders/get_status_orders?type=3&status=2&page=1
-[Mon Apr 13 06:01:06 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jdOO.0&sid=nRVoT6JvLzj3loZmAAAB => 200 in 25023ms
-[Mon Apr 13 06:01:31 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jjVd&sid=nRVoT6JvLzj3loZmAAAB => 200 in 5ms
-批量保存详细记录失败: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month, company)\n                    VALUES ('CGRK002202604120047', '上海' at line 4")
-本页解析: 500 条, 保存: 0 条
-
-正在获取第 2 页数据...
-[Mon Apr 13 06:01:08 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jdsA&sid=xifiRNkehYBQUZO6AAAO => 200 in 25022ms
-[Mon Apr 13 06:01:33 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jjzN&sid=xifiRNkehYBQUZO6AAAO => 200 in 0ms
-[Mon Apr 13 06:01:10 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jeLi&sid=h9hpIihiuby_W_V8AAAY => 200 in 25025ms
-[Mon Apr 13 06:01:35 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jkSt&sid=h9hpIihiuby_W_V8AAAY => 200 in 0ms
-请求成功！
-状态码： 200
-网页编码： utf-8
-第 1 页已保存 20 条数据
-正在爬取第 2 页
-正在爬取的接口 https://wms.gzbbr.com/api/Wms.Orders/get_status_orders?type=3&status=2&page=2
-请求成功！
-状态码： 200
-网页编码： utf-8
-第 2 页已保存 20 条数据
-总共保存 40 条数据到数据库
---------------------------------------------------
-
-[定时任务] WMS已完成订单自动拉取任务完成 - 2026-04-13 06:01:46 ====================================================================================================
-批量保存详细记录失败: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month, company)\n                    VALUES ('CGRK002202604100031', '广州' at line 4")
-本页解析: 495 条, 保存: 0 条
-
-============================================================
-近 5 天采购历史爬取完成!
-时间范围: 2026-04-08 ~ 2026-04-13
-总处理数: 995
-保存记录: 0
-失败数: 0
-============================================================
-[PurchaseHistoryMain] 爬取完成: {'date_range': '2026-04-08 ~ 2026-04-13', 'total_processed': 995, 'saved': 0, 'failed': 0}
-[PurchaseHistoryMain] 第2步: 聚合数据并更新旧表...
-
-============================================================
-开始采购历史数据聚合
-============================================================
-处理月份: 2026-03, 2026-04
-时间范围: 2026-03-01 ~ 2026-04-30
-
-[采购历史爬取] 出现异常: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month,\n                        purchase_date,\n                        suppl' at line 2")
-Traceback (most recent call last):
-  File "./app/tasks/daily_crawl_pipeline.py", line 74, in execute_daily_pipeline
-    purchase_history_result = run(company='fsbbr', days=5)
-  File "./app/services/procurement_service/purchase_history_main.py", line 25, in run
-    aggregate_result = PurchaseHistoryAggregateService().aggregate_and_update(company)
-  File "./app/services/procurement_service/purchase_history_aggregate_service.py", line 45, in aggregate_and_update
-    records = self._aggregate_from_detail(company, start_date, end_date)
-  File "./app/services/procurement_service/purchase_history_aggregate_service.py", line 138, in _aggregate_from_detail
-    cursor.execute(sql, (company, start_date, end_date))
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 605, in tough_method
-    result = method(*args, **kwargs)  # try to execute
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 153, in execute
-    result = self._query(query)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 322, in _query
-    conn.query(q)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 575, in query
-    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 826, in _read_query_result
-    result.read()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 1203, in read
-    first_packet = self.connection._read_packet()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 782, in _read_packet
-    packet.raise_for_error()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/protocol.py", line 219, in raise_for_error
-    err.raise_mysql_exception(self._data)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/err.py", line 150, in raise_mysql_exception
-    raise errorclass(errno, errval)
-pymysql.err.ProgrammingError: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month,\n                        purchase_date,\n                        suppl' at line 2")
-
-============================================================
-3. 开始采购数据同步到比价表
-============================================================
-
-============================================================
-开始采购数据同步到比价表
-============================================================
-
-[采购数据同步] 出现异常: 0
-Traceback (most recent call last):
-  File "./app/tasks/daily_crawl_pipeline.py", line 105, in execute_daily_pipeline
-    sync_result = service.sync_to_compare_summary(company='fsbbr')
-  File "./app/services/procurement_service/purchase_sync_service.py", line 45, in sync_to_compare_summary
-    oe_brand_list = self._get_all_oe_brand(company)
-  File "./app/services/procurement_service/purchase_sync_service.py", line 100, in _get_all_oe_brand
-    return [(row[0], row[1]) for row in cursor.fetchall()]
-  File "./app/services/procurement_service/purchase_sync_service.py", line 100, in <listcomp>
-    return [(row[0], row[1]) for row in cursor.fetchall()]
-KeyError: 0
-
-============================================================
-4. 开始销量明细爬取（近5天）
-============================================================
-
-============================================================
-开始同步近5天销量明细数据
-============================================================
-
-[同步] 日期范围: 2026-04-09 至 2026-04-13 (5天)
-[同步] 总页数: 4
-[保存] 第1页: 500 条
-[保存] 第2/4页: 500 条
-[保存] 第3/4页: 500 条
-[Mon Apr 13 06:01:31 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jjVd.0&sid=nRVoT6JvLzj3loZmAAAB => 200 in 25029ms
-[Mon Apr 13 06:01:56 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jpcx&sid=nRVoT6JvLzj3loZmAAAB => 200 in 0ms
-[保存] 第4/4页: 290 条
-[同步完成] 共4页, 1790条, 保存500条
-============================================================
-
-
-[销量明细爬取] 结束:
-  - 总页数: 4
-  - 总条目: 1790
-  - 保存记录: 500
-
-================================================================================
-每日定时任务执行报告
-开始时间: 2026-04-13 02:00:00.001592
-结束时间: 2026-04-13 06:01:56.608161
-总耗时: 4:01:56.606569
-================================================================================
-
-📊 总同步记录数: 85500
-❌ 总失败数: 2
-
-⚠️  检测到部分任务失败，详见上方错误日志。
-
-================================================================================
-每日定时任务执行完毕
-================================================================================
+{
+    "code": 200,
+    "errorMessage": null,
+    "data": {
+        "statisticsPeriodInfo": "近7天",
+        "heads": [
+            {
+                "key": "indicator",
+                "type": null,
+                "names": [
+                    "指标"
+                ],
+                "children": null
+            },
+            {
+                "key": "excellent",
+                "type": null,
+                "names": [
+                    "同行优秀值"
+                ],
+                "children": null
+            },
+            {
+                "key": "date1",
+                "type": null,
+                "names": [
+                    "4.7 周二"
+                ],
+                "children": null
+            },
+            {
+                "key": "date2",
+                "type": null,
+                "names": [
+                    "4.8 周三"
+                ],
+                "children": null
+            },
+            {
+                "key": "date3",
+                "type": null,
+                "names": [
+                    "4.9 周四"
+                ],
+                "children": null
+            },
+            {
+                "key": "date4",
+                "type": null,
+                "names": [
+                    "4.10 周五"
+                ],
+                "children": null
+            },
+            {
+                "key": "date5",
+                "type": null,
+                "names": [
+                    "4.11 周六"
+                ],
+                "children": null
+            },
+            {
+                "key": "date6",
+                "type": null,
+                "names": [
+                    "4.12 周日"
+                ],
+                "children": null
+            },
+            {
+                "key": "date7",
+                "type": null,
+                "names": [
+                    "4.13 周一"
+                ],
+                "children": null
+            }
+        ],
+        "rows": [
+            {
+                "indicator": "销售额(元)",
+                "excellent": "暂不提供",
+                "date1": "58,163.73",
+                "date2": "60,834.07",
+                "date3": "59,994.40",
+                "date4": "57,941.08",
+                "date5": "40,367.73",
+                "date6": "43,788.10",
+                "date7": "49,102.66"
+            },
+            {
+                "indicator": "系统报价成交额比例(%)",
+                "excellent": "100.00%",
+                "date1": "95.67%",
+                "date2": "99.63%",
+                "date3": "99.11%",
+                "date4": "95.64%",
+                "date5": "99.09%",
+                "date6": "100.00%",
+                "date7": "100.00%"
+            },
+            {
+                "indicator": "下单客户数(个)",
+                "excellent": "暂不提供",
+                "date1": "92",
+                "date2": "78",
+                "date3": "84",
+                "date4": "81",
+                "date5": "75",
+                "date6": "69",
+                "date7": "73"
+            },
+            {
+                "indicator": "总报出率(%)",
+                "excellent": "98.10%",
+                "date1": "92.35%",
+                "date2": "93.19%",
+                "date3": "92.03%",
+                "date4": "92.36%",
+                "date5": "92.77%",
+                "date6": "88.45%",
+                "date7": "94.75%"
+            },
+            {
+                "indicator": "系统报出率(%)",
+                "excellent": "94.72%",
+                "date1": "82.85%",
+                "date2": "83.80%",
+                "date3": "82.15%",
+                "date4": "82.54%",
+                "date5": "82.96%",
+                "date6": "80.74%",
+                "date7": "85.06%"
+            },
+            {
+                "indicator": "人工报出率(%)",
+                "excellent": "103.70%",
+                "date1": "55.43%",
+                "date2": "58.40%",
+                "date3": "56.53%",
+                "date4": "56.19%",
+                "date5": "58.15%",
+                "date6": "39.88%",
+                "date7": "65.71%"
+            },
+            {
+                "indicator": "整单报出率(%)",
+                "excellent": "96.21%",
+                "date1": "87.34%",
+                "date2": "88.19%",
+                "date3": "85.33%",
+                "date4": "86.10%",
+                "date5": "85.95%",
+                "date6": "81.51%",
+                "date7": "89.18%"
+            },
+            {
+                "indicator": "现货报出率(%)",
+                "excellent": "100.00%",
+                "date1": "96.74%",
+                "date2": "97.00%",
+                "date3": "96.18%",
+                "date4": "96.47%",
+                "date5": "96.62%",
+                "date6": "97.33%",
+                "date7": "96.88%"
+            },
+            {
+                "indicator": "报出转化率(%)",
+                "excellent": "96.36%",
+                "date1": "7.10%",
+                "date2": "6.97%",
+                "date3": "6.48%",
+                "date4": "5.20%",
+                "date5": "6.84%",
+                "date6": "5.04%",
+                "date7": "5.77%"
+            },
+            {
+                "indicator": "系统报出转化率(%)",
+                "excellent": "27.53%",
+                "date1": "7.91%",
+                "date2": "7.63%",
+                "date3": "7.27%",
+                "date4": "5.77%",
+                "date5": "7.57%",
+                "date6": "5.52%",
+                "date7": "6.43%"
+            },
+            {
+                "indicator": "平均报出品质数(个)",
+                "excellent": "暂不提供",
+                "date1": "2.91",
+                "date2": "2.86",
+                "date3": "2.64",
+                "date4": "2.63",
+                "date5": "2.7",
+                "date6": "2.72",
+                "date7": "2.68"
+            },
+            {
+                "indicator": "退货SKU数(个)",
+                "excellent": "暂不提供",
+                "date1": "6",
+                "date2": "12",
+                "date3": "6",
+                "date4": "15",
+                "date5": "15",
+                "date6": "5",
+                "date7": "4"
+            },
+            {
+                "indicator": "SKU退货率(%)",
+                "excellent": "暂不提供",
+                "date1": "3.08%",
+                "date2": "5.58%",
+                "date3": "3.21%",
+                "date4": "9.09%",
+                "date5": "9.04%",
+                "date6": "3.45%",
+                "date7": "2.37%"
+            },
+            {
+                "indicator": "退货金额(元)",
+                "excellent": "暂不提供",
+                "date1": "857.98",
+                "date2": "1,949.87",
+                "date3": "2,406.97",
+                "date4": "5,987.86",
+                "date5": "5,281.83",
+                "date6": "448.96",
+                "date7": "715.90"
+            },
+            {
+                "indicator": "金额退货率(%)",
+                "excellent": "暂不提供",
+                "date1": "1.48%",
+                "date2": "3.21%",
+                "date3": "4.01%",
+                "date4": "10.33%",
+                "date5": "13.08%",
+                "date6": "1.03%",
+                "date7": "1.46%"
+            }
+        ],
+        "total": null
+    }
+}
