@@ -1,76 +1,6 @@
 {
     "code": 200,
     "errorMessage": null,
-    "data": [
-        {
-            "eventCount": 29,
-            "eventDate": "04-08"
-        },
-        {
-            "eventCount": 30,
-            "eventDate": "04-09"
-        },
-        {
-            "eventCount": 29,
-            "eventDate": "04-10"
-        },
-        {
-            "eventCount": 31,
-            "eventDate": "04-11"
-        },
-        {
-            "eventCount": 77,
-            "eventDate": "04-12"
-        },
-        {
-            "eventCount": 15,
-            "eventDate": "04-13"
-        },
-        {
-            "eventCount": 19,
-            "eventDate": "04-14"
-        }
-    ]
-}
-
-{
-    "code": 200,
-    "errorMessage": null,
-    "data": [
-        {
-            "eventTypeKey": "QUOTATION_SUBMIT_OVERDUE",
-            "eventTypeName": "报价单超10分钟未报价",
-            "eventCount": 11,
-            "statisticsUnit": "单",
-            "eventDate": "2026-04-14",
-            "eventInfluence": "报价不及时，可能错失成交机会。",
-            "eventSuggest": "系统报出为主，人工报出为辅。\\n1、提升店铺成员对平台的重视度；\\n2、人工重点补充系统报出缺失的品类、品质。"
-        },
-        {
-            "eventTypeKey": "ORDER_PAYMENT_OVERDUE",
-            "eventTypeName": "订单超10分钟未支付",
-            "eventCount": 7,
-            "statisticsUnit": "单",
-            "eventDate": "2026-04-14",
-            "eventInfluence": "客户已下单未付款，可能找其他商家采购。",
-            "eventSuggest": "1、主动跟单，解决客户因商品品质、价格等疑虑促进成交； \\n2、如客户遇到因支付、挂账额度等平台因素无法支付，可联系平台协助解决。"
-        },
-        {
-            "eventTypeKey": "INVOICE_TIPS",
-            "eventTypeName": "月度开票",
-            "eventCount": 1,
-            "statisticsUnit": "次",
-            "eventDate": "2026-04-14",
-            "eventInfluence": "影响店铺绩效和对账回款。",
-            "eventSuggest": "及时盘点待开票账单，及时开票并上传至商家工作台。"
-        }
-    ]
-}
-
-
-{
-    "code": 200,
-    "errorMessage": null,
     "data": {
         "statisticsPeriodInfo": "近7天",
         "heads": [
@@ -94,7 +24,7 @@
                 "key": "date1",
                 "type": null,
                 "names": [
-                    "4.7 周二"
+                    "4.8 周三"
                 ],
                 "children": null
             },
@@ -102,7 +32,7 @@
                 "key": "date2",
                 "type": null,
                 "names": [
-                    "4.8 周三"
+                    "4.9 周四"
                 ],
                 "children": null
             },
@@ -110,7 +40,7 @@
                 "key": "date3",
                 "type": null,
                 "names": [
-                    "4.9 周四"
+                    "4.10 周五"
                 ],
                 "children": null
             },
@@ -118,7 +48,7 @@
                 "key": "date4",
                 "type": null,
                 "names": [
-                    "4.10 周五"
+                    "4.11 周六"
                 ],
                 "children": null
             },
@@ -126,7 +56,7 @@
                 "key": "date5",
                 "type": null,
                 "names": [
-                    "4.11 周六"
+                    "4.12 周日"
                 ],
                 "children": null
             },
@@ -134,7 +64,7 @@
                 "key": "date6",
                 "type": null,
                 "names": [
-                    "4.12 周日"
+                    "4.13 周一"
                 ],
                 "children": null
             },
@@ -142,7 +72,7 @@
                 "key": "date7",
                 "type": null,
                 "names": [
-                    "4.13 周一"
+                    "4.14 周二"
                 ],
                 "children": null
             }
@@ -151,167 +81,167 @@
             {
                 "indicator": "销售额(元)",
                 "excellent": "暂不提供",
-                "date1": "58,163.73",
-                "date2": "60,834.07",
-                "date3": "59,994.40",
-                "date4": "57,941.08",
-                "date5": "40,367.73",
-                "date6": "43,788.10",
-                "date7": "49,102.66"
+                "date1": "60,834.07",
+                "date2": "59,994.40",
+                "date3": "57,941.08",
+                "date4": "40,367.73",
+                "date5": "43,788.10",
+                "date6": "49,102.66",
+                "date7": "31,570.32"
             },
             {
                 "indicator": "系统报价成交额比例(%)",
                 "excellent": "100.00%",
-                "date1": "95.67%",
-                "date2": "99.63%",
-                "date3": "99.11%",
-                "date4": "95.64%",
-                "date5": "99.09%",
+                "date1": "99.63%",
+                "date2": "99.11%",
+                "date3": "95.64%",
+                "date4": "99.09%",
+                "date5": "100.00%",
                 "date6": "100.00%",
-                "date7": "100.00%"
+                "date7": "98.21%"
             },
             {
                 "indicator": "下单客户数(个)",
                 "excellent": "暂不提供",
-                "date1": "92",
-                "date2": "78",
-                "date3": "84",
-                "date4": "81",
-                "date5": "75",
-                "date6": "69",
-                "date7": "73"
+                "date1": "78",
+                "date2": "84",
+                "date3": "81",
+                "date4": "75",
+                "date5": "69",
+                "date6": "73",
+                "date7": "71"
             },
             {
                 "indicator": "总报出率(%)",
-                "excellent": "98.10%",
-                "date1": "92.35%",
-                "date2": "93.19%",
-                "date3": "92.03%",
-                "date4": "92.36%",
-                "date5": "92.77%",
-                "date6": "88.45%",
-                "date7": "94.75%"
+                "excellent": "98.19%",
+                "date1": "93.19%",
+                "date2": "92.03%",
+                "date3": "92.36%",
+                "date4": "92.77%",
+                "date5": "88.36%",
+                "date6": "94.49%",
+                "date7": "91.77%"
             },
             {
                 "indicator": "系统报出率(%)",
-                "excellent": "94.72%",
-                "date1": "82.85%",
-                "date2": "83.80%",
-                "date3": "82.15%",
-                "date4": "82.54%",
-                "date5": "82.96%",
-                "date6": "80.74%",
-                "date7": "85.06%"
+                "excellent": "94.71%",
+                "date1": "83.80%",
+                "date2": "82.15%",
+                "date3": "82.54%",
+                "date4": "82.96%",
+                "date5": "80.44%",
+                "date6": "84.83%",
+                "date7": "79.65%"
             },
             {
                 "indicator": "人工报出率(%)",
-                "excellent": "103.70%",
-                "date1": "55.43%",
-                "date2": "58.40%",
-                "date3": "56.53%",
-                "date4": "56.19%",
-                "date5": "58.15%",
-                "date6": "39.88%",
-                "date7": "65.71%"
+                "excellent": "103.57%",
+                "date1": "58.40%",
+                "date2": "56.53%",
+                "date3": "56.19%",
+                "date4": "58.15%",
+                "date5": "40.31%",
+                "date6": "64.49%",
+                "date7": "59.32%"
             },
             {
                 "indicator": "整单报出率(%)",
-                "excellent": "96.21%",
-                "date1": "87.34%",
-                "date2": "88.19%",
-                "date3": "85.33%",
-                "date4": "86.10%",
-                "date5": "85.95%",
-                "date6": "81.51%",
-                "date7": "89.18%"
+                "excellent": "96.23%",
+                "date1": "88.19%",
+                "date2": "85.33%",
+                "date3": "86.10%",
+                "date4": "85.95%",
+                "date5": "81.51%",
+                "date6": "88.45%",
+                "date7": "85.68%"
             },
             {
                 "indicator": "现货报出率(%)",
                 "excellent": "100.00%",
-                "date1": "96.74%",
-                "date2": "97.00%",
-                "date3": "96.18%",
-                "date4": "96.47%",
-                "date5": "96.62%",
-                "date6": "97.33%",
-                "date7": "96.88%"
+                "date1": "97.00%",
+                "date2": "96.18%",
+                "date3": "96.47%",
+                "date4": "96.62%",
+                "date5": "97.26%",
+                "date6": "96.89%",
+                "date7": "95.66%"
             },
             {
                 "indicator": "报出转化率(%)",
-                "excellent": "96.36%",
-                "date1": "7.10%",
-                "date2": "6.97%",
-                "date3": "6.48%",
-                "date4": "5.20%",
-                "date5": "6.84%",
-                "date6": "5.04%",
-                "date7": "5.77%"
+                "excellent": "100.00%",
+                "date1": "6.97%",
+                "date2": "6.48%",
+                "date3": "5.20%",
+                "date4": "6.84%",
+                "date5": "5.18%",
+                "date6": "6.58%",
+                "date7": "3.96%"
             },
             {
                 "indicator": "系统报出转化率(%)",
-                "excellent": "27.53%",
-                "date1": "7.91%",
-                "date2": "7.63%",
-                "date3": "7.27%",
-                "date4": "5.77%",
-                "date5": "7.57%",
-                "date6": "5.52%",
-                "date7": "6.43%"
+                "excellent": "27.11%",
+                "date1": "7.63%",
+                "date2": "7.27%",
+                "date3": "5.77%",
+                "date4": "7.57%",
+                "date5": "5.69%",
+                "date6": "7.29%",
+                "date7": "4.47%"
             },
             {
                 "indicator": "平均报出品质数(个)",
                 "excellent": "暂不提供",
-                "date1": "2.91",
-                "date2": "2.86",
-                "date3": "2.64",
-                "date4": "2.63",
-                "date5": "2.7",
-                "date6": "2.72",
-                "date7": "2.68"
+                "date1": "2.86",
+                "date2": "2.64",
+                "date3": "2.63",
+                "date4": "2.7",
+                "date5": "2.71",
+                "date6": "2.68",
+                "date7": "2.73"
             },
             {
                 "indicator": "退货SKU数(个)",
                 "excellent": "暂不提供",
-                "date1": "6",
-                "date2": "12",
-                "date3": "6",
+                "date1": "12",
+                "date2": "6",
+                "date3": "15",
                 "date4": "15",
-                "date5": "15",
-                "date6": "5",
-                "date7": "4"
+                "date5": "5",
+                "date6": "4",
+                "date7": "13"
             },
             {
                 "indicator": "SKU退货率(%)",
                 "excellent": "暂不提供",
-                "date1": "3.08%",
-                "date2": "5.58%",
-                "date3": "3.21%",
-                "date4": "9.09%",
-                "date5": "9.04%",
-                "date6": "3.45%",
-                "date7": "2.37%"
+                "date1": "5.58%",
+                "date2": "3.21%",
+                "date3": "9.09%",
+                "date4": "9.04%",
+                "date5": "3.45%",
+                "date6": "2.37%",
+                "date7": "9.63%"
             },
             {
                 "indicator": "退货金额(元)",
                 "excellent": "暂不提供",
-                "date1": "857.98",
-                "date2": "1,949.87",
-                "date3": "2,406.97",
-                "date4": "5,987.86",
-                "date5": "5,281.83",
-                "date6": "448.96",
-                "date7": "715.90"
+                "date1": "1,949.87",
+                "date2": "2,406.97",
+                "date3": "5,987.86",
+                "date4": "5,281.83",
+                "date5": "448.96",
+                "date6": "715.90",
+                "date7": "4,675.82"
             },
             {
                 "indicator": "金额退货率(%)",
                 "excellent": "暂不提供",
-                "date1": "1.48%",
-                "date2": "3.21%",
-                "date3": "4.01%",
-                "date4": "10.33%",
-                "date5": "13.08%",
-                "date6": "1.03%",
-                "date7": "1.46%"
+                "date1": "3.21%",
+                "date2": "4.01%",
+                "date3": "10.33%",
+                "date4": "13.08%",
+                "date5": "1.03%",
+                "date6": "1.46%",
+                "date7": "14.81%"
             }
         ],
         "total": null

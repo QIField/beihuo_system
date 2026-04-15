@@ -92,6 +92,18 @@ def init_shop_business_indicator_table():
                 ("sales_amount", "DECIMAL(15,2) DEFAULT 0.00 COMMENT '销售额(元)'"),
                 ("system_quote_rate", "VARCHAR(20) COMMENT '系统报价成交额比例(%)'"),
                 ("order_customer_count", "INT DEFAULT 0 COMMENT '下单客户数(个)'"),
+                ("total_quote_rate", "VARCHAR(20) COMMENT '总报出率(%)'"),
+                ("system_quote_rate_detail", "VARCHAR(20) COMMENT '系统报出率(%)'"),
+                ("manual_quote_rate", "VARCHAR(20) COMMENT '人工报出率(%)'"),
+                ("whole_order_quote_rate", "VARCHAR(20) COMMENT '整单报出率(%)'"),
+                ("spot_quote_rate", "VARCHAR(20) COMMENT '现货报出率(%)'"),
+                ("quote_conversion_rate", "VARCHAR(20) COMMENT '报出转化率(%)'"),
+                ("system_quote_conversion_rate", "VARCHAR(20) COMMENT '系统报出转化率(%)'"),
+                ("avg_quote_quality_count", "DECIMAL(10,2) DEFAULT 0.00 COMMENT '平均报出品质数(个)'"),
+                ("return_sku_count", "INT DEFAULT 0 COMMENT '退货SKU数(个)'"),
+                ("sku_return_rate", "VARCHAR(20) COMMENT 'SKU退货率(%)'"),
+                ("return_amount", "DECIMAL(15,2) DEFAULT 0.00 COMMENT '退货金额(元)'"),
+                ("amount_return_rate", "VARCHAR(20) COMMENT '金额退货率(%)'"),
             ]
             
             for col_name, col_def in alter_columns:
