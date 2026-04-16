@@ -621,8 +621,8 @@ class QuoteCountSyncService:
         print(f"开始时间: {datetime.now()}")
         print(f"{'='*70}")
         
-        # 1. 爬取近60天的开思询价明细（覆盖两个月）
-        crawl_result = self.sync_recent_days(days=60)
+        # 1. 爬取近5天的开思询价明细
+        crawl_result = self.sync_recent_days(days=5)
         
         # 2. 更新统计表（上月+本月）
         stats_result = self.update_stats_from_details()

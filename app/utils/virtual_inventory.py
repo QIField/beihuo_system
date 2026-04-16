@@ -10,6 +10,91 @@ import math
 from .database_connection import get_db_connection as get_pooled_db_connection  # 导入统一的连接池实现并重命名
 
 
+# 全局品牌缓存
+_brand_cache = None
+
+
+def load_crm_brand_list():
+    """
+    从 crm_brand_list 表加载品牌列表
+    返回: {品牌名: type_cn, ...}
+    """
+    global _brand_cache
+    
+    if _brand_cache is not None:
+        return _brand_cache
+    
+    conn = get_pooled_db_connection()
+    brand_dict = {}
+    
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = "SELECT l_name_zh, type_cn FROM crm_brand_list"
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            print(f"查询 crm_brand_list 返回 {len(rows)} 行数据")
+            for row in rows:
+                brand_name = row['l_name_zh'].strip() if row['l_name_zh'] else ''
+                type_cn = row['type_cn'].strip() if row['type_cn'] else ''
+                if brand_name:
+                    brand_dict[brand_name] = type_cn
+        
+        _brand_cache = brand_dict
+        print(f"已从 crm_brand_list 表加载 {len(brand_dict)} 个品牌")
+        return brand_dict
+    except Exception as e:
+        import traceback
+        print(f"加载 crm_brand_list 表失败: {e}")
+        print(traceback.format_exc())
+        _brand_cache = {}
+        return {}
+    finally:
+        conn.close()
+
+
+def clear_brand_cache():
+    """清除品牌缓存"""
+    global _brand_cache
+    _brand_cache = None
+    print("品牌缓存已清除")
+
+
+def process_price_by_brand(price, brand):
+    """
+    根据品牌精准匹配处理价格：
+    - 品牌为'原厂'：价格 × 1.05
+    - 品牌匹配 crm_brand_list 且 type_cn='品牌'：价格 × 1.06
+    - 其他所有情况（包括 type_cn='其他品牌' 或未匹配到的品牌）：价格 × 1.08
+    """
+    if not price or price == '':
+        return 0.0
+    
+    try:
+        price_float = float(price)
+        
+        # 获取品牌缓存
+        brand_dict = load_crm_brand_list()
+        
+        # 检查品牌是否在 crm_brand_list 中
+        if brand in brand_dict:
+            type_cn = brand_dict[brand]
+            # 原厂品牌直接 × 1.05
+            if type_cn == '原厂':
+                return round(price_float * 1.05, 2)
+            # type_cn='品牌' 的 × 1.06
+            elif type_cn == '品牌':
+                return round(price_float * 1.06, 2)
+            # type_cn='其他品牌' 或未匹配到的 × 1.08
+            else:
+                return round(price_float * 1.08, 2)
+        else:
+            # 品牌不在 crm_brand_list 中，× 1.08
+            return round(price_float * 1.08, 2)
+        
+    except (ValueError, TypeError):
+        return 0.0
+
+
 # 数据库配置
 DB_CONFIG = {
     'host': '113.45.176.129',
@@ -513,13 +598,13 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
 
         # 执行查询
         if supplier_name == '腾隆':
-            cursor.execute("SELECT * FROM kucun where shuliang > 0 and gs='腾隆' and chexing='宝马'")
+            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='腾隆' and LEN(REPLACE(bianma, ' ', '')) = 11")
         elif supplier_name == '宝翼隆':
-            cursor.execute("SELECT * FROM kucun where shuliang > 0 and gs='宝翼隆'")
+            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='宝翼隆' and LEN(REPLACE(bianma, ' ', '')) = 11")
         elif supplier_name == '沐博':
-            cursor.execute("SELECT * FROM kucun where shuliang > 0 and gs='沐博'")
+            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='沐博' and LEN(REPLACE(bianma, ' ', '')) = 11")
         else:
-            cursor.execute("SELECT * FROM kucun where shuliang > 0")
+            cursor.execute("SELECT * FROM kucun where shuliang > 1 and LEN(REPLACE(bianma, ' ', '')) = 11")
 
         # 获取结果
         rows = cursor.fetchall()
@@ -535,9 +620,9 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
                 continue
 
             code = row[1].replace(' ', '')
-            # 价格先乘以1.1，然后四舍五入到两位小数
+            # 根据品牌处理价格
             original_price = float(row[7])
-            price = round(original_price * 1.1, 2)
+            price = process_price_by_brand(original_price, brand)
             if price < 1:
                 continue
 
@@ -785,7 +870,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                 except ValueError:
                     print(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
-            adjusted_price = round(price_value * 1.1, 2)
+            adjusted_price = process_price_by_brand(price_value, '贝洱')
             data.append([
                 number, '贝洱', adjusted_price, male[number]['stock']
             ])
@@ -800,7 +885,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                 except ValueError:
                     print(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
-            adjusted_price = round(price_value * 1.1, 2)
+            adjusted_price = process_price_by_brand(price_value, '马勒')
             data.append([
                 number, '马勒', adjusted_price, beier[number]['stock']
             ])
@@ -816,7 +901,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                 except ValueError:
                     print(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
-            adjusted_price = round(price_value * 1.1, 2)
+            adjusted_price = process_price_by_brand(price_value, '吉凯恩')
             data.append([
                 number, '吉凯恩', adjusted_price, ntf[number]['stock']
             ])
@@ -831,7 +916,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                 except ValueError:
                     print(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
-            adjusted_price = round(price_value * 1.1, 2)
+            adjusted_price = process_price_by_brand(price_value, '纳铁福')
             data.append([
                 number, '纳铁福', adjusted_price, jky[number]['stock']
             ])
@@ -975,9 +1060,9 @@ def gylqp_start():
             bm = bm.split('-')[0].replace('AM','')
             gys = '爱车贝母'
             pp = '巴博瑞'
-            # 价格乘以1.1并四舍五入到两位小数
+            # 根据品牌处理价格
             original_price = i[4]
-            price = round(original_price * 1.1, 2)
+            price = process_price_by_brand(original_price, pp)
             kc = i[5]
             next_day_later = (current_time + timedelta(days=1)).strftime(
                 "%Y-%m-%d %H:%M:%S")
@@ -990,9 +1075,9 @@ def gylqp_start():
             bm = bm.split('-')[0].replace('AM','')
             gys = '爱车贝母'
             pp = '巴博瑞'
-            # 价格乘以1.1并四舍五入到两位小数
+            # 根据品牌处理价格
             original_price = i[4]
-            price = round(original_price * 1.1, 2)
+            price = process_price_by_brand(original_price, pp)
             kc = i[5]
             next_day_later = (current_time + timedelta(days=1)).strftime(
                 "%Y-%m-%d %H:%M:%S")
@@ -1005,9 +1090,9 @@ def gylqp_start():
             bm = bm.split('-')[0].replace('AM','')
             gys = '爱车贝母'
             pp = '巴博瑞'
-            # 价格乘以1.1并四舍五入到两位小数
+            # 根据品牌处理价格
             original_price = i[4]
-            price = round(original_price * 1.1, 2)
+            price = process_price_by_brand(original_price, pp)
             kc = i[5]
             next_day_later = (current_time + timedelta(days=1)).strftime(
                 "%Y-%m-%d %H:%M:%S")
@@ -1346,9 +1431,8 @@ def fetch_and_process_latest_data():
             batch_size = 1000  # 批量处理大小
             fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # 对所有价格应用乘以1.1并四舍五入到两位小数
-            # 使用向量化操作而不是循环
-            result_df['价格'] = result_df['价格'].apply(lambda x: round(float(x) * 1.1, 2))
+            # 根据品牌处理价格
+            result_df['价格'] = result_df.apply(lambda row: process_price_by_brand(row['价格'], row['品牌']), axis=1)
 
             
             # 保存原始数据到机器人数据表
@@ -1467,9 +1551,10 @@ def ggg2():
     fd_df['原厂OE码'] = fd_df['原厂oe码']
     fd_df = fd_df[['供应商名称','原厂OE码','品牌','价格','失效时间','仓库名称','库存','备注']]
     
-    # 对价格列乘以1.1并四舍五入到两位小数
-    fd_df['价格'] = fd_df['价格'].apply(
-        lambda x: round(float(x) * 1.1, 2) if x != '' and pd.notna(x) and x is not None else x
+    # 根据品牌处理价格
+    fd_df['价格'] = fd_df.apply(
+        lambda row: process_price_by_brand(row['价格'], row['品牌']) if row['价格'] != '' and pd.notna(row['价格']) and row['价格'] is not None else row['价格'],
+        axis=1
     )
 
     # 替换nan值
@@ -1963,6 +2048,13 @@ def main_process(skip_table_creation=False):
         skip_table_creation: 是否跳过表创建检查，默认为False
                             当在应用启动时已创建表，后续定时任务可设为True跳过
     """
+    # 清除品牌缓存，确保每次运行都重新加载
+    clear_brand_cache()
+    
+    # 预加载 crm_brand_list 品牌列表到缓存
+    print("正在加载 crm_brand_list 品牌列表...")
+    load_crm_brand_list()
+    
     # 清理当前业务时间范围内的数据
     clean_business_time_data()
     
