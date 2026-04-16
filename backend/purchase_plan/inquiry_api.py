@@ -90,6 +90,9 @@ def import_price_data():
         # 获取加价倍数
         markup_rate = request.form.get('markup_rate', '1')
         
+        # 获取是否跳过B2B推送
+        skip_b2b = request.form.get('skip_b2b', 'false').lower() == 'true'
+        
         # 提交异步任务
         from app.core.async_task_store import submit_excel_task
         task_id = submit_excel_task(
@@ -97,7 +100,8 @@ def import_price_data():
             temp_path,
             markup_rate,
             creator,
-            company
+            company,
+            skip_b2b
         )
         
         return jsonify({
@@ -155,10 +159,13 @@ def download_inquiry_import_result(task_id):
     )
 
 
-def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str, company: str, progress_callback=None):
+def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str, company: str, skip_b2b: bool = False, progress_callback=None):
     """
     询价导入异步处理函数（完整版）
     支持进度回调，包含完整8步流程
+    
+    参数:
+        skip_b2b: 是否跳过B2B推送，直接入库
     """
     # 读取文件
     if file_path.endswith('.csv'):
@@ -213,6 +220,13 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     
     total = len(valid_items)
     processed = 0
+    
+    # 如果跳过B2B推送，直接走直接入库流程
+    if skip_b2b:
+        return _process_direct_import(
+            valid_items, skipped_items, df, original_columns, column_mapping,
+            brand_aliases_mapping, file_path, creator, company, markup_rate, progress_callback
+        )
     
     # 步骤1：B2B上传（带进度回调）
     def item_callback(result):
@@ -436,61 +450,230 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     
     # 步骤8：同步到比价表和采购记录表
     if inserted_count > 0:
-        sync_data_map = {}
-        procurement_data_list = []
+        _sync_to_compare_and_procurement(insert_data, company)
+    
+    # 清理临时文件
+    os.remove(file_path)
+    
+    return result_path
+
+
+def _process_direct_import(valid_items, skipped_items, df, original_columns, column_mapping, 
+                           brand_aliases_mapping, file_path, creator, company, markup_rate, progress_callback):
+    """
+    处理直接入库流程（跳过B2B推送）
+    """
+    import os
+    from datetime import datetime
+    
+    total = len(valid_items)
+    
+    # 处理品牌别名映射
+    for item in valid_items:
+        original_brand = item.get('brand', '')
+        mapped_brand = brand_aliases_mapping.get(original_brand, original_brand)
+        item['mapped_brand'] = mapped_brand
+        # 直接入库，所有数据都标记为成功
+        item['处理结果'] = '直接入库'
+        item['详情'] = '跳过B2B推送，直接入库'
+        item['二次上传'] = ''
         
-        for data in insert_data:
-            key = (data['oe'], data['brand'], data['company'])
-            if key not in sync_data_map:
-                sync_data_map[key] = key
+        if progress_callback:
+            progress_callback(valid_items.index(item) + 1, total, f"处理: {item.get('oe', '')}")
+    
+    for item in skipped_items:
+        item['处理结果'] = '其他'
+        item['详情'] = f"跳过: {item.get('skip_reason', '')}"
+        item['二次上传'] = ''
+    
+    # 生成Excel结果文件
+    all_items = valid_items + skipped_items
+    result_data = []
+    
+    for item in all_items:
+        row_data = {}
+        for orig_col in original_columns:
+            english_col = column_mapping.get(orig_col, orig_col)
+            if english_col == 'brand':
+                row_data[orig_col] = item.get('mapped_brand', item.get('brand', ''))
+            elif english_col in ['oe', 'supplier', 'price', 'warehouse', 'expire_time', 'stock_quantity', 'remark']:
+                value = item.get(english_col, '')
+                if value is None or (isinstance(value, float) and math.isnan(value)) or str(value).lower() == 'nan':
+                    value = ''
+                row_data[orig_col] = value
+            else:
+                idx = item.get('index')
+                if idx is not None and idx < len(df):
+                    value = df.iloc[idx].get(english_col, '')
+                    if value is None or (isinstance(value, float) and math.isnan(value)) or str(value).lower() == 'nan':
+                        value = ''
+                    row_data[orig_col] = value
+                else:
+                    row_data[orig_col] = ''
+        
+        row_data['处理结果'] = item.get('处理结果', '')
+        row_data['详情'] = item.get('详情', '')
+        row_data['二次上传'] = item.get('二次上传', '')
+        result_data.append(row_data)
+    
+    result_df = pd.DataFrame(result_data)
+    output_cols = list(original_columns) + ['处理结果', '详情', '二次上传']
+    result_df = result_df[output_cols]
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    result_filename = f'inquiry_direct_result_{timestamp}.xlsx'
+    result_dir = 'static/uploads/b2b_results'
+    os.makedirs(result_dir, exist_ok=True)
+    result_path = os.path.join(result_dir, result_filename)
+    result_df.to_excel(result_path, index=False)
+    
+    # 导入到直接入库表（所有有效数据）
+    insert_data = []
+    for item in valid_items:
+        try:
+            oe = item['oe']
+            brand = item.get('mapped_brand') or item.get('brand') or None
+            supplier = item.get('supplier') or None
+            price = item.get('price', 0)
+            original_price = item.get('original_price', price)
+            warehouse = item.get('warehouse') or None
+            expire_time = item.get('expire_time')
+            remark = item.get('remark')
+            if remark and str(remark).lower() == 'nan':
+                remark = None
+            elif remark:
+                remark = str(remark).strip() or None
+            stock_quantity = item.get('stock_quantity', 0)
             
-            original_price = data.get('original_price', data['price'])
-            if data['supplier'] and original_price > 0:
-                procurement_data_list.append({
-                    'oe': data['oe'], 'brand': data['brand'],
-                    'supplier': data['supplier'], 'price': original_price,
-                    'company': data['company']
-                })
-        
+            # 处理失效时间
+            if expire_time and pd.notna(expire_time):
+                if isinstance(expire_time, str):
+                    expire_time = expire_time.strip()
+                    parsed = False
+                    for fmt in ['%Y/%m/%d %H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d', '%Y/%m/%d']:
+                        try:
+                            expire_time = datetime.strptime(expire_time, fmt)
+                            parsed = True
+                            break
+                        except ValueError:
+                            continue
+                    if not parsed:
+                        expire_time = None
+            else:
+                expire_time = None
+            
+            insert_data.append({
+                'oe': oe, 'brand': brand, 'supplier': supplier, 'price': price,
+                'original_price': original_price, 'warehouse': warehouse,
+                'expire_time': expire_time, 'remark': remark,
+                'stock_quantity': stock_quantity, 'common_number': None,
+                'company': company, 'creator': creator,
+                'source_file': os.path.basename(file_path)
+            })
+        except Exception as e:
+            pass
+    
+    inserted_count = 0
+    if insert_data:
         conn = get_db_connection()
         cursor = conn.cursor()
         try:
-            if sync_data_map:
-                cursor.executemany("""
-                    INSERT IGNORE INTO crmapp_compare_summary (oe, brand, company)
-                    VALUES (%s, %s, %s)
-                """, list(sync_data_map.values()))
-                conn.commit()
+            batch_insert_data = []
+            for data in insert_data:
+                cursor.execute("""
+                    SELECT replace_number, is_cass FROM crmapp_compare_summary 
+                    WHERE oe = %s AND brand = %s AND company = %s
+                """, (data['oe'], data['brand'], data['company']))
+                compare_result = cursor.fetchone()
+                
+                sync_common_number = compare_result[0] if compare_result and compare_result[0] else ''
+                sync_ks_sync = 1 if compare_result and compare_result[1] and str(compare_result[1]) == '1' else 0
+                
+                batch_insert_data.append((
+                    data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['warehouse'],
+                    data['expire_time'], data['remark'], data['stock_quantity'],
+                    sync_common_number, sync_ks_sync, data['company'], data['creator'], data['source_file']
+                ))
+
+            cursor.executemany("""
+                INSERT IGNORE INTO crmapp_price_inquiry_direct
+                (oe, brand, supplier, price, original_price, warehouse, expire_time, remark,
+                 stock_quantity, common_number, ks_sync, company, creator, source_file)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, batch_insert_data)
             
-            for proc_data in procurement_data_list:
-                try:
-                    add_inquiry_record(
-                        proc_data['oe'], proc_data['brand'],
-                        proc_data['supplier'], proc_data['price'], proc_data['company']
-                    )
-                except Exception as e:
-                    pass
-            
-            if procurement_data_list:
-                try:
-                    from app.services.procurement_service.purchase_sync_service import PurchaseSyncService
-                    sync_service = PurchaseSyncService()
-                    for proc_data in procurement_data_list:
-                        sync_service.sync_single_product(
-                            proc_data['oe'], proc_data['brand'], proc_data['company']
-                        )
-                except Exception as e:
-                    pass
+            conn.commit()
+            inserted_count = cursor.rowcount
         except Exception as e:
             conn.rollback()
         finally:
             cursor.close()
             conn.close()
     
+    # 同步到比价表和采购记录表
+    if inserted_count > 0:
+        _sync_to_compare_and_procurement(insert_data, company)
+    
     # 清理临时文件
     os.remove(file_path)
     
     return result_path
+
+
+def _sync_to_compare_and_procurement(insert_data, company):
+    """
+    同步数据到比价表和采购记录表
+    """
+    sync_data_map = {}
+    procurement_data_list = []
+    
+    for data in insert_data:
+        key = (data['oe'], data['brand'], data['company'])
+        if key not in sync_data_map:
+            sync_data_map[key] = key
+        
+        original_price = data.get('original_price', data['price'])
+        if data['supplier'] and original_price > 0:
+            procurement_data_list.append({
+                'oe': data['oe'], 'brand': data['brand'],
+                'supplier': data['supplier'], 'price': original_price,
+                'company': data['company']
+            })
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if sync_data_map:
+            cursor.executemany("""
+                INSERT IGNORE INTO crmapp_compare_summary (oe, brand, company)
+                VALUES (%s, %s, %s)
+            """, list(sync_data_map.values()))
+            conn.commit()
+        
+        for proc_data in procurement_data_list:
+            try:
+                add_inquiry_record(
+                    proc_data['oe'], proc_data['brand'],
+                    proc_data['supplier'], proc_data['price'], proc_data['company']
+                )
+            except Exception as e:
+                pass
+        
+        if procurement_data_list:
+            try:
+                from app.services.procurement_service.purchase_sync_service import PurchaseSyncService
+                sync_service = PurchaseSyncService()
+                for proc_data in procurement_data_list:
+                    sync_service.sync_single_product(
+                        proc_data['oe'], proc_data['brand'], proc_data['company']
+                    )
+            except Exception as e:
+                pass
+    except Exception as e:
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def _classify_nine_category(update_msg: str, create_result: str) -> str:
@@ -583,6 +766,109 @@ def get_inquiry_list():
         data_sql = f"""
             SELECT id, oe, brand, supplier, price, original_price, warehouse, expire_time, remark, stock_quantity, common_number, ks_sync, import_time
             FROM crmapp_price_inquiry
+            {where_clause}
+            ORDER BY oe, brand, id DESC
+        """
+        cursor.execute(data_sql, params)
+
+        # 获取列名和数据
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+
+        # 转换为字典列表并格式化日期
+        data_list = []
+        for row in rows:
+            # 如果row已经是字典，直接使用；否则进行zip转换
+            if isinstance(row, dict):
+                item = row
+            else:
+                item = dict(zip(columns, row))
+            # 格式化失效时间（仅当是datetime类型时）
+            if item.get('expire_time') and hasattr(item['expire_time'], 'strftime'):
+                item['expire_time'] = item['expire_time'].strftime('%Y-%m-%d %H:%M:%S')
+            # 格式化上传时间（仅当是datetime类型时）
+            if item.get('import_time') and hasattr(item['import_time'], 'strftime'):
+                item['import_time'] = item['import_time'].strftime('%Y-%m-%d %H:%M:%S')
+            # 处理备注字段：如果是None或'None'字符串，设为空值
+            if item.get('remark') is None or item.get('remark') == 'None':
+                item['remark'] = ''
+            data_list.append(item)
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': data_list,
+            'total': len(data_list)
+        })
+
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取数据失败: {str(e)}'}), 500
+
+
+@inquiry_bp.route('/direct/list', methods=['GET'])
+@inquiry_permission_required
+def get_direct_inquiry_list():
+    """
+    获取直接入库数据列表
+    返回扁平化数据，用于AG Grid
+    根据用户所在组织过滤数据
+    """
+    try:
+        # 获取查询参数
+        oe = request.args.get('oe', '').strip()
+        brand = request.args.get('brand', '').strip()
+        supplier = request.args.get('supplier', '').strip()
+        
+        # 获取用户当前切换到的组织
+        company = session.get('current_org', session.get('store', 'fsbbr'))
+
+        # 构建查询条件
+        where_conditions = []
+        params = []
+
+        # 必须按用户所在组织过滤
+        where_conditions.append("company = %s")
+        params.append(company)
+
+        # 处理多行搜索
+        oe_list = parse_space(oe) if oe else []
+        brand_list = parse_comma(brand) if brand else []
+        supplier_list = parse_comma(supplier) if supplier else []
+
+        if oe_list:
+            or_conditions = []
+            for item in oe_list:
+                or_conditions.append("oe LIKE %s")
+                params.append(f"%{item}%")
+            where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+
+        if brand_list:
+            or_conditions = []
+            for item in brand_list:
+                or_conditions.append("brand LIKE %s")
+                params.append(f"%{item}%")
+            where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+
+        if supplier_list:
+            or_conditions = []
+            for item in supplier_list:
+                or_conditions.append("supplier LIKE %s")
+                params.append(f"%{item}%")
+            where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+
+        where_clause = "WHERE " + " AND ".join(where_conditions)
+
+        # 连接数据库
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 查询所有数据
+        data_sql = f"""
+            SELECT id, oe, brand, supplier, price, original_price, warehouse, expire_time, remark, stock_quantity, common_number, ks_sync, import_time
+            FROM crmapp_price_inquiry_direct
             {where_clause}
             ORDER BY oe, brand, id DESC
         """

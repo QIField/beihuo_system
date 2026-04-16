@@ -1,6 +1,6 @@
 """
 开思询价相关表
-包含：开思询价明细表、微信询价明细表、询价单监控数据表
+包含：开思询价明细表、微信询价明细表、询价单监控数据表、询价直接入库数据表
 """
 
 from app.utils.database_connection import get_db_connection
@@ -101,5 +101,45 @@ def init_weixin_inquiry_detail_table():
             cursor.execute(create_table_sql)
     except Exception as e:
         print(f"  ✗ 微信询价明细表: {e}")
+    finally:
+        conn.close()
+
+
+def init_price_inquiry_direct_table():
+    """
+    初始化询价直接入库数据表
+    用于存储跳过B2B推送直接入库的询价数据
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS crmapp_price_inquiry_direct (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                oe VARCHAR(50) NOT NULL COMMENT 'OE号',
+                brand VARCHAR(100) DEFAULT NULL COMMENT '品牌',
+                supplier VARCHAR(200) DEFAULT NULL COMMENT '供应商',
+                price DECIMAL(10,2) DEFAULT NULL COMMENT '价格（加价后）',
+                original_price DECIMAL(10,2) DEFAULT NULL COMMENT '原始价格',
+                warehouse VARCHAR(200) DEFAULT NULL COMMENT '仓库',
+                expire_time DATETIME DEFAULT NULL COMMENT '失效时间',
+                remark TEXT COMMENT '备注',
+                stock_quantity INT DEFAULT 0 COMMENT '库存数量',
+                common_number VARCHAR(500) DEFAULT NULL COMMENT '通用号',
+                ks_sync TINYINT DEFAULT 0 COMMENT '是否同步开思 0-否 1-是',
+                company VARCHAR(50) DEFAULT NULL COMMENT '公司',
+                import_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '导入时间',
+                creator VARCHAR(100) DEFAULT NULL COMMENT '导入人',
+                source_file VARCHAR(255) DEFAULT NULL COMMENT '来源文件名',
+                INDEX idx_oe (oe),
+                INDEX idx_brand (brand),
+                INDEX idx_company (company),
+                INDEX idx_import_time (import_time)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='询价直接入库数据表';
+            """
+            cursor.execute(create_table_sql)
+            print("  ✓ 询价直接入库数据表")
+    except Exception as e:
+        print(f"  ✗ 询价直接入库数据表: {e}")
     finally:
         conn.close()
