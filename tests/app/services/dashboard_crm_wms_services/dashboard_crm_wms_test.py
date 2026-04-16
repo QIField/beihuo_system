@@ -54,8 +54,8 @@ def crawl_data_crm_wms_test():
     print("开始测试 crawl_data_crm_wms 函数")
     print("=" * 50)
     
-    start_date = "1775750400000"
-    end_date = "1775836799000"
+    start_date = "1776268800000"
+    end_date = "1776355199000"
     
     print(f"开始时间: {start_date}")
     print(f"结束时间: {end_date}")
@@ -99,5 +99,5 @@ def crawl_data_crm_wms_test():
 
 if __name__ == "__main__":
     # wms_get_status_orders_spider_test()
-    print()
+    # print()
     crawl_data_crm_wms_test()
