@@ -214,6 +214,10 @@ def init_ks_quote_count_task():
         return
 
     try:
+        # 设置环境变量，自动选择线上数据库（定时任务必须自动选择）
+        os.environ['DB_CHOICE'] = 'online'
+        print("[询价次数同步] 已自动选择线上数据库")
+
         def run_quote_count_pipeline():
             """询价次数完整流程"""
             print("\n" + "="*70)
@@ -227,7 +231,9 @@ def init_ks_quote_count_task():
                 weixin_result = WeixinQuoteParserService().parse_recent_days(days=7)
                 print(f"✓ 微信解析完成: {weixin_result.get('saved_count', 0)} 条")
             except Exception as e:
+                import traceback
                 print(f"✗ 微信解析失败: {e}")
+                print(f"详细错误:\n{traceback.format_exc()}")
                 weixin_result = {'saved_count': 0}
             
             # 2. 再爬开思询价
