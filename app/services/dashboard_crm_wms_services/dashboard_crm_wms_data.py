@@ -420,11 +420,12 @@ def crawl_data_crm_wms(start_date, end_date):
 
     # 把数据库返回的数据转成df列表
     df_wms_orders_by_out_nos = pd.DataFrame([vars(order) for order in wms_orders_by_out_nos])
+    # print("数据库查到的数据",df_wms_orders_by_out_nos)
 
     # 要新增的列名
-    new_columns = ['out_no', 'shipper', 'shipDate', 'order_id', 'photos', 'total_quantity']
-
-    if 'out_no' not in df_merged_new.columns:
+    new_columns = ['out_no', 'shipper', 'ship_date', 'order_id', 'photos', 'total_quantity']
+    print("df_wms_orders_by_out_nos列名=",df_wms_orders_by_out_nos.columns)
+    if 'out_no' not in df_wms_orders_by_out_nos.columns:
         # df_wms_orders_by_out_nos['out_no'] = ''
         # 添加多个新列，全部赋值为空字符串
         df_wms_orders_by_out_nos[new_columns] = ""

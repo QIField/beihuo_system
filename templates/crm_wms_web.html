@@ -1004,7 +1004,7 @@
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">发货时间</span>
-                    <span class="detail-value">${formatTimestamp(task.shipDate)}</span>
+                    <span class="detail-value">${handleEmpty(task.ship_date)}</span>
                 </div>
                 <div class="detail-item">
                     <span class="detail-label">图片</span>
@@ -1276,7 +1276,7 @@
                     <td>${formatTimestamp(item.jhdate_timestamp)}</td>
                     <td></td>
                     <td>${handleEmpty(item.shipper)}</td>
-                    <td>${handleEmpty(item.shipDate)}</td>
+                    <td>${handleEmpty(item.ship_date)}</td>
                 `;
                 const statusTd = tr.children[4];
                 statusTd.innerHTML = formatStatus(item.status_wms, item.is_data_exists_wms_keywd);
