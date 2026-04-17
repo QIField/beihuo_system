@@ -93,7 +93,7 @@ class PurchaseHistoryAggregateService:
     def _aggregate_from_detail(self, company: str, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """
         从 crmapp_procurement_history_detail 表聚合数据
-        使用 ROW_NUMBER() 确保价格-供应商一一对应，取每组最低价且最新的一条
+        使用 Python 聚合：取每组 (year_month, oe, brand) 最低价且最新的一条
 
         Args:
             company: 公司代码
@@ -106,47 +106,52 @@ class PurchaseHistoryAggregateService:
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
-                # 使用子查询 + ROW_NUMBER() 取每组第一条（按单价升序，创建日期降序）
+                # 先查询所有数据，然后在 Python 中聚合
                 sql = """
                     SELECT 
-                        year_month,
-                        purchase_date,
-                        supplier_name,
-                        oe,
+                        create_date,
+                        fullname,
+                        number as oe,
                         brand,
-                        unit_price
-                    FROM (
-                        SELECT 
-                            DATE_FORMAT(create_date, '%%Y-%%m') as year_month,
-                            DATE(create_date) as purchase_date,
-                            supplier_name,
-                            number as oe,
-                            brand,
-                            unit_cost as unit_price,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY DATE_FORMAT(create_date, '%%Y-%%m'), number, brand 
-                                ORDER BY unit_cost ASC, create_date DESC
-                            ) as rn
-                        FROM crmapp_procurement_history_detail
-                        WHERE company = %s 
-                            AND create_date BETWEEN %s AND %s
-                            AND unit_cost > 0
-                    ) t
-                    WHERE rn = 1
-                    ORDER BY year_month DESC, oe, brand
+                        unit_cost as unit_price
+                    FROM crmapp_procurement_history_detail
+                    WHERE company = %s 
+                        AND create_date BETWEEN %s AND %s
+                        AND unit_cost > 0
                 """
+                
                 cursor.execute(sql, (company, start_date, end_date))
                 rows = cursor.fetchall()
+                
+                # 在 Python 中聚合：每组 (year_month, oe, brand) 取第一条（最低价且最新）
+                from collections import defaultdict
+                
+                # 按 (year_month, oe, brand) 分组，保留最低价且最新的
+                groups = defaultdict(list)
+                for row in rows:
+                    create_date = row[0]
+                    year_month = create_date.strftime('%Y-%m') if hasattr(create_date, 'strftime') else str(create_date)[:7]
+                    key = (year_month, row[2], row[3])  # (year_month, oe, brand)
+                    groups[key].append(row)
+                
+                # 每组按单价升序、日期降序排序，取第一条
+                seen = {}
+                for key, group_rows in groups.items():
+                    # 排序：单价升序，日期降序
+                    sorted_rows = sorted(group_rows, key=lambda x: (x[4], -x[0].timestamp() if hasattr(x[0], 'timestamp') else 0))
+                    seen[key] = sorted_rows[0]
 
                 records = []
-                for row in rows:
+                for key, row in seen.items():
+                    create_date = row[0]
+                    year_month = key[0]
                     records.append({
-                        'year_month': row[0],
-                        'purchase_date': row[1].strftime('%Y-%m-%d') if hasattr(row[1], 'strftime') else str(row[1]),
-                        'supplier_name': row[2],
-                        'oe': row[3],
-                        'brand': row[4],
-                        'unit_price': float(row[5]) if row[5] else 0.0
+                        'year_month': year_month,
+                        'purchase_date': create_date.strftime('%Y-%m-%d') if hasattr(create_date, 'strftime') else str(create_date)[:10],
+                        'fullname': row[1],
+                        'oe': row[2],
+                        'brand': row[3],
+                        'unit_price': float(row[4]) if row[4] else 0.0
                     })
 
                 return records
@@ -200,7 +205,7 @@ class PurchaseHistoryAggregateService:
                         values.append((
                             record['year_month'],
                             record['purchase_date'],
-                            record['supplier_name'],
+                            record['fullname'],
                             record['oe'],
                             record['brand'],
                             record['unit_price'],

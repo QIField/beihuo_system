@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from datetime import datetime
 from app.services.procurement_service.purchase_history_service import PurchaseHistoryService
 from app.services.procurement_service.purchase_history_aggregate_service import PurchaseHistoryAggregateService
+from app.core.session_init import init_session_manager
 
 
 def crawl_purchase_history_one_year():
@@ -24,7 +25,12 @@ def crawl_purchase_history_one_year():
     print("="*80)
     print(f"⏰ 开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("-"*80)
-    
+
+    # 初始化 SessionManager（必须！用于获取 CRM Cookie）
+    print("🔑 初始化 CRM Session...")
+    init_session_manager()
+    print("✅ CRM Session 初始化完成\n")
+
     # 创建服务实例
     crawl_service = PurchaseHistoryService()
     aggregate_service = PurchaseHistoryAggregateService()

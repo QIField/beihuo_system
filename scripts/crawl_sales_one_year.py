@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from datetime import datetime
 from app.services.sales_history_service.data_sync_service import SalesHistorySyncService
+from app.core.session_init import init_session_manager
 
 
 def crawl_sales_one_year():
@@ -23,6 +24,11 @@ def crawl_sales_one_year():
     print("="*80)
     print(f"⏰ 开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("-"*80)
+    
+    # 初始化 SessionManager（配置CRM Cookie）
+    print("🔐 正在初始化CRM认证...")
+    init_session_manager()
+    print("✅ CRM认证初始化完成\n")
     
     # 创建服务实例
     service = SalesHistorySyncService()
