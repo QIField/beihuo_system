@@ -1,21 +1,21 @@
-# Web 框架
+# Web Framework
 Flask==2.3.3
 Werkzeug==2.3.7
 
-# 数据库
+# Database
 PyMySQL==1.1.0
 pyodbc==4.0.39
 DBUtils==2.0.3
 
-# 数据处理
+# Data Processing
 pandas==2.1.1
 numpy==1.24.3
 openpyxl==3.1.2
 
-# HTTP 请求
+# HTTP Requests
 requests==2.31.0
 
-# 编码检测
+# Encoding Detection
 chardet==5.2.0
 
 # WebSocket
@@ -29,25 +29,25 @@ h11==0.14.0
 greenlet==3.0.1
 bidict==0.22.1
 
-# 定时任务
+# Scheduled Tasks
 schedule==1.2.1
 APScheduler==3.10.4
 
-# 时间处理
+# Time Processing
 python-dateutil==2.8.2
 pytz==2023.3
 tzdata==2023.3
 
-# 网络/DNS
+# Network/DNS
 dnspython==2.4.2
 
-# 网页解析
+# Web Parsing
 beautifulsoup4==4.12.2
 lxml==4.9.3
 
-# 自动化测试
+# Automation Testing
 selenium==4.15.2
 webdriver-manager==4.0.1
 
-# 图像处理
+# Image Processing
 Pillow==10.1.0

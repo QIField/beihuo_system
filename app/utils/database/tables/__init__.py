@@ -25,10 +25,17 @@ from .inquiry_tables import (
     init_ks_inquiry_detail_table,
     init_weixin_inquiry_detail_table,
     init_ks_inquiry_monitor_table,
+    init_price_inquiry_direct_table,
 )
 
 from .virtual_inventory_stats_tables import (
     init_virtual_inventory_stats_log_table,
+)
+
+from .shop_event_tables import (
+    init_shop_event_summary_table,
+    init_shop_event_detail_table,
+    init_shop_business_indicator_table,
 )
 
 __all__ = [
@@ -42,4 +49,8 @@ __all__ = [
     'init_weixin_inquiry_detail_table',
     'init_virtual_inventory_stats_log_table',
     'init_ks_inquiry_monitor_table',
+    'init_shop_event_summary_table',
+    'init_shop_event_detail_table',
+    'init_shop_business_indicator_table',
+    'init_price_inquiry_direct_table',
 ]

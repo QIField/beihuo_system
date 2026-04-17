@@ -14,6 +14,10 @@ from .tables import (
     init_weixin_inquiry_detail_table,
     init_virtual_inventory_stats_log_table,
     init_ks_inquiry_monitor_table,
+    init_shop_event_summary_table,
+    init_shop_event_detail_table,
+    init_shop_business_indicator_table,
+    init_price_inquiry_direct_table,
 )
 
 
@@ -817,6 +821,10 @@ def init_all_tables():
         ('库存明细', init_inventory_detail_table),
         ('虚拟库存统计日志', init_virtual_inventory_stats_log_table),
         ('开思询价单监控', init_ks_inquiry_monitor_table),
+        ('店铺事件汇总', init_shop_event_summary_table),
+        ('店铺事件明细', init_shop_event_detail_table),
+        ('店铺经营指标', init_shop_business_indicator_table),
+        ('询价直接入库', init_price_inquiry_direct_table),
     ]
 
     completed = []

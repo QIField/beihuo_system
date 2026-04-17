@@ -271,6 +271,87 @@
             min-width: 100px;
         }
 
+        /* 跳过B2B开关样式 */
+        .skip-b2b-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            padding: 12px;
+            background-color: #f6ffed;
+            border: 1px solid #b7eb8f;
+            border-radius: 4px;
+        }
+
+        .skip-b2b-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .skip-b2b-container label {
+            color: #52c41a;
+            font-size: 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .skip-b2b-hint {
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            margin-top: -15px;
+            margin-bottom: 20px;
+        }
+
+        /* 标签页样式 */
+        .data-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 0;
+            border-bottom: 1px solid #e8e8e8;
+            background-color: #fafafa;
+            padding: 0 20px;
+        }
+
+        .data-tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .data-tab:hover {
+            color: #1890ff;
+        }
+
+        .data-tab.active {
+            color: #1890ff;
+            border-bottom-color: #1890ff;
+            background-color: #fff;
+            font-weight: 500;
+        }
+
+        .tab-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 8px;
+            background-color: #f0f0f0;
+            color: #666;
+        }
+
+        .data-tab.active .tab-badge {
+            background-color: #1890ff;
+            color: #fff;
+        }
+
         .history-table {
             width: 100%;
             border-collapse: collapse;
@@ -396,6 +477,14 @@
                     最终价格 = 原价 × 倍数<br>
                     1 = 价格不变 | 1.1 = 加价10% | 1.5 = 加价50%
                 </div>
+                <!-- 跳过B2B开关 -->
+                <div class="skip-b2b-container">
+                    <input type="checkbox" id="skipB2bCheckbox">
+                    <label for="skipB2bCheckbox">跳过B2B推送，直接入库</label>
+                </div>
+                <div class="skip-b2b-hint">
+                    开启后将直接入库，不推送虚拟库存
+                </div>
                 <div class="markup-modal-footer">
                     <button class="btn btn-default" id="markupCancel">取消</button>
                     <button class="btn btn-primary" id="markupConfirm">确认上传</button>
@@ -435,9 +524,19 @@
             </div>
         </div>
 
+        <!-- 数据标签页 -->
+        <div class="data-tabs">
+            <button class="data-tab active" id="tabNormal" data-type="normal">
+                正常询价数据<span class="tab-badge" id="normalBadge">0</span>
+            </button>
+            <button class="data-tab" id="tabDirect" data-type="direct">
+                直接入库数据<span class="tab-badge" id="directBadge">0</span>
+            </button>
+        </div>
+
         <div class="data-container">
             <div class="data-header">
-                <span>询价比价数据</span>
+                <span id="dataTitle">询价比价数据</span>
                 <div class="search-bar">
                     <input type="text" class="search-input" id="searchOe" placeholder="搜索OE号">
                     <input type="text" class="search-input" id="searchBrand" placeholder="搜索品牌">
@@ -470,6 +569,9 @@
         let currentPage = 1;
         let pageSize = 100;
         let totalPages = 1;
+
+        // 当前数据类型：normal-正常询价数据, direct-直接入库数据
+        let currentDataType = 'normal';
 
         // 行高固定为40px
         const DEFAULT_ROW_HEIGHT = 40;
@@ -772,7 +874,10 @@
                 const container = document.getElementById('handsontable-container');
                 container.innerHTML = '<div class="loading-overlay">加载中...</div>';
 
-                let url = '/api/purchase_plan/inquiry/list';
+                // 根据当前数据类型选择接口
+                let url = currentDataType === 'direct' 
+                    ? '/api/purchase_plan/inquiry/direct/list' 
+                    : '/api/purchase_plan/inquiry/list';
                 const params = new URLSearchParams();
                 if (oe) params.append('oe', oe);
                 if (brand) params.append('brand', brand);
@@ -787,6 +892,9 @@
                     currentPage = 1;
                     console.log('数据条数:', allData.length);
                     
+                    // 更新标签页上的数量
+                    updateTabBadge(currentDataType, allData.length);
+                    
                     renderCurrentPage();
                 } else {
                     container.innerHTML = '<div class="loading-overlay">加载失败: ' + result.msg + '</div>';
@@ -796,6 +904,44 @@
                 const container = document.getElementById('handsontable-container');
                 container.innerHTML = '<div class="loading-overlay">加载失败: ' + error.message + '</div>';
             }
+        }
+
+        // 更新标签页数量
+        function updateTabBadge(type, count) {
+            const badgeId = type === 'direct' ? 'directBadge' : 'normalBadge';
+            const badge = document.getElementById(badgeId);
+            if (badge) {
+                badge.textContent = count;
+            }
+        }
+
+        // 初始化标签页
+        function initTabs() {
+            const tabNormal = document.getElementById('tabNormal');
+            const tabDirect = document.getElementById('tabDirect');
+            const dataTitle = document.getElementById('dataTitle');
+
+            tabNormal.addEventListener('click', () => {
+                if (currentDataType !== 'normal') {
+                    currentDataType = 'normal';
+                    tabNormal.classList.add('active');
+                    tabDirect.classList.remove('active');
+                    dataTitle.textContent = '询价比价数据';
+                    expandedRows.clear();
+                    loadData();
+                }
+            });
+
+            tabDirect.addEventListener('click', () => {
+                if (currentDataType !== 'direct') {
+                    currentDataType = 'direct';
+                    tabDirect.classList.add('active');
+                    tabNormal.classList.remove('active');
+                    dataTitle.textContent = '直接入库数据';
+                    expandedRows.clear();
+                    loadData();
+                }
+            });
         }
 
         // 分页事件监听
@@ -892,13 +1038,16 @@
             }
 
             // 显示加价设置弹窗
-                function showMarkupModal() {
-                    const modal = document.getElementById('markupModal');
-                    modal.style.display = 'flex';
-                    
-                    // 重置默认值为1（价格不变）
-                    document.getElementById('markupInput').value = '1.0';
-                }
+            function showMarkupModal() {
+                const modal = document.getElementById('markupModal');
+                modal.style.display = 'flex';
+                
+                // 重置默认值为1（价格不变）
+                document.getElementById('markupInput').value = '1.0';
+                
+                // 重置跳过B2B开关
+                document.getElementById('skipB2bCheckbox').checked = false;
+            }
 
             // 隐藏加价设置弹窗
             function hideMarkupModal() {
@@ -910,10 +1059,11 @@
             initMarkupModalEvents();
 
             // 实际执行文件上传（异步版本）
-            async function handleFileUpload(file, markupRate) {
+            async function handleFileUpload(file, markupRate, skipB2b = false) {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('markup_rate', markupRate);
+                formData.append('skip_b2b', skipB2b ? 'true' : 'false');
 
                 uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">提交任务中...</div>';
 
@@ -1050,10 +1200,11 @@
                 // 确认上传按钮
                 markupConfirm.addEventListener('click', () => {
                     const markupRate = parseFloat(markupInput.value) || 0;
+                    const skipB2b = document.getElementById('skipB2bCheckbox').checked;
                     hideMarkupModal();
                     
                     if (pendingFile) {
-                        handleFileUpload(pendingFile, markupRate);
+                        handleFileUpload(pendingFile, markupRate, skipB2b);
                     }
                 });
 
@@ -1166,6 +1317,7 @@
             initSearch();
             initPagination();
             initBrandSearch();
+            initTabs();
             loadData();
         });
 

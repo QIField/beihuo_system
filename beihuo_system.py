@@ -4548,6 +4548,10 @@ def init_background_tasks():
         from app.core.task_manager import init_ks_quote_count_task
         init_ks_quote_count_task()
 
+        # 初始化开思商家数据同步任务（每10分钟）
+        from app.core.task_manager import init_ks_merchant_task
+        init_ks_merchant_task()
+
         print("[系统] 定时任务已启动")
 
     except:

@@ -4,17 +4,20 @@
     <meta charset="utf-8">
     <title>开思询价单监控</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <!-- AG Grid CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='ag-grid/ag-grid.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ag-grid/ag-theme-alpine.css') }}">
     <style>
         body { padding: 20px; background: #f2f2f2; }
         .header { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .title { font-size: 24px; font-weight: 600; }
         .check-time { font-size: 14px; color: #999; }
-        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 
         .card {
             background: #fff;
-            border-radius: 12px;
-            padding: 24px;
+            border-radius: 8px;
+            padding: 12px;
             position: relative;
             transition: all 0.3s;
         }
@@ -26,40 +29,128 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
         }
-        .store-name { font-size: 20px; font-weight: 600; color: #333; }
+        .store-name { font-size: 14px; font-weight: 600; color: #333; }
         .store-badge {
-            font-size: 12px;
+            font-size: 10px;
             color: #999;
             background: #f5f5f5;
-            padding: 4px 12px;
-            border-radius: 12px;
+            padding: 2px 8px;
+            border-radius: 8px;
         }
 
         .main-stat {
             text-align: center;
-            padding: 20px;
+            padding: 10px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 12px;
-            margin-bottom: 16px;
+            border-radius: 6px;
+            margin-bottom: 8px;
         }
         .main-stat.alert { background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); }
-        .main-stat-value { font-size: 48px; font-weight: 700; color: #fff; line-height: 1; }
-        .main-stat-label { font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 8px; }
+        .main-stat-value { font-size: 28px; font-weight: 700; color: #fff; line-height: 1; }
+        .main-stat-label { font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 4px; }
 
-        .sub-stats { display: flex; gap: 12px; }
+        .sub-stats { display: flex; gap: 6px; }
         .sub-stat {
             flex: 1;
             text-align: center;
-            padding: 12px;
+            padding: 6px;
             background: #f8f9fa;
-            border-radius: 8px;
+            border-radius: 4px;
         }
-        .sub-stat-value { font-size: 20px; font-weight: 600; color: #333; }
-        .sub-stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+        .sub-stat-value { font-size: 14px; font-weight: 600; color: #333; }
+        .sub-stat-label { font-size: 10px; color: #999; margin-top: 2px; }
 
         .update-time { text-align: right; margin-top: 16px; font-size: 12px; color: #bbb; }
+
+        /* 商家数据区域样式 - 缩小 */
+        .merchant-section {
+            margin-top: 20px;
+            background: #fff;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .date-input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            width: 150px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background-color: #1890ff; color: white; }
+        .btn-primary:hover { background-color: #40a9ff; }
+
+        /* 统计卡片 - 再缩小 */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 6px;
+            text-align: center;
+        }
+        .stat-card-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1890ff;
+        }
+        .stat-card-label {
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* AG Grid 容器 - 放大 */
+        .merchant-section {
+            min-height: 600px;
+        }
+        .grids-wrapper {
+            display: flex;
+            gap: 20px;
+            height: 450px;
+        }
+        .grid-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .grid-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #666;
+        }
+        .ag-theme-alpine {
+            flex: 1;
+            height: auto;
+            min-height: 400px;
+        }
     </style>
 </head>
 <body>
@@ -72,14 +163,66 @@
 
     <div class="cards" id="cards"></div>
 
+    <!-- 商家数据区域 -->
+    <div class="merchant-section">
+        <div class="section-title">📊 店铺经营数据</div>
+        
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <span>日期：</span>
+            <input type="text" class="date-input" id="queryDate" placeholder="选择日期">
+            <button class="btn btn-primary" onclick="queryData()">查询</button>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-cards" id="statsCards">
+            <div class="stat-card">
+                <div class="stat-card-value" id="totalEvents">-</div>
+                <div class="stat-card-label">总事件数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value" id="quotationOverdue">-</div>
+                <div class="stat-card-label">报价超期</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value" id="paymentOverdue">-</div>
+                <div class="stat-card-label">订单未支付</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-value" id="invoiceTips">-</div>
+                <div class="stat-card-label">月度开票</div>
+            </div>
+        </div>
+
+        <!-- 两个表格并排 -->
+        <div class="grids-wrapper">
+            <!-- 事件明细表格 -->
+            <div class="grid-container">
+                <div class="grid-title">📋 事件明细</div>
+                <div id="detailGrid" class="ag-theme-alpine"></div>
+            </div>
+
+            <!-- 经营指标表格 -->
+            <div class="grid-container">
+                <div class="grid-title">📈 经营指标</div>
+                <div id="indicatorGrid" class="ag-theme-alpine"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <!-- AG Grid JS -->
+    <script src="{{ url_for('static', filename='ag-grid/ag-grid-community.min.js') }}"></script>
+    <!-- AG Grid 工具函数 -->
+    <script src="{{ url_for('static', filename='ag-grid/ag-grid-utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ks_inquiry_monitor/alert-sound.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ks_inquiry_monitor/test-button.js') }}"></script>
     <script>
         const ALERT_THRESHOLD = 7;
         let lastAlert = false;
 
+        // ========== 原有询价单监控代码 ==========
         function render(data) {
             let html = '';
             let maxUnclaimedCount = 0;
@@ -117,7 +260,6 @@
             document.getElementById('cards').innerHTML = html;
             document.getElementById('checkTime').textContent = '最新检查时间: ' + data.update_time;
 
-            // 使用新的报警声音模块
             if (data.alert && !lastAlert) {
                 if (window.KsInquiryAlert) {
                     window.KsInquiryAlert.play(maxUnclaimedCount);
@@ -135,22 +277,186 @@
         });
 
         socket.on('ks_inquiry_update', function(data) {
-            console.log('[WebSocket] 收到数据:', data);
-            console.log('[WebSocket] stores数量:', data.stores ? data.stores.length : 0);
-            console.log('[WebSocket] 第一条数据:', data.stores && data.stores[0]);
             try {
                 render(data);
-                console.log('[WebSocket] render执行完成');
             } catch(e) {
                 console.error('[WebSocket] render执行出错:', e);
             }
         });
 
         socket.on('notification', function(data) {
-            // 处理定时任务广播的数据
             if (data.data && data.data.stores) {
                 render(data.data);
             }
+        });
+
+        // ========== 商家数据查询代码 ==========
+        let detailGridApi = null;
+        let indicatorGridApi = null;
+
+        // 初始化日期选择器
+        layui.use('laydate', function(){
+            var laydate = layui.laydate;
+            laydate.render({
+                elem: '#queryDate',
+                value: new Date(),
+                format: 'yyyy-MM-dd'
+            });
+        });
+
+        // 初始化 AG Grid
+        function initGrids() {
+            // 事件明细表格配置
+            const detailColumnDefs = [
+                { headerName: '事件类型', field: 'event_type_name', flex: 2, sortable: true, filter: true, resizable: true },
+                { headerName: '数量', field: 'event_count', width: 100, sortable: true, filter: true, resizable: true },
+                { headerName: '单位', field: 'statistics_unit', width: 80, sortable: true, filter: true, resizable: true }
+            ];
+
+            const detailGridOptions = {
+                columnDefs: detailColumnDefs,
+                rowData: [],
+                pagination: true,
+                paginationPageSize: 10,
+                domLayout: 'normal',
+                onGridReady: function(params) {
+                    detailGridApi = params.api;
+                    const detailColumnApi = params.columnApi;
+                    
+                    // 启用工具函数功能
+                    initDragSelection(detailGridApi, detailColumnApi);
+                    initDoubleClickCopy(detailGridApi, detailColumnApi);
+                    initShortcuts(detailGridApi);
+                    initPageSizeSelector(detailGridApi, [10, 20, 50]);
+                    sizeColumnsToFit(detailGridApi);
+                }
+            };
+
+            // 经营指标表格配置
+            const indicatorColumnDefs = [
+                { headerName: '指标名称', field: 'indicator_name', flex: 2, sortable: true, filter: true, resizable: true },
+                { headerName: '数值', field: 'indicator_value', width: 150, sortable: true, filter: true, resizable: true },
+                { headerName: '同行优秀值', field: 'excellent_value', width: 150, sortable: true, filter: true, resizable: true }
+            ];
+
+            const indicatorGridOptions = {
+                columnDefs: indicatorColumnDefs,
+                rowData: [],
+                pagination: true,
+                paginationPageSize: 10,
+                domLayout: 'normal',
+                onGridReady: function(params) {
+                    indicatorGridApi = params.api;
+                    const indicatorColumnApi = params.columnApi;
+                    
+                    // 启用工具函数功能
+                    initDragSelection(indicatorGridApi, indicatorColumnApi);
+                    initDoubleClickCopy(indicatorGridApi, indicatorColumnApi);
+                    initShortcuts(indicatorGridApi);
+                    initPageSizeSelector(indicatorGridApi, [10, 20, 50]);
+                    sizeColumnsToFit(indicatorGridApi);
+                }
+            };
+
+            // 创建表格（使用旧版 AG Grid API）
+            const detailGridDiv = document.querySelector('#detailGrid');
+            new agGrid.Grid(detailGridDiv, detailGridOptions);
+
+            const indicatorGridDiv = document.querySelector('#indicatorGrid');
+            new agGrid.Grid(indicatorGridDiv, indicatorGridOptions);
+        }
+
+        // 查询数据
+        function queryData() {
+            const date = document.getElementById('queryDate').value;
+            console.log('[查询数据] 日期:', date);
+            
+            if (!date) {
+                layui.use('layer', function(layer){
+                    layer.msg('请选择日期');
+                });
+                return;
+            }
+
+            const url = `/api/ks_merchant/data/${date}`;
+            console.log('[查询数据] URL:', url);
+
+            fetch(url)
+                .then(res => {
+                    console.log('[查询数据] 响应状态:', res.status);
+                    return res.json();
+                })
+                .then(result => {
+                    console.log('[查询数据] 结果:', result);
+                    if (result.code === 0) {
+                        updateDisplay(result.data);
+                    } else {
+                        layui.use('layer', function(layer){
+                            layer.msg('查询失败: ' + result.msg);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error('查询失败:', err);
+                    layui.use('layer', function(layer){
+                        layer.msg('查询失败');
+                    });
+                });
+        }
+
+        // 更新显示
+        function updateDisplay(data) {
+            console.log('[更新显示] 数据:', data);
+            
+            // 更新统计卡片
+            const summary = data.summary;
+            const details = data.details || [];
+            
+            console.log('[更新显示] 汇总:', summary, '明细:', details);
+            
+            document.getElementById('totalEvents').textContent = summary ? summary.total_event_count : 0;
+            
+            // 查找特定事件类型的数量
+            const quotationOverdue = details.find(d => d.event_type_key === 'QUOTATION_SUBMIT_OVERDUE');
+            const paymentOverdue = details.find(d => d.event_type_key === 'ORDER_PAYMENT_OVERDUE');
+            const invoiceTips = details.find(d => d.event_type_key === 'INVOICE_TIPS');
+            
+            document.getElementById('quotationOverdue').textContent = quotationOverdue ? quotationOverdue.event_count : 0;
+            document.getElementById('paymentOverdue').textContent = paymentOverdue ? paymentOverdue.event_count : 0;
+            document.getElementById('invoiceTips').textContent = invoiceTips ? invoiceTips.event_count : 0;
+
+            // 更新事件明细表格
+            detailGridApi.setRowData(details);
+
+            // 更新经营指标表格
+            const indicators = data.indicators;
+            if (indicators) {
+                const indicatorRows = [
+                    { indicator_name: '销售额(元)', indicator_value: indicators.sales_amount, excellent_value: indicators.excellent_value },
+                    { indicator_name: '系统报价成交额比例(%)', indicator_value: indicators.system_quote_rate, excellent_value: indicators.excellent_value },
+                    { indicator_name: '下单客户数(个)', indicator_value: indicators.order_customer_count, excellent_value: indicators.excellent_value },
+                    { indicator_name: '总报出率(%)', indicator_value: indicators.total_quote_rate, excellent_value: indicators.excellent_value },
+                    { indicator_name: '系统报出率(%)', indicator_value: indicators.system_quote_rate_detail, excellent_value: indicators.excellent_value },
+                    { indicator_name: '人工报出率(%)', indicator_value: indicators.manual_quote_rate, excellent_value: indicators.excellent_value },
+                    { indicator_name: '整单报出率(%)', indicator_value: indicators.whole_order_quote_rate, excellent_value: indicators.excellent_value },
+                    { indicator_name: '现货报出率(%)', indicator_value: indicators.spot_quote_rate, excellent_value: indicators.excellent_value },
+                    { indicator_name: '报出转化率(%)', indicator_value: indicators.quote_conversion_rate, excellent_value: indicators.excellent_value },
+                    { indicator_name: '系统报出转化率(%)', indicator_value: indicators.system_quote_conversion_rate, excellent_value: indicators.excellent_value },
+                    { indicator_name: '平均报出品质数(个)', indicator_value: indicators.avg_quote_quality_count, excellent_value: indicators.excellent_value },
+                    { indicator_name: '退货SKU数(个)', indicator_value: indicators.return_sku_count, excellent_value: indicators.excellent_value },
+                    { indicator_name: 'SKU退货率(%)', indicator_value: indicators.sku_return_rate, excellent_value: indicators.excellent_value },
+                    { indicator_name: '退货金额(元)', indicator_value: indicators.return_amount, excellent_value: indicators.excellent_value },
+                    { indicator_name: '金额退货率(%)', indicator_value: indicators.amount_return_rate, excellent_value: indicators.excellent_value }
+                ];
+                indicatorGridApi.setRowData(indicatorRows);
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initGrids();
+            // 默认查询今天
+            queryData();
         });
     </script>
 </body>

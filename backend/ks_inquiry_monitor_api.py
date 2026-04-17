@@ -72,3 +72,53 @@ def check_alert_status():
     user_id = session.get('user_id', session.get('_id', 'anonymous'))
     confirmed = is_alert_confirmed(user_id)
     return jsonify({'code': 0, 'data': {'confirmed': confirmed}})
+
+
+# ========== 开思商家数据查询 API ==========
+
+from app.services.ks_merchant_service.query_service import KsMerchantQueryService
+
+# 查询服务实例
+ks_merchant_query_service = KsMerchantQueryService()
+
+
+@bp.route('/api/ks_merchant/data/<date>')
+@login_required
+@org_required(['fsbbr'])
+def get_merchant_data_by_date(date):
+    """
+    根据日期获取商家数据
+    
+    URL: /api/ks_merchant/data/2026-04-14
+    """
+    try:
+        data = ks_merchant_query_service.get_data_by_date(date)
+        return jsonify({'code': 0, 'data': data})
+    except ValueError as e:
+        return jsonify({'code': 1, 'msg': '日期格式错误'}), 400
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': str(e)}), 500
+
+
+@bp.route('/api/ks_merchant/data/range')
+@login_required
+@org_required(['fsbbr'])
+def get_merchant_data_by_range():
+    """
+    根据日期范围获取商家数据
+    
+    URL: /api/ks_merchant/data/range?start=2026-04-01&end=2026-04-14
+    """
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    if not start_date or not end_date:
+        return jsonify({'code': 1, 'msg': '缺少参数'}), 400
+    
+    try:
+        data = ks_merchant_query_service.get_data_by_range(start_date, end_date)
+        return jsonify({'code': 0, 'data': data})
+    except ValueError as e:
+        return jsonify({'code': 1, 'msg': '日期格式错误'}), 400
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': str(e)}), 500

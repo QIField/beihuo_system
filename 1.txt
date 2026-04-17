@@ -1,242 +1,373 @@
-💾 批量保存 5000 条数据...
-批量保存失败: (1062, "Duplicate entry '6420901642-巴博瑞-fsbbr' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 86")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 315")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 1783")
-✅ 保存成功: 0 条
-
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1406, "Data too long for column 'l_model_zh' at row 2164")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1062, "Duplicate entry '13908665236-菲尔-fsbbr' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1062, "Duplicate entry '11318648732，11317592877，11317592850，11318685091-盖茨-fsb' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-💾 批量保存 5000 条数据...
-批量保存失败: (1062, "Duplicate entry '18407646681-菲尔-fsbbr' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-💾 保存最后一批数据: 3135 条...
-批量保存失败: (1062, "Duplicate entry '11287530314-依纳-fsbbr' for key 'uk_oe_brand_company'")
-✅ 保存成功: 0 条
-
-================================================================================
-爬取完成统计
-================================================================================
-📊 总记录数: 403135
-✅ 成功保存: 85000 条
-❌ 失败: 0 条
-📄 总页数: 807
-⚠️  失败页数: 0
-
-================================================================================
-CRM全量爬取完成，开始从备货表同步销量数据...
-================================================================================
-
-[销量同步] 失败: (1267, "Illegal mix of collations (utf8mb4_unicode_ci,IMPLICIT) and (utf8mb4_general_ci,IMPLICIT) for operation '='")
-Traceback (most recent call last):
-  File "./app/services/procurement_service/crawl_service.py", line 371, in _sync_sales_from_beihuo
-    cursor.execute(sql, (COMPANY,))
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 682, in tough_method
-    raise error  # re-raise the original error again
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 605, in tough_method
-    result = method(*args, **kwargs)  # try to execute
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 153, in execute
-    result = self._query(query)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 322, in _query
-    conn.query(q)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 575, in query
-    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 826, in _read_query_result
-    result.read()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 1203, in read
-    first_packet = self.connection._read_packet()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 782, in _read_packet
-    packet.raise_for_error()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/protocol.py", line 219, in raise_for_error
-    err.raise_mysql_exception(self._data)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/err.py", line 150, in raise_mysql_exception
-    raise errorclass(errno, errval)
-pymysql.err.OperationalError: (1267, "Illegal mix of collations (utf8mb4_unicode_ci,IMPLICIT) and (utf8mb4_general_ci,IMPLICIT) for operation '='")
-
-[CRM全量爬取] 结束:
-  - 总记录数: 403135
-  - 成功保存: 85000
-  - 失败: 0
-
-
-  ============================================================
-2. 开始采购历史爬取（近5天）+ 聚合到旧表
-============================================================
-[PurchaseHistoryMain] 开始执行采购历史数据同步, company=fsbbr, days=5
-[PurchaseHistoryMain] 第1步: 爬取近5天数据...
-
-============================================================
-开始爬取近 5 天的采购历史数据
-时间范围: 2026-04-08 ~ 2026-04-13
-时间戳范围: 1775599272489 ~ 1776031272489
-============================================================
-
-正在获取第 1 页数据...
-
-[定时任务] WMS已完成订单自动拉取任务开始 - 2026-04-13 06:01:30 ====================================================================================================
---------------------------------------------------
-get_status_orders_complete
-
-============================================================
-[开思自动对单] 开始执行: 2026-04-13 06:01:30
-============================================================
-[开思自动对单] 当前时间 6 点，不在运行时间段内，跳过
-[开思自动对单] 任务执行成功
-正在爬取第 1 页
-正在爬取的接口 https://wms.gzbbr.com/api/Wms.Orders/get_status_orders?type=3&status=2&page=1
-[Mon Apr 13 06:01:06 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jdOO.0&sid=nRVoT6JvLzj3loZmAAAB => 200 in 25023ms
-[Mon Apr 13 06:01:31 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jjVd&sid=nRVoT6JvLzj3loZmAAAB => 200 in 5ms
-批量保存详细记录失败: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month, company)\n                    VALUES ('CGRK002202604120047', '上海' at line 4")
-本页解析: 500 条, 保存: 0 条
-
-正在获取第 2 页数据...
-[Mon Apr 13 06:01:08 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jdsA&sid=xifiRNkehYBQUZO6AAAO => 200 in 25022ms
-[Mon Apr 13 06:01:33 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jjzN&sid=xifiRNkehYBQUZO6AAAO => 200 in 0ms
-[Mon Apr 13 06:01:10 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jeLi&sid=h9hpIihiuby_W_V8AAAY => 200 in 25025ms
-[Mon Apr 13 06:01:35 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jkSt&sid=h9hpIihiuby_W_V8AAAY => 200 in 0ms
-请求成功！
-状态码： 200
-网页编码： utf-8
-第 1 页已保存 20 条数据
-正在爬取第 2 页
-正在爬取的接口 https://wms.gzbbr.com/api/Wms.Orders/get_status_orders?type=3&status=2&page=2
-请求成功！
-状态码： 200
-网页编码： utf-8
-第 2 页已保存 20 条数据
-总共保存 40 条数据到数据库
---------------------------------------------------
-
-[定时任务] WMS已完成订单自动拉取任务完成 - 2026-04-13 06:01:46 ====================================================================================================
-批量保存详细记录失败: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month, company)\n                    VALUES ('CGRK002202604100031', '广州' at line 4")
-本页解析: 495 条, 保存: 0 条
-
-============================================================
-近 5 天采购历史爬取完成!
-时间范围: 2026-04-08 ~ 2026-04-13
-总处理数: 995
-保存记录: 0
-失败数: 0
-============================================================
-[PurchaseHistoryMain] 爬取完成: {'date_range': '2026-04-08 ~ 2026-04-13', 'total_processed': 995, 'saved': 0, 'failed': 0}
-[PurchaseHistoryMain] 第2步: 聚合数据并更新旧表...
-
-============================================================
-开始采购历史数据聚合
-============================================================
-处理月份: 2026-03, 2026-04
-时间范围: 2026-03-01 ~ 2026-04-30
-
-[采购历史爬取] 出现异常: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month,\n                        purchase_date,\n                        suppl' at line 2")
-Traceback (most recent call last):
-  File "./app/tasks/daily_crawl_pipeline.py", line 74, in execute_daily_pipeline
-    purchase_history_result = run(company='fsbbr', days=5)
-  File "./app/services/procurement_service/purchase_history_main.py", line 25, in run
-    aggregate_result = PurchaseHistoryAggregateService().aggregate_and_update(company)
-  File "./app/services/procurement_service/purchase_history_aggregate_service.py", line 45, in aggregate_and_update
-    records = self._aggregate_from_detail(company, start_date, end_date)
-  File "./app/services/procurement_service/purchase_history_aggregate_service.py", line 138, in _aggregate_from_detail
-    cursor.execute(sql, (company, start_date, end_date))
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/dbutils/steady_db.py", line 605, in tough_method
-    result = method(*args, **kwargs)  # try to execute
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 153, in execute
-    result = self._query(query)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/cursors.py", line 322, in _query
-    conn.query(q)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 575, in query
-    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 826, in _read_query_result
-    result.read()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 1203, in read
-    first_packet = self.connection._read_packet()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/connections.py", line 782, in _read_packet
-    packet.raise_for_error()
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/protocol.py", line 219, in raise_for_error
-    err.raise_mysql_exception(self._data)
-  File "/www/server/pyporject_evn/beihuo_system_venv/lib/python3.8/site-packages/pymysql/err.py", line 150, in raise_mysql_exception
-    raise errorclass(errno, errval)
-pymysql.err.ProgrammingError: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'year_month,\n                        purchase_date,\n                        suppl' at line 2")
-
-============================================================
-3. 开始采购数据同步到比价表
-============================================================
-
-============================================================
-开始采购数据同步到比价表
-============================================================
-
-[采购数据同步] 出现异常: 0
-Traceback (most recent call last):
-  File "./app/tasks/daily_crawl_pipeline.py", line 105, in execute_daily_pipeline
-    sync_result = service.sync_to_compare_summary(company='fsbbr')
-  File "./app/services/procurement_service/purchase_sync_service.py", line 45, in sync_to_compare_summary
-    oe_brand_list = self._get_all_oe_brand(company)
-  File "./app/services/procurement_service/purchase_sync_service.py", line 100, in _get_all_oe_brand
-    return [(row[0], row[1]) for row in cursor.fetchall()]
-  File "./app/services/procurement_service/purchase_sync_service.py", line 100, in <listcomp>
-    return [(row[0], row[1]) for row in cursor.fetchall()]
-KeyError: 0
-
-============================================================
-4. 开始销量明细爬取（近5天）
-============================================================
-
-============================================================
-开始同步近5天销量明细数据
-============================================================
-
-[同步] 日期范围: 2026-04-09 至 2026-04-13 (5天)
-[同步] 总页数: 4
-[保存] 第1页: 500 条
-[保存] 第2/4页: 500 条
-[保存] 第3/4页: 500 条
-[Mon Apr 13 06:01:31 2026] GET /socket.io/?EIO=4&transport=polling&t=Ps3jjVd.0&sid=nRVoT6JvLzj3loZmAAAB => 200 in 25029ms
-[Mon Apr 13 06:01:56 2026] POST /socket.io/?EIO=4&transport=polling&t=Ps3jpcx&sid=nRVoT6JvLzj3loZmAAAB => 200 in 0ms
-[保存] 第4/4页: 290 条
-[同步完成] 共4页, 1790条, 保存500条
-============================================================
-
-
-[销量明细爬取] 结束:
-  - 总页数: 4
-  - 总条目: 1790
-  - 保存记录: 500
-
-================================================================================
-每日定时任务执行报告
-开始时间: 2026-04-13 02:00:00.001592
-结束时间: 2026-04-13 06:01:56.608161
-总耗时: 4:01:56.606569
-================================================================================
-
-📊 总同步记录数: 85500
-❌ 总失败数: 2
-
-⚠️  检测到部分任务失败，详见上方错误日志。
-
-================================================================================
-每日定时任务执行完毕
-================================================================================
+{
+    "status": 200,
+    "msg": "返回成功",
+    "data": {
+        "total": 2715,
+        "per_page": 20,
+        "current_page": 1,
+        "last_page": 136,
+        "data": [
+            {
+                "brand_id": "4564",
+                "l_name_zh": "进口瓦勒",
+                "frey_no": "BBR4564",
+                "seq": "100",
+                "short_name": "WAH",
+                "suffix": "",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "479",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2026-04-03 11:26:01",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "程晓霞"
+            },
+            {
+                "brand_id": "4563",
+                "l_name_zh": "烟台日冷",
+                "frey_no": "BBR4563",
+                "seq": "100",
+                "short_name": "YTRL",
+                "suffix": "",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "387",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2026-03-26 10:32:32",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "贺绪润(寮步）"
+            },
+            {
+                "brand_id": "4562",
+                "l_name_zh": "2228307515\t",
+                "frey_no": "BBR4562",
+                "seq": "100",
+                "short_name": "P",
+                "suffix": "暖风水管",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "26",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2026-03-24 09:46:54",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "贺绪润"
+            },
+            {
+                "brand_id": "4561",
+                "l_name_zh": "勃乐氏",
+                "frey_no": "BBR4561",
+                "seq": "100",
+                "short_name": "BRUSS",
+                "suffix": "BRUSS",
+                "cass_name": "BRUSS",
+                "type": "2",
+                "byname": "BRUSS",
+                "user_id": "394",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2026-03-18 11:16:26",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "佛山采购专用"
+            },
+            {
+                "brand_id": "4560",
+                "l_name_zh": "NTN",
+                "frey_no": "BBR4560",
+                "seq": "100",
+                "short_name": "NT",
+                "suffix": "NTN",
+                "cass_name": "NTN",
+                "type": "2",
+                "byname": "NTN",
+                "user_id": "11",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2026-01-29 16:37:07",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "黄锐洪"
+            },
+            {
+                "brand_id": "4559",
+                "l_name_zh": "GMP",
+                "frey_no": "BBR4559",
+                "seq": "100",
+                "short_name": "GMP",
+                "suffix": "GMP",
+                "cass_name": "GMP",
+                "type": "2",
+                "byname": "GMP",
+                "user_id": "111",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2026-01-24 19:45:46",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "吴杰"
+            },
+            {
+                "brand_id": "4558",
+                "l_name_zh": "贝偲特（BMTSR）",
+                "frey_no": "BBR4558",
+                "seq": "100",
+                "short_name": "BSTS",
+                "suffix": "BMTSR",
+                "cass_name": "贝偲特（BMTSR）",
+                "type": "2",
+                "byname": "贝偲特（BMTSR）",
+                "user_id": "111",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-12-30 13:29:39",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "吴杰"
+            },
+            {
+                "brand_id": "4557",
+                "l_name_zh": "伊顿",
+                "frey_no": "BBR4557",
+                "seq": "100",
+                "short_name": "ETN",
+                "suffix": "",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "457",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-12-30 11:57:49",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "赵阿根"
+            },
+            {
+                "brand_id": "4556",
+                "l_name_zh": "欧卡驰",
+                "frey_no": "BBR4556",
+                "seq": "100",
+                "short_name": "OKC",
+                "suffix": "OKC",
+                "cass_name": "欧卡驰",
+                "type": "2",
+                "byname": "OKC",
+                "user_id": "111",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-12-26 13:33:11",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "吴杰"
+            },
+            {
+                "brand_id": "4555",
+                "l_name_zh": "马牌 (国产)",
+                "frey_no": "BBR4555",
+                "seq": "100",
+                "short_name": "GCMP",
+                "suffix": "GCMP",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "457",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-12-17 08:58:54",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "赵阿根"
+            },
+            {
+                "brand_id": "4554",
+                "l_name_zh": "蜥蜴",
+                "frey_no": "BBR4554",
+                "seq": "100",
+                "short_name": "XY",
+                "suffix": "蜥蜴",
+                "cass_name": "蜥蜴",
+                "type": "2",
+                "byname": "蜥蜴",
+                "user_id": "111",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-12-03 13:38:31",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "吴杰"
+            },
+            {
+                "brand_id": "4553",
+                "l_name_zh": "海拉贝尔",
+                "frey_no": "BBR4553",
+                "seq": "100",
+                "short_name": "HLBR",
+                "suffix": "HLBR",
+                "cass_name": "其他",
+                "type": "2",
+                "byname": "",
+                "user_id": "111",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-11-24 10:16:18",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "吴杰"
+            },
+            {
+                "brand_id": "4552",
+                "l_name_zh": "菲德帝",
+                "frey_no": "BBR4552",
+                "seq": "100",
+                "short_name": "FDD",
+                "suffix": "菲",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "288",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-11-22 16:20:20",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "杜彦飞"
+            },
+            {
+                "brand_id": "4551",
+                "l_name_zh": "ABS",
+                "frey_no": "BBR4551",
+                "seq": "100",
+                "short_name": "ABS",
+                "suffix": "ABS",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "278",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-11-19 14:30:15",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "沈玉来"
+            },
+            {
+                "brand_id": "4550",
+                "l_name_zh": "三威",
+                "frey_no": "BBR4550",
+                "seq": "100",
+                "short_name": "sw",
+                "suffix": "sanwei",
+                "cass_name": "三威",
+                "type": "2",
+                "byname": "三威",
+                "user_id": "111",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-09-25 13:44:44",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "吴杰"
+            },
+            {
+                "brand_id": "4549",
+                "l_name_zh": "埃尔夫",
+                "frey_no": "BBR4549",
+                "seq": "100",
+                "short_name": "ELF",
+                "suffix": "",
+                "cass_name": "埃尔夫",
+                "type": "2",
+                "byname": "",
+                "user_id": "224",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-09-09 10:37:30",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "梁鹏"
+            },
+            {
+                "brand_id": "4548",
+                "l_name_zh": "光束",
+                "frey_no": "BBR4548",
+                "seq": "100",
+                "short_name": "GS",
+                "suffix": "GS",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "457",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-09-02 19:00:01",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "赵阿根"
+            },
+            {
+                "brand_id": "4547",
+                "l_name_zh": "千里马",
+                "frey_no": "BBR4547",
+                "seq": "100",
+                "short_name": "QLM",
+                "suffix": "",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "72",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-08-18 09:57:10",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "陈晓明"
+            },
+            {
+                "brand_id": "4546",
+                "l_name_zh": "保隆",
+                "frey_no": "BBR4546",
+                "seq": "100",
+                "short_name": "BLKJ",
+                "suffix": "",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "457",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-07-31 09:13:45",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "赵阿根"
+            },
+            {
+                "brand_id": "4545",
+                "l_name_zh": "速来达",
+                "frey_no": "BBR4545",
+                "seq": "100",
+                "short_name": "SLD",
+                "suffix": "",
+                "cass_name": "",
+                "type": "2",
+                "byname": "",
+                "user_id": "72",
+                "company_id": "1",
+                "is_kingdee": "1",
+                "create_time": "2025-07-28 18:17:37",
+                "type_cn": "其他品牌",
+                "is_kingdee_cn": "已同步",
+                "user_cn": "陈晓明"
+            }
+        ],
+        "is_parent": 0
+    }
+}

@@ -122,6 +122,17 @@ class WeixinQuoteParserService:
         """
         records = []
 
+        # 字段映射配置：数据库字段名 -> 程序字段名
+        # 同时支持元组索引和字典键名访问
+        FIELD_MAPPING = [
+            {'db_key': 'id', 'idx': 0, 'app_key': 'id'},
+            {'db_key': 'creation_date', 'idx': 1, 'app_key': 'creation_date'},
+            {'db_key': 'groupname', 'idx': 2, 'app_key': 'groupname'},
+            {'db_key': 'nickname', 'idx': 3, 'app_key': 'nickname'},
+            {'db_key': 'content', 'idx': 4, 'app_key': 'content'},
+            {'db_key': 'result', 'idx': 5, 'app_key': 'result'},
+        ]
+
         with db_cursor() as cursor:
             sql = """
                 SELECT id, creation_date, groupname, nickname, content, result
@@ -136,14 +147,19 @@ class WeixinQuoteParserService:
             rows = cursor.fetchall()
 
             for row in rows:
-                records.append({
-                    'id': row[0],
-                    'creation_date': row[1],
-                    'groupname': row[2],
-                    'nickname': row[3],
-                    'content': row[4],
-                    'result': row[5]
-                })
+                # 使用字段映射获取数据，自动适配元组或字典格式
+                record = {}
+                is_dict = isinstance(row, dict)
+                
+                for mapping in FIELD_MAPPING:
+                    if is_dict:
+                        # 字典格式：使用数据库字段名
+                        record[mapping['app_key']] = row.get(mapping['db_key'])
+                    else:
+                        # 元组格式：使用索引
+                        record[mapping['app_key']] = row[mapping['idx']]
+                
+                records.append(record)
 
         return records
 

@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Tuple
 
 from config import create_crm_session
 from app.utils.database_connection import get_db_connection
+from app.services.procurement_service.vehicle_model_sync import VehicleModelSyncService
 
 
 # 配置参数
@@ -38,6 +39,7 @@ class CRMDataCrawlService:
         self.session = None
         self.total_saved = 0
         self.total_failed = 0
+        self.model_sync_service = VehicleModelSyncService()
 
     def get_total_pages(self) -> Tuple[int, int]:
         """
@@ -289,6 +291,13 @@ class CRMDataCrawlService:
                         try:
                             parsed = self.parse_product(product)
                             page_products.append(parsed)
+
+                            # 收集车型映射（用于后续同步）
+                            oe = product.get('number', '')
+                            brand = product.get('brand_name', '')
+                            model = product.get('l_model_zh', '')
+                            self.model_sync_service.collect_model_mapping(oe, brand, model)
+
                         except Exception as e:
                             print(f"⚠️  解析产品失败: {e}")
                             self.total_failed += 1
@@ -336,12 +345,18 @@ class CRMDataCrawlService:
                 'failed': self.total_failed
             }
             
-            # 全量爬取完成后，从备货表同步销量数据
+            # 全量爬取完成后，同步车型数据
             print("\n" + "="*80)
-            print("CRM全量爬取完成，开始从备货表同步销量数据...")
+            print("CRM全量爬取完成，开始同步车型数据...")
+            print("="*80)
+            self.model_sync_service.sync_to_database(company=COMPANY)
+
+            # 从备货表同步销量数据
+            print("\n" + "="*80)
+            print("开始从备货表同步销量数据...")
             print("="*80)
             self._sync_sales_from_beihuo()
-            
+
             return result
 
         except Exception as e:

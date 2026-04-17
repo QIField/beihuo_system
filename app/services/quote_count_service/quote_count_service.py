@@ -249,7 +249,7 @@ class QuoteCountSyncService:
                 break
 
             page_num += 1
-            time.sleep(0.5)
+            time.sleep(0.5)  # 翻页间隔0.5秒
 
         print(f"[订单列表] 共获取 {len(order_ids)} 个订单ID")
         return order_ids
@@ -462,7 +462,7 @@ class QuoteCountSyncService:
                 if idx % 50 == 0:
                     print(f"[进度] 已处理 {idx}/{len(order_ids)} 个订单，获取 {len(all_items)} 条明细")
                 
-                time.sleep(0.2)
+                time.sleep(0.2)  # 订单明细请求间隔0.2秒
             
             # 3. 批量保存明细
             if all_items:
@@ -621,8 +621,8 @@ class QuoteCountSyncService:
         print(f"开始时间: {datetime.now()}")
         print(f"{'='*70}")
         
-        # 1. 爬取近60天的开思询价明细（覆盖两个月）
-        crawl_result = self.sync_recent_days(days=60)
+        # 1. 爬取近5天的开思询价明细
+        crawl_result = self.sync_recent_days(days=5)
         
         # 2. 更新统计表（上月+本月）
         stats_result = self.update_stats_from_details()
