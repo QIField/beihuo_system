@@ -16,7 +16,7 @@ def two_minutes_task():
     WMS状态订单任务
     """
     print(f"\n[定时任务] WMS已完成订单自动拉取任务开始 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}","="*100)
-    get_status_orders_complete_by_page(2)
+    get_status_orders_complete_by_page(1)
     print(f"\n[定时任务] WMS已完成订单自动拉取任务完成 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}","="*100)
 
 
@@ -51,7 +51,7 @@ def two_minutes_register(task_manager):
             two_minutes_task,
             'interval',
             'wms_status_orders_task',
-            minutes=1,
+            minutes=2,
             replace_existing=True
         )
         print("[WMS状态订单] 定时任务已注册（每1分钟执行）")
