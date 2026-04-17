@@ -823,6 +823,12 @@
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:;">库存管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="javascript:void(0);" onclick="openSafetyStockInNewTab()">安全库存预警</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed">
                         <a href="javascript:;">开思</a>
                         <dl class="layui-nav-child">
                             <dd id="ksAutoBillMenuItem"><a href="javascript:void(0);" onclick="openKsAutoBillInNewTab()">开思自动开单</a></dd>
@@ -1475,6 +1481,11 @@ fetch('/api/current_user')
 function openVirtualInventoryInNewTab() {
     // 在新标签页中打开虚拟库存页面
     window.open('/virtual_inventory', '_blank');
+}
+
+function openSafetyStockInNewTab() {
+    // 在新标签页中打开安全库存页面
+    window.open('/safety_stock', '_blank');
 }
 
 // 添加打开开思自动开单新标签页的函数

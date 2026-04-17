@@ -18,6 +18,7 @@ from .tables import (
     init_shop_event_detail_table,
     init_shop_business_indicator_table,
     init_price_inquiry_direct_table,
+    init_safety_stock_calculation_table,
 )
 
 
@@ -825,6 +826,7 @@ def init_all_tables():
         ('店铺事件明细', init_shop_event_detail_table),
         ('店铺经营指标', init_shop_business_indicator_table),
         ('询价直接入库', init_price_inquiry_direct_table),
+        ('安全库存计算', init_safety_stock_calculation_table),
     ]
 
     completed = []

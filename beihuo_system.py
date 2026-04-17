@@ -65,6 +65,10 @@ app.register_blueprint(ks_inquiry_monitor_bp)  # 注册开思询价单监控蓝�
 from app.api.beihuo_api import bp as beihuo_bp
 app.register_blueprint(beihuo_bp)
 
+# 注册安全库存API蓝图
+from app.api.safety_stock_api import safety_stock_api
+app.register_blueprint(safety_stock_api)
+
 # 从配置导入门店信息
 from app.services.beihuo_service.config import STORES, COMPANIES
 
@@ -906,6 +910,13 @@ def instructions():
     if 'logged_in' not in session:
         return render_template('login.html')
     return render_template('instructions.html')
+
+@app.route('/safety_stock')
+def safety_stock_page():
+    """安全库存管理页面"""
+    if 'logged_in' not in session:
+        return render_template('login.html')
+    return render_template('safety_stock.html')
 
 
 # ==================== 任务管理 API ====================
