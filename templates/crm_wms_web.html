@@ -37,6 +37,11 @@
             position: absolute;
             left: 50%;
             transform: translateX(-50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .header-center .header-title {
+            pointer-events: auto;
         }
         .header-left {
             display: flex;
@@ -103,6 +108,8 @@
             padding: 6px 12px;
             border-radius: 4px;
             border: 1px solid #2a385f;
+            margin-left: auto;
+            margin-right: 20px; /* 右边留安全空隙，不紧贴 */
         }
         .search-input {
             background: transparent;
@@ -1522,7 +1529,8 @@
          * 绑定设置按钮、关闭按钮、保存按钮等的事件监听器
          */
         function initSettingsModal() {
-            const settingsBtn = document.querySelector('.header-right .link-btn:first-child');
+            const linkBtns = document.querySelectorAll('.header-right .link-btn');
+            const settingsBtn = linkBtns[0];
             const settingsModal = document.getElementById('settingsModal');
             const closeModal = document.getElementById('closeModal');
             const cancelBtn = document.getElementById('cancelBtn');
