@@ -25,19 +25,26 @@
         }
         .header {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
-            padding: 12px 20px;
+            padding: 15px 30px;
             background-color: #161e38;
             border-bottom: 1px solid #2a385f;
+            min-height: 60px;
             position: relative;
+        }
+        .header-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
         }
         .header-left {
             display: flex;
             align-items: center;
             gap: 15px;
-            position: absolute;
-            left: 20px;
+            min-width: 280px;
+            position: relative;
+            z-index: 1;
         }
         .date-time {
             font-size: 14px;
@@ -52,8 +59,10 @@
             display: flex;
             align-items: center;
             gap: 15px;
-            position: absolute;
-            right: 20px;
+            min-width: 500px;
+            justify-content: flex-end;
+            position: relative;
+            z-index: 1;
         }
         .date-picker {
             display: flex;
@@ -85,6 +94,39 @@
             color: #8fa4d9;
             cursor: pointer;
             font-size: 14px;
+        }
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #1e2847;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #2a385f;
+        }
+        .search-input {
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 14px;
+            width: 280px;
+            outline: none;
+        }
+        .search-input::placeholder {
+            color: #5d77a8;
+        }
+        .search-btn {
+            background-color: #40a9ff;
+            color: #ffffff;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .search-btn:hover {
+            background-color: #1890ff;
         }
         .main-container {
             padding: 20px;
@@ -589,9 +631,14 @@
         <div class="header-left">
             <div class="date-time" id="dateTime">2025.04.07 09:28:24 星期二 天气晴</div>
         </div>
-        <div class="header-title">WMS仓库数据看板</div>
+        <div class="header-center">
+            <div class="header-title">WMS仓库数据看板</div>
+        </div>
         <div class="header-right">
-
+            <div class="search-container">
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索客户名称、金蝶单号、业务员、拣货人、发货员...">
+                <button class="search-btn" id="searchBtn">搜索</button>
+            </div>
             <button class="link-btn">设置</button>
             <button class="link-btn">退出</button>
         </div>
@@ -758,6 +805,12 @@
          * 用于控制只在网页刚开始加载时显示等待界面
          */
         let isFirstLoad = true;
+
+        /**
+         * 搜索关键词
+         * 用于存储用户输入的搜索内容
+         */
+        let searchKeyword = '';
 
         /**
          * 时间轴自动滚动管理器
@@ -975,7 +1028,7 @@
             const detailTitle = document.getElementById('detailTitle');
             const detailContent = document.getElementById('detailContent');
 
-            detailTitle.textContent = `金蝶单号：${handleEmpty(task.pono_new)}`;
+            detailTitle.textContent = `客户名称：${handleEmpty(task.fullname_crm)}`;
 
             let photosHtml = '';
             if (task.photos) {
@@ -1293,6 +1346,76 @@
         }
 
         // =========================================================================
+        // 搜索功能函数
+        // =========================================================================
+
+        /**
+         * 搜索任务数据
+         * 根据用户输入的关键词搜索任务数据，支持搜索客户名称、金蝶单号、业务员、拣货人、发货员
+         * @param {string} keyword - 搜索关键词
+         * @returns {Array} 过滤后的任务数据数组
+         */
+        function searchTasks(keyword) {
+            searchKeyword = keyword.trim();
+            
+            // 如果搜索关键词为空，返回所有数据
+            if (!searchKeyword) {
+                return tasksData;
+            }
+            
+            // 过滤数据，支持搜索客户名称、金蝶单号、业务员、拣货人、发货员
+            return tasksData.filter(task => {
+                const fullname = handleEmpty(task.fullname_crm);
+                const pono = handleEmpty(task.pono_new);
+                const handler = handleEmpty(task.handler_crm);
+                const picker = handleEmpty(task.name_wms);
+                const shipper = handleEmpty(task.shipper);
+                
+                // 不区分大小写搜索
+                return fullname.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+                       pono.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+                       handler.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+                       picker.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+                       shipper.toLowerCase().includes(searchKeyword.toLowerCase());
+            });
+        }
+
+        /**
+         * 执行搜索
+         * 获取搜索框的值，执行搜索并重新渲染表格
+         */
+        function performSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const keyword = searchInput.value;
+            
+            const filteredData = searchTasks(keyword);
+            currentPage = 1; // 搜索后重置到第一页
+            renderTable(filteredData);
+            
+            console.log('搜索关键词:', keyword);
+            console.log('搜索结果数量:', filteredData.length);
+        }
+
+        /**
+         * 初始化搜索功能
+         * 绑定搜索按钮点击事件和搜索框回车事件
+         */
+        function initSearch() {
+            const searchBtn = document.getElementById('searchBtn');
+            const searchInput = document.getElementById('searchInput');
+            
+            // 搜索按钮点击事件
+            searchBtn.addEventListener('click', performSearch);
+            
+            // 搜索框回车事件
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+        }
+
+        // =========================================================================
         // 分页控制函数
         // =========================================================================
 
@@ -1301,9 +1424,11 @@
          * 如果当前是最后一页，则回到第一页；否则页码+1
          */
         function nextPage() {
-            const totalPages = Math.ceil(tasksData.length / pageSize);
+            // 如果有搜索关键词，使用过滤后的数据
+            const dataToUse = searchKeyword ? searchTasks(searchKeyword) : tasksData;
+            const totalPages = Math.ceil(dataToUse.length / pageSize);
             currentPage = currentPage >= totalPages ? 1 : currentPage + 1;
-            renderTable(tasksData);
+            renderTable(dataToUse);
         }
 
         /**
@@ -1546,6 +1671,7 @@
             startAutoRefresh();
             initSettingsModal();
             initDetailModal();
+            initSearch();
         });
     </script>
 </body>
