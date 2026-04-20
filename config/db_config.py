@@ -1,6 +1,15 @@
 import os
 import threading
 from pathlib import Path
+from dotenv import load_dotenv
+
+# 获取项目根目录（从当前文件向上 2 层：config -> beihuo_system）
+BASE_DIR = Path(__file__).resolve().parent.parent
+# .env 文件路径（项目根目录下的 .env）
+ENV_PATH = BASE_DIR / ".env"
+
+# 加载 .env 文件中的环境变量
+load_dotenv(dotenv_path=ENV_PATH)
 
 # 缓存用户选择的数据库配置，避免重复询问
 _selected_config = None
@@ -55,22 +64,22 @@ def _create_config(choice):
     """根据选择创建数据库配置"""
     if choice == "local":
         return {
-            'host': os.environ.get('DB_HOST', '113.46.196.69'),
-            'port': int(os.environ.get('DB_PORT', 3306)),
-            'user': os.environ.get('DB_USER', 'BBR_test'),
-            'password': os.environ.get('DB_PASSWORD', 'SkYwiC5DDhZA8XtH'),
-            'database': os.environ.get('DB_NAME', 'bbr_test'),
+            'host': os.environ.get('MYSQL_LOCAL_HOST', '113.46.196.69'),
+            'port': int(os.environ.get('MYSQL_LOCAL_PORT', 3306)),
+            'user': os.environ.get('MYSQL_LOCAL_USER', 'BBR_test'),
+            'password': os.environ.get('MYSQL_LOCAL_PASSWORD', 'SkYwiC5DDhZA8XtH'),
+            'database': os.environ.get('MYSQL_LOCAL_DATABASE', 'bbr_test'),
             'charset': 'utf8mb4',
             'autocommit': True,
             'use_unicode': True
         }
     else:
         return {
-            'host': '113.45.176.129',
-            'port': 3306,
-            'user': 'fsbbr_data',
-            'password': 'wRCA8AGn3a568f4X',
-            'database': 'fsbbr_data',
+            'host': os.environ.get('MYSQL_ONLINE_HOST', '113.45.176.129'),
+            'port': int(os.environ.get('MYSQL_ONLINE_PORT', 3306)),
+            'user': os.environ.get('MYSQL_ONLINE_USER', 'fsbbr_data'),
+            'password': os.environ.get('MYSQL_ONLINE_PASSWORD', 'wRCA8AGn3a568f4X'),
+            'database': os.environ.get('MYSQL_ONLINE_DATABASE', 'fsbbr_data'),
             'charset': 'utf8mb4',
             'autocommit': True,
             'use_unicode': True
