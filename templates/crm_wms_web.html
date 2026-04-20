@@ -565,6 +565,49 @@
             font-size: 40px;
             cursor: pointer;
             line-height: 1;
+            z-index: 10;
+        }
+
+        .photo-viewer-prev,
+        .photo-viewer-next {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            color: #ffffff;
+            font-size: 50px;
+            cursor: pointer;
+            padding: 20px;
+            border-radius: 50%;
+            transition: background 0.3s;
+            z-index: 10;
+        }
+
+        .photo-viewer-prev:hover,
+        .photo-viewer-next:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .photo-viewer-prev {
+            left: 30px;
+        }
+
+        .photo-viewer-next {
+            right: 30px;
+        }
+
+        .photo-viewer-page {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffffff;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 20px;
+            border-radius: 20px;
+            z-index: 10;
         }
 
         .loading-overlay {
@@ -740,7 +783,10 @@
 
     <div class="photo-viewer-overlay" id="photoViewerOverlay">
         <button class="photo-viewer-close" id="photoViewerClose">&times;</button>
+        <button class="photo-viewer-prev" id="photoViewerPrev" onclick="prevPhoto()">&#10094;</button>
+        <button class="photo-viewer-next" id="photoViewerNext" onclick="nextPhoto()">&#10095;</button>
         <img class="photo-viewer-img" id="photoViewerImg" src="">
+        <div class="photo-viewer-page" id="photoViewerPage"></div>
     </div>
 
     <div class="loading-overlay" id="loadingOverlay">
@@ -818,6 +864,18 @@
          * 用于存储用户输入的搜索内容
          */
         let searchKeyword = '';
+
+        /**
+         * 当前查看的图片列表
+         * 用于存储当前详情页中的所有图片URL
+         */
+        let currentPhotoList = [];
+
+        /**
+         * 当前查看的图片索引
+         * 记录当前在图片查看器中显示的是第几张图片
+         */
+        let currentPhotoIndex = 0;
 
         /**
          * 时间轴自动滚动管理器
@@ -1038,13 +1096,15 @@
             detailTitle.textContent = `客户名称：${handleEmpty(task.fullname_crm)}`;
 
             let photosHtml = '';
+            currentPhotoList = [];
             if (task.photos) {
                 const photoFiles = task.photos.split(',').filter(p => p.trim());
                 if (photoFiles.length > 0) {
                     photosHtml = '<div class="detail-photos">';
-                    photoFiles.forEach(photoFile => {
+                    photoFiles.forEach((photoFile, index) => {
                         const photoUrl = `https://jh.fsbbr.net/uploads/${photoFile.trim()}`;
-                        photosHtml += `<img class="detail-photo" src="${photoUrl}" onclick="openPhotoViewer('${photoUrl}')" alt="照片">`;
+                        currentPhotoList.push(photoUrl);
+                        photosHtml += `<img class="detail-photo" src="${photoUrl}" onclick="openPhotoViewer(${index})" alt="照片">`;
                     });
                     photosHtml += '</div>';
                 }
@@ -1085,13 +1145,49 @@
 
         /**
          * 打开图片查看器
-         * @param {string} imgSrc - 图片地址
+         * @param {number} index - 图片索引
          */
-        function openPhotoViewer(imgSrc) {
+        function openPhotoViewer(index) {
             const photoViewerOverlay = document.getElementById('photoViewerOverlay');
             const photoViewerImg = document.getElementById('photoViewerImg');
-            photoViewerImg.src = imgSrc;
+            const photoViewerPage = document.getElementById('photoViewerPage');
+            
+            currentPhotoIndex = index;
+            photoViewerImg.src = currentPhotoList[currentPhotoIndex];
+            updatePhotoPageNumber();
             photoViewerOverlay.classList.add('active');
+        }
+
+        /**
+         * 更新图片页码显示
+         */
+        function updatePhotoPageNumber() {
+            const photoViewerPage = document.getElementById('photoViewerPage');
+            if (photoViewerPage) {
+                photoViewerPage.textContent = `${currentPhotoIndex + 1} / ${currentPhotoList.length}`;
+            }
+        }
+
+        /**
+         * 上一张图片
+         */
+        function prevPhoto() {
+            if (currentPhotoList.length === 0) return;
+            currentPhotoIndex = (currentPhotoIndex - 1 + currentPhotoList.length) % currentPhotoList.length;
+            const photoViewerImg = document.getElementById('photoViewerImg');
+            photoViewerImg.src = currentPhotoList[currentPhotoIndex];
+            updatePhotoPageNumber();
+        }
+
+        /**
+         * 下一张图片
+         */
+        function nextPhoto() {
+            if (currentPhotoList.length === 0) return;
+            currentPhotoIndex = (currentPhotoIndex + 1) % currentPhotoList.length;
+            const photoViewerImg = document.getElementById('photoViewerImg');
+            photoViewerImg.src = currentPhotoList[currentPhotoIndex];
+            updatePhotoPageNumber();
         }
 
         /**
@@ -1121,6 +1217,20 @@
             photoViewerClose.addEventListener('click', closePhotoViewer);
             photoViewerOverlay.addEventListener('click', function(e) {
                 if (e.target === photoViewerOverlay) {
+                    closePhotoViewer();
+                }
+            });
+
+            // 添加键盘事件监听
+            document.addEventListener('keydown', function(e) {
+                const isViewerActive = photoViewerOverlay.classList.contains('active');
+                if (!isViewerActive) return;
+
+                if (e.key === 'ArrowLeft') {
+                    prevPhoto();
+                } else if (e.key === 'ArrowRight') {
+                    nextPhoto();
+                } else if (e.key === 'Escape') {
                     closePhotoViewer();
                 }
             });
