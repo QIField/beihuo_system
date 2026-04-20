@@ -138,6 +138,7 @@ class CRMDataCrawlService:
             stock_zaitu_list = None
 
         return {
+            'product_id': product.get('product_id', ''),
             'oe': product.get('number', ''),
             'brand': product.get('brand_name', ''),
             'company': COMPANY,
@@ -186,7 +187,7 @@ class CRMDataCrawlService:
         conn = get_db_connection()
 
         columns = [
-            'oe', 'brand', 'company', 'product_name', 'vehicle_brand',
+            'product_id', 'oe', 'brand', 'company', 'product_name', 'vehicle_brand',
             'replace_number', 'brand_code', 'is_cass', 'product_remark',
             'product_level', 'l_model_zh', 'stock_zaitu_list', 'frey_no',
             'supplier_price', 'max_price', 'min_price'
@@ -195,6 +196,7 @@ class CRMDataCrawlService:
 
         def make_row(p):
             return (
+                p.get('product_id', ''),
                 p.get('oe', ''),
                 p.get('brand', ''),
                 p.get('company', COMPANY),

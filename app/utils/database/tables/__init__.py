@@ -38,6 +38,10 @@ from .shop_event_tables import (
     init_shop_business_indicator_table,
 )
 
+from .safety_stock_tables import (
+    init_safety_stock_calculation_table,
+)
+
 __all__ = [
     'init_sales_history_detail_table',
     'init_quote_count_ks_table',
@@ -53,4 +57,5 @@ __all__ = [
     'init_shop_event_detail_table',
     'init_shop_business_indicator_table',
     'init_price_inquiry_direct_table',
+    'init_safety_stock_calculation_table',
 ]

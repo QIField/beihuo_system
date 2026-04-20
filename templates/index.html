@@ -823,6 +823,12 @@
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:;">库存管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="javascript:void(0);" onclick="openSafetyStockInNewTab()">安全库存预警</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed">
                         <a href="javascript:;">开思</a>
                         <dl class="layui-nav-child">
                             <dd id="ksAutoBillMenuItem"><a href="javascript:void(0);" onclick="openKsAutoBillInNewTab()">开思自动开单</a></dd>
@@ -1475,6 +1481,11 @@ fetch('/api/current_user')
 function openVirtualInventoryInNewTab() {
     // 在新标签页中打开虚拟库存页面
     window.open('/virtual_inventory', '_blank');
+}
+
+function openSafetyStockInNewTab() {
+    // 在新标签页中打开安全库存页面
+    window.open('/safety_stock', '_blank');
 }
 
 // 添加打开开思自动开单新标签页的函数
@@ -3629,6 +3640,13 @@ function bindEventHandlers(myTable, form, table) {
                                         只需要Excel文件包含“oe”，“brand”两个表头即可使用，若有条码，则加上“条码”表头，自动读取表头
                                     </div>
                                 </div>
+                                <div id="updateCrmProductOption" style="margin-bottom: 8px;">
+                                    <input type="radio" id="updateCrmProductRadio" name="billType">
+                                    <label for="updateCrmProductRadio">更新CRM产品信息</label>
+                                    <div style="font-size: 12px; color: #666; margin-left: 20px; margin-top: 5px;">
+                                        更新产品的开思描述、开思价、同行价、汽配龙价格等信息，需要包含"配件编码"、"品牌"表头
+                                    </div>
+                                </div>
                             </div>
                             <div style="margin-bottom: 15px;">
                                 <input type="file" id="billFileSelect" name="files" accept=".xlsx,.xls,.csv" multiple style="width: 100%;">
@@ -3656,6 +3674,7 @@ function bindEventHandlers(myTable, form, table) {
                         var processBillRadio = document.getElementById('processBillRadio');
                         var processOrderRadio = document.getElementById('processOrderRadio');
                         var processCrmRadio = document.getElementById('processCrmRadio');
+                        var updateCrmProductRadio = document.getElementById('updateCrmProductRadio');
                         var orderTypeSelect = document.getElementById('orderTypeSelect');
                         
                         // 默认情况下禁用下拉框（因为默认选中处理对账单）
@@ -3710,6 +3729,16 @@ function bindEventHandlers(myTable, form, table) {
                             }
                         });
 
+                        // 控制更新CRM产品信息选项
+                        updateCrmProductRadio.addEventListener('change', function() {
+                            if (this.checked) {
+                                orderTypeSelect.disabled = true;
+                                orderTypeSelect.value = '';
+                                document.getElementById('crmModeSelect').disabled = true;
+                                document.getElementById('crmModeSelect').value = '';
+                            }
+                        });
+
                         // 添加下载模板按钮事件处理
                         document.getElementById('downloadTemplateBtn').addEventListener('click', function() {
                             // 获取当前选中的处理类型
@@ -3734,6 +3763,9 @@ function bindEventHandlers(myTable, form, table) {
                             } else if (processCrmRadio.checked) {
                                 // 如果选择了新建CRM档案
                                 layui.layer.msg('CRM档案处理无需模板', {icon: 1});
+                            } else if (updateCrmProductRadio.checked) {
+                                // 如果选择了更新CRM产品信息
+                                window.location.href = '/api/excel/template/updateview';
                             } else {
                                 // 其他情况
                                 layui.layer.msg('请选择处理方式', {icon: 2});
@@ -3776,6 +3808,7 @@ function bindEventHandlers(myTable, form, table) {
                             var processType = '';
                             var orderType = '';
                             var crmMode = ''; // 新增
+                            var updateCrmProductRadio = document.getElementById('updateCrmProductRadio');
                             
                             if (processBillRadio.checked) {
                                 processType = 'bill';
@@ -3807,6 +3840,19 @@ function bindEventHandlers(myTable, form, table) {
                                     layer.msg('新建CRM档案仅支持Excel或CSV文件', {icon: 2});
                                     return;
                                 }
+                            } else if (updateCrmProductRadio.checked) {
+                                processType = 'update_crm_product';
+                                
+                                // 验证文件格式（只支持单个Excel文件）
+                                if (files.length > 1) {
+                                    layer.msg('更新CRM产品信息仅支持单个文件', {icon: 2});
+                                    return;
+                                }
+                                var fileName = files[0].name.toLowerCase();
+                                if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
+                                    layer.msg('更新CRM产品信息仅支持Excel或CSV文件', {icon: 2});
+                                    return;
+                                }
                             } else {
                                 layer.msg('请选择处理方式', {icon: 2});
                                 return;
@@ -3814,8 +3860,8 @@ function bindEventHandlers(myTable, form, table) {
 
                             // 创建FormData对象
                             var formData = new FormData();
-                            // 只取第一个文件（CRM处理只支持单个文件）
-                            if (processType === 'crm' && files.length > 0) {
+                            // 只取第一个文件（CRM处理和更新CRM产品信息只支持单个文件）
+                            if ((processType === 'crm' || processType === 'update_crm_product') && files.length > 0) {
                                 formData.append('file', files[0]);  // 单数形式
                             } else {
                                 // 其他类型支持多文件
@@ -3842,7 +3888,10 @@ function bindEventHandlers(myTable, form, table) {
                             // 根据处理类型发送不同的请求
                             if (processType === 'crm') {
                                 // 新建CRM档案使用异步API接口
-                                handleCrmAsyncProcess(formData, processLoading);
+                                handleCrmAsyncProcess(formData, processLoading, '/api/excel/async/product_archive');
+                            } else if (processType === 'update_crm_product') {
+                                // 更新CRM产品信息使用异步API接口
+                                handleCrmAsyncProcess(formData, processLoading, '/api/excel/async/update_crm_product');
                             } else {
                                 // 其他类型使用原有的API接口
                                 handleSyncProcess(formData, processLoading, processType, files);
@@ -3919,9 +3968,9 @@ function bindEventHandlers(myTable, form, table) {
     });
 
     // CRM异步处理函数
-    function handleCrmAsyncProcess(formData, loadingIndex) {
+    function handleCrmAsyncProcess(formData, loadingIndex, apiUrl) {
         // 步骤1：提交异步任务
-        fetch('/api/excel/async/product_archive', {
+        fetch(apiUrl, {
             method: 'POST',
             body: formData
         })

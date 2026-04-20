@@ -18,6 +18,7 @@ from .tables import (
     init_shop_event_detail_table,
     init_shop_business_indicator_table,
     init_price_inquiry_direct_table,
+    init_safety_stock_calculation_table,
 )
 
 
@@ -653,6 +654,7 @@ def init_compare_summary_table():
             create_table_sql = """
             CREATE TABLE IF NOT EXISTS crmapp_compare_summary (
                 id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                product_id VARCHAR(100) COMMENT '产品ID',
                 oe VARCHAR(255) NOT NULL COMMENT 'OE号',
                 brand VARCHAR(255) COMMENT '品牌',
                 company VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码',
@@ -709,6 +711,7 @@ def init_compare_summary_table():
             
             # 检查并添加缺失的字段（兼容旧表）
             alter_columns = [
+                ("product_id", "VARCHAR(100) COMMENT '产品ID'"),
                 ("is_cass", "VARCHAR(10) COMMENT '是否同步开思'"),
                 ("l_model_zh", "TEXT COMMENT '车型中文名'"),
                 ("stock_zaitu_list", "JSON COMMENT '在途库存列表'"),
@@ -825,6 +828,7 @@ def init_all_tables():
         ('店铺事件明细', init_shop_event_detail_table),
         ('店铺经营指标', init_shop_business_indicator_table),
         ('询价直接入库', init_price_inquiry_direct_table),
+        ('安全库存计算', init_safety_stock_calculation_table),
     ]
 
     completed = []
