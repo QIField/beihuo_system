@@ -84,7 +84,8 @@ def execute_daily_calculation():
             'in_transit_qty': in_transit_qty,
             'available_stock': available_stock,
             'inventory_amount': inventory_amount,
-            **status_info
+            'stock_status': status_info['status'],
+            'sellable_days': status_info['sellable_days']
         })
     
     # 7. 保存计算结果

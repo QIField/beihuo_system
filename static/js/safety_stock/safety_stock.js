@@ -123,9 +123,32 @@ function initGrid() {
             valueFormatter: numberFormatter
         },
         {
-            headerName: '安全库存',
+            headerName: '基础安全库存',
+            field: 'base_safety_stock',
+            width: 110,
+            sortable: true,
+            filter: 'agNumberColumnFilter',
+            resizable: true,
+            cellClass: 'cell-number',
+            valueFormatter: numberFormatter
+        },
+        {
+            headerName: '季节系数',
+            field: 'seasonal_factor',
+            width: 90,
+            sortable: true,
+            filter: 'agNumberColumnFilter',
+            resizable: true,
+            cellClass: 'cell-number',
+            valueFormatter: function(params) {
+                if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
+                return parseFloat(params.value).toFixed(2);
+            }
+        },
+        {
+            headerName: '调整后安全库存',
             field: 'safety_stock',
-            width: 100,
+            width: 120,
             sortable: true,
             filter: 'agNumberColumnFilter',
             resizable: true,
@@ -161,8 +184,8 @@ function initGrid() {
             resizable: true,
             cellClass: 'cell-number',
             valueFormatter: function(params) {
-                if (params.value === null || params.value === undefined) return '-';
-                return params.value.toFixed(1) + '天';
+                if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
+                return parseFloat(params.value).toFixed(1) + '天';
             }
         },
         {
@@ -193,8 +216,8 @@ function initGrid() {
             resizable: true,
             cellClass: 'cell-number',
             valueFormatter: function(params) {
-                if (params.value === null || params.value === undefined) return '-';
-                return '¥' + params.value.toFixed(2);
+                if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
+                return '¥' + parseFloat(params.value).toFixed(2);
             }
         }
     ];
@@ -206,18 +229,13 @@ function initGrid() {
         defaultColDef: {
             sortable: true,
             filter: true,
-            resizable: true,
-            menuTabs: ['filterMenuTab', 'generalMenuTab', 'columnsMenuTab']
+            resizable: true
         },
         pagination: true,
         paginationPageSize: 50,
-        paginationPageSizeSelector: [20, 50, 100, 200, 500],
         rowSelection: 'multiple',
         suppressRowClickSelection: true,
         animateRows: true,
-        enableRangeSelection: true,
-        enableClipboard: true,
-        suppressClipboardPaste: false,
         localeText: {
             page: '页',
             more: '更多',
@@ -242,28 +260,7 @@ function initGrid() {
         onGridReady: function(params) {
             gridApi = params.api;
             gridColumnApi = params.columnApi;
-            
-            // 启用工具函数功能
-            if (typeof initDragSelection === 'function') {
-                initDragSelection(gridApi, gridColumnApi);
-            }
-            if (typeof initDoubleClickCopy === 'function') {
-                initDoubleClickCopy(gridApi, gridColumnApi);
-            }
-            if (typeof initShortcuts === 'function') {
-                initShortcuts(gridApi);
-            }
-            if (typeof initPageSizeSelector === 'function') {
-                initPageSizeSelector(gridApi, [20, 50, 100, 200, 500]);
-            }
-            if (typeof sizeColumnsToFit === 'function') {
-                sizeColumnsToFit(gridApi);
-            }
-        },
-        onFirstDataRendered: function(params) {
-            if (typeof sizeColumnsToFit === 'function') {
-                sizeColumnsToFit(gridApi);
-            }
+            console.log('AG Grid 初始化完成');
         }
     };
 
@@ -361,6 +358,8 @@ function loadData() {
                 
                 if (res.code === 0) {
                     allData = res.data || [];
+                    console.log('加载数据成功:', allData.length, '条');
+                    console.log('第一条数据:', allData[0]);
                     applyFilter();
                 } else {
                     layer.msg(res.msg || '加载失败', { icon: 2 });
@@ -407,6 +406,8 @@ function applyFilter() {
     // 更新表格数据
     if (gridApi) {
         gridApi.setRowData(filteredData);
+        // 刷新分页
+        gridApi.paginationGoToPage(0);
     }
 }
 

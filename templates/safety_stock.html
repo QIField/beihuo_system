@@ -251,6 +251,12 @@
         /* AG Grid */
         .grid-container {
             height: 600px;
+            width: 100%;
+        }
+        
+        #safetyStockGrid {
+            height: 100%;
+            width: 100%;
         }
         
         .ag-theme-alpine {
@@ -396,6 +402,19 @@
                 </div>
                 <div class="stat-card-value" id="countSuccess">0</div>
                 <div class="stat-card-label">库存正常产品</div>
+            </div>
+        </div>
+        
+        <!-- 说明区域 -->
+        <div class="info-panel" style="background: #fff; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+            <div style="font-size: 14px; color: #262626; font-weight: 600; margin-bottom: 10px;">📊 ABC分类说明</div>
+            <div style="display: flex; gap: 30px; flex-wrap: wrap; font-size: 13px; color: #595959;">
+                <div><span class="abc-tag abc-a">A</span> <strong>前20%</strong> 高销量产品 | 高服务水平 | 覆盖10天</div>
+                <div><span class="abc-tag abc-b">B</span> <strong>中间60%</strong> 中销量产品 | 中服务水平 | 覆盖20天</div>
+                <div><span class="abc-tag abc-c">C</span> <strong>后20%</strong> 低销量产品 | 低服务水平 | 覆盖30天</div>
+            </div>
+            <div style="margin-top: 10px; font-size: 12px; color: #8c8c8c; border-top: 1px dashed #e8e8e8; padding-top: 10px;">
+                💡 <strong>季节系数</strong>：根据过去12个月销量波动自动调整（0.7-1.3），旺季增加安全库存，淡季减少安全库存
             </div>
         </div>
         

@@ -7,6 +7,7 @@ from backend.virtual_inventory_api import register_virtual_inventory_routes
 from backend.search_in_crm import search_in_crm_bp
 from backend.ks_auto_bill_api import ks_auto_bill_bp
 from backend.excel_process_api import register_excel_process_routes
+from backend.api.excel.updateview_api import register_updateview_routes
 from urllib.parse import unquote
 import pandas as pd
 from pathlib import Path
@@ -51,6 +52,7 @@ app.secret_key = 'your-very-secret-key'
 
 register_virtual_inventory_routes(app)
 register_excel_process_routes(app)  # 注册Excel处理API
+register_updateview_routes(app)  # 注册UpdateView API
 app.register_blueprint(search_in_crm_bp)
 app.register_blueprint(get_order_bp)
 app.register_blueprint(ks_auto_bill_bp)

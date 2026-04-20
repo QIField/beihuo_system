@@ -44,14 +44,13 @@ class SafetyStockDBService:
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # 读取销量明细，按OE+品牌分组
+                # 简化SQL，在Python中处理日期格式化
                 sql = """
                     SELECT 
                         number as oe,
                         brand_name as brand,
                         quantity,
-                        create_date,
-                        DATE_FORMAT(create_date, '%Y-%m') as year_month,
-                        DATE(create_date) as sale_date
+                        create_date
                     FROM crmapp_sales_history_detail
                     WHERE create_date >= %s
                       AND create_date <= %s
@@ -76,12 +75,20 @@ class SafetyStockDBService:
                 
                 for row in rows:
                     key = f"{row['oe']}|{row['brand']}"
+                    # 在Python中处理日期格式化
+                    create_date = row['create_date']
+                    if isinstance(create_date, str):
+                        create_date = datetime.strptime(create_date, '%Y-%m-%d %H:%M:%S')
+                    
+                    sale_date = create_date.strftime('%Y-%m-%d')
+                    year_month = create_date.strftime('%Y-%m')
+                    
                     product_data[key]['oe'] = row['oe']
                     product_data[key]['brand'] = row['brand']
-                    product_data[key]['daily_sales'][row['sale_date']] += float(row['quantity'] or 0)
-                    product_data[key]['monthly_sales'][row['year_month']] += float(row['quantity'] or 0)
+                    product_data[key]['daily_sales'][sale_date] += float(row['quantity'] or 0)
+                    product_data[key]['monthly_sales'][year_month] += float(row['quantity'] or 0)
                     product_data[key]['total_sales'] += float(row['quantity'] or 0)
-                    product_data[key]['sale_days'].add(row['sale_date'])
+                    product_data[key]['sale_days'].add(sale_date)
                 
                 # 计算平均日销量和标准差
                 result = {}

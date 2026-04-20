@@ -36,14 +36,14 @@ def get_safety_stock_list():
         abc_class = request.args.get('abc_class')
         keyword = request.args.get('keyword', '').strip()
         page = int(request.args.get('page', 1))
-        limit = min(int(request.args.get('limit', 50)), 500)
+        limit = int(request.args.get('limit', 50))
         
-        # 查询数据
+        # 查询数据（取消500条限制，最大支持10万条）
         results = SafetyStockDBService.get_calculation_results(
             calc_date=calc_date,
             stock_status=stock_status,
             abc_class=abc_class,
-            limit=10000  # 先查大量数据，再内存分页
+            limit=100000  # 查询大量数据用于内存筛选
         )
         
         # 关键词筛选
@@ -56,7 +56,7 @@ def get_safety_stock_list():
                     keyword_lower in (r.get('product_name') or '').lower())
             ]
         
-        # 内存分页
+        # 内存分页（保留分页功能）
         total = len(results)
         start = (page - 1) * limit
         end = start + limit
