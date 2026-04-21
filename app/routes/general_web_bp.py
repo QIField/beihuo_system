@@ -21,3 +21,15 @@ general_web_bp = Blueprint(
 def dashboard_crm_wms():
     """仓库大屏"""
     return render_template("crm_wms_web.html")
+
+
+@general_web_bp.route("/system_config")
+def system_config():
+    """系统配置管理"""
+    return render_template("system_setting_web/beihuo_system_config_web.html")
+
+
+@general_web_bp.route("/transaction_sum_web")
+def transaction_sum():
+
+    return render_template("customer_quota_manager_web/transaction_sum_web.html")

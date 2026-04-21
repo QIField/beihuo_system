@@ -83,22 +83,67 @@ def timestamp_to_str(ts: int, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     return dt.strftime(fmt)
 
 
-# # 测试示例
-if __name__ == '__main__':
-    # 传入 2026-03
-    # start_ts, end_ts = get_month_timestamp("2026-01")
-    # print(f"开始时间戳：{start_ts}")
-    # print(f"结束时间戳：{end_ts}")
+def get_relative_month_timestamp(step: int) -> tuple[int, int]:
+    """
+    新增方法：获取相对当前时间的月份时间戳
+    参数规则：1=本月, 2=上月, 3=上上月, ..., 12=前11个月
 
-    # start_ts, end_ts = get_day_timestamp("2026-01-20")
-    # print(f"开始时间戳：{start_ts}")
-    # print(f"结束时间戳：{end_ts}")
+    Args:
+        step: 偏移步数，范围 1~12
 
-    # 测试你之前的时间戳
-    print(timestamp_to_str(1769097600))  # 2026-01-23 00:00:00
-    print(timestamp_to_str(1769183999))  # 2026-01-23 23:59:59
-    print(timestamp_to_str(1772294400))  # 2026-03-01 00:00:00
-    print(timestamp_to_str(1774972799))  # 2026-03-31 23:59:59
+    Returns:
+        tuple: (开始时间戳, 结束时间戳)
+    """
+    # # 参数校验
+    # if not isinstance(step, int) or step < 1 or step > 12:
+    #     raise ValueError("参数必须是 1~12 之间的整数")
 
-    # 只需要日期
-    print(timestamp_to_str(1769097600, "%Y-%m-%d"))  # 2026-01-23
+    # 获取当前北京时间
+    now = datetime.now()
+    current_year = now.year
+    current_month = now.month
+
+    # 计算目标月份：step=1 → 当月，step=2 → 上月，以此类推
+    target_month = current_month - (step - 1)
+    target_year = current_year
+
+    # 处理跨年场景（例如 1月 - 1 → 去年12月）
+    while target_month < 1:
+        target_year -= 1
+        target_month += 12
+
+    # 拼接月份字符串，调用原有方法
+    month_str = f"{target_year}-{target_month:02d}"
+    return get_month_timestamp(month_str)
+
+
+def get_border_month_timestamp(month_pair: tuple[int, int]) -> tuple[int, int]:
+    """
+    获取两个月份的边界时间戳
+    参数格式 (a, b):
+        返回 => ( a月的最后一秒时间戳, b月的第一秒时间戳 )
+
+    月份规则：
+        1 = 本月
+        2 = 上月
+        3 = 上上月
+        ...
+        12 = 前11个月
+    """
+    a_month, b_month = month_pair
+
+    # 获取 a 月的结束时间
+    _, a_end = get_relative_month_timestamp(a_month)
+
+    # 获取 b 月的开始时间
+    b_start, _ = get_relative_month_timestamp(b_month)
+
+    return b_start,a_end
+# if __name__ == '__main__':
+#     # t1=get_relative_month_timestamp(1)  # 2026-04 → (1774972800000, 1776700799000)
+#     # t2=get_relative_month_timestamp(2)  # 2026-03 → (1772294400000, 1774972799000)
+#     # t3=get_relative_month_timestamp(30)  # 2026-02 → (1769875200000, 1772294399000)
+#     # print(t1,t2,t3)
+#
+#     print(get_border_month_timestamp((1,3)))
+#     print(get_relative_month_timestamp(3))

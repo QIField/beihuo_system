@@ -6,7 +6,7 @@
 # @Software: PyCharm
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, text
 from sqlalchemy.dialects.mysql import insert
 
 from .base_models import BaseModels
@@ -149,6 +149,134 @@ class PartnerList(BaseModels):
         session.execute(stmt)
         
         return len(data_list)
+
+    @classmethod
+    def list_to_dict_list(cls, obj_list):
+        """
+        将对象列表转换为字典列表
+        
+        支持两种输入类型：
+        1. PartnerList 模型对象列表
+        2. SQLAlchemy Row 对象列表（原生SQL查询结果）
+        
+        :param obj_list: PartnerList 对象列表 或 Row 对象列表
+        :return: 字典列表
+        """
+        if not obj_list:
+            return []
+        
+        result = []
+        for obj in obj_list:
+            if hasattr(obj, 'to_dict'):
+                # 是模型对象，调用 to_dict 方法
+                result.append(obj.to_dict())
+            else:
+                # 是 Row 对象，转换为字典并处理特殊类型
+                try:
+                    # 尝试使用 _asdict() 方法（适用于 SQLAlchemy 1.4+）
+                    row_dict = obj._asdict()
+                except AttributeError:
+                    # 备用方法：手动构建字典
+                    row_dict = {}
+                    for key in obj.keys():
+                        row_dict[key] = obj[key]
+                # 处理 Numeric 类型，转换为 float
+                for key, value in row_dict.items():
+                    if hasattr(value, 'real') and hasattr(value, 'imag'):
+                        # Decimal/Numeric 类型
+                        row_dict[key] = float(value)
+                result.append(row_dict)
+        return result
+
+    @classmethod
+    def get_customer_total_price_sum(
+            cls,
+            session,
+            page: int = 1,
+            limit: int = 20,
+            start_time: int = None,
+            end_time: int = None,
+            customer_name: str = None
+    ):
+        """
+        仿照通用分页函数 → 订单统计专用分页（执行原生SQL）
+        返回：当前页数据列表, 总记录数
+        """
+        # ===================== 1. 参数校验 =====================
+        page = max(1, page)
+        limit = max(1, min(limit, 100))
+        offset = (page - 1) * limit
+
+        # ===================== 2. 你的统计SQL（带分页占位符） =====================
+        sql = text("""
+                   SELECT t.customer_id,
+                          t.order_count,
+                          t.total_price_sum,
+                          t.sfje_sum,
+                          t.no_receive_amount_sum,
+                          p.level_id,
+                          p.level_name,
+                          p.fullname,
+                          p.contacts_phone,
+                          p.payment_description,
+                          p.payment_method,
+                          p.real_name,
+                          p.sap_no,
+                          p.street
+                   FROM (SELECT customer_id,
+                                COUNT(*)               AS order_count,
+                                SUM(total_price)       AS total_price_sum,
+                                SUM(sfje)              AS sfje_sum,
+                                SUM(no_receive_amount) AS no_receive_amount_sum
+                         FROM merge_order_list m
+                         WHERE 1 = 1
+                           AND (:start_time IS NULL OR m.create_date >= :start_time)
+                           AND (:end_time IS NULL OR m.create_date <= :end_time)
+                           AND (:customer_name IS NULL OR m.fullname = :customer_name)
+                         GROUP BY customer_id) t
+                            RIGHT JOIN partner_list p ON t.customer_id = p.partner_id
+                   ORDER BY p.level_id DESC,
+                            p.payment_description DESC,
+                            t.total_price_sum DESC LIMIT :limit
+                   OFFSET :offset
+                   """)
+
+        # 统计总数SQL（去掉ORDER BY + LIMIT）
+        count_sql = text("""
+                         SELECT COUNT(*)
+                         FROM (SELECT customer_id
+                               FROM merge_order_list m
+                               WHERE 1 = 1
+                                 AND (:start_time IS NULL OR m.create_date >= :start_time)
+                                 AND (:end_time IS NULL OR m.create_date <= :end_time)
+                                 AND (:customer_name IS NULL OR m.fullname = :customer_name)
+                               GROUP BY customer_id) t
+                         """)
+
+        # ===================== 3. 参数绑定 =====================
+        params = {
+            "start_time": start_time,
+            "end_time": end_time,
+            "customer_name": customer_name,
+            "limit": limit,
+            "offset": offset
+        }
+
+        # ===================== 4. 查询总数 =====================
+        total = session.execute(count_sql, params).scalar() or 0
+
+        # ===================== 5. 查询当前页数据 =====================
+        results = session.execute(sql, params).all()
+
+        return results, total
+
+
+
+
+
+
+
+
 
     def __repr__(self):
         """
