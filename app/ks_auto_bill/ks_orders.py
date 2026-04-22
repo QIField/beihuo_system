@@ -24,15 +24,17 @@ def _get_date_range():
         tuple: (start_date, end_date)
     """
     # 判断运行环境，设置日期
-    current_path = os.getcwd()
-    if r"E:\work download\project\BBR" in current_path:
-        today = "2026-03-14"
-        start_date = f"{today} 00:00:00"
-        end_date = f"{today} 23:59:59"
-    else:
+    # 只有在 /www/wwwroot/beihuo_system 路径下才是线上环境，其他都是测试环境
+    current_path = os.getcwd().replace('\\', '/')
+    if "/www/wwwroot/beihuo_system" in current_path:
         # 线上环境使用最近一周的日期
         end_date = datetime.now().strftime("%Y-%m-%d") + " 23:59:59"
         start_date = (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d") + " 00:00:00"
+    else:
+        # 测试环境使用固定日期
+        today = "2026-04-20"
+        start_date = f"{today} 00:00:00"
+        end_date = f"{today} 23:59:59"
 
     return (start_date, end_date)
 
@@ -42,11 +44,11 @@ def print_date_range():
     打印本次爬取的时间范围（在每次爬取开始时调用一次）
     """
     start_date, end_date = _get_date_range()
-    current_path = os.getcwd()
-    if r"E:\work download\project\BBR" in current_path:
-        print(f"【本地环境】使用固定日期: {start_date[:10]}")
-    else:
+    current_path = os.getcwd().replace('\\', '/')
+    if "/www/wwwroot/beihuo_system" in current_path:
         print(f"【生产环境】查询日期范围: {start_date} 至 {end_date}")
+    else:
+        print(f"【测试环境】使用固定日期: {start_date[:10]}")
 
 def get_orders(session, status="", page_num=1, page_size=20):
     """
@@ -63,7 +65,7 @@ def get_orders(session, status="", page_num=1, page_size=20):
         None: 请求失败
     
     说明:
-        - 本地环境（E:\work download\project\BBR）使用固定日期 2026-03-14
+        - 本地环境（E:\work download\project\BBR）使用固定日期 2026-04-20
         - 其他环境使用最近一周的日期
     """
     if session is None:

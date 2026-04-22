@@ -8,6 +8,7 @@ import time
 from collections import defaultdict
 import math
 from .database_connection import get_db_connection as get_pooled_db_connection  # 导入统一的连接池实现并重命名
+from .supplier_data_fetchers.changsheng_inventory import start as fetch_changsheng_data
 
 
 # 全局品牌缓存
@@ -925,7 +926,9 @@ def chuli_beiermale(male, beier, ntf, jky):
 
 
 def save_beiermale_to_db(data):
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    current_time = datetime.now()
+    expiry_date = (current_time + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    fetch_time_str = current_time.strftime('%Y-%m-%d %H:%M:%S')
     
     # 批量保存到数据库
     db_manager = get_db_connection()
@@ -943,11 +946,11 @@ def save_beiermale_to_db(data):
                     row[0],       # OE码
                     row[1],       # 品牌
                     row[2],       # 价格
-                    current_time, # 失效时间
+                    expiry_date,  # 失效时间（当前时间+1天）
                     '佛山禅城仓', # 仓库
                     row[3],       # 库存
                     '',           # 备注
-                    current_time  # 拉取时间
+                    fetch_time_str  # 拉取时间
                 ))
             
             # 批量插入
@@ -970,11 +973,11 @@ def save_beiermale_to_db(data):
                     row[0],       # OE码
                     row[1],       # 品牌
                     row[2],       # 价格
-                    current_time, # 失效时间
+                    expiry_date,  # 失效时间（当前时间+1天）
                     '佛山禅城仓', # 仓库
                     row[3],       # 库存
                     '',           # 备注
-                    current_time  # 拉取时间
+                    fetch_time_str  # 拉取时间
                 ))
             
             # 批量插入到整合表
@@ -1405,9 +1408,8 @@ def fetch_and_process_latest_data():
         # 应用仓库名称映射
         df['city_name'] = df['city_name'].replace(city_mapping)
         df['oe_number1'] = df['oe_number1'].astype(str).apply(process_oe_number)
-        # 计算明天23点的时间，并格式化为字符串避免乱码
-        tomorrow_23 = (datetime.now() + timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-        tomorrow_23_str = tomorrow_23.strftime('%Y-%m-%d %H:%M:%S')
+        # 计算当前时间+1天作为失效时间
+        expiry_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
 
         # 创建新的DataFrame，匹配Excel表头
         result_df = pd.DataFrame({
@@ -1415,7 +1417,7 @@ def fetch_and_process_latest_data():
             '原厂OE码': df['oe_number1'],  # 修改列名
             '品牌': df['brand_name1'],
             '价格': df['price1'],
-            '失效时间': tomorrow_23_str,
+            '失效时间': expiry_date,  # 当前时间+1天
             '仓库名称': df['city_name'],
             '库存': df['quantity1'],
             '备注': ''
@@ -1638,6 +1640,55 @@ def delete_old_data():
         """
         deleted_count = db_manager.execute_update(delete_sql)
         print(f"已删除 {deleted_count} 条50天前的数据")
+    finally:
+        db_manager.close()
+
+
+def save_changsheng_to_virtual_inventory(df):
+    """
+    保存昌盛库存数据到virtual_inventory表
+    :param df: 昌盛库存DataFrame
+    """
+    if df is None or df.empty:
+        print("昌盛库存数据为空，跳过保存")
+        return
+    
+    # 根据品牌处理价格
+    df['价格'] = df.apply(lambda row: process_price_by_brand(row['价格'], row['品牌']), axis=1)
+    
+    # 添加拉取时间
+    fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df['fetch_time'] = fetch_time
+    
+    # 批量保存到数据库
+    db_manager = get_db_connection()
+    try:
+        batch_size = 1000
+        for i in range(0, len(df), batch_size):
+            batch = df.iloc[i:i + batch_size]
+            
+            # 准备批量插入数据
+            batch_data = []
+            for index, row in batch.iterrows():
+                batch_data.append((
+                    row['供应商名称'],
+                    row['原厂OE码'],
+                    row['品牌'],
+                    row['价格'],
+                    row['失效时间'],
+                    row['仓库名称'],
+                    row['库存'],
+                    row['备注'],
+                    row['fetch_time']
+                ))
+            
+            # 批量插入到整合表
+            sql = """
+                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            db_manager.execute_many(sql, batch_data)
+            print(f"已批量保存 {min(i + batch_size, len(df))} / {len(df)} 条昌盛库存数据到整合表")
     finally:
         db_manager.close()
 
@@ -2005,13 +2056,20 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
     # 使用映射后的品牌
     df['品牌'] = df['temp_brand']
     
+    # 供应商名称映射（用于B2B上传时匹配，不改变数据库中的名称）
+    # 广州昌盛 -> 昌盛
+    supplier_mapping = {
+        '广州昌盛': '昌盛'
+    }
+    df['供应商名称_映射'] = df['供应商名称'].map(supplier_mapping).fillna(df['供应商名称'])
+    
     # 在合并前保存原始品牌信息
     df_with_original = df.copy()
     df_with_original['original_brand'] = original_brand_series.values
     
-    # 合并数据
+    # 合并数据（使用映射后的供应商名称进行匹配）
     df_merged = pd.merge(df_with_original, ck_data, left_on='仓库名称', right_on='warehouse_name', how='inner')
-    df_merged = pd.merge(df_merged, gys_data, left_on='供应商名称', right_on='name', how='inner')
+    df_merged = pd.merge(df_merged, gys_data, left_on='供应商名称_映射', right_on='name', how='inner')
     
     if df_merged.empty:
         print("没有匹配的仓库或供应商数据，无法上传")
@@ -2076,6 +2134,23 @@ def main_process(skip_table_creation=False):
     
     # 获取外部数据
     df2 = ggg2()
+    
+    # 获取昌盛库存数据
+    try:
+        print("\n" + "="*60)
+        print("开始获取昌盛库存数据")
+        print("="*60)
+        changsheng_df = fetch_changsheng_data()
+        if changsheng_df is not None and not changsheng_df.empty:
+            save_changsheng_to_virtual_inventory(changsheng_df)
+            print(f"昌盛库存数据获取完成，共 {len(changsheng_df)} 条")
+        else:
+            print("昌盛库存数据为空")
+        print("="*60)
+    except Exception as e:
+        print(f"获取昌盛库存数据失败: {e}")
+        import traceback
+        traceback.print_exc()
     
     # 读取所有数据并整合到虚拟库存表（已通过各模块自动添加）
     db_manager = get_db_connection()

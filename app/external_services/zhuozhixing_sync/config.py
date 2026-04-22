@@ -20,6 +20,11 @@ SUPPLIERS = {
         'name': '鑫峰',
         'gsign': 'B810A2A5ABAE10EAEE19B3BE563B24A9',
         'description': '鑫峰供应商库存数据'
+    },
+    '佛山万拓': {
+        'name': '佛山万拓',
+        'gsign': 'EFA9CC150A42AA1AAD67B069606C3B71',
+        'description': '佛山万拓供应商库存数据'
     }
 }
 

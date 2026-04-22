@@ -19,17 +19,14 @@ _config_lock = threading.Lock()
 def is_local_environment():
     """
     判断是否为本地开发环境
-    通过检测文件路径或环境变量来判断
+    通过检测文件路径来判断
+    只有在 /www/wwwroot/beihuo_system 路径下才是线上环境，其他都是测试环境
     """
     current_file_path = Path(__file__).resolve()
     current_path_str = str(current_file_path).lower().replace('\\', '/')
     
-    return (
-        current_path_str.startswith('g:/work/') or
-        current_path_str.startswith('e:/work download/') or
-        os.environ.get('FLASK_ENV') == 'development' or
-        'localhost' in os.environ.get('HOSTNAME', '').lower()
-    )
+    # 只有在 /www/wwwroot/beihuo_system 路径下才是线上环境，其他都是测试环境
+    return "/www/wwwroot/beihuo_system" not in current_path_str
 
 
 def _ask_database_choice():
