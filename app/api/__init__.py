@@ -13,5 +13,10 @@ api_bp = Blueprint('api', __name__, url_prefix='/new/api')
 # 导入 user 接口（必须放在下面！）
 from . import api_test
 from . import dashboard_crm_wms
+from . import compare_api
+from .compare_api import bp as compare_bp
+
+# 注册比价数据对比蓝图（设置正确的 url_prefix）
+api_bp.register_blueprint(compare_bp, url_prefix='/compare')
 
 __all__ = ["api_bp"]

@@ -661,6 +661,7 @@ def init_compare_summary_table():
                 product_name VARCHAR(500) COMMENT '产品名称',
                 vehicle_brand VARCHAR(255) COMMENT '车辆品牌',
                 replace_number VARCHAR(255) COMMENT '替换号',
+                replace_number_with_keys VARCHAR(500) COMMENT '替换号(含key信息，格式key1:num1;key2:num2)',
                 brand_code VARCHAR(255) COMMENT '品牌编码',
                 inquiry_count INT DEFAULT 0 COMMENT '询价次数',
                 product_level VARCHAR(50) COMMENT '产品等级',
@@ -718,6 +719,7 @@ def init_compare_summary_table():
                 ("frey_no", "VARCHAR(255) COMMENT 'Frey编号'"),
                 ("sales_6m", "INT DEFAULT 0 COMMENT '近6个月总销量'"),
                 ("sales_12m", "INT DEFAULT 0 COMMENT '近12个月总销量'"),
+                ("replace_number_with_keys", "VARCHAR(500) COMMENT '替换号(含key信息，格式key1:num1;key2:num2)'"),
             ]
             
             for col_name, col_def in alter_columns:

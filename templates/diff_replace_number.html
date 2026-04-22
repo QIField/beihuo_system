@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>替换号差异对比</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* 头部 */
+        .header {
+            background: #fff;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .header-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #262626;
+        }
+        
+        .header-subtitle {
+            font-size: 14px;
+            color: #8c8c8c;
+            margin-top: 4px;
+        }
+        
+        /* 搜索表单 */
+        .search-form {
+            background: #fff;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .form-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .form-item label {
+            font-size: 14px;
+            color: #595959;
+            white-space: nowrap;
+        }
+        
+        .form-item input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 200px;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #1890ff;
+            color: #fff;
+        }
+        
+        .btn-primary:hover {
+            background: #40a9ff;
+        }
+        
+        .btn-default {
+            background: #fff;
+            color: #595959;
+            border: 1px solid #d9d9d9;
+        }
+        
+        /* 统计信息 */
+        .stats-bar {
+            background: #fff;
+            padding: 16px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #8c8c8c;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #262626;
+        }
+        
+        .stat-value.highlight {
+            color: #1890ff;
+        }
+        
+        .stat-value.warning {
+            color: #faad14;
+        }
+        
+        /* 进度信息 */
+        .progress-bar {
+            background: #fff;
+            padding: 16px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .progress-info {
+            font-size: 16px;
+            color: #262626;
+        }
+        
+        .progress-info span {
+            color: #1890ff;
+            font-weight: 600;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-nav {
+            padding: 10px 24px;
+            font-size: 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-prev {
+            background: #f0f0f0;
+            color: #595959;
+        }
+        
+        .btn-prev:hover:not(:disabled) {
+            background: #d9d9d9;
+        }
+        
+        .btn-next {
+            background: #1890ff;
+            color: #fff;
+        }
+        
+        .btn-next:hover:not(:disabled) {
+            background: #40a9ff;
+        }
+        
+        .btn-nav:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* 数据表格 */
+        .data-container {
+            background: #fff;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .current-oe {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1890ff;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e6f7ff;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table th {
+            background: #fafafa;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #262626;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #595959;
+        }
+        
+        .data-table tr:hover {
+            background: #f6ffed;
+        }
+        
+        .col-oe {
+            width: 25%;
+        }
+        
+        .col-brand {
+            width: 15%;
+        }
+        
+        .col-stock {
+            width: 12%;
+            text-align: center;
+        }
+        
+        .col-purchase {
+            width: 12%;
+            text-align: center;
+        }
+        
+        .col-replace {
+            width: 36%;
+        }
+        
+        .stock-yes {
+            color: #52c41a;
+            font-weight: 600;
+        }
+        
+        .stock-no {
+            color: #999;
+        }
+        
+        .purchase-yes {
+            color: #1890ff;
+            font-weight: 600;
+        }
+        
+        .purchase-no {
+            color: #999;
+        }
+        
+        .empty-cell {
+            color: #999;
+            font-style: italic;
+        }
+        
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #8c8c8c;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #1890ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <div class="header-title">替换号差异对比</div>
+            <div class="header-subtitle">逐个查看同一OE下不同品牌的替换号差异</div>
+        </div>
+        
+        <!-- 搜索表单 -->
+        <div class="search-form">
+            <div class="form-row">
+                <div class="form-item">
+                    <label>OE号：</label>
+                    <input type="text" id="searchOe" placeholder="支持空格分隔多值">
+                </div>
+                <div class="form-item">
+                    <label>品牌：</label>
+                    <input type="text" id="searchBrand" placeholder="支持逗号分隔多值">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="searchData()">开始查询</button>
+                <button class="btn btn-default" onclick="resetForm()">重置</button>
+            </div>
+        </div>
+        
+        <!-- 统计信息 -->
+        <div class="stats-bar" id="statsBar" style="display: none;">
+            <div class="stat-item">
+                <span class="stat-label">数据库总OE数：</span>
+                <span class="stat-value" id="totalOeCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">有差异的OE数：</span>
+                <span class="stat-value warning" id="diffOeCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">差异率：</span>
+                <span class="stat-value highlight" id="diffRate">0%</span>
+            </div>
+        </div>
+        
+        <!-- 进度和操作 -->
+        <div class="progress-bar" id="progressBar" style="display: none;">
+            <div class="progress-info">
+                当前第 <span id="currentIndex">0</span> / <span id="totalCount">0</span> 个OE
+            </div>
+            <div class="nav-buttons">
+                <button class="btn-nav btn-prev" id="btnPrev" onclick="showPrev()" disabled>
+                    ← 上一个
+                </button>
+                <button class="btn-nav btn-next" id="btnNext" onclick="showNext()" disabled>
+                    下一个 →
+                </button>
+            </div>
+        </div>
+        
+        <!-- 数据展示 -->
+        <div class="data-container" id="dataContainer" style="display: none;">
+            <div class="current-oe" id="currentOe"></div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="col-oe">OE</th>
+                        <th class="col-brand">品牌</th>
+                        <th class="col-purchase">采购历史</th>
+                        <th class="col-stock">库存数量</th>
+                        <th class="col-replace">替换号</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody">
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 空状态 -->
+        <div class="empty-state" id="emptyState">
+            请点击"开始查询"按钮查询数据
+        </div>
+        
+        <!-- 加载中 -->
+        <div class="loading" id="loading" style="display: none;">
+            加载中...
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script>
+        // 全局变量
+        let allData = [];           // 所有数据
+        let groupedData = {};       // 按OE分组的数据
+        let oeList = [];            // OE列表
+        let currentIndex = 0;       // 当前显示的OE索引
+        
+        // 查询数据（支持分页获取所有数据）
+        async function searchData() {
+            const oe = document.getElementById('searchOe').value.trim();
+            const brand = document.getElementById('searchBrand').value.trim();
+            
+            // 显示加载状态
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = '加载中...';
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('dataContainer').style.display = 'none';
+            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('statsBar').style.display = 'none';
+            
+            allData = [];
+            let page = 1;
+            const limit = 5000; // 每页获取数量
+            let hasMore = true;
+            let totalExpected = 0;
+            
+            try {
+                // 循环获取所有数据
+                while (hasMore) {
+                    // 构建请求参数
+                    const params = new URLSearchParams({
+                        page: page,
+                        limit: limit
+                    });
+                    
+                    if (oe) params.append('oe', oe);
+                    if (brand) params.append('brand', brand);
+                    
+                    // 发送请求
+                    const response = await fetch(`/new/api/compare/diff-replace-numbers?${params.toString()}`);
+                    const result = await response.json();
+                    
+                    if (result.code === 0) {
+                        const pageData = result.data.list;
+                        totalExpected = result.data.total;
+                        
+                        if (pageData.length === 0) {
+                            hasMore = false;
+                        } else {
+                            allData = allData.concat(pageData);
+                            document.getElementById('loading').textContent = `已加载 ${allData.length} / ${totalExpected} 条数据...`;
+                            
+                            // 如果获取的数据少于 limit，说明已经获取完
+                            if (pageData.length < limit) {
+                                hasMore = false;
+                            } else {
+                                page++;
+                            }
+                        }
+                    } else {
+                        throw new Error(result.message);
+                    }
+                }
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (allData.length === 0) {
+                    document.getElementById('emptyState').style.display = 'block';
+                    document.getElementById('emptyState').textContent = '没有找到数据';
+                    return;
+                }
+                
+                // 按OE分组
+                groupDataByOe();
+                
+                // 显示第一个OE
+                currentIndex = 0;
+                showCurrentOe();
+                
+                // 显示进度条和统计
+                document.getElementById('progressBar').style.display = 'flex';
+                document.getElementById('statsBar').style.display = 'flex';
+                document.getElementById('dataContainer').style.display = 'block';
+                document.getElementById('emptyState').style.display = 'none';
+                
+                updateProgress();
+                
+                // 获取总OE数统计
+                loadTotalStats(oe, brand);
+                
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('emptyState').textContent = '请求失败：' + error.message;
+                console.error('Error:', error);
+            }
+        }
+        
+        // 加载总统计信息
+        function loadTotalStats(oe, brand) {
+            // 构建请求参数（不带oe筛选，获取总数）
+            const params = new URLSearchParams({
+                page: 1,
+                limit: 1
+            });
+            
+            if (brand) params.append('brand', brand);
+            
+            // 调用普通列表接口获取总OE数
+            fetch(`/new/api/compare/total-oe-count?${params.toString()}`)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.code === 0) {
+                        const totalOe = result.data.total_oe_count;
+                        const diffOe = oeList.length;
+                        
+                        document.getElementById('totalOeCount').textContent = totalOe;
+                        document.getElementById('diffOeCount').textContent = diffOe;
+                        
+                        // 计算差异率
+                        const rate = totalOe > 0 ? ((diffOe / totalOe) * 100).toFixed(2) : 0;
+                        document.getElementById('diffRate').textContent = rate + '%';
+                    }
+                })
+                .catch(error => {
+                    console.error('获取统计失败:', error);
+                    // 如果接口不存在，至少显示有差异的数量
+                    document.getElementById('diffOeCount').textContent = oeList.length;
+                });
+        }
+        
+        // 按OE分组数据
+        function groupDataByOe() {
+            groupedData = {};
+            allData.forEach(item => {
+                const oe = item.oe || '未知';
+                if (!groupedData[oe]) {
+                    groupedData[oe] = [];
+                }
+                groupedData[oe].push(item);
+            });
+            oeList = Object.keys(groupedData);
+        }
+        
+        // 显示当前OE的数据
+        function showCurrentOe() {
+            if (oeList.length === 0) return;
+            
+            const currentOe = oeList[currentIndex];
+            const items = groupedData[currentOe];
+            
+            // 显示OE标题
+            document.getElementById('currentOe').textContent = `OE: ${currentOe}`;
+            
+            // 填充表格
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+            
+            items.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // 采购历史显示
+                const hasPurchase = item.has_purchase_history;
+                const purchaseHtml = hasPurchase 
+                    ? '<span class="purchase-yes">是</span>' 
+                    : '<span class="purchase-no">否</span>';
+                
+                // 库存数量显示
+                const stockQty = item.stock_quantity || 0;
+                const stockHtml = stockQty > 0 
+                    ? `<span class="stock-yes">${stockQty}</span>` 
+                    : '<span class="stock-no">0</span>';
+                
+                row.innerHTML = `
+                    <td>${item.oe || '-'}</td>
+                    <td>${item.brand || '-'}</td>
+                    <td class="col-purchase">${purchaseHtml}</td>
+                    <td class="col-stock">${stockHtml}</td>
+                    <td>${item.replace_number ? item.replace_number : '<span class="empty-cell">（空）</span>'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            updateButtons();
+        }
+        
+        // 显示上一个
+        function showPrev() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                showCurrentOe();
+                updateProgress();
+            }
+        }
+        
+        // 显示下一个
+        function showNext() {
+            if (currentIndex < oeList.length - 1) {
+                currentIndex++;
+                showCurrentOe();
+                updateProgress();
+            }
+        }
+        
+        // 更新进度显示
+        function updateProgress() {
+            document.getElementById('currentIndex').textContent = currentIndex + 1;
+            document.getElementById('totalCount').textContent = oeList.length;
+        }
+        
+        // 更新按钮状态
+        function updateButtons() {
+            document.getElementById('btnPrev').disabled = currentIndex === 0;
+            document.getElementById('btnNext').disabled = currentIndex === oeList.length - 1;
+        }
+        
+        // 重置表单
+        function resetForm() {
+            document.getElementById('searchOe').value = '';
+            document.getElementById('searchBrand').value = '';
+            document.getElementById('dataContainer').style.display = 'none';
+            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'block';
+            document.getElementById('emptyState').textContent = '请点击"开始查询"按钮查询数据';
+            allData = [];
+            groupedData = {};
+            oeList = [];
+            currentIndex = 0;
+        }
+    </script>
+</body>
+</html>

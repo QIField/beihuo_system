@@ -9,6 +9,7 @@ from collections import defaultdict
 import math
 from .database_connection import get_db_connection as get_pooled_db_connection  # 导入统一的连接池实现并重命名
 from .supplier_data_fetchers.changsheng_inventory import start as fetch_changsheng_data
+from .supplier_data_fetchers.wantuo_inventory import start as fetch_wantuo_data
 
 
 # 全局品牌缓存
@@ -2151,7 +2152,24 @@ def main_process(skip_table_creation=False):
         print(f"获取昌盛库存数据失败: {e}")
         import traceback
         traceback.print_exc()
-    
+
+    # 获取佛山万拓库存数据
+    try:
+        print("\n" + "="*60)
+        print("开始获取佛山万拓库存数据")
+        print("="*60)
+        wantuo_df = fetch_wantuo_data()
+        if wantuo_df is not None and not wantuo_df.empty:
+            save_changsheng_to_virtual_inventory(wantuo_df)
+            print(f"佛山万拓库存数据获取完成，共 {len(wantuo_df)} 条")
+        else:
+            print("佛山万拓库存数据为空")
+        print("="*60)
+    except Exception as e:
+        print(f"获取佛山万拓库存数据失败: {e}")
+        import traceback
+        traceback.print_exc()
+
     # 读取所有数据并整合到虚拟库存表（已通过各模块自动添加）
     db_manager = get_db_connection()
     try:

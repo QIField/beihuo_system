@@ -124,6 +124,24 @@ class CRMDataCrawlService:
         unique_numbers = list(dict.fromkeys(numbers))
         return '，'.join(unique_numbers)
 
+    def _extract_replace_numbers_with_keys(self, display_number):
+        """
+        从 display_number 数组中提取key和number
+        格式: key1:number1;key2:number2
+        """
+        if not display_number or not isinstance(display_number, list):
+            return ''
+
+        pairs = []
+        for item in display_number:
+            if isinstance(item, dict):
+                key = item.get('key', '').strip()
+                num = item.get('number', '').strip()
+                if key and num:
+                    pairs.append(f"{key}:{num}")
+
+        return ';'.join(pairs)
+
     def parse_product(self, product: Dict) -> Dict[str, Any]:
         """解析单个产品数据"""
         # 转换产品等级
@@ -145,6 +163,7 @@ class CRMDataCrawlService:
             'product_name': product.get('l_name_zh', ''),
             'vehicle_brand': product.get('cass_oebrand_name', ''),
             'replace_number': self._extract_replace_numbers(product.get('display_number')),
+            'replace_number_with_keys': self._extract_replace_numbers_with_keys(product.get('display_number')),
             'brand_code': product.get('brand_code', ''),
             'is_cass': product.get('is_cass', ''),
             'product_remark': product.get('company_remark', ''),
@@ -188,7 +207,7 @@ class CRMDataCrawlService:
 
         columns = [
             'product_id', 'oe', 'brand', 'company', 'product_name', 'vehicle_brand',
-            'replace_number', 'brand_code', 'is_cass', 'product_remark',
+            'replace_number', 'replace_number_with_keys', 'brand_code', 'is_cass', 'product_remark',
             'product_level', 'l_model_zh', 'stock_zaitu_list', 'frey_no',
             'supplier_price', 'max_price', 'min_price'
         ]
@@ -203,6 +222,7 @@ class CRMDataCrawlService:
                 p.get('product_name', ''),
                 p.get('vehicle_brand', ''),
                 p.get('replace_number', ''),
+                p.get('replace_number_with_keys', ''),
                 p.get('brand_code', ''),
                 p.get('is_cass', ''),
                 p.get('product_remark', ''),
