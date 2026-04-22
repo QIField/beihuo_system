@@ -1645,13 +1645,15 @@ def delete_old_data():
         db_manager.close()
 
 
-def save_changsheng_to_virtual_inventory(df):
+def save_supplier_to_virtual_inventory(df, supplier_name="供应商"):
     """
-    保存昌盛库存数据到virtual_inventory表
-    :param df: 昌盛库存DataFrame
+    保存供应商库存数据到virtual_inventory表
+    
+    :param df: 供应商库存DataFrame
+    :param supplier_name: 供应商名称（用于日志显示）
     """
     if df is None or df.empty:
-        print("昌盛库存数据为空，跳过保存")
+        print(f"{supplier_name}库存数据为空，跳过保存")
         return
     
     # 根据品牌处理价格
@@ -1689,7 +1691,7 @@ def save_changsheng_to_virtual_inventory(df):
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(df))} / {len(df)} 条昌盛库存数据到整合表")
+            print(f"已批量保存 {min(i + batch_size, len(df))} / {len(df)} 条{supplier_name}库存数据到整合表")
     finally:
         db_manager.close()
 
@@ -2059,8 +2061,10 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
     
     # 供应商名称映射（用于B2B上传时匹配，不改变数据库中的名称）
     # 广州昌盛 -> 昌盛
+    # 佛山万拓 -> 万拓
     supplier_mapping = {
-        '广州昌盛': '昌盛'
+        '广州昌盛': '昌盛',
+        '佛山万拓': '万拓'
     }
     df['供应商名称_映射'] = df['供应商名称'].map(supplier_mapping).fillna(df['供应商名称'])
     
@@ -2143,7 +2147,7 @@ def main_process(skip_table_creation=False):
         print("="*60)
         changsheng_df = fetch_changsheng_data()
         if changsheng_df is not None and not changsheng_df.empty:
-            save_changsheng_to_virtual_inventory(changsheng_df)
+            save_supplier_to_virtual_inventory(changsheng_df, "昌盛")
             print(f"昌盛库存数据获取完成，共 {len(changsheng_df)} 条")
         else:
             print("昌盛库存数据为空")
@@ -2160,7 +2164,7 @@ def main_process(skip_table_creation=False):
         print("="*60)
         wantuo_df = fetch_wantuo_data()
         if wantuo_df is not None and not wantuo_df.empty:
-            save_changsheng_to_virtual_inventory(wantuo_df)
+            save_supplier_to_virtual_inventory(wantuo_df, "佛山万拓")
             print(f"佛山万拓库存数据获取完成，共 {len(wantuo_df)} 条")
         else:
             print("佛山万拓库存数据为空")
