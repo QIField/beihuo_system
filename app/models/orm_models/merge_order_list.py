@@ -157,6 +157,43 @@ class MergeOrderList(BaseModels):
         
         return len(data_list)
 
+    @classmethod
+    def list_to_dict_list(cls, obj_list):
+        """
+        将对象列表转换为字典列表
+        
+        支持两种输入类型：
+        1. MergeOrderList 模型对象列表
+        2. SQLAlchemy Row 对象列表（原生SQL查询结果）
+        
+        :param obj_list: MergeOrderList 对象列表 或 Row 对象列表
+        :return: 字典列表
+        """
+        if not obj_list:
+            return []
+        
+        result = []
+        for obj in obj_list:
+            if hasattr(obj, 'to_dict'):
+                # 是模型对象，调用 to_dict 方法
+                result.append(obj.to_dict())
+            else:
+                # 是 Row 对象，转换为字典并处理特殊类型
+                try:
+                    # 尝试使用 _asdict() 方法（适用于 SQLAlchemy 1.4+）
+                    row_dict = obj._asdict()
+                except AttributeError:
+                    # 备用方法：手动构建字典
+                    row_dict = {}
+                    for key in obj.keys():
+                        row_dict[key] = obj[key]
+                # 处理 Numeric 类型，转换为 float
+                for key, value in row_dict.items():
+                    if hasattr(value, 'real') and hasattr(value, 'imag'):
+                        # Decimal/Numeric 类型
+                        row_dict[key] = float(value)
+                result.append(row_dict)
+        return result
 
     @classmethod
     def get_customer_total_price_sum(
@@ -166,7 +203,11 @@ class MergeOrderList(BaseModels):
             limit: int = 20,
             start_time: int = None,
             end_time: int = None,
-            customer_name: str = None
+            customer_name: str = None,
+            level_id: int = None,
+            payment_description: str = None,
+            total_price_min: float = None,
+            total_price_max: float = None
     ):
         """
         仿照通用分页函数 → 订单统计专用分页（执行原生SQL）
@@ -202,9 +243,27 @@ class MergeOrderList(BaseModels):
                          WHERE 1 = 1
                            AND (:start_time IS NULL OR m.create_date >= :start_time)
                            AND (:end_time IS NULL OR m.create_date <= :end_time)
-                           AND (:customer_name IS NULL OR m.fullname = :customer_name)
-                         GROUP BY customer_id) t
-                            LEFT JOIN partner_list p ON t.customer_id = p.partner_id
+                           AND (:customer_name IS NULL OR m.fullname LIKE :customer_name)
+                         GROUP BY customer_id
+                         HAVING 1 = 1
+                           AND (:total_price_min IS NULL OR SUM(total_price) >= :total_price_min)
+                           AND (:total_price_max IS NULL OR SUM(total_price) <= :total_price_max)) t
+                            INNER JOIN (
+                                SELECT partner_id,
+                                       level_id,
+                                       level_name,
+                                       fullname,
+                                       contacts_phone,
+                                       payment_description,
+                                       payment_method,
+                                       real_name,
+                                       sap_no,
+                                       street
+                                FROM partner_list
+                                WHERE 1 = 1
+                                  AND (:payment_description IS NULL OR payment_description = :payment_description)
+                                  AND (:level_id IS NULL OR level_id = :level_id)
+                            ) p ON t.customer_id = p.partner_id
                    ORDER BY p.level_id DESC,
                             p.payment_description DESC,
                             t.total_price_sum DESC LIMIT :limit
@@ -219,15 +278,31 @@ class MergeOrderList(BaseModels):
                                WHERE 1 = 1
                                  AND (:start_time IS NULL OR m.create_date >= :start_time)
                                  AND (:end_time IS NULL OR m.create_date <= :end_time)
-                                 AND (:customer_name IS NULL OR m.fullname = :customer_name)
-                               GROUP BY customer_id) t
+                                 AND (:customer_name IS NULL OR m.fullname LIKE :customer_name)
+                               GROUP BY customer_id
+                               HAVING 1 = 1
+                                 AND (:total_price_min IS NULL OR SUM(total_price) >= :total_price_min)
+                                 AND (:total_price_max IS NULL OR SUM(total_price) <= :total_price_max)) t
+                                    INNER JOIN (
+                                        SELECT partner_id,
+                                               level_id,
+                                               payment_description
+                                        FROM partner_list
+                                        WHERE  1 = 1
+                                          AND (:payment_description IS NULL OR payment_description = :payment_description)
+                                          AND (:level_id IS NULL OR level_id = :level_id)
+                                    ) p ON t.customer_id = p.partner_id
                          """)
 
         # ===================== 3. 参数绑定 =====================
         params = {
             "start_time": start_time,
             "end_time": end_time,
-            "customer_name": customer_name,
+            "customer_name": f"%{customer_name}%" if customer_name else None,
+            "level_id": level_id,
+            "payment_description": payment_description,
+            "total_price_min": total_price_min,
+            "total_price_max": total_price_max,
             "limit": limit,
             "offset": offset
         }
@@ -238,10 +313,7 @@ class MergeOrderList(BaseModels):
         # ===================== 5. 查询当前页数据 =====================
         results = session.execute(sql, params).all()
 
-
-
-        return results, total
-
+        return total,results
 
 
 

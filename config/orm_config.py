@@ -8,13 +8,13 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 获取项目根目录（从当前文件向上 2 层：config -> beihuo_system）
-BASE_DIR = Path(__file__).resolve().parent.parent
-# .env 文件路径（项目根目录下的 .env）
-ENV_PATH = BASE_DIR / ".env"
-
-# 加载 .env 文件中的环境变量
-load_dotenv(dotenv_path=ENV_PATH)
+# # 获取项目根目录（从当前文件向上 2 层：config -> beihuo_system）
+# BASE_DIR = Path(__file__).resolve().parent.parent
+# # .env 文件路径（项目根目录下的 .env）
+# ENV_PATH = BASE_DIR / ".env"
+#
+# # 加载 .env 文件中的环境变量
+# load_dotenv(dotenv_path=ENV_PATH)
 
 
 class ORMConfig:

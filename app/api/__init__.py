@@ -2,10 +2,12 @@
 # @Time    : 2026/4/3 17:01
 # @Author  : xingkongtub
 # @Project : beihuo_system
-# @File    : __init__.py.py
+# @File    : __init__.py
 # @Software: PyCharm
 
 from flask import Blueprint
+
+
 
 # 创建蓝图对象
 api_bp = Blueprint('api', __name__, url_prefix='/new/api')
@@ -15,8 +17,14 @@ from . import api_test
 from . import dashboard_crm_wms
 from . import compare_api
 from .compare_api import bp as compare_bp
+from .system_setting_api import system_setting_bp
+from .customer_quota_manager_api import customer_quota_manager_bp
 
 # 注册比价数据对比蓝图（设置正确的 url_prefix）
 api_bp.register_blueprint(compare_bp, url_prefix='/compare')
+
+# 将 system_setting 子蓝图注册到主蓝图
+api_bp.register_blueprint(system_setting_bp)
+api_bp.register_blueprint(customer_quota_manager_bp)
 
 __all__ = ["api_bp"]

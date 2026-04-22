@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>客户交易金额汇总</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+</head>
+<body>
+<div class="layui-container" style="margin-top: 20px;">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header">客户交易金额汇总</div>
+                <div class="layui-card-body">
+                    <div class="layui-form-item">
+                        <div class="layui-inline">
+                            <label class="layui-form-label" style="width: 60px;">客户名称</label>
+                            <div class="layui-input-inline" style="width: 140px;">
+                                <input type="text" name="customer_name" placeholder="请输入客户名称" autocomplete="off" class="layui-input" id="customerName">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label" style="width: 60px;">客户等级</label>
+                            <div class="layui-input-inline" style="width: auto;">
+                                <button class="layui-btn layui-btn-primary" id="levelIdBtn">
+                                    <span>全部</span>
+                                    <i class="layui-icon layui-icon-down layui-font-12"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label" style="width: 60px;">付款方式</label>
+                            <div class="layui-input-inline" style="width: auto;">
+                                <button class="layui-btn layui-btn-primary" id="paymentDescriptionBtn">
+                                    <span>全部</span>
+                                    <i class="layui-icon layui-icon-down layui-font-12"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label" style="width: 60px;">金额范围</label>
+                            <div class="layui-input-inline" style="width: 80px;">
+                                <input type="number" name="total_price_min" placeholder="最小" autocomplete="off" class="layui-input" id="totalPriceMin" step="0.01">
+                            </div>
+                            <div class="layui-input-inline" style="width: 30px; text-align: center;">
+                                <span>-</span>
+                            </div>
+                            <div class="layui-input-inline" style="width: 80px;">
+                                <input type="number" name="total_price_max" placeholder="最大" autocomplete="off" class="layui-input" id="totalPriceMax" step="0.01">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <button class="layui-btn" id="searchBtn">搜索</button>
+                            <button class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+                        </div>
+                    </div>
+                    <div class="layui-btn-group" id="btnGroup">
+                    </div>
+                    <br><br>
+                    <table id="configTable" lay-filter="configTable"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+<script>
+layui.use(['table', 'layer', 'form', 'jquery', 'dropdown'], function(){
+    var table = layui.table;
+    var layer = layui.layer;
+    var form = layui.form;
+    var $ = layui.jquery;
+    var dropdown = layui.dropdown;
+    
+    var currentStartMonth = 1;
+    var currentEndMonth = 1;
+    var currentLevelId = '';
+    var currentPaymentDescription = '';
+    
+    function initButtons() {
+        var now = new Date();
+        var year = now.getFullYear();
+        var month = now.getMonth() + 1;
+        
+        var btnGroup = $('#btnGroup');
+        btnGroup.empty();
+         btnGroup.append('<button type="button" class="layui-btn" data-start="" data-end="">全部</button>');
+        btnGroup.append('<button type="button" class="layui-btn layui-btn-normal" data-start="1" data-end="1">本月</button>');
+        btnGroup.append('<button type="button" class="layui-btn" data-start="2" data-end="2">上月</button>');
+ 
+        
+        var thisYearStart = 1;
+        var thisYearEnd;
+        if (month >= 4) {
+            thisYearEnd = 9;
+        } else {
+            thisYearEnd = 11;
+        }
+        btnGroup.append('<button type="button" class="layui-btn" data-start="' + thisYearStart + '" data-end="' + thisYearEnd + '">今年</button>');
+        btnGroup.append('<button type="button" class="layui-btn" data-start="1" data-end="3">前3月</button>');
+        btnGroup.append('<button type="button" class="layui-btn" data-start="1" data-end="6">前6月</button>');
+        btnGroup.append('<button type="button" class="layui-btn" data-start="1" data-end="12">前12月</button>');
+
+        for (var i = 2; i <= 9; i++) {
+            var targetDate = new Date(now);
+            targetDate.setMonth(targetDate.getMonth() - i);
+            var targetYear = targetDate.getFullYear();
+            var targetMonth = targetDate.getMonth() + 1;
+            var targetMonthStr = targetMonth < 10 ? '0' + targetMonth : targetMonth;
+            var buttonText = targetYear + '-' + targetMonthStr;
+            
+            var monthOffset = i + 1;
+            btnGroup.append('<button type="button" class="layui-btn" data-start="' + monthOffset + '" data-end="' + monthOffset + '">' + buttonText + '</button>');
+        }
+        
+        $('#btnGroup .layui-btn').on('click', function(){
+            $('#btnGroup .layui-btn').removeClass('layui-btn-normal');
+            $(this).addClass('layui-btn-normal');
+            currentStartMonth = $(this).data('start');
+            currentEndMonth = $(this).data('end');
+            reloadTable();
+        });
+    }
+    
+    initButtons();
+    
+    form.render();
+    
+    dropdown.render({
+        elem: '#levelIdBtn',
+        data: [
+            {title: '全部', id: ''},
+            {title: '车主', id: '20'},
+            {title: '开思', id: '22'},
+            {title: '同行', id: '25'},
+            {title: '维修厂', id: '27'},
+            {title: '缤汽库', id: '105'},
+            {title: '线上-途虎养车（汽配龙）', id: '30'},
+            {title: '线上-F6', id: '28'},
+            {title: '集群车宝', id: '101'},
+            {title: '天猫', id: '26'},
+            {title: '一级代理', id: '102'},
+            {title: '巴博瑞价格', id: '103'},
+            {title: '总代理', id: '104'},
+            {title: '前置仓', id: '106'},
+            {title: '地级市含税价', id: '107'},
+            {title: '维修厂大客户', id: '109'}
+        ],
+        click: function(obj){
+            this.elem.find('span').text(obj.title);
+            currentLevelId = obj.id;
+            reloadTable();
+        }
+    });
+    
+    dropdown.render({
+        elem: '#paymentDescriptionBtn',
+        data: [
+            {title: '全部', id: ''},
+            {title: '现金', id: '现金'},
+            {title: '月结(1个月)', id: '月结(1个月)'},
+            {title: '开思', id: '开思'}
+        ],
+        click: function(obj){
+            this.elem.find('span').text(obj.title);
+            currentPaymentDescription = obj.id;
+            reloadTable();
+        }
+    });
+    
+    table.render({
+        elem: '#configTable',
+        url: '/new/api/customer_quota_manager/time_transaction_sum_api',
+        method: 'get',
+        page: true,
+        limits: [10, 20, 50, 100],
+        limit: 20,
+        request: {
+            pageName: 'page',
+            limitName: 'limit'
+        },
+        where: {
+            start_month: currentStartMonth,
+            end_month: currentEndMonth,
+            level_id: currentLevelId,
+            payment_description: currentPaymentDescription,
+            total_price_min: $('#totalPriceMin').val(),
+            total_price_max: $('#totalPriceMax').val()
+        },
+        parseData: function(res){
+            return {
+                "code": res.code === 200 ? 0 : res.code,
+                "msg": res.msg,
+                "count": res.data.total,
+                "data": res.data.result
+            };
+        },
+        toolbar: false,
+        defaultToolbar: ['filter', 'exports', 'print'],
+        cols: [[
+            {field: 'customer_id', title: '客户ID', width: 100, sort: true},
+            {field: 'fullname', title: '客户名称', width: 200},
+            {field: 'contacts_phone', title: '联系电话', width: 140},
+            {field: 'level_name', title: '客户等级', width: 120},
+            {field: 'payment_description', title: '付款方式', width: 100},
+            {field: 'order_count', title: '订单数', width: 100, sort: true},
+            {field: 'total_price_sum', title: '总金额', width: 140, sort: true, templet: function(d){
+                return d.total_price_sum ? d.total_price_sum.toFixed(2) : '0.00';
+            }},
+            {field: 'sfje_sum', title: '实付金额', width: 140, sort: true, templet: function(d){
+                return d.sfje_sum ? d.sfje_sum.toFixed(2) : '0.00';
+            }},
+            {field: 'no_receive_amount_sum', title: '未收金额', width: 140, sort: true, templet: function(d){
+                return d.no_receive_amount_sum ? d.no_receive_amount_sum.toFixed(2) : '0.00';
+            }},
+            {field: 'sap_no', title: 'SAP编号', width: 200},
+            {field: 'street', title: '地址', minWidth: 200}
+        ]],
+        height: 'full-250'
+    });
+    
+    function reloadTable(){
+        var customerName = $('#customerName').val();
+        var totalPriceMin = $('#totalPriceMin').val();
+        var totalPriceMax = $('#totalPriceMax').val();
+        table.reload('configTable', {
+            where: {
+                start_month: currentStartMonth,
+                end_month: currentEndMonth,
+                customer_name: customerName,
+                level_id: currentLevelId,
+                payment_description: currentPaymentDescription,
+                total_price_min: totalPriceMin,
+                total_price_max: totalPriceMax
+            },
+            page: {
+                curr: 1
+            }
+        });
+    }
+    
+    $('#searchBtn').on('click', function(){
+        reloadTable();
+    });
+    
+    $('#resetBtn').on('click', function(){
+        $('#customerName').val('');
+        $('#totalPriceMin').val('');
+        $('#totalPriceMax').val('');
+        currentLevelId = '';
+        currentPaymentDescription = '';
+        $('#levelIdBtn span').text('全部');
+        $('#paymentDescriptionBtn span').text('全部');
+        reloadTable();
+    });
+});
+</script>
+</body>
+</html>
