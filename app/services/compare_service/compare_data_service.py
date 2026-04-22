@@ -752,6 +752,281 @@ class CompareDataService:
             raise
         finally:
             conn.close()
+    
+    @staticmethod
+    def get_oe_with_different_replace_numbers(
+        oe: str = '',
+        brand: str = '',
+        product_name: str = '',
+        vehicle_brand: str = '',
+        company: str = '',
+        page: int = 1,
+        limit: int = 100
+    ) -> Tuple[List[Dict], int]:
+        """
+        查询 replace_number 有差异的 OE 分组数据
+        
+        逻辑：
+        1. 先找出有差异的 oe（该 oe 下不同 brand 的 replace_number 不一致）
+        2. 查询这些 oe 的所有数据（包含所有 brand）
+        3. 支持分页和筛选
+        
+        参数:
+            oe: OE号筛选
+            brand: 品牌筛选
+            product_name: 产品名称筛选
+            vehicle_brand: 车辆品牌筛选
+            company: 公司/组织筛选
+            page: 页码
+            limit: 每页条数
+            
+        返回:
+            (数据列表, 总记录数)
+        """
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
+                # 构建基础 WHERE 条件
+                where_conditions = []
+                params = []
+                
+                # 必须按公司过滤
+                if company:
+                    where_conditions.append("company = %s")
+                    params.append(company)
+                
+                # 处理多行搜索
+                oe_list = parse_space(oe) if oe else []
+                brand_list = parse_comma(brand) if brand else []
+                product_name_list = parse_comma(product_name) if product_name else []
+                vehicle_brand_list = parse_comma(vehicle_brand) if vehicle_brand else []
+                
+                if oe_list:
+                    or_conditions = []
+                    for item in oe_list:
+                        or_conditions.append("oe LIKE %s")
+                        params.append(f"%{item}%")
+                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+                
+                if brand_list:
+                    or_conditions = []
+                    for item in brand_list:
+                        or_conditions.append("brand LIKE %s")
+                        params.append(f"%{item}%")
+                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+                
+                if product_name_list:
+                    or_conditions = []
+                    for item in product_name_list:
+                        or_conditions.append("product_name LIKE %s")
+                        params.append(f"%{item}%")
+                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+                
+                if vehicle_brand_list:
+                    or_conditions = []
+                    for item in vehicle_brand_list:
+                        or_conditions.append("vehicle_brand LIKE %s")
+                        params.append(f"%{item}%")
+                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+                
+                where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else "WHERE 1=1"
+                
+                # 第一步：找出有差异的 oe
+                # 使用子查询：按 oe 分组，统计不同 replace_number 的数量
+                diff_oe_sql = f"""
+                    SELECT oe FROM {CompareDataService.TABLE_NAME}
+                    {where_clause}
+                    GROUP BY oe
+                    HAVING COUNT(DISTINCT IFNULL(replace_number, '')) > 1
+                """
+                
+                cursor.execute(diff_oe_sql, params)
+                diff_oe_rows = cursor.fetchall()
+                diff_oe_list = [row[0] for row in diff_oe_rows]
+                
+                if not diff_oe_list:
+                    return [], 0
+                
+                # 第二步：查询这些 oe 的总数
+                # 构建 IN 条件
+                in_placeholders = ', '.join(['%s'] * len(diff_oe_list))
+                count_sql = f"""
+                    SELECT COUNT(*) FROM {CompareDataService.TABLE_NAME}
+                    WHERE oe IN ({in_placeholders})
+                    {(" AND " + " AND ".join(where_conditions)) if where_conditions else ""}
+                """
+                count_params = diff_oe_list + params if where_conditions else diff_oe_list
+                cursor.execute(count_sql, count_params)
+                total = cursor.fetchone()[0]
+                
+                # 第三步：查询具体数据（分页）
+                offset = (page - 1) * limit
+                data_sql = f"""
+                    SELECT * FROM {CompareDataService.TABLE_NAME}
+                    WHERE oe IN ({in_placeholders})
+                    {(" AND " + " AND ".join(where_conditions)) if where_conditions else ""}
+                    ORDER BY oe, brand
+                    LIMIT %s OFFSET %s
+                """
+                data_params = diff_oe_list + params + [limit, offset] if where_conditions else diff_oe_list + [limit, offset]
+                
+                cursor.execute(data_sql, data_params)
+                rows = cursor.fetchall()
+                
+                columns = [desc[0] for desc in cursor.description]
+                data = []
+                oe_brand_list = []  # 收集所有oe和brand用于批量查询
+                for row in rows:
+                    item = dict(zip(columns, row))
+                    # 格式化时间字段
+                    for time_field in ['price_update_time', 'updated_time', 'created_time']:
+                        if item.get(time_field):
+                            if hasattr(item[time_field], 'strftime'):
+                                item[time_field] = item[time_field].strftime('%Y-%m-%d %H:%M:%S')
+                    # 格式化价格字段
+                    for price_field in ['max_price', 'min_price', 'supplier_price',
+                                       'dealer_purchase_price', 'dealer_sale_price',
+                                       'avg_sales_12m', 'avg_sales_6m']:
+                        if item.get(price_field) is not None:
+                            item[price_field] = float(item[price_field])
+                    
+                    # 收集oe和brand用于批量查询库存和采购历史
+                    oe_brand_list.append((item.get('oe', ''), item.get('brand', '')))
+                    
+                    data.append(item)
+                
+                # 批量查询库存和采购历史
+                if data:
+                    stock_map = CompareDataService._batch_get_stock_quantity(cursor, oe_brand_list, company)
+                    purchase_map = CompareDataService._batch_get_purchase_history(cursor, oe_brand_list, company)
+                    
+                    # 将查询结果添加到数据中
+                    for item in data:
+                        key = (item.get('oe', ''), item.get('brand', ''))
+                        item['stock_quantity'] = stock_map.get(key, 0)
+                        item['has_purchase_history'] = purchase_map.get(key, False)
+                
+                return data, total
+                
+        except Exception as e:
+            print(f"查询 replace_number 差异数据时出错: {str(e)}")
+            raise
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def _batch_get_stock_quantity(cursor, oe_brand_list: List[Tuple[str, str]], company: str) -> Dict[Tuple[str, str], int]:
+        """
+        批量查询库存数量
+        
+        参数:
+            cursor: 数据库游标
+            oe_brand_list: OE和品牌元组列表 [(oe, brand), ...]
+            company: 公司代码
+            
+        返回:
+            字典 {(oe, brand): stock_quantity}
+        """
+        if not oe_brand_list:
+            return {}
+        
+        # 去重
+        unique_pairs = list(set(oe_brand_list))
+        
+        result = {}
+        # 分批查询，避免SQL过长
+        batch_size = 500
+        for i in range(0, len(unique_pairs), batch_size):
+            batch = unique_pairs[i:i + batch_size]
+            
+            # 构建OR条件
+            or_conditions = []
+            params = [company]
+            for oe, brand in batch:
+                if oe and brand:
+                    or_conditions.append("(number = %s AND brand_name = %s)")
+                    params.extend([oe, brand])
+            
+            if not or_conditions:
+                continue
+            
+            sql = f"""
+                SELECT number, brand_name, SUM(stock_quantity) as total_stock
+                FROM crmapp_inventory_detail
+                WHERE company = %s AND ({' OR '.join(or_conditions)})
+                GROUP BY number, brand_name
+            """
+            
+            try:
+                cursor.execute(sql, params)
+                rows = cursor.fetchall()
+                for row in rows:
+                    key = (row[0], row[1])
+                    result[key] = int(row[2]) if row[2] else 0
+            except Exception as e:
+                print(f"查询库存失败: {e}")
+        
+        return result
+    
+    @staticmethod
+    def _batch_get_purchase_history(cursor, oe_brand_list: List[Tuple[str, str]], company: str) -> Dict[Tuple[str, str], bool]:
+        """
+        批量查询是否有采购历史
+        
+        参数:
+            cursor: 数据库游标
+            oe_brand_list: OE和品牌元组列表 [(oe, brand), ...]
+            company: 公司代码
+            
+        返回:
+            字典 {(oe, brand): True/False}
+        """
+        if not oe_brand_list:
+            return {}
+        
+        # 去重
+        unique_pairs = list(set(oe_brand_list))
+        
+        result = {}
+        # 分批查询
+        batch_size = 500
+        for i in range(0, len(unique_pairs), batch_size):
+            batch = unique_pairs[i:i + batch_size]
+            
+            # 构建OR条件
+            or_conditions = []
+            params = [company]
+            for oe, brand in batch:
+                if oe and brand:
+                    or_conditions.append("(number = %s AND brand = %s)")
+                    params.extend([oe, brand])
+            
+            if not or_conditions:
+                continue
+            
+            sql = f"""
+                SELECT DISTINCT number, brand
+                FROM crmapp_procurement_history_detail
+                WHERE company = %s AND ({' OR '.join(or_conditions)})
+                LIMIT 10000
+            """
+            
+            try:
+                cursor.execute(sql, params)
+                rows = cursor.fetchall()
+                for row in rows:
+                    key = (row[0], row[1])
+                    result[key] = True
+            except Exception as e:
+                print(f"查询采购历史失败: {e}")
+        
+        # 对于没有查询到的，设置为False
+        for oe, brand in unique_pairs:
+            key = (oe, brand)
+            if key not in result:
+                result[key] = False
+        
+        return result
 
 
 # 便捷函数（模块级别）
@@ -788,3 +1063,40 @@ def list_compare_data(**kwargs) -> Tuple[List[Dict], int]:
 def upsert_compare_data(data: Dict) -> int:
     """插入或更新数据"""
     return CompareDataService.upsert_by_oe(data)
+
+
+def get_oe_with_different_replace_numbers(
+    oe: str = '',
+    brand: str = '',
+    product_name: str = '',
+    vehicle_brand: str = '',
+    company: str = '',
+    page: int = 1,
+    limit: int = 100
+) -> Tuple[List[Dict], int]:
+    """
+    查询 replace_number 有差异的 OE 分组数据
+    
+    逻辑：
+    1. 按 oe 分组，收集所有 brand 和 replace_number
+    2. 检查每个 oe 下的 replace_number 是否有差异（去重后数量>1）
+    3. 只返回有差异的 oe 分组数据（该 oe 下的所有 brand 都展示）
+    
+    参数:
+        oe: OE号筛选
+        brand: 品牌筛选
+        product_name: 产品名称筛选
+        vehicle_brand: 车辆品牌筛选
+        company: 公司/组织筛选
+        page: 页码
+        limit: 每页条数
+        
+    返回:
+        (数据列表, 总记录数)
+        数据列表格式: [{oe, brand, replace_number, replace_number_with_keys, product_name, ...}, ...]
+    """
+    return CompareDataService.get_oe_with_different_replace_numbers(
+        oe=oe, brand=brand, product_name=product_name, 
+        vehicle_brand=vehicle_brand, company=company,
+        page=page, limit=limit
+    )
