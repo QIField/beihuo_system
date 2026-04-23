@@ -139,7 +139,19 @@ def start():
     # 4. 字段映射和转换
     df['供应商名称'] = '佛山万拓'
     df['原厂OE码'] = df['pjcode'].apply(clean_oecode)
+
+    # 品牌映射
+    brand_mapping = {
+        'WANTUO': '巴博瑞',
+        '菲儿': '菲尔',
+        '品牌': '巴博瑞'
+    }
     df['品牌'] = df['pjfactory'].fillna('')
+    df['品牌'] = df['品牌'].replace(brand_mapping)
+
+    # 只保留品牌为'菲尔'和'巴博瑞'的数据
+    df = df[df['品牌'].isin(['菲尔', '巴博瑞'])]
+
     df['价格'] = df['xsprice'].fillna(0)
     df['失效时间'] = str(tomorrow_ts)
     df['仓库名称'] = '佛山禅城仓'

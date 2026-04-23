@@ -394,13 +394,22 @@ def _save_result(db_manager, oe_number, brand, result):
 # 三种模式处理函数
 # ============================================================================
 
-def process_database_mode(session, product_df, alias_df):
+def process_database_mode(session, product_df, alias_df, supplier_name=None):
     """
     数据库模式处理
     注意：session参数保留用于兼容性，但实际使用线程本地session
     新增：过滤已创建的产品，防止重复创建
+    
+    Args:
+        session: CRM session
+        product_df: 产品数据DataFrame
+        alias_df: 别名数据DataFrame
+        supplier_name: 可选，指定供应商名称筛选数据，如 '佛山万拓'
     """
-    print("\n【数据库模式】")
+    if supplier_name:
+        print(f"\n【数据库模式 - 供应商筛选: {supplier_name}】")
+    else:
+        print("\n【数据库模式】")
     
     # 获取数据库连接
     db_manager = get_db_connection()
@@ -412,8 +421,8 @@ def process_database_mode(session, product_df, alias_df):
         # 1. 初始化 crmapp_created_products 表
         init_crmapp_created_products_table(db_manager)
         
-        # 2. 加载数据
-        data = load_data_from_mysql()
+        # 2. 加载数据（传入供应商名称参数）
+        data = load_data_from_mysql(supplier_name)
         if not data:
             print("没有数据需要处理")
             return
@@ -800,12 +809,18 @@ def main():
 # 外部调用接口
 # ============================================================================
 
-def process_database_mode_api():
+def process_database_mode_api(supplier_name=None):
     """
     数据库模式 API 接口
     供虚拟库存上传后调用
+    
+    Args:
+        supplier_name: 可选，指定供应商名称筛选数据，如 '佛山万拓'
     """
-    print("\n=== CRM Product Add - 数据库模式 ===")
+    if supplier_name:
+        print(f"\n=== CRM Product Add - 数据库模式 (供应商: {supplier_name}) ===")
+    else:
+        print("\n=== CRM Product Add - 数据库模式 ===")
     
     # 创建 Session
     session = create_crm_session()
@@ -815,8 +830,8 @@ def process_database_mode_api():
     product_df = load_product_data()
     alias_df = load_alias_data()
     
-    # 处理数据库模式
-    process_database_mode(session, product_df, alias_df)
+    # 处理数据库模式（传入供应商名称参数）
+    process_database_mode(session, product_df, alias_df, supplier_name)
     
     print("\n数据库模式处理完毕")
     return True

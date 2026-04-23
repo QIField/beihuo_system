@@ -134,11 +134,14 @@ def extract_oe_numbers_from_msg(update_msg):
     return all(keyword in update_msg for keyword in required_keywords)
 
 
-def load_data_from_mysql():
+def load_data_from_mysql(supplier_name=None):
     """
     从 MySQL 数据库读取 virtual_inventory 表数据
     返回包含 oe_code、brand、update_msg 和 fetch_time 列的数据
     筛选条件：update_msg 符合特定格式 且 fetch_time 在指定时间范围内
+    
+    Args:
+        supplier_name: 可选，指定供应商名称进行筛选，如 '佛山万拓'
     """
     db_manager = get_db_connection()
     try:
@@ -148,16 +151,28 @@ def load_data_from_mysql():
         start_time, end_time = get_current_day_time_range()
         print(f"时间筛选范围: {start_time} 到 {end_time}")
         
-        query = """
-        SELECT oe_code, brand, update_msg, fetch_time 
-        FROM virtual_inventory 
-        WHERE update_msg IS NOT NULL 
-          AND update_msg != '' 
-          AND fetch_time BETWEEN %s AND %s
-        """
-        results = db_manager.execute_query(query, (start_time, end_time))
-        
-        print(f"从数据库读取到 {len(results)} 条记录（已按时间范围筛选）")
+        # 根据是否指定供应商构建查询
+        if supplier_name:
+            query = """
+            SELECT oe_code, brand, update_msg, fetch_time, supplier_name 
+            FROM virtual_inventory 
+            WHERE update_msg IS NOT NULL 
+              AND update_msg != '' 
+              AND fetch_time BETWEEN %s AND %s
+              AND supplier_name = %s
+            """
+            results = db_manager.execute_query(query, (start_time, end_time, supplier_name))
+            print(f"从数据库读取到 {len(results)} 条记录（已按时间范围和供应商 '{supplier_name}' 筛选）")
+        else:
+            query = """
+            SELECT oe_code, brand, update_msg, fetch_time 
+            FROM virtual_inventory 
+            WHERE update_msg IS NOT NULL 
+              AND update_msg != '' 
+              AND fetch_time BETWEEN %s AND %s
+            """
+            results = db_manager.execute_query(query, (start_time, end_time))
+            print(f"从数据库读取到 {len(results)} 条记录（已按时间范围筛选）")
         
         filtered_results = []
         for row in results:
@@ -166,10 +181,14 @@ def load_data_from_mysql():
                     'oe_code': row['oe_code'],
                     'brand': row['brand'],
                     'update_msg': row['update_msg'],
-                    'fetch_time': row['fetch_time']
+                    'fetch_time': row['fetch_time'],
+                    'supplier_name': row.get('supplier_name', '')
                 })
         
-        print(f"筛选出 {len(filtered_results)} 条符合特定格式和时间范围的记录")
+        if supplier_name:
+            print(f"筛选出 {len(filtered_results)} 条符合特定格式、时间范围和供应商 '{supplier_name}' 的记录")
+        else:
+            print(f"筛选出 {len(filtered_results)} 条符合特定格式和时间范围的记录")
         return filtered_results
     except Exception as e:
         print(f"从数据库读取数据时发生错误: {e}")

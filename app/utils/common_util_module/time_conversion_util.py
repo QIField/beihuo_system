@@ -6,9 +6,10 @@
 # @Software: PyCharm
 import time
 from datetime import datetime, timedelta
+from typing import Tuple
 
 
-def get_month_timestamp(month_str: str) -> tuple[int, int]:
+def get_month_timestamp(month_str: str) -> Tuple[int, int]:
     """
     传入月份字符串（格式：YYYY-MM），返回该月的开始和结束时间戳（北京时间）
 
@@ -44,7 +45,7 @@ def get_month_timestamp(month_str: str) -> tuple[int, int]:
     return start_timestamp, end_timestamp
 
 
-def get_day_timestamp(day_str: str) -> tuple[int, int]:
+def get_day_timestamp(day_str: str) -> Tuple[int, int]:
     """
     传入日期字符串（格式：YYYY-MM-DD），返回当天的开始和结束时间戳（北京时间）
 
@@ -83,7 +84,7 @@ def timestamp_to_str(ts: int, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     return dt.strftime(fmt)
 
 
-def get_relative_month_timestamp(step: int) -> tuple[int, int]:
+def get_relative_month_timestamp(step: int) -> Tuple[int, int]:
     """
     新增方法：获取相对当前时间的月份时间戳
     参数规则：1=本月, 2=上月, 3=上上月, ..., 12=前11个月
@@ -117,7 +118,7 @@ def get_relative_month_timestamp(step: int) -> tuple[int, int]:
     return get_month_timestamp(month_str)
 
 
-def get_border_month_timestamp(month_pair: tuple[int, int]) -> tuple[int, int]:
+def get_border_month_timestamp(month_pair: Tuple[int, int]) -> Tuple[int, int]:
     """
     获取两个月份的边界时间戳
     参数格式 (a, b):

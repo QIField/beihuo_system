@@ -1,9 +1,9 @@
 """
 采购数据同步服务
-用于将 crmapp_procurement_history 表的数据同步到 crmapp_compare_summary 表
+用于将采购历史数据同步到 crmapp_compare_summary 表
+支持从三个表查询价格：procurement_history, price_inquiry, price_inquiry_direct
 """
 
-import json
 import pymysql
 from datetime import datetime
 from typing import List, Dict, Any, Tuple
@@ -47,7 +47,7 @@ class PurchaseSyncService:
 
         for idx, (oe, brand) in enumerate(oe_brand_list, 1):
             try:
-                # 计算该 OE+品牌 的各项价格数据
+                # 计算该 OE+品牌 的各项价格数据（从三个表查询）
                 max_price, min_price = self._calculate_max_min_price(oe, brand, company)
                 supplier_price = self._get_latest_price(oe, brand, company)
 
@@ -81,6 +81,7 @@ class PurchaseSyncService:
     def _get_all_oe_brand(self, company: str) -> List[Tuple[str, str]]:
         """
         获取所有唯一的 OE+品牌 组合
+        从 procurement_history 表获取（聚合后的数据）
 
         Args:
             company: 公司代码
@@ -97,13 +98,14 @@ class PurchaseSyncService:
                     WHERE company = %s
                 """
                 cursor.execute(sql, (company,))
-                return [(row['oe'], row['brand']) for row in cursor.fetchall()]
+                return [(row[0], row[1]) for row in cursor.fetchall()]
         finally:
             conn.close()
 
     def _calculate_max_min_price(self, oe: str, brand: str, company: str) -> Tuple[float, float]:
         """
         计算同一OE+品牌的最高和最低采购价
+        从三个表查询：procurement_history, price_inquiry, price_inquiry_direct
 
         Args:
             oe: OE号
@@ -115,18 +117,42 @@ class PurchaseSyncService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            with conn.cursor() as cursor:
+                # 从三个表 UNION ALL 查询价格
                 sql = """
-                    SELECT MAX(unit_price) as max_price, MIN(unit_price) as min_price
-                    FROM crmapp_procurement_history
-                    WHERE oe = %s AND brand = %s AND company = %s
-                    AND unit_price > 0
+                    SELECT 
+                        MAX(unit_price) as max_price, 
+                        MIN(unit_price) as min_price
+                    FROM (
+                        -- 从采购汇总表查询
+                        SELECT unit_price 
+                        FROM crmapp_procurement_history
+                        WHERE oe = %s AND brand = %s AND company = %s AND unit_price > 0
+                        
+                        UNION ALL
+                        
+                        -- 从正常询价表查询
+                        SELECT original_price as unit_price 
+                        FROM crmapp_price_inquiry
+                        WHERE oe = %s AND brand = %s AND company = %s AND original_price > 0
+                        
+                        UNION ALL
+                        
+                        -- 从直接入库表查询
+                        SELECT original_price as unit_price 
+                        FROM crmapp_price_inquiry_direct
+                        WHERE oe = %s AND brand = %s AND company = %s AND original_price > 0
+                    ) t
                 """
-                cursor.execute(sql, (oe, brand, company))
+                cursor.execute(sql, (
+                    oe, brand, company,
+                    oe, brand, company,
+                    oe, brand, company
+                ))
                 result = cursor.fetchone()
 
-                if result:
-                    return float(result['max_price'] or 0.0), float(result['min_price'] or 0.0)
+                if result and result[0] is not None:
+                    return float(result[0]), float(result[1])
                 return 0.0, 0.0
         finally:
             conn.close()
@@ -134,6 +160,7 @@ class PurchaseSyncService:
     def _get_latest_price(self, oe: str, brand: str, company: str) -> float:
         """
         获取同一OE+品牌最新日期的采购价
+        从三个表查询，取日期最新的价格
 
         Args:
             oe: OE号
@@ -145,73 +172,52 @@ class PurchaseSyncService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            with conn.cursor() as cursor:
+                # 从三个表查询最新价格
                 sql = """
-                    SELECT unit_price
-                    FROM crmapp_procurement_history
-                    WHERE oe = %s AND brand = %s AND company = %s
-                    ORDER BY purchase_date DESC
+                    SELECT unit_price, purchase_date
+                    FROM (
+                        -- 从采购汇总表查询
+                        SELECT 
+                            unit_price,
+                            purchase_date,
+                            1 as source_order
+                        FROM crmapp_procurement_history
+                        WHERE oe = %s AND brand = %s AND company = %s AND unit_price > 0
+                        
+                        UNION ALL
+                        
+                        -- 从正常询价表查询
+                        SELECT 
+                            original_price as unit_price,
+                            import_time as purchase_date,
+                            2 as source_order
+                        FROM crmapp_price_inquiry
+                        WHERE oe = %s AND brand = %s AND company = %s AND original_price > 0
+                        
+                        UNION ALL
+                        
+                        -- 从直接入库表查询
+                        SELECT 
+                            original_price as unit_price,
+                            import_time as purchase_date,
+                            3 as source_order
+                        FROM crmapp_price_inquiry_direct
+                        WHERE oe = %s AND brand = %s AND company = %s AND original_price > 0
+                    ) t
+                    ORDER BY purchase_date DESC, source_order ASC
                     LIMIT 1
                 """
-                cursor.execute(sql, (oe, brand, company))
+                cursor.execute(sql, (
+                    oe, brand, company,
+                    oe, brand, company,
+                    oe, brand, company
+                ))
                 result = cursor.fetchone()
 
                 if result:
-                    return float(result['unit_price'] or 0.0)
+                    return float(result[0])
                 return 0.0
-        finally:
-            conn.close()
-
-    def _build_procurement_records(self, oe: str, brand: str, company: str) -> List[Dict]:
-        """
-        构建采购记录JSON数组
-        每个月份取最低价的记录
-
-        Args:
-            oe: OE号
-            brand: 品牌
-            company: 公司代码
-
-        Returns:
-            [{"supplier_name": "...", "purchase_price": 100, "purchase_date": "..."}, ...]
-        """
-        conn = get_db_connection()
-        try:
-            with conn.cursor() as cursor:
-                # 按年月分组，取每组最低价的记录
-                sql = """
-                    SELECT `year_month`, MIN(unit_price) as min_price
-                    FROM crmapp_procurement_history
-                    WHERE oe = %s AND brand = %s AND company = %s
-                    AND unit_price > 0
-                    GROUP BY `year_month`
-                    ORDER BY `year_month` DESC
-                """
-                cursor.execute(sql, (oe, brand, company))
-                monthly_min = cursor.fetchall()
-
-                records = []
-                for year_month, min_price in monthly_min:
-                    # 获取该月最低价的详细记录（取第一条）
-                    detail_sql = """
-                        SELECT supplier_name, unit_price, purchase_date
-                        FROM crmapp_procurement_history
-                        WHERE oe = %s AND brand = %s AND company = %s
-                        AND `year_month` = %s AND unit_price = %s
-                        ORDER BY purchase_date DESC
-                        LIMIT 1
-                    """
-                    cursor.execute(detail_sql, (oe, brand, company, year_month, min_price))
-                    detail = cursor.fetchone()
-
-                    if detail:
-                        records.append({
-                            'supplier_name': detail[0],
-                            'purchase_price': float(detail[1]),
-                            'purchase_date': detail[2].strftime('%Y-%m-%d') if hasattr(detail[2], 'strftime') else str(detail[2])
-                        })
-
-                return records
         finally:
             conn.close()
 
@@ -234,7 +240,7 @@ class PurchaseSyncService:
         """
         conn = get_db_connection()
         try:
-            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            with conn.cursor() as cursor:
                 # 检查记录是否存在
                 check_sql = """
                     SELECT id FROM crmapp_compare_summary

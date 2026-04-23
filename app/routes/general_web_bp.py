@@ -33,3 +33,9 @@ def system_config():
 def transaction_sum():
 
     return render_template("customer_quota_manager_web/transaction_sum_web.html")
+
+
+@general_web_bp.route("/diff_replace_number")
+def diff_replace_number_page():
+    """替换号差异对比页面"""
+    return render_template("diff_replace_number.html")

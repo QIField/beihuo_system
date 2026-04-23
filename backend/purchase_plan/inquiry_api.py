@@ -448,9 +448,9 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
                 cursor.close()
                 conn.close()
     
-    # 步骤8：同步到比价表和采购记录表
+    # 步骤8：触发聚合和同步（异步执行，不阻塞返回）
     if inserted_count > 0:
-        _sync_to_compare_and_procurement(insert_data, company)
+        _trigger_aggregate_async(company)
     
     # 清理临时文件
     os.remove(file_path)
@@ -610,9 +610,9 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
             cursor.close()
             conn.close()
     
-    # 同步到比价表和采购记录表
+    # 触发聚合和同步（异步执行，不阻塞返回）
     if inserted_count > 0:
-        _sync_to_compare_and_procurement(insert_data, company)
+        _trigger_aggregate_async(company)
     
     # 清理临时文件
     os.remove(file_path)
@@ -620,60 +620,42 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
     return result_path
 
 
-def _sync_to_compare_and_procurement(insert_data, company):
+def _trigger_aggregate_async(company: str):
     """
-    同步数据到比价表和采购记录表
+    异步触发聚合和同步任务
+    不阻塞主流程，在后台线程中执行
     """
-    sync_data_map = {}
-    procurement_data_list = []
+    import threading
     
-    for data in insert_data:
-        key = (data['oe'], data['brand'], data['company'])
-        if key not in sync_data_map:
-            sync_data_map[key] = key
-        
-        original_price = data.get('original_price', data['price'])
-        if data['supplier'] and original_price > 0:
-            procurement_data_list.append({
-                'oe': data['oe'], 'brand': data['brand'],
-                'supplier': data['supplier'], 'price': original_price,
-                'company': data['company']
-            })
+    def run_aggregate():
+        try:
+            print(f"[InquiryImport] 开始异步聚合和同步, company={company}")
+            
+            # 1. 聚合三个表数据
+            from app.services.procurement_service.purchase_history_aggregate_service import PurchaseHistoryAggregateService
+            aggregate_service = PurchaseHistoryAggregateService()
+            aggregate_result = aggregate_service.aggregate_and_update(
+                sources=['procurement_detail', 'price_inquiry', 'price_inquiry_direct'],
+                company=company
+            )
+            print(f"[InquiryImport] 聚合完成: {aggregate_result}")
+            
+            # 2. 同步到比价表
+            from app.services.procurement_service.purchase_sync_service import PurchaseSyncService
+            sync_service = PurchaseSyncService()
+            sync_result = sync_service.sync_to_compare_summary(company)
+            print(f"[InquiryImport] 同步完成: {sync_result}")
+            
+        except Exception as e:
+            print(f"[InquiryImport] 异步聚合同步失败: {e}")
+            import traceback
+            traceback.print_exc()
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        if sync_data_map:
-            cursor.executemany("""
-                INSERT IGNORE INTO crmapp_compare_summary (oe, brand, company)
-                VALUES (%s, %s, %s)
-            """, list(sync_data_map.values()))
-            conn.commit()
-        
-        for proc_data in procurement_data_list:
-            try:
-                add_inquiry_record(
-                    proc_data['oe'], proc_data['brand'],
-                    proc_data['supplier'], proc_data['price'], proc_data['company']
-                )
-            except Exception as e:
-                pass
-        
-        if procurement_data_list:
-            try:
-                from app.services.procurement_service.purchase_sync_service import PurchaseSyncService
-                sync_service = PurchaseSyncService()
-                for proc_data in procurement_data_list:
-                    sync_service.sync_single_product(
-                        proc_data['oe'], proc_data['brand'], proc_data['company']
-                    )
-            except Exception as e:
-                pass
-    except Exception as e:
-        conn.rollback()
-    finally:
-        cursor.close()
-        conn.close()
+    # 在后台线程中执行
+    thread = threading.Thread(target=run_aggregate)
+    thread.daemon = True
+    thread.start()
+    print(f"[InquiryImport] 已启动异步聚合线程")
 
 
 def _classify_nine_category(update_msg: str, create_result: str) -> str:
