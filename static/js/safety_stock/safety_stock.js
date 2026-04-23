@@ -261,6 +261,13 @@ function initGrid() {
             gridApi = params.api;
             gridColumnApi = params.columnApi;
             console.log('AG Grid 初始化完成');
+            
+            // 初始化双击复制功能
+            initDoubleClickCopy();
+            
+            // 初始化分页大小选择器和页码跳转器
+            setTimeout(initPageSizeSelector, 500);
+            setTimeout(initPageJumper, 600);
         }
     };
 
@@ -551,4 +558,168 @@ function numberFormatter(params) {
     }
     // 保留2位小数，去除末尾0
     return parseFloat(params.value).toFixed(2).replace(/\.?0+$/, '');
+}
+
+/**
+ * 初始化双击复制功能
+ */
+function initDoubleClickCopy() {
+    const gridDiv = document.getElementById('safetyStockGrid');
+    if (!gridDiv) return;
+    
+    gridDiv.addEventListener('dblclick', function(e) {
+        const cell = e.target.closest('.ag-cell');
+        if (!cell) return;
+        
+        const value = cell.textContent.trim();
+        if (!value) return;
+        
+        // 复制到剪贴板
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(value).then(function() {
+                layui.layer.msg('已复制: ' + value.substring(0, 20) + (value.length > 20 ? '...' : ''), {icon: 1, time: 1500});
+            }).catch(function() {
+                fallbackCopyText(value);
+            });
+        } else {
+            fallbackCopyText(value);
+        }
+    });
+    
+    console.log('[双击复制] 初始化完成');
+}
+
+/**
+ * 兼容性复制文本
+ */
+function fallbackCopyText(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+        const success = document.execCommand('copy');
+        if (success) {
+            layui.layer.msg('已复制: ' + text.substring(0, 20) + (text.length > 20 ? '...' : ''), {icon: 1, time: 1500});
+        }
+    } catch (err) {
+        console.error('[双击复制] 复制失败:', err);
+    }
+    
+    document.body.removeChild(textarea);
+}
+
+/**
+ * 初始化分页大小选择器
+ */
+function initPageSizeSelector() {
+    const pagingPanel = document.querySelector('.ag-paging-panel');
+    if (!pagingPanel) {
+        console.log('[分页选择器] 未找到分页面板，稍后重试');
+        setTimeout(initPageSizeSelector, 500);
+        return;
+    }
+    
+    // 检查是否已存在
+    if (pagingPanel.querySelector('.page-size-selector')) {
+        return;
+    }
+    
+    // 创建选择器容器
+    const selectorContainer = document.createElement('div');
+    selectorContainer.className = 'page-size-selector';
+    selectorContainer.innerHTML = `
+        <span>每页显示:</span>
+        <select id="pageSizeSelect">
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+        </select>
+        <span>条</span>
+    `;
+    
+    pagingPanel.appendChild(selectorContainer);
+    
+    // 绑定事件
+    const select = selectorContainer.querySelector('#pageSizeSelect');
+    select.addEventListener('change', function() {
+        const newPageSize = parseInt(this.value);
+        if (gridApi) {
+            gridApi.paginationSetPageSize(newPageSize);
+            console.log('[分页选择器] 切换到每页', newPageSize, '条');
+        }
+    });
+    
+    console.log('[分页选择器] 初始化完成');
+}
+
+/**
+ * 初始化页码跳转器
+ */
+function initPageJumper() {
+    const pagingPanel = document.querySelector('.ag-paging-panel');
+    const rowSummaryPanel = pagingPanel.querySelector('.ag-paging-row-summary-panel');
+    
+    if (!pagingPanel || !rowSummaryPanel) return;
+    
+    // 检查是否已存在
+    if (rowSummaryPanel.querySelector('.page-jumper')) {
+        return;
+    }
+    
+    // 将rowSummaryPanel改为水平布局，使内容和跳转器并排
+    rowSummaryPanel.style.display = 'flex';
+    rowSummaryPanel.style.flexDirection = 'row';
+    rowSummaryPanel.style.alignItems = 'center';
+    rowSummaryPanel.style.gap = '15px';
+    rowSummaryPanel.style.flexWrap = 'wrap';
+    rowSummaryPanel.style.justifyContent = 'center';
+    
+    // 创建跳转器容器
+    const jumperDiv = document.createElement('div');
+    jumperDiv.className = 'page-jumper';
+    jumperDiv.innerHTML = `
+        <span>跳至</span>
+        <input type="number" id="pageJumperInput" min="1" placeholder="页码">
+        <span>页</span>
+        <button id="pageJumperBtn">跳转</button>
+    `;
+    
+    // 将跳转器添加到rowSummaryPanel中，与统计信息并排
+    rowSummaryPanel.appendChild(jumperDiv);
+    
+    // 绑定事件
+    const input = jumperDiv.querySelector('#pageJumperInput');
+    const btn = jumperDiv.querySelector('#pageJumperBtn');
+    
+    const doJump = function() {
+        const pageNum = parseInt(input.value);
+        if (!pageNum || pageNum < 1) {
+            layui.layer.msg('请输入有效的页码', {icon: 0});
+            return;
+        }
+        
+        const totalPages = gridApi.paginationGetTotalPages();
+        if (pageNum > totalPages) {
+            layui.layer.msg('页码超出范围，最大页码: ' + totalPages, {icon: 0});
+            return;
+        }
+        
+        // AG Grid 页码从0开始，所以减1
+        gridApi.paginationGoToPage(pageNum - 1);
+        input.value = '';
+        console.log('[页码跳转] 跳转到第', pageNum, '页');
+    };
+    
+    btn.addEventListener('click', doJump);
+    input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            doJump();
+        }
+    });
+    
+    console.log('[页码跳转器] 初始化完成');
 }

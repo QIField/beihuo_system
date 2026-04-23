@@ -402,7 +402,8 @@ class CRMDataCrawlService:
             with conn.cursor() as cursor:
                 sql = """
                     UPDATE crmapp_compare_summary s
-                    JOIN crmapp_beihuo b ON s.oe = b.oe AND s.brand = b.brand
+                    JOIN crmapp_beihuo b ON s.oe = b.oe COLLATE utf8mb4_unicode_ci
+                        AND s.brand = b.brand COLLATE utf8mb4_unicode_ci
                     SET
                         s.today_sales = b.today_sales,
                         s.yesterday_sales = b.sales_yesterday,

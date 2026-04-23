@@ -683,6 +683,7 @@ def init_compare_summary_table():
                 sales_12m INT DEFAULT 0 COMMENT '近12个月总销量',
                 product_remark TEXT COMMENT '系统产品备注',
                 is_cass VARCHAR(10) COMMENT '是否同步开思',
+                l_model_zh TEXT COMMENT '车型中文名',
                 created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
                 INDEX idx_oe (oe),
@@ -714,7 +715,6 @@ def init_compare_summary_table():
             alter_columns = [
                 ("product_id", "VARCHAR(100) COMMENT '产品ID'"),
                 ("is_cass", "VARCHAR(10) COMMENT '是否同步开思'"),
-                ("l_model_zh", "TEXT COMMENT '车型中文名'"),
                 ("stock_zaitu_list", "JSON COMMENT '在途库存列表'"),
                 ("frey_no", "VARCHAR(255) COMMENT 'Frey编号'"),
                 ("sales_6m", "INT DEFAULT 0 COMMENT '近6个月总销量'"),
@@ -730,30 +730,35 @@ def init_compare_summary_table():
                     if "Duplicate column name" not in str(e):
                         pass  # 静默处理字段添加错误
             
-            # 检查并修改字段类型为 TEXT（如果需要）
-            text_fields = [
-                ('l_model_zh', "TEXT COMMENT '车型中文名'"),
-            ]
-            
-            for field_name, field_def in text_fields:
-                try:
+            # 检查并确保 l_model_zh 字段存在且类型为 TEXT
+            try:
+                cursor.execute("""
+                    SELECT DATA_TYPE 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = 'crmapp_compare_summary' 
+                    AND COLUMN_NAME = 'l_model_zh'
+                """)
+                result = cursor.fetchone()
+                
+                if result is None:
+                    # 字段不存在，添加字段
                     cursor.execute("""
-                        SELECT DATA_TYPE 
-                        FROM INFORMATION_SCHEMA.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = 'crmapp_compare_summary' 
-                        AND COLUMN_NAME = %s
-                    """, (field_name,))
-                    result = cursor.fetchone()
-                    
-                    if result and result[0].upper() != 'TEXT':
-                        cursor.execute(f"""
-                            ALTER TABLE crmapp_compare_summary 
-                            MODIFY COLUMN `{field_name}` {field_def}
-                        """)
-                        print(f"已修改 {field_name} 字段类型为 TEXT")
-                except Exception as e:
-                    print(f"修改 {field_name} 字段类型时出错: {e}")
+                        ALTER TABLE crmapp_compare_summary 
+                        ADD COLUMN l_model_zh TEXT COMMENT '车型中文名'
+                    """)
+                    print("已添加 l_model_zh 字段到 crmapp_compare_summary 表")
+                elif result[0].upper() != 'TEXT':
+                    # 字段存在但类型不是 TEXT，修改类型
+                    cursor.execute("""
+                        ALTER TABLE crmapp_compare_summary 
+                        MODIFY COLUMN l_model_zh TEXT COMMENT '车型中文名'
+                    """)
+                    print(f"已修改 l_model_zh 字段类型为 TEXT (原类型: {result[0]})")
+                else:
+                    print("  ✓ l_model_zh 字段类型已是 TEXT，无需修改")
+            except Exception as e:
+                print(f"处理 l_model_zh 字段时出错: {e}")
             
             # 检查并删除冗余字段 procurement_records
             try:
