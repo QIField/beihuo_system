@@ -14,6 +14,24 @@ from app.utils.database_connection import get_db_connection
 COMPANY = 'fsbbr'
 
 
+def _get_field(row, field_name: str, index: int):
+    """
+    从数据库行中获取字段值，兼容字典游标和元组游标
+
+    Args:
+        row: 数据库行（字典或元组）
+        field_name: 字段名（用于字典游标）
+        index: 字段索引（用于元组游标）
+
+    Returns:
+        字段值
+    """
+    if isinstance(row, dict):
+        return row.get(field_name)
+    else:
+        return row[index] if index < len(row) else None
+
+
 class PurchaseSyncService:
     """采购数据同步服务类"""
 
@@ -98,7 +116,12 @@ class PurchaseSyncService:
                     WHERE company = %s
                 """
                 cursor.execute(sql, (company,))
-                return [(row[0], row[1]) for row in cursor.fetchall()]
+                rows = cursor.fetchall()
+                # 使用字段映射获取数据，兼容字典游标和元组游标
+                return [
+                    (_get_field(row, 'oe', 0), _get_field(row, 'brand', 1))
+                    for row in rows
+                ]
         finally:
             conn.close()
 
@@ -151,8 +174,12 @@ class PurchaseSyncService:
                 ))
                 result = cursor.fetchone()
 
-                if result and result[0] is not None:
-                    return float(result[0]), float(result[1])
+                if result:
+                    # 使用字段映射获取数据，兼容字典游标和元组游标
+                    max_price = _get_field(result, 'max_price', 0)
+                    min_price = _get_field(result, 'min_price', 1)
+                    if max_price is not None:
+                        return float(max_price), float(min_price)
                 return 0.0, 0.0
         finally:
             conn.close()
@@ -216,7 +243,10 @@ class PurchaseSyncService:
                 result = cursor.fetchone()
 
                 if result:
-                    return float(result[0])
+                    # 使用字段映射获取数据，兼容字典游标和元组游标
+                    unit_price = _get_field(result, 'unit_price', 0)
+                    if unit_price is not None:
+                        return float(unit_price)
                 return 0.0
         finally:
             conn.close()

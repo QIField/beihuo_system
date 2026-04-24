@@ -741,6 +741,12 @@ def init_compare_summary_table():
                 """)
                 result = cursor.fetchone()
                 
+                # 兼容元组和字典两种返回格式
+                if isinstance(result, dict):
+                    data_type = result.get('DATA_TYPE', '')
+                else:
+                    data_type = result[0] if result else ''
+                
                 if result is None:
                     # 字段不存在，添加字段
                     cursor.execute("""
@@ -748,13 +754,13 @@ def init_compare_summary_table():
                         ADD COLUMN l_model_zh TEXT COMMENT '车型中文名'
                     """)
                     print("已添加 l_model_zh 字段到 crmapp_compare_summary 表")
-                elif result[0].upper() != 'TEXT':
+                elif data_type.upper() != 'TEXT':
                     # 字段存在但类型不是 TEXT，修改类型
                     cursor.execute("""
                         ALTER TABLE crmapp_compare_summary 
                         MODIFY COLUMN l_model_zh TEXT COMMENT '车型中文名'
                     """)
-                    print(f"已修改 l_model_zh 字段类型为 TEXT (原类型: {result[0]})")
+                    print(f"已修改 l_model_zh 字段类型为 TEXT (原类型: {data_type})")
                 else:
                     print("  ✓ l_model_zh 字段类型已是 TEXT，无需修改")
             except Exception as e:

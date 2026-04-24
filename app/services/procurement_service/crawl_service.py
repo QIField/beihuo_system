@@ -403,7 +403,7 @@ class CRMDataCrawlService:
                 sql = """
                     UPDATE crmapp_compare_summary s
                     JOIN crmapp_beihuo b ON s.oe = b.oe COLLATE utf8mb4_unicode_ci
-                        AND s.brand = b.brand COLLATE utf8mb4_unicode_ci
+                        AND s.brand = b.`品牌` COLLATE utf8mb4_unicode_ci
                     SET
                         s.today_sales = b.today_sales,
                         s.yesterday_sales = b.sales_yesterday,
