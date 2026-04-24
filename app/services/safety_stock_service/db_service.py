@@ -43,30 +43,26 @@ class SafetyStockDBService:
         conn = get_db_connection()
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # 读取销量明细，按OE+品牌分组
+                # 读取销量明细，按frey_no分组
                 # 简化SQL，在Python中处理日期格式化
                 sql = """
                     SELECT 
-                        number as oe,
-                        brand_name as brand,
+                        frey_no,
                         quantity,
                         create_date
                     FROM crmapp_sales_history_detail
                     WHERE create_date >= %s
                       AND create_date <= %s
-                      AND number IS NOT NULL 
-                      AND number != ''
-                      AND brand_name IS NOT NULL
-                      AND brand_name != ''
-                    ORDER BY number, brand_name, create_date
+                      AND frey_no IS NOT NULL 
+                      AND frey_no != ''
+                    ORDER BY frey_no, create_date
                 """
                 cursor.execute(sql, (start_date, end_date))
                 rows = cursor.fetchall()
                 
-                # 按OE+品牌分组统计
+                # 按frey_no分组统计
                 product_data = defaultdict(lambda: {
-                    'oe': '',
-                    'brand': '',
+                    'frey_no': '',
                     'daily_sales': defaultdict(float),  # 按天统计销量
                     'monthly_sales': defaultdict(float),  # 按月统计销量
                     'total_sales': 0,
@@ -74,7 +70,7 @@ class SafetyStockDBService:
                 })
                 
                 for row in rows:
-                    key = f"{row['oe']}|{row['brand']}"
+                    key = f"{row['frey_no']}"
                     # 在Python中处理日期格式化
                     create_date = row['create_date']
                     if isinstance(create_date, str):
@@ -83,8 +79,7 @@ class SafetyStockDBService:
                     sale_date = create_date.strftime('%Y-%m-%d')
                     year_month = create_date.strftime('%Y-%m')
                     
-                    product_data[key]['oe'] = row['oe']
-                    product_data[key]['brand'] = row['brand']
+                    product_data[key]['frey_no'] = row['frey_no']
                     product_data[key]['daily_sales'][sale_date] += float(row['quantity'] or 0)
                     product_data[key]['monthly_sales'][year_month] += float(row['quantity'] or 0)
                     product_data[key]['total_sales'] += float(row['quantity'] or 0)
@@ -114,8 +109,7 @@ class SafetyStockDBService:
                         monthly_sales[month] = monthly_sales.get(month, 0) + qty
                     
                     result[key] = {
-                        'oe': data['oe'],
-                        'brand': data['brand'],
+                        'frey_no': data['frey_no'],
                         'total_sales': data['total_sales'],
                         'avg_daily': avg_daily,
                         'std_daily': std_daily,
@@ -133,33 +127,29 @@ class SafetyStockDBService:
         从库存表读取当前库存数据
         
         Returns:
-            字典，key为 "oe|品牌"，value包含库存信息
+            字典，key为 "frey_no"，value包含库存信息
         """
         conn = get_db_connection()
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 sql = """
                     SELECT 
-                        oe,
-                        品牌 as brand,
+                        物料条码 as frey_no,
                         物料名称 as product_name,
                         库存数量 as stock_qty,
                         库存金额 as inventory_amount
                     FROM crmapp_beihuo
-                    WHERE oe IS NOT NULL 
-                      AND oe != ''
-                      AND 品牌 IS NOT NULL
-                      AND 品牌 != ''
+                    WHERE 物料条码 IS NOT NULL 
+                      AND 物料条码 != ''
                 """
                 cursor.execute(sql)
                 rows = cursor.fetchall()
                 
                 result = {}
                 for row in rows:
-                    key = f"{row['oe']}|{row['brand']}"
+                    key = f"{row['frey_no']}"
                     result[key] = {
-                        'oe': row['oe'],
-                        'brand': row['brand'],
+                        'frey_no': row['frey_no'],
                         'product_name': row['product_name'],
                         'stock_qty': float(row['stock_qty'] or 0),
                         'inventory_amount': float(row['inventory_amount'] or 0)
@@ -243,22 +233,21 @@ class SafetyStockDBService:
                 # 插入新数据
                 insert_sql = f"""
                     INSERT INTO {TABLE_NAME} (
-                        oe, brand, product_name, abc_class,
+                        frey_no, product_name, abc_class,
                         avg_daily_sales, sales_std, seasonal_factor,
                         base_safety_stock, safety_stock,
                         reorder_point, target_stock,
                         current_stock, in_transit_qty, available_stock, inventory_amount,
                         sellable_days, stock_status, calc_date
                     ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                     )
                 """
                 
                 values = []
                 for r in results:
                     values.append((
-                        r['oe'],
-                        r['brand'],
+                        r['frey_no'],
                         r.get('product_name', ''),
                         r['abc_class'],
                         r['avg_daily_sales'],

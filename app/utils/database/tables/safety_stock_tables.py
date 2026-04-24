@@ -17,8 +17,7 @@ def init_safety_stock_calculation_table():
             create_table_sql = """
             CREATE TABLE IF NOT EXISTS crmapp_safety_stock_calculation (
                 id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                oe VARCHAR(100) NOT NULL COMMENT 'OE号',
-                brand VARCHAR(100) NOT NULL COMMENT '品牌',
+                frey_no VARCHAR(100) NOT NULL COMMENT 'Frey编号/物料条码',
                 product_name VARCHAR(255) DEFAULT NULL COMMENT '产品名称',
                 abc_class VARCHAR(10) DEFAULT NULL COMMENT 'ABC分类(A/B/C)',
                 avg_daily_sales DECIMAL(10,2) DEFAULT 0.00 COMMENT '平均日销量',
@@ -38,7 +37,7 @@ def init_safety_stock_calculation_table():
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
                 
-                UNIQUE KEY uk_oe_brand_date (oe, brand, calc_date),
+                UNIQUE KEY uk_frey_no_date (frey_no, calc_date),
                 INDEX idx_abc_class (abc_class),
                 INDEX idx_stock_status (stock_status),
                 INDEX idx_calc_date (calc_date),

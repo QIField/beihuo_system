@@ -51,8 +51,7 @@ def get_safety_stock_list():
             keyword_lower = keyword.lower()
             results = [
                 r for r in results 
-                if (keyword_lower in (r.get('oe') or '').lower() or
-                    keyword_lower in (r.get('brand') or '').lower() or
+                if (keyword_lower in (r.get('frey_no') or '').lower() or
                     keyword_lower in (r.get('product_name') or '').lower())
             ]
         

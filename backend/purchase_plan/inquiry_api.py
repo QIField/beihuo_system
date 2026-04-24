@@ -214,7 +214,15 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     # 准备数据
     from app.utils.b2b_inquiry_upload.uploader import prepare_data, batch_upload_with_callback
     valid_items, skipped_items = prepare_data(df)
-    
+
+    # 询价模块专用：过滤价格为空或为0的数据
+    for item in valid_items[:]:
+        price = item.get('price', 0)
+        if not price or price == 0:
+            item['skip_reason'] = '价格为空或为0'
+            skipped_items.append(item)
+            valid_items.remove(item)
+
     if not valid_items:
         raise ValueError('没有有效的数据可导入')
     

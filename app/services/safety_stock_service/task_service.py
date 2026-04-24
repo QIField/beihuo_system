@@ -55,7 +55,7 @@ def execute_daily_calculation():
     print("  → 合并库存数据并判断状态...")
     final_results = []
     for result in calc_results:
-        key = f"{result['oe']}|{result['brand']}"
+        key = f"{result['frey_no']}"
         
         # 获取库存信息
         inv = inventory_data.get(key, {})

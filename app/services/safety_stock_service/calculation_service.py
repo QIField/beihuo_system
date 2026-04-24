@@ -242,8 +242,7 @@ class SafetyStockCalculator:
             )
             
             results.append({
-                'oe': data['oe'],
-                'brand': data['brand'],
+                'frey_no': data['frey_no'],
                 'abc_class': abc_class,
                 'avg_daily_sales': round(data['avg_daily'], 2),
                 'sales_std': round(data['std_daily'], 2),
