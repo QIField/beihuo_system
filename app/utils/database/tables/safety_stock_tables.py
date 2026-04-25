@@ -21,6 +21,7 @@ def init_safety_stock_calculation_table():
                 oe VARCHAR(100) DEFAULT NULL COMMENT 'OE号',
                 brand VARCHAR(100) DEFAULT NULL COMMENT '品牌',
                 product_name VARCHAR(255) DEFAULT NULL COMMENT '产品名称',
+                company VARCHAR(100) NOT NULL DEFAULT 'fsbbr' COMMENT '组织代码',
                 abc_class VARCHAR(10) DEFAULT NULL COMMENT 'ABC分类(A/B/C)',
                 avg_daily_sales DECIMAL(10,2) DEFAULT 0.00 COMMENT '平均日销量',
                 sales_std DECIMAL(10,2) DEFAULT 0.00 COMMENT '销量标准差',
@@ -38,12 +39,13 @@ def init_safety_stock_calculation_table():
                 calc_date DATE NOT NULL COMMENT '计算日期',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-                
-                UNIQUE KEY uk_frey_no_date (frey_no, calc_date),
+
+                UNIQUE KEY uk_frey_no_company_date (frey_no, company, calc_date),
                 INDEX idx_abc_class (abc_class),
                 INDEX idx_stock_status (stock_status),
                 INDEX idx_calc_date (calc_date),
-                INDEX idx_available_stock (available_stock)
+                INDEX idx_available_stock (available_stock),
+                INDEX idx_company (company)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全库存计算结果表';
             """
             cursor.execute(create_table_sql)
