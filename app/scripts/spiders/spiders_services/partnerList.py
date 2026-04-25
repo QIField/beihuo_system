@@ -12,6 +12,7 @@ from app.models.orm_models.partner_list import PartnerList
 from app.scripts.spiders.pipeline_clean.partnerList_clean import remove_duplicate
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.utils.orm import orm_session
+from config.config_list_manager.config_cache import get_config_value
 
 
 def partnerList(token, page_num=None):
@@ -75,6 +76,14 @@ def partnerList(token, page_num=None):
         # 3. 继续下一页
         current_page += 1
 
-if __name__ == '__main__':
-    token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJjbGllbnQueGhhZG1pbiIsImF1ZCI6InNlcnZlci54aGFkbWluIiwiaWF0IjoxNzc2MjE1NDYxLCJleHAiOjE3Nzg4MDc0NjEsInVpZCI6IjY2NSIsIm5hbWUiOiJcdTY3NGVcdTVmYjdcdTY3NzAiLCJhZG1pbl9zd2l0Y2hfbG9naW4iOiIifQ.x8YL5pQyXpY4nf9Ap62uUkM4B16qpYXCKi06KewH9vw"
-    partnerList(token)
+
+def partnerList_service():
+    print("="*100)
+    print("partnerList_service执行开始")
+    token = get_config_value("customer_quota_manager").get("WMS_TOKEN")
+    partnerList(token, page_num=None)
+    print("partnerList_service执行结束")
+    print("=" * 100)
+
+
+

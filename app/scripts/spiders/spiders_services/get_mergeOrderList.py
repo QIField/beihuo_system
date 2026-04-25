@@ -8,9 +8,7 @@ from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.scripts.spiders.pipeline_clean.get_mergeOrderList_clean import remove_duplicate
 from app.models.orm_models.merge_order_list import MergeOrderList
 from app.utils.orm.session import orm_session
-
-
-
+from config.config_list_manager.config_cache import get_config_value
 
 
 def get_mergeOrderList_complete_by_level_id(token, page_num=None,
@@ -98,9 +96,35 @@ def get_mergeOrderList_complete_by_level_id(token, page_num=None,
     # return total_item_count
 
 
-if __name__ == '__main__':
-    token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJjbGllbnQueGhhZG1pbiIsImF1ZCI6InNlcnZlci54aGFkbWluIiwiaWF0IjoxNzc2MjE1NDYxLCJleHAiOjE3Nzg4MDc0NjEsInVpZCI6IjY2NSIsIm5hbWUiOiJcdTY3NGVcdTVmYjdcdTY3NzAiLCJhZG1pbl9zd2l0Y2hfbG9naW4iOiIifQ.x8YL5pQyXpY4nf9Ap62uUkM4B16qpYXCKi06KewH9vw"
+def get_mergeOrderList_service():
+    print("="*100)
+    print("get_mergeOrderList_service执行开始")
 
+    token = get_config_value("customer_quota_manager").get("WMS_TOKEN")
 
+    level_id_list = [
+                     22,  #开思
+                     27,  #维修厂
+                     25, #同行
+                     20, #车主
+                     30, #线上-途虎养车（汽配龙）
+                     109,  # 维修厂大客户
+                     # 105,
+                     # 28,
+                     # 101,
+                     # 26,
+                     # 102,
+                     # 103,
+                     # 104,
+                     # 106,
+                     # 107
 
-    get_mergeOrderList_complete_by_level_id(token,level_id=22)
+                     ]
+    for level_id in level_id_list:
+        print("="*100)
+        print(f"正在爬取level_id={level_id}")
+        get_mergeOrderList_complete_by_level_id(token,level_id=level_id)
+        print(f"level_id={level_id} 爬取结束")
+        print("=" * 100)
+    print("get_mergeOrderList_service执行结束")
+    print("=" * 100)

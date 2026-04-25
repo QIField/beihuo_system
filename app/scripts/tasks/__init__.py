@@ -15,3 +15,11 @@ def expansion_tasks(task_manager):
     #注册定时业务
     from app.scripts.tasks.wms_get_status_orders_tasks import two_minutes_register
     two_minutes_register(task_manager)
+
+    # 注册合并订单列表定时任务
+    from app.scripts.tasks.get_mergeOrderList_tasks import merge_order_list_register
+    merge_order_list_register(task_manager)
+
+    # 注册合作伙伴列表定时任务
+    from app.scripts.tasks.partnerList_tasks import partner_list_register
+    partner_list_register(task_manager)

@@ -68,31 +68,30 @@
 <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
 <script>
 layui.use(['table', 'layer', 'form', 'jquery', 'dropdown'], function(){
-    var table = layui.table;
-    var layer = layui.layer;
-    var form = layui.form;
-    var $ = layui.jquery;
-    var dropdown = layui.dropdown;
+    const table = layui.table;
+    const layer = layui.layer;
+    const form = layui.form;
+    const $ = layui.jquery;
+    const dropdown = layui.dropdown;
     
-    var currentStartMonth = 1;
-    var currentEndMonth = 1;
-    var currentLevelId = '';
-    var currentPaymentDescription = '';
+    let currentStartMonth = 1;
+    let currentEndMonth = 1;
+    let currentLevelId = '';
+    let currentPaymentDescription = '';
     
     function initButtons() {
-        var now = new Date();
-        var year = now.getFullYear();
-        var month = now.getMonth() + 1;
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
         
-        var btnGroup = $('#btnGroup');
+        const btnGroup = $('#btnGroup');
         btnGroup.empty();
          btnGroup.append('<button type="button" class="layui-btn" data-start="" data-end="">全部</button>');
         btnGroup.append('<button type="button" class="layui-btn layui-btn-normal" data-start="1" data-end="1">本月</button>');
         btnGroup.append('<button type="button" class="layui-btn" data-start="2" data-end="2">上月</button>');
- 
         
-        var thisYearStart = 1;
-        var thisYearEnd;
+        const thisYearStart = 1;
+        let thisYearEnd;
         if (month >= 4) {
             thisYearEnd = 9;
         } else {
@@ -103,15 +102,15 @@ layui.use(['table', 'layer', 'form', 'jquery', 'dropdown'], function(){
         btnGroup.append('<button type="button" class="layui-btn" data-start="1" data-end="6">前6月</button>');
         btnGroup.append('<button type="button" class="layui-btn" data-start="1" data-end="12">前12月</button>');
 
-        for (var i = 2; i <= 9; i++) {
-            var targetDate = new Date(now);
+        for (let i = 2; i <= 9; i++) {
+            const targetDate = new Date(now);
             targetDate.setMonth(targetDate.getMonth() - i);
-            var targetYear = targetDate.getFullYear();
-            var targetMonth = targetDate.getMonth() + 1;
-            var targetMonthStr = targetMonth < 10 ? '0' + targetMonth : targetMonth;
-            var buttonText = targetYear + '-' + targetMonthStr;
+            const targetYear = targetDate.getFullYear();
+            const targetMonth = targetDate.getMonth() + 1;
+            const targetMonthStr = targetMonth < 10 ? '0' + targetMonth : targetMonth;
+            const buttonText = targetYear + '-' + targetMonthStr;
             
-            var monthOffset = i + 1;
+            const monthOffset = i + 1;
             btnGroup.append('<button type="button" class="layui-btn" data-start="' + monthOffset + '" data-end="' + monthOffset + '">' + buttonText + '</button>');
         }
         
@@ -222,9 +221,9 @@ layui.use(['table', 'layer', 'form', 'jquery', 'dropdown'], function(){
     });
     
     function reloadTable(){
-        var customerName = $('#customerName').val();
-        var totalPriceMin = $('#totalPriceMin').val();
-        var totalPriceMax = $('#totalPriceMax').val();
+        const customerName = $('#customerName').val();
+        const totalPriceMin = $('#totalPriceMin').val();
+        const totalPriceMax = $('#totalPriceMax').val();
         table.reload('configTable', {
             where: {
                 start_month: currentStartMonth,

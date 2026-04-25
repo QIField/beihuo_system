@@ -31,7 +31,6 @@ def system_config():
 
 @general_web_bp.route("/transaction_sum_web")
 def transaction_sum():
-
     return render_template("customer_quota_manager_web/transaction_sum_web.html")
 
 
@@ -39,3 +38,25 @@ def transaction_sum():
 def diff_replace_number_page():
     """替换号差异对比页面"""
     return render_template("diff_replace_number.html")
+
+
+@general_web_bp.route("/unpaid_customer_web")
+def unpaid_customer():
+    return render_template("customer_quota_manager_web/unpaid_customer_web.html")
+
+
+@general_web_bp.route("/expected_unpaid_customers_web")
+def expected_unpaid_customers():
+    return render_template("customer_quota_manager_web/expected_unpaid_customers_web.html")
+
+
+@general_web_bp.route("/customer_quota_web")
+def customer_quota():
+    """客户额度管理"""
+    return render_template("customer_quota_manager_web/customer_quota_web.html")
+
+
+@general_web_bp.route("/display_unpaid_customer_limit_web")
+def display_unpaid_customer_limit():
+    """未付款客户额度展示"""
+    return render_template("customer_quota_manager_web/display_unpaid_customer_limit_web.html")
