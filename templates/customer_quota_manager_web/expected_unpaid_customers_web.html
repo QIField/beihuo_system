@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>逾期未付款客户</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+</head>
+<body>
+<div class="layui-container" style="margin-top: 20px;">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <div class="layui-card">
+                <div class="layui-card-header">逾期未付款客户（只计算到期日过了且没有结清款项的客户）</div>
+                <div class="layui-card-body">
+                    <div class="layui-form-item">
+                        <div class="layui-inline">
+                            <label class="layui-form-label" style="width: 60px;">客户名称</label>
+                            <div class="layui-input-inline" style="width: 200px;">
+                                <input type="text" name="customer_name" placeholder="请输入客户名称" autocomplete="off" class="layui-input" id="customerName">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label" style="width: 60px;">客户等级</label>
+                            <div class="layui-input-inline" style="width: auto;">
+                                <button class="layui-btn layui-btn-primary" id="levelNameBtn">
+                                    <span>全部</span>
+                                    <i class="layui-icon layui-icon-down layui-font-12"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label" style="width: 60px;">付款说明</label>
+                            <div class="layui-input-inline" style="width: auto;">
+                                <button class="layui-btn layui-btn-primary" id="paymentDescriptionBtn">
+                                    <span>全部</span>
+                                    <i class="layui-icon layui-icon-down layui-font-12"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <button class="layui-btn" id="searchBtn">搜索</button>
+                            <button class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+                        </div>
+                    </div>
+                    <table id="configTable" lay-filter="configTable"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+<script>
+layui.use(['table', 'layer', 'form', 'jquery', 'dropdown'], function(){
+    const table = layui.table;
+    const layer = layui.layer;
+    const form = layui.form;
+    const $ = layui.jquery;
+    const dropdown = layui.dropdown;
+    
+    let currentLevelName = '';
+    let currentPaymentDescription = '';
+    
+    dropdown.render({
+        elem: '#levelNameBtn',
+        data: [
+            {title: '全部', id: ''},
+            {title: '车主', id: '车主'},
+            {title: '开思', id: '开思'},
+            {title: '同行', id: '同行'},
+            {title: '维修厂', id: '维修厂'},
+            {title: '缤汽库', id: '缤汽库'},
+            {title: '线上-途虎养车（汽配龙）', id: '线上-途虎养车（汽配龙）'},
+            {title: '线上-F6', id: '线上-F6'},
+            {title: '集群车宝', id: '集群车宝'},
+            {title: '天猫', id: '天猫'},
+            {title: '一级代理', id: '一级代理'},
+            {title: '巴博瑞价格', id: '巴博瑞价格'},
+            {title: '总代理', id: '总代理'},
+            {title: '前置仓', id: '前置仓'},
+            {title: '地级市含税价', id: '地级市含税价'},
+            {title: '维修厂大客户', id: '维修厂大客户'}
+        ],
+        click: function(obj){
+            this.elem.find('span').text(obj.title);
+            currentLevelName = obj.id;
+            reloadTable();
+        }
+    });
+    
+    dropdown.render({
+        elem: '#paymentDescriptionBtn',
+        data: [
+            {title: '全部', id: ''},
+            {title: '现金', id: '现金'},
+            {title: '月结(1个月)', id: '月结(1个月)'},
+            {title: '开思', id: '开思'}
+        ],
+        click: function(obj){
+            this.elem.find('span').text(obj.title);
+            currentPaymentDescription = obj.id;
+            reloadTable();
+        }
+    });
+    
+    table.render({
+        elem: '#configTable',
+        url: '/new/api/customer_quota_manager/get_overdue_unpaid_customers_api',
+        method: 'get',
+        page: true,
+        limits: [10, 20, 50, 100],
+        limit: 20,
+        request: {
+            pageName: 'page',
+            limitName: 'limit'
+        },
+        where: {
+            customer_name: $('#customerName').val(),
+            level_name: currentLevelName,
+            payment_description: currentPaymentDescription
+        },
+        parseData: function(res){
+            return {
+                "code": res.code === 200 ? 0 : res.code,
+                "msg": res.msg,
+                "count": res.data.total,
+                "data": res.data.result
+            };
+        },
+        toolbar: false,
+        defaultToolbar: ['filter', 'exports', 'print'],
+        cols: [[
+            {field: 'customer_code', title: '客户编码', width: 150, sort: true},
+            {field: 'customer_name', title: '客户名称', width: 250},
+            {field: 'level_name', title: '客户等级', width: 150},
+            {field: 'payment_description', title: '付款说明', width: 250},
+            {field: 'total_tax_amount', title: '价税合计', width: 150, sort: true, templet: function(d){
+                return d.total_tax_amount ? d.total_tax_amount.toFixed(2) : '0.00';
+            }},
+            {field: 'total_received_amount', title: '已收款金额', width: 150, sort: true, templet: function(d){
+                return d.total_received_amount ? d.total_received_amount.toFixed(2) : '0.00';
+            }},
+            {field: 'unpaid_amount', title: '未付款金额', width: 150, sort: true, templet: function(d){
+                return d.unpaid_amount ? d.unpaid_amount.toFixed(2) : '0.00';
+            }},
+            {title: '操作', width: 100, fixed: 'right', templet: function(d){
+                return '<button class="layui-btn layui-btn-xs layui-btn-normal" lay-event="detail">详情</button>';
+            }}
+        ]],
+        height: 'full-200'
+    });
+    
+    // 监听主表格的行点击事件
+    table.on('tool(configTable)', function(obj){
+        const data = obj.data;
+        if(obj.event === 'detail'){
+            showDetail(data);
+        }
+    });
+    
+    // 显示详情弹窗
+    function showDetail(data){
+        const customerCode = data.customer_code;
+        const customerName = data.customer_name;
+        let currentPaymentStatus = '';
+        
+        // 先打开弹窗，获取容器ID
+        const detailLayerIndex = layer.open({
+            type: 1,
+            title: customerName + ' 的应收单详情',
+            area: ['90%', '70%'],
+            content: '<div id="detailTableContainer" style="padding: 15px;">' +
+                '<div style="margin-bottom: 15px;">' +
+                '<form class="layui-form" onsubmit="return false;">' +
+                '<div class="layui-form-item" style="margin-bottom: 0;">' +
+                '<label class="layui-form-label" style="width: 80px;">付款状态</label>' +
+                '<div class="layui-input-inline" style="width: 200px;">' +
+                '<select id="detailPaymentStatus" lay-filter="detailPaymentStatus">' +
+                '<option value="">全部</option>' +
+                '<option value="unpaid">未结清</option>' +
+                '<option value="paid">已结清</option>' +
+                '</select>' +
+                '</div>' +
+                '</div>' +
+                '</form>' +
+                '</div>' +
+                '<table id="detailTable" lay-filter="detailTable"></table>' +
+                '</div>',
+            success: function(layero, index){
+                // 渲染select
+                form.render('select');
+                
+                // 监听select变化
+                form.on('select(detailPaymentStatus)', function(data){
+                    currentPaymentStatus = data.value;
+                    reloadDetailTable();
+                });
+                
+                // 渲染表格的函数
+                function renderDetailTable(){
+                    table.render({
+                        elem: '#detailTable',
+                        url: '/new/api/customer_quota_manager/get_receipts_by_customer_code_api',
+                        method: 'get',
+                        page: true,
+                        limits: [10, 20, 50, 100],
+                        limit: 10,
+                        request: {
+                            pageName: 'page',
+                            limitName: 'limit'
+                        },
+                        where: {
+                            customer_code: customerCode,
+                            payment_status: currentPaymentStatus
+                        },
+                        parseData: function(res){
+                            return {
+                                "code": res.code === 200 ? 0 : res.code,
+                                "msg": res.msg,
+                                "count": res.data.total,
+                                "data": res.data.result
+                            };
+                        },
+                        toolbar: false,
+                        defaultToolbar: ['filter', 'exports', 'print'],
+                        cols: [[
+                            {field: 'receipt_no', title: '单据编号', width: 200},
+                            {field: 'receipt_status', title: '单据状态', width: 120},
+                            {field: 'business_date', title: '业务日期', width: 120},
+                            {field: 'due_date', title: '到期日', width: 120},
+                            {field: 'tax_total_amount', title: '价税合计', width: 120, templet: function(d){
+                                return d.tax_total_amount ? d.tax_total_amount.toFixed(2) : '0.00';
+                            }},
+                            {field: 'received_amount', title: '已收款金额', width: 120, templet: function(d){
+                                return d.received_amount ? d.received_amount.toFixed(2) : '0.00';
+                            }},
+                            {field: 'payment_terms', title: '收款条件', width: 150},
+                            {field: 'salesperson', title: '销售员', width: 120},
+                            {field: 'creator', title: '创建人', width: 120},
+                            {field: 'create_date', title: '创建日期', width: 120}
+                        ]],
+                        height: 'full-100'
+                    });
+                }
+                
+                // 重新加载表格的函数
+                function reloadDetailTable(){
+                    table.reload('detailTable', {
+                        where: {
+                            customer_code: customerCode,
+                            payment_status: currentPaymentStatus
+                        },
+                        page: {
+                            curr: 1
+                        }
+                    });
+                }
+                
+                // 初始渲染表格
+                renderDetailTable();
+            }
+        });
+    }
+    
+    function reloadTable(){
+        const customerName = $('#customerName').val();
+        table.reload('configTable', {
+            where: {
+                customer_name: customerName,
+                level_name: currentLevelName,
+                payment_description: currentPaymentDescription
+            },
+            page: {
+                curr: 1
+            }
+        });
+    }
+    
+    $('#searchBtn').on('click', function(){
+        reloadTable();
+    });
+    
+    $('#resetBtn').on('click', function(){
+        $('#customerName').val('');
+        currentLevelName = '';
+        currentPaymentDescription = '';
+        $('#levelNameBtn span').text('全部');
+        $('#paymentDescriptionBtn span').text('全部');
+        reloadTable();
+    });
+});
+</script>
+</body>
+</html>

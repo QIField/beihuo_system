@@ -1,0 +1,261 @@
+<div class="layui-card">
+    <div class="layui-card-header">客户额度管理</div>
+    <div class="layui-card-body">
+        <div class="layui-form-item">
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">客户名称</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="text" name="fullname" placeholder="请输入客户名称" autocomplete="off" class="layui-input" id="fullname">
+                </div>
+            </div>
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">额度状态</label>
+                <div class="layui-input-inline" style="width: auto;">
+                    <button class="layui-btn layui-btn-primary" id="quotaStatusBtn">
+                        <span>全部</span>
+                        <i class="layui-icon layui-icon-down layui-font-12"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="layui-inline">
+                <button class="layui-btn" id="searchBtn">搜索</button>
+                <button class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+            </div>
+        </div>
+        <br>
+        <table id="customerQuotaTable" lay-filter="customerQuotaTable"></table>
+    </div>
+</div>
+
+<script type="text/html" id="customerQuotaToolbar">
+</script>
+
+<script type="text/html" id="customerQuotaBar">
+    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+</script>
+
+<script type="text/html" id="customerQuotaFormTpl">
+    <form class="layui-form layui-form-pane" lay-filter="customerQuotaForm" style="padding: 20px;">
+        <div class="layui-form-item">
+            <label class="layui-form-label">合作伙伴ID</label>
+            <div class="layui-input-block">
+                <input type="number" name="partner_id" placeholder="请输入合作伙伴ID" autocomplete="off" class="layui-input" lay-verify="required" disabled>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">客户编码</label>
+            <div class="layui-input-block">
+                <input type="text" name="remenber_code" placeholder="请输入客户编码" autocomplete="off" class="layui-input" disabled>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">客户名称</label>
+            <div class="layui-input-block">
+                <input type="text" name="fullname" placeholder="请输入客户名称" autocomplete="off" class="layui-input" disabled>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">交易额度上限</label>
+            <div class="layui-input-block">
+                <input type="number" name="max_trade_quota" placeholder="请输入交易额度上限" autocomplete="off" class="layui-input" step="0.01">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">授信总额度</label>
+            <div class="layui-input-block">
+                <input type="number" name="credit_quota" placeholder="请输入授信总额度" autocomplete="off" class="layui-input" step="0.01">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">额度状态</label>
+            <div class="layui-input-block">
+                <select name="quota_status" lay-verify="required">
+                    <option value="">请选择额度状态</option>
+                    <option value="normal">正常</option>
+                    <option value="frozen">冻结</option>
+                    <option value="restricted">限制使用</option>
+                    <option value="expired">已过期</option>
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+            <label class="layui-form-label">备注</label>
+            <div class="layui-input-block">
+                <textarea name="remark" placeholder="请输入备注" class="layui-textarea"></textarea>
+            </div>
+        </div>
+    </form>
+</script>
+
+<script>
+layui.use(['table', 'layer', 'form', 'jquery', 'dropdown'], function(){
+    const table = layui.table;
+    const layer = layui.layer;
+    const form = layui.form;
+    const $ = layui.jquery;
+    const dropdown = layui.dropdown;
+    
+    let currentQuotaStatus = '';
+    
+    form.render();
+    
+    dropdown.render({
+        elem: '#quotaStatusBtn',
+        data: [
+            {title: '全部', id: ''},
+            {title: '正常', id: 'normal'},
+            {title: '冻结', id: 'frozen'},
+            {title: '限制使用', id: 'restricted'},
+            {title: '已过期', id: 'expired'}
+        ],
+        click: function(obj){
+            this.elem.find('span').text(obj.title);
+            currentQuotaStatus = obj.id;
+            reloadTable();
+        }
+    });
+    
+    table.render({
+        elem: '#customerQuotaTable',
+        url: '/new/api/customer_quota_manager/customer_quota_list_api',
+        method: 'get',
+        page: true,
+        limits: [10, 20, 50, 100],
+        limit: 20,
+        request: {
+            pageName: 'page',
+            limitName: 'limit'
+        },
+        where: {
+            fullname: '',
+            quota_status: ''
+        },
+        parseData: function(res){
+            return {
+                "code": res.code === 200 ? 0 : res.code,
+                "msg": res.msg,
+                "count": res.data.total,
+                "data": res.data.result
+            };
+        },
+        toolbar: '#customerQuotaToolbar',
+        defaultToolbar: ['filter'],
+        cols: [[
+            {field: 'id', title: 'ID', width: 80, sort: true,hide: true},
+            {field: 'partner_id', title: '合作伙伴ID', width: 120, sort: true},
+            {field: 'remenber_code', title: '客户编码', width: 180},
+            {field: 'fullname', title: '客户名称', width: 200},
+            {field: 'max_trade_quota', title: '交易额度上限', width: 150, sort: true, templet: function(d){
+                return d.max_trade_quota ? d.max_trade_quota.toFixed(2) : '0.00';
+            }},
+            {field: 'credit_quota', title: '授信总额度', width: 150, sort: true, templet: function(d){
+                return d.credit_quota ? d.credit_quota.toFixed(2) : '0.00';
+            }},
+            {field: 'quota_status_desc', title: '额度状态', width: 120},
+            {field: 'remark', title: '备注', minWidth: 200,hide: true},
+            {field: 'created_at', title: '创建时间', width: 180, hide: true},
+            {field: 'updated_at', title: '更新时间', width: 180},
+            {title: '操作', toolbar: '#customerQuotaBar', width: 150}
+        ]],
+        height: 'full-250'
+    });
+    
+    function reloadTable(){
+        const fullname = $('#fullname').val();
+        table.reload('customerQuotaTable', {
+            where: {
+                fullname: fullname,
+                quota_status: currentQuotaStatus
+            },
+            page: {
+                curr: 1
+            }
+        });
+    }
+    
+    $('#searchBtn').off().on('click', function(){
+        reloadTable();
+    });
+    
+    $('#resetBtn').off().on('click', function(){
+        $('#fullname').val('');
+        currentQuotaStatus = '';
+        $('#quotaStatusBtn span').text('全部');
+        reloadTable();
+    });
+    
+    table.on('tool(customerQuotaTable)', function(obj){
+        const data = obj.data;
+        const layEvent = obj.event;
+        
+        if(layEvent === 'edit'){
+            openEditDialog(data);
+        }
+    });
+    
+    function openEditDialog(data){
+        const formDataObj = {
+            id: data.id,
+            partner_id: data.partner_id,
+            remenber_code: data.remenber_code || '',
+            fullname: data.fullname || '',
+            max_trade_quota: data.max_trade_quota || 0,
+            credit_quota: data.credit_quota || 0,
+            quota_status: data.quota_status,
+            remark: data.remark || ''
+        };
+        
+        layer.open({
+            type: 1,
+            title: '编辑客户额度',
+            content: $('#customerQuotaFormTpl').html(),
+            area: ['550px', '550px'],
+            btn: ['确定', '取消'],
+            success: function(layero, index){
+                // 填充表单数据
+                layero.find('input[name="partner_id"]').val(formDataObj.partner_id);
+                layero.find('input[name="remenber_code"]').val(formDataObj.remenber_code);
+                layero.find('input[name="fullname"]').val(formDataObj.fullname);
+                layero.find('input[name="max_trade_quota"]').val(formDataObj.max_trade_quota);
+                layero.find('input[name="credit_quota"]').val(formDataObj.credit_quota);
+                layero.find('textarea[name="remark"]').val(formDataObj.remark);
+                
+                form.render();
+                
+                if(formDataObj.quota_status){
+                    layero.find('select[name="quota_status"]').val(formDataObj.quota_status);
+                    form.render('select');
+                }
+            },
+            yes: function(index, layero){
+                const formData = {
+                    id: data.id,
+                    max_trade_quota: parseFloat(layero.find('input[name="max_trade_quota"]').val()) || 0,
+                    credit_quota: parseFloat(layero.find('input[name="credit_quota"]').val()) || 0,
+                    quota_status: layero.find('select[name="quota_status"]').val(),
+                    remark: layero.find('textarea[name="remark"]').val() || null
+                };
+                
+                $.ajax({
+                    url: '/new/api/customer_quota_manager/update_customer_quota_api',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: function(res){
+                        if(res.code === 200){
+                            layer.msg(res.msg, {icon: 1});
+                            layer.close(index);
+                            reloadTable();
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    },
+                    error: function(){
+                        layer.msg('请求失败', {icon: 2});
+                    }
+                });
+            }
+        });
+    }
+});
+</script>

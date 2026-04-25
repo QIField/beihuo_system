@@ -6,6 +6,7 @@
 # @Software: PyCharm
 
 
+
 def expansion_app(app):
 
 
@@ -15,3 +16,8 @@ def expansion_app(app):
     # 注册页面路由蓝图（根路径访问）
     from app.routes import general_web_bp
     app.register_blueprint(general_web_bp)
+
+
+
+    from app.routes.customer_quota_manager_web import customer_quota_manager_web_bp
+    app.register_blueprint(customer_quota_manager_web_bp)

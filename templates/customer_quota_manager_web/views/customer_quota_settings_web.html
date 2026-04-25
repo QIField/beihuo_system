@@ -1,0 +1,125 @@
+<div class="layui-card">
+    <div class="layui-card-header">应收单数据导入</div>
+    <div class="layui-card-body">
+        <div class="layui-form layui-form-pane">
+            <div class="layui-form-item">
+                <label class="layui-form-label">文件上传</label>
+                <div class="layui-input-block">
+                    <button type="button" class="layui-btn" id="selectFileBtn">
+                        <i class="layui-icon">&#xe67c;</i>选择文件
+                    </button>
+                    <span id="fileName" style="margin-left: 10px; color: #666;"></span>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <div class="layui-input-block">
+                    <button type="button" class="layui-btn" id="uploadBtn" disabled>
+                        <i class="layui-icon">&#xe608;</i>上传并导入
+                    </button>
+                    <button type="button" class="layui-btn layui-btn-primary" id="clearBtn">
+                        <i class="layui-icon">&#x1006;</i>清空
+                    </button>
+                </div>
+            </div>
+        </div>
+        <hr class="layui-bg-gray">
+        <div class="layui-elem-quote layui-quote-nm" style="margin-top: 20px;">
+            <div class="layui-text">
+                <h4>文件要求：</h4>
+                <ul>
+                    <li>支持格式：.xlsx、.xls</li>
+                    <li>必填字段：业务日期	到期日	单据编号	单据状态	客户	价税合计	总金额	已收款金额	客户编码	收款条件	收款组织	销售员	备注	客户分组	创建人	创建日期	支付类型</li>
+                    <li style="color: #1E9FFF;">导入模式：单据编号相同的记录会自动更新，新记录会插入</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+layui.use(['form', 'layer', 'upload', 'jquery'], function(){
+    const form = layui.form;
+    const layer = layui.layer;
+    const upload = layui.upload;
+    const $ = layui.jquery;
+    
+    let selectedFile = null;
+    
+    // 渲染表单
+    form.render();
+    
+    // 选择文件按钮
+    $('#selectFileBtn').off().on('click', function(){
+        $('#fileInput').click();
+    });
+    
+    // 文件选择变化
+    $('#fileInput').off().on('change', function(){
+        const file = this.files[0];
+        if(file){
+            // 验证文件格式
+            const fileName = file.name.toLowerCase();
+            if(!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')){
+                layer.msg('请选择 .xlsx 或 .xls 格式的文件', {icon: 2});
+                this.value = '';
+                selectedFile = null;
+                $('#fileName').text('');
+                $('#uploadBtn').prop('disabled', true);
+                return;
+            }
+            selectedFile = file;
+            $('#fileName').text(file.name);
+            $('#uploadBtn').prop('disabled', false);
+        }
+    });
+    
+    // 上传按钮
+    $('#uploadBtn').off().on('click', function(){
+        if(!selectedFile){
+            layer.msg('请先选择文件', {icon: 2});
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        const loading = layer.load(2, {
+            shade: [0.3, '#000']
+        });
+        
+        $.ajax({
+            url: '/new/api/customer_quota_manager/import_account_receivable_api',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res){
+                layer.close(loading);
+                if(res.code === 200){
+                    layer.msg(res.msg, {icon: 1, time: 3000});
+                    // 清空选择
+                    $('#fileInput').val('');
+                    selectedFile = null;
+                    $('#fileName').text('');
+                    $('#uploadBtn').prop('disabled', true);
+                } else {
+                    layer.msg(res.msg, {icon: 2});
+                }
+            },
+            error: function(){
+                layer.close(loading);
+                layer.msg('请求失败，请稍后重试', {icon: 2});
+            }
+        });
+    });
+    
+    // 清空按钮
+    $('#clearBtn').off().on('click', function(){
+        $('#fileInput').val('');
+        selectedFile = null;
+        $('#fileName').text('');
+        $('#uploadBtn').prop('disabled', true);
+    });
+});
+</script>

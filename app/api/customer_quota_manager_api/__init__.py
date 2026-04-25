@@ -12,3 +12,8 @@ customer_quota_manager_bp = Blueprint('customer_quota_manager', __name__, url_pr
 
 # 导入并注册路由
 from . import transaction_amount_api
+from . import account_receivable_list_api
+from . import expected_unpaid_customers_api
+from . import customer_quota_api
+from . import display_unpaid_customer_limit_api
+from . import excel_data_loader_api
