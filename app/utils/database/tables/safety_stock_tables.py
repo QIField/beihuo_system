@@ -18,6 +18,8 @@ def init_safety_stock_calculation_table():
             CREATE TABLE IF NOT EXISTS crmapp_safety_stock_calculation (
                 id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
                 frey_no VARCHAR(100) NOT NULL COMMENT 'Frey编号/物料条码',
+                oe VARCHAR(100) DEFAULT NULL COMMENT 'OE号',
+                brand VARCHAR(100) DEFAULT NULL COMMENT '品牌',
                 product_name VARCHAR(255) DEFAULT NULL COMMENT '产品名称',
                 abc_class VARCHAR(10) DEFAULT NULL COMMENT 'ABC分类(A/B/C)',
                 avg_daily_sales DECIMAL(10,2) DEFAULT 0.00 COMMENT '平均日销量',
@@ -31,7 +33,7 @@ def init_safety_stock_calculation_table():
                 in_transit_qty DECIMAL(10,2) DEFAULT 0.00 COMMENT '在途数量',
                 available_stock DECIMAL(10,2) DEFAULT 0.00 COMMENT '可用库存',
                 inventory_amount DECIMAL(12,2) DEFAULT 0.00 COMMENT '库存金额',
-                sellable_days DECIMAL(5,1) DEFAULT 0.0 COMMENT '可卖天数',
+                sellable_days DECIMAL(8,1) DEFAULT 0.0 COMMENT '可卖天数',
                 stock_status VARCHAR(20) DEFAULT '正常' COMMENT '库存状态',
                 calc_date DATE NOT NULL COMMENT '计算日期',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

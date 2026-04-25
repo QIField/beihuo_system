@@ -48,6 +48,8 @@ class SafetyStockDBService:
                 sql = """
                     SELECT 
                         frey_no,
+                        number as oe,
+                        brand_name as brand,
                         quantity,
                         create_date
                     FROM crmapp_sales_history_detail
@@ -63,6 +65,8 @@ class SafetyStockDBService:
                 # 按frey_no分组统计
                 product_data = defaultdict(lambda: {
                     'frey_no': '',
+                    'oe': '',
+                    'brand': '',
                     'daily_sales': defaultdict(float),  # 按天统计销量
                     'monthly_sales': defaultdict(float),  # 按月统计销量
                     'total_sales': 0,
@@ -80,6 +84,8 @@ class SafetyStockDBService:
                     year_month = create_date.strftime('%Y-%m')
                     
                     product_data[key]['frey_no'] = row['frey_no']
+                    product_data[key]['oe'] = row['oe']
+                    product_data[key]['brand'] = row['brand']
                     product_data[key]['daily_sales'][sale_date] += float(row['quantity'] or 0)
                     product_data[key]['monthly_sales'][year_month] += float(row['quantity'] or 0)
                     product_data[key]['total_sales'] += float(row['quantity'] or 0)
@@ -110,6 +116,8 @@ class SafetyStockDBService:
                     
                     result[key] = {
                         'frey_no': data['frey_no'],
+                        'oe': data['oe'],
+                        'brand': data['brand'],
                         'total_sales': data['total_sales'],
                         'avg_daily': avg_daily,
                         'std_daily': std_daily,
@@ -125,7 +133,7 @@ class SafetyStockDBService:
     def get_inventory_data() -> Dict[str, Dict]:
         """
         从库存表读取当前库存数据
-        
+
         Returns:
             字典，key为 "frey_no"，value包含库存信息
         """
@@ -133,30 +141,56 @@ class SafetyStockDBService:
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 sql = """
-                    SELECT 
+                    SELECT
                         物料条码 as frey_no,
+                        oe,
+                        品牌 as brand,
                         物料名称 as product_name,
                         库存数量 as stock_qty,
                         库存金额 as inventory_amount
                     FROM crmapp_beihuo
-                    WHERE 物料条码 IS NOT NULL 
+                    WHERE 物料条码 IS NOT NULL
                       AND 物料条码 != ''
                 """
                 cursor.execute(sql)
                 rows = cursor.fetchall()
-                
-                result = {}
+
+                # 按 frey_no 分组，合并同一物料条码下的多个 oe+品牌
+                from collections import defaultdict
+                product_data = defaultdict(lambda: {
+                    'frey_no': '',
+                    'oes': set(),
+                    'brands': set(),
+                    'product_name': '',
+                    'stock_qty': 0,
+                    'inventory_amount': 0
+                })
+
                 for row in rows:
                     key = f"{row['frey_no']}"
+                    product_data[key]['frey_no'] = row['frey_no']
+                    if row['oe']:
+                        product_data[key]['oes'].add(row['oe'])
+                    if row['brand']:
+                        product_data[key]['brands'].add(row['brand'])
+                    product_data[key]['product_name'] = row['product_name']
+                    product_data[key]['stock_qty'] += float(row['stock_qty'] or 0)
+                    product_data[key]['inventory_amount'] += float(row['inventory_amount'] or 0)
+
+                # 转换为最终结果，oe 和 brand 用逗号分隔
+                result = {}
+                for key, data in product_data.items():
                     result[key] = {
-                        'frey_no': row['frey_no'],
-                        'product_name': row['product_name'],
-                        'stock_qty': float(row['stock_qty'] or 0),
-                        'inventory_amount': float(row['inventory_amount'] or 0)
+                        'frey_no': data['frey_no'],
+                        'oe': ','.join(data['oes']) if data['oes'] else '',
+                        'brand': ','.join(data['brands']) if data['brands'] else '',
+                        'product_name': data['product_name'],
+                        'stock_qty': data['stock_qty'],
+                        'inventory_amount': data['inventory_amount']
                     }
-                
+
                 return result
-                
+
         finally:
             conn.close()
     
@@ -164,44 +198,45 @@ class SafetyStockDBService:
     def get_in_transit_data() -> Dict[str, float]:
         """
         从在途库存表读取在途数量
-        
+
         Returns:
-            字典，key为 "oe|brand"，value为在途数量
+            字典，key为 "frey_no"，value为在途数量
         """
         conn = get_db_connection()
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 sql = """
-                    SELECT 
-                        oe,
-                        brand,
+                    SELECT
+                        frey_no,
                         stock_zaitu_list
                     FROM crmapp_compare_summary
                     WHERE stock_zaitu_list IS NOT NULL
                       AND stock_zaitu_list != ''
                       AND stock_zaitu_list != '[]'
                       AND stock_zaitu_list != '{}'
+                      AND frey_no IS NOT NULL
+                      AND frey_no != ''
                 """
                 cursor.execute(sql)
                 rows = cursor.fetchall()
-                
+
                 result = {}
                 for row in rows:
-                    key = f"{row['oe']}|{row['brand']}"
+                    key = f"{row['frey_no']}"
                     try:
                         zaitu_list = json.loads(row['stock_zaitu_list'])
                         if isinstance(zaitu_list, list):
                             # 累加所有在途数量
                             total_qty = sum(
-                                float(item.get('purchase_quantity', 0) or 0) 
+                                float(item.get('purchase_quantity', 0) or 0)
                                 for item in zaitu_list
                             )
                             result[key] = total_qty
                     except:
                         continue
-                
+
                 return result
-                
+
         finally:
             conn.close()
     
@@ -233,21 +268,23 @@ class SafetyStockDBService:
                 # 插入新数据
                 insert_sql = f"""
                     INSERT INTO {TABLE_NAME} (
-                        frey_no, product_name, abc_class,
+                        frey_no, oe, brand, product_name, abc_class,
                         avg_daily_sales, sales_std, seasonal_factor,
                         base_safety_stock, safety_stock,
                         reorder_point, target_stock,
                         current_stock, in_transit_qty, available_stock, inventory_amount,
                         sellable_days, stock_status, calc_date
                     ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                     )
                 """
-                
+
                 values = []
                 for r in results:
                     values.append((
                         r['frey_no'],
+                        r.get('oe', ''),
+                        r.get('brand', ''),
                         r.get('product_name', ''),
                         r['abc_class'],
                         r['avg_daily_sales'],

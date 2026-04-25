@@ -32,10 +32,19 @@ function initGrid() {
     // 列定义
     const columnDefs = [
         {
-            headerName: 'Frey编号',
-            field: 'frey_no',
+            headerName: 'OE号',
+            field: 'oe',
             flex: 2,
             minWidth: 150,
+            sortable: true,
+            filter: 'agTextColumnFilter',
+            resizable: true,
+            cellClass: 'cell-text'
+        },
+        {
+            headerName: '品牌',
+            field: 'brand',
+            width: 120,
             sortable: true,
             filter: 'agTextColumnFilter',
             resizable: true,
@@ -489,12 +498,13 @@ function exportToCSV(data) {
     }
     
     // 表头
-    const headers = ['Frey编号', '产品名称', 'ABC分类', '当前库存', '在途数量', '可用库存',
+    const headers = ['OE号', '品牌', '产品名称', 'ABC分类', '当前库存', '在途数量', '可用库存',
                      '平均日销量', '安全库存', '库存下限', '库存上限', '可卖天数', '库存状态', '库存金额'];
 
     // 数据行
     const rows = data.map(item => [
-        item.frey_no || '',
+        item.oe || '',
+        item.brand || '',
         item.product_name || '',
         item.abc_class || '',
         item.current_stock || 0,
