@@ -7,6 +7,7 @@
 
 from .general_web_bp import general_web_bp
 from .customer_quota_manager_web import customer_quota_manager_web_bp
+from .report_wx_quote_data_web import report_wx_quote_data_web_bp
 
 
-__all__ = ['general_web_bp','customer_quota_manager_web_bp']
+__all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp']

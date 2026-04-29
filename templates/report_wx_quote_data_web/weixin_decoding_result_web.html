@@ -1,0 +1,241 @@
+<div class="layui-card">
+    <div class="layui-card-header">每日报价明细</div>
+    <div class="layui-card-body">
+        <div class="layui-form-item">
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">选择日期</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="text" name="date" id="date" placeholder="选择日期" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-inline">
+                <button class="layui-btn" id="searchBtn">查询</button>
+                <button class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+            </div>
+        </div>
+        <br>
+        <table id="weixinDecodingResultTable" lay-filter="weixinDecodingResultTable"></table>
+    </div>
+</div>
+
+<style>
+/* 强制表格单元格不限制高度 */
+.layui-table-cell {
+    height: auto !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+}
+.layui-table-cell .layui-table-cell-content {
+    height: auto !important;
+    overflow: visible !important;
+}
+</style>
+
+<script>
+layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
+    const table = layui.table;
+    const layer = layui.layer;
+    const form = layui.form;
+    const $ = layui.jquery;
+    const laydate = layui.laydate;
+    
+    // 原生JS合并单元格函数
+    function mergeCellsByField(fieldName, colspan) {
+        // 获取表格body
+        var tableBody = document.querySelector('#weixinDecodingResultTable + .layui-table-view .layui-table-body table');
+        if (!tableBody) return;
+        
+        // 获取所有行
+        var rows = tableBody.querySelectorAll('tr');
+        if (rows.length === 0) return;
+        
+        // 遍历每一行，找到需要合并的单元格
+        for (var i = 0; i < rows.length; ) {
+            var currentRow = rows[i];
+            var currentCell = currentRow.querySelector('td[data-field="' + fieldName + '"]');
+            
+            if (!currentCell) {
+                i++;
+                continue;
+            }
+            
+            // 获取当前行的rowId（存储在data属性中或通过LAY_TABLE_INDEX获取）
+            var rowData = table.cache['weixinDecodingResultTable'][i];
+            var currentRowId = rowData ? rowData['rowId'] : null;
+            
+            if (!currentRowId) {
+                i++;
+                continue;
+            }
+            
+            // 计算有多少连续的相同rowId
+            var rowspanCount = 1;
+            for (var j = i + 1; j < rows.length; j++) {
+                var nextRowData = table.cache['weixinDecodingResultTable'][j];
+                var nextRowId = nextRowData ? nextRowData['rowId'] : null;
+                
+                if (nextRowId === currentRowId) {
+                    rowspanCount++;
+                } else {
+                    break;
+                }
+            }
+            
+            // 如果有多行需要合并
+            if (rowspanCount > 1) {
+                // 设置当前单元格的rowspan
+                currentCell.setAttribute('rowspan', rowspanCount);
+                currentCell.style.verticalAlign = 'middle';
+                
+                // 隐藏后续行的对应单元格
+                for (var k = i + 1; k < i + rowspanCount; k++) {
+                    var nextRow = rows[k];
+                    var nextCell = nextRow.querySelector('td[data-field="' + fieldName + '"]');
+                    if (nextCell) {
+                        nextCell.style.display = 'none';
+                    }
+                }
+            }
+            
+            // 跳过已经处理的行
+            i += rowspanCount;
+        }
+    }
+    
+    // 获取今天的日期
+    function getTodayDate(){
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
+    const todayDate = getTodayDate();
+    $('#date').val(todayDate);
+    
+    // 渲染日期选择器
+    laydate.render({
+        elem: '#date',
+        type: 'date'
+    });
+    
+    // 渲染表格 - 默认显示当天数据
+    table.render({
+        elem: '#weixinDecodingResultTable',
+        id: 'weixinDecodingResultTable',
+        url: '/new/api/report_wx_quote_data/weixin_decoding_result_list_api',
+        method: 'get',
+        page: true,
+        limits: [5,10, 20, 50, 100],
+        limit: 5,
+        request: {
+            pageName: 'page',
+            limitName: 'limit'
+        },
+        where: {
+            // 默认显示当天数据
+            start_date: todayDate,
+            end_date: todayDate
+        },
+        parseData: function(res){
+            // 把数据展开，每个 resultDetail 变成一行
+            const originalData = res.data.result || [];
+            const expandedData = [];
+            
+            originalData.forEach(function(record) {
+                const resultDetails = record.result_details || [];
+                
+                if (resultDetails.length === 0) {
+                    // 没有 result_details，添加一行空数据
+                    expandedData.push({
+                        rowId: record.id,
+                        create_time: record.create_time,
+                        groupname: record.groupname,
+                        nickname: record.nickname,
+                        content: record.content,
+                        quote: '',
+                        is_out_of_stock: false
+                    });
+                } else {
+                    // 有 result_details，每个 detail 一行
+                    resultDetails.forEach(function(detail) {
+                        expandedData.push({
+                            rowId: record.id,
+                            create_time: record.create_time,
+                            groupname: record.groupname,
+                            nickname: record.nickname,
+                            content: record.content,
+                            quote: detail.item,
+                            is_out_of_stock: detail.is_out_of_stock
+                        });
+                    });
+                }
+            });
+            
+            return {
+                "code": res.code === 200 ? 0 : res.code,
+                "msg": res.msg,
+                "count": res.data.total,
+                "data": expandedData
+            };
+        },
+        cols: [[
+            {field: 'create_time', title: '创建日期', width: 120},
+            {field: 'groupname', title: '群名称', width: 160},
+            {field: 'nickname', title: '用户', width: 160},
+            {field: 'content', title: '询价', minWidth: 100},
+            {field: 'quote', title: '报价', minWidth: 200},
+            {
+                title: '缺货', 
+                width: 80, 
+                templet: function(d){
+                    const color = d.is_out_of_stock ? 'red' : 'green';
+                    const text = d.is_out_of_stock ? '是' : '否';
+                    return '<span style="color: ' + color + ';">' + text + '</span>';
+                }
+            },
+            {field: 't1', title: '成交客户', minWidth: 120},
+            {field: 't2', title: '成交品牌', minWidth: 120},
+            {field: 't3', title: '成交金额', minWidth: 120},
+        ]],
+        done: function(res, curr, count) {
+            // 延迟执行合并，确保DOM渲染完成
+            setTimeout(function() {
+                // 使用原生JS合并前4列
+                mergeCellsByField('create_time'); // 创建日期
+                mergeCellsByField('groupname');   // 群名称
+                mergeCellsByField('nickname');    // 用户
+                mergeCellsByField('content');     // 询价
+            }, 100);
+        }
+    });
+    
+    // 刷新表格
+    function reloadTable(){
+        const selectedDate = $('#date').val();
+        table.reload('weixinDecodingResultTable', {
+            where: {
+                start_date: selectedDate,
+                end_date: selectedDate
+            },
+            page: {
+                curr: 1
+            }
+        });
+    }
+    
+    // 查询按钮
+    $('#searchBtn').off().on('click', function(){
+        reloadTable();
+    });
+    
+    // 重置按钮 - 恢复当天日期
+    $('#resetBtn').off().on('click', function(){
+        const today = getTodayDate();
+        $('#date').val(today);
+        reloadTable();
+    });
+});
+</script>

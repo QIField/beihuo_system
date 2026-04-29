@@ -1,0 +1,110 @@
+<div class="layui-card">
+    <div class="layui-card-header">每月汇总</div>
+    <div class="layui-card-body">
+        <div class="layui-form-item">
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">月份</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="text" name="month" id="month" placeholder="选择月份" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-inline">
+                <button class="layui-btn" id="searchBtn">查询</button>
+                <button class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+            </div>
+        </div>
+        <br>
+        <table id="monthlySummaryTable" lay-filter="monthlySummaryTable"></table>
+    </div>
+</div>
+
+<script>
+layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
+    const table = layui.table;
+    const layer = layui.layer;
+    const form = layui.form;
+    const $ = layui.jquery;
+    const laydate = layui.laydate;
+    
+    // 获取今天的月份
+    function getCurrentMonth(){
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}`;
+    }
+    
+    const currentMonth = getCurrentMonth();
+    $('#month').val(currentMonth);
+    
+    // 渲染月份选择器
+    laydate.render({
+        elem: '#month',
+        type: 'month'
+    });
+    
+    // 渲染表格
+    table.render({
+        elem: '#monthlySummaryTable',
+        url: '/new/api/report_wx_quote_data/monthly_summary_list_api',
+        method: 'get',
+        page: true,
+        limits: [10, 20, 50, 100, 200,500,2000],
+        limit: 500,
+        request: {
+            pageName: 'page',
+            limitName: 'limit'
+        },
+        where: {
+            month: $('#month').val()
+        },
+        parseData: function(res){
+            return {
+                "code": res.code === 200 ? 0 : res.code,
+                "msg": res.msg,
+                "count": res.data.total,
+                "data": res.data.result
+            };
+        },
+        cols: [[
+            {field: 'month', title: '月份', width: 120},
+            {field: 'groupname', title: '群名称', width: 200},
+            {field: 'part_name', title: '配件名称', width: 200},
+            {field: 'oe_code', title: 'OE码', width: 150},
+            {field: 'inquiry_count', title: '询价次数', width: 100, sort: true},
+            {field: 'out_of_stock_count', title: '缺货次数', width: 100, sort: true},
+            {title: '成交次数', width: 100, templet: function(d){
+                return 0;
+            }},
+            {title: '成交率', width: 100, templet: function(d){
+                return '0%';
+            }}
+        ]],
+        height: 'full-250'
+    });
+    
+    // 刷新表格
+    function reloadTable(){
+        table.reload('monthlySummaryTable', {
+            where: {
+                month: $('#month').val()
+            },
+            page: {
+                curr: 1
+            }
+        });
+    }
+    
+    // 查询按钮
+    $('#searchBtn').off().on('click', function(){
+        reloadTable();
+    });
+    
+    // 重置按钮
+    $('#resetBtn').off().on('click', function(){
+        const current = getCurrentMonth();
+        $('#month').val(current);
+        reloadTable();
+    });
+});
+</script>

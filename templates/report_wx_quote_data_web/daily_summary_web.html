@@ -1,0 +1,111 @@
+<div class="layui-card">
+    <div class="layui-card-header">每日汇总</div>
+    <div class="layui-card-body">
+        <div class="layui-form-item">
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">日期</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="text" name="date" id="date" placeholder="选择日期" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-inline">
+                <button class="layui-btn" id="searchBtn">查询</button>
+                <button class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+            </div>
+        </div>
+        <br>
+        <table id="dailySummaryTable" lay-filter="dailySummaryTable"></table>
+    </div>
+</div>
+
+<script>
+layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
+    const table = layui.table;
+    const layer = layui.layer;
+    const form = layui.form;
+    const $ = layui.jquery;
+    const laydate = layui.laydate;
+    
+    // 获取今天的日期
+    function getTodayDate(){
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
+    const todayDate = getTodayDate();
+    $('#date').val(todayDate);
+    
+    // 渲染日期选择器
+    laydate.render({
+        elem: '#date',
+        type: 'date'
+    });
+    
+    // 渲染表格
+    table.render({
+        elem: '#dailySummaryTable',
+        url: '/new/api/report_wx_quote_data/daily_summary_list_api',
+        method: 'get',
+        page: true,
+        limits: [10, 20, 50, 100],
+        limit: 20,
+        request: {
+            pageName: 'page',
+            limitName: 'limit'
+        },
+        where: {
+            date: $('#date').val()
+        },
+        parseData: function(res){
+            return {
+                "code": res.code === 200 ? 0 : res.code,
+                "msg": res.msg,
+                "count": res.data.total,
+                "data": res.data.result
+            };
+        },
+        cols: [[
+            {field: 'create_date', title: '创建日期', width: 120},
+            {field: 'groupname', title: '群名称', width: 200},
+            {field: 'part_name', title: '配件名称', width: 200},
+            {field: 'oe_code', title: 'OE码', width: 150},
+            {field: 'inquiry_count', title: '询价次数', width: 100, sort: true},
+            {field: 'out_of_stock_count', title: '缺货次数', width: 100, sort: true},
+            {title: '成交次数', width: 100, templet: function(d){
+                return 0;
+            }},
+            {title: '成交率', width: 100, templet: function(d){
+                return '0%';
+            }}
+        ]],
+        height: 'full-250'
+    });
+    
+    // 刷新表格
+    function reloadTable(){
+        table.reload('dailySummaryTable', {
+            where: {
+                date: $('#date').val()
+            },
+            page: {
+                curr: 1
+            }
+        });
+    }
+    
+    // 查询按钮
+    $('#searchBtn').off().on('click', function(){
+        reloadTable();
+    });
+    
+    // 重置按钮
+    $('#resetBtn').off().on('click', function(){
+        const today = getTodayDate();
+        $('#date').val(today);
+        reloadTable();
+    });
+});
+</script>
