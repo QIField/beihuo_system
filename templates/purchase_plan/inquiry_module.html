@@ -1399,13 +1399,9 @@
                                                          '</div>';
                             } else if (status.status === 'completed') {
                                 clearInterval(checkStatus);
-                                uploadResult.innerHTML = '<div class="result-info result-success">' +
-                                                         '<strong>处理完成！</strong><br>正在下载结果文件...' +
-                                                         '</div>';
+                                // 静默完成，结果文件可在历史记录中下载
 
-                                window.location.href = '/api/purchase_plan/inquiry/import/download/' + taskId;
-                                
-                                // 如果开启比对，同时下载比对结果
+                                // 如果开启比对，自动下载比对结果
                                 if (enableCompare) {
                                     setTimeout(() => {
                                         window.location.href = '/api/purchase_plan/purchase_history_compare/export';

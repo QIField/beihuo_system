@@ -19,6 +19,7 @@ from . import compare_api
 from .compare_api import bp as compare_bp
 from .system_setting_api import system_setting_bp
 from .customer_quota_manager_api import customer_quota_manager_bp
+from .cookie import cookie_bp
 
 # 注册比价数据对比蓝图（设置正确的 url_prefix）
 api_bp.register_blueprint(compare_bp, url_prefix='/compare')
@@ -26,5 +27,6 @@ api_bp.register_blueprint(compare_bp, url_prefix='/compare')
 # 将 system_setting 子蓝图注册到主蓝图
 api_bp.register_blueprint(system_setting_bp)
 api_bp.register_blueprint(customer_quota_manager_bp)
+api_bp.register_blueprint(cookie_bp)
 
 __all__ = ["api_bp"]
