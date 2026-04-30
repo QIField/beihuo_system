@@ -44,10 +44,11 @@ function initGrid() {
         {
             headerName: '品牌',
             field: 'brand',
-            width: 100,
+            width: 120,
             sortable: true,
             filter: 'agTextColumnFilter',
-            resizable: true
+            resizable: true,
+            cellClass: 'cell-text'
         },
         {
             headerName: '产品名称',
@@ -497,9 +498,9 @@ function exportToCSV(data) {
     }
     
     // 表头
-    const headers = ['OE号', '品牌', '产品名称', 'ABC分类', '当前库存', '在途数量', '可用库存', 
+    const headers = ['OE号', '品牌', '产品名称', 'ABC分类', '当前库存', '在途数量', '可用库存',
                      '平均日销量', '安全库存', '库存下限', '库存上限', '可卖天数', '库存状态', '库存金额'];
-    
+
     // 数据行
     const rows = data.map(item => [
         item.oe || '',

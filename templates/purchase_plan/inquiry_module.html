@@ -187,32 +187,108 @@
             font-size: 13px;
         }
 
-        /* 加价设置弹窗样式 */
-        .markup-modal-content {
+        /* 导入设置弹窗样式 */
+        .import-modal-content {
             background-color: #fff;
             border-radius: 8px;
-            width: 400px;
+            width: 450px;
             padding: 24px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
 
-        .markup-modal-header {
+        .import-modal-header {
             text-align: center;
             margin-bottom: 20px;
         }
 
-        .markup-modal-header h3 {
+        .import-modal-header h3 {
             margin: 0;
             color: #333;
             font-size: 18px;
         }
 
+        /* 导入方式选择区域 */
+        .import-mode-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .section-hint {
+            font-size: 12px;
+            color: #999;
+            font-weight: normal;
+            margin-left: 8px;
+        }
+
+        .import-mode-options {
+            display: flex;
+            gap: 12px;
+        }
+
+        .import-mode-option {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #d9d9d9;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            background-color: #fafafa;
+        }
+
+        .import-mode-option:hover {
+            border-color: #1890ff;
+            background-color: #e6f7ff;
+        }
+
+        .import-mode-option.selected {
+            border-color: #1890ff;
+            background-color: #e6f7ff;
+        }
+
+        .import-mode-option .mode-icon {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .import-mode-option .mode-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .import-mode-option .mode-desc {
+            font-size: 12px;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        /* 动态内容区域 */
+        .dynamic-content {
+            height: 100px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background-color: #f5f5f5;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* 加价设置 */
         .markup-input-container {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 12px;
-            margin-bottom: 24px;
+            margin-bottom: 12px;
         }
 
         .markup-btn {
@@ -258,51 +334,82 @@
             text-align: center;
             color: #666;
             font-size: 13px;
-            margin-bottom: 20px;
+            margin: 0;
         }
 
-        .markup-modal-footer {
+        /* 加价设置容器 */
+        .markup-section {
             display: flex;
-            gap: 12px;
-            justify-content: center;
-        }
-
-        .markup-modal-footer .btn {
-            min-width: 100px;
-        }
-
-        /* 跳过B2B开关样式 */
-        .skip-b2b-container {
-            display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            margin-bottom: 20px;
-            padding: 12px;
-            background-color: #f6ffed;
-            border: 1px solid #b7eb8f;
-            border-radius: 4px;
+            height: 100%;
         }
 
-        .skip-b2b-container input[type="checkbox"] {
+        /* 直接入库提示 */
+        .direct-import-hint {
+            text-align: center;
+            color: #52c41a;
+            font-size: 14px;
+        }
+
+        .direct-import-hint .hint-icon {
+            font-size: 28px;
+            margin-bottom: 4px;
+        }
+
+        /* 未选择提示 */
+        .no-selection-hint {
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+        }
+
+        /* 采购历史比对选项 */
+        .compare-option-section {
+            margin-bottom: 20px;
+            padding: 12px;
+            background-color: #fff7e6;
+            border: 1px solid #ffd591;
+            border-radius: 6px;
+        }
+
+        .compare-checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .compare-checkbox-container input[type="checkbox"] {
             width: 18px;
             height: 18px;
             cursor: pointer;
         }
 
-        .skip-b2b-container label {
-            color: #52c41a;
+        .compare-checkbox-container label {
+            color: #fa8c16;
             font-size: 14px;
             cursor: pointer;
             user-select: none;
+            font-weight: 500;
         }
 
-        .skip-b2b-hint {
-            text-align: center;
-            color: #999;
+        .compare-hint {
+            margin-top: 4px;
+            margin-left: 26px;
             font-size: 12px;
-            margin-top: -15px;
-            margin-bottom: 20px;
+            color: #999;
+        }
+
+        .import-modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .import-modal-footer .btn {
+            min-width: 100px;
         }
 
         /* 标签页样式 */
@@ -462,32 +569,51 @@
             </div>
         </div>
 
-        <!-- 加价设置弹窗 -->
-        <div class="modal-overlay" id="markupModal">
-            <div class="markup-modal-content">
-                <div class="markup-modal-header">
-                    <h3>💰 价格倍数设置</h3>
+        <!-- 导入设置弹窗 -->
+        <div class="modal-overlay" id="importModal">
+            <div class="import-modal-content">
+                <div class="import-modal-header">
+                    <h3>📁 导入设置</h3>
                 </div>
-                <div class="markup-input-container">
-                    <button class="markup-btn" id="markupDecrease">−</button>
-                    <input type="number" class="markup-input" id="markupInput" value="1" min="0.1" step="0.1">
-                    <button class="markup-btn" id="markupIncrease">+</button>
+                
+                <!-- 导入方式选择 -->
+                <div class="import-mode-section">
+                    <div class="section-title">导入方式（二选一）<span class="section-hint">重复点击取消选择，可只进行采购历史比对，不选择导入方式</span></div>
+                    <div class="import-mode-options">
+                        <div class="import-mode-option" id="modeNormal" data-mode="normal">
+                            <div class="mode-icon">🚀</div>
+                            <div class="mode-title">正常导入</div>
+                            <div class="mode-desc">B2B+入库</div>
+                        </div>
+                        <div class="import-mode-option" id="modeDirect" data-mode="direct">
+                            <div class="mode-icon">📦</div>
+                            <div class="mode-title">直接入库</div>
+                            <div class="mode-desc">跳过B2B</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="markup-hint">
-                    最终价格 = 原价 × 倍数<br>
-                    1 = 价格不变 | 1.1 = 加价10% | 1.5 = 加价50%
+                
+                <!-- 动态内容区域 -->
+                <div class="dynamic-content" id="dynamicContent">
+                    <div class="no-selection-hint">请选择一种导入方式</div>
                 </div>
-                <!-- 跳过B2B开关 -->
-                <div class="skip-b2b-container">
-                    <input type="checkbox" id="skipB2bCheckbox">
-                    <label for="skipB2bCheckbox">跳过B2B推送，直接入库</label>
+                
+                <!-- 采购历史比对选项 -->
+                <div class="compare-option-section">
+                    <div class="compare-checkbox-container">
+                        <input type="checkbox" id="enableCompare">
+                        <label for="enableCompare">📊 采购历史比对</label>
+                    </div>
+                    <div class="compare-hint">根据OE查询采购历史并生成月份价格比对Excel</div>
+                    <!-- 品牌输入框（可选） -->
+                    <div class="compare-brand-input" id="compareBrandInput" style="display: none; margin-top: 10px; margin-left: 26px;">
+                        <input type="text" id="compareBrand" placeholder="输入品牌（可选，不输入则只按OE查询）" style="width: 100%; padding: 6px 10px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px;">
+                    </div>
                 </div>
-                <div class="skip-b2b-hint">
-                    开启后将直接入库，不推送虚拟库存
-                </div>
-                <div class="markup-modal-footer">
-                    <button class="btn btn-default" id="markupCancel">取消</button>
-                    <button class="btn btn-primary" id="markupConfirm">确认上传</button>
+                
+                <div class="import-modal-footer">
+                    <button class="btn btn-default" id="importCancel">取消</button>
+                    <button class="btn btn-primary" id="importConfirm">确认上传</button>
                 </div>
             </div>
         </div>
@@ -1021,7 +1147,10 @@
                 }
             });
 
-            // 文件选择后，先弹出加价设置弹窗
+            // 当前选中的导入模式
+            let currentImportMode = null;
+
+            // 文件选择后，先弹出导入设置弹窗
             function handleFileSelect(file) {
                 const validTypes = ['.csv', '.xls', '.xlsx'];
                 const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
@@ -1033,42 +1162,202 @@
                 // 保存文件引用
                 pendingFile = file;
                 
-                // 显示加价设置弹窗
-                showMarkupModal();
+                // 显示导入设置弹窗
+                showImportModal();
             }
 
-            // 显示加价设置弹窗
-            function showMarkupModal() {
-                const modal = document.getElementById('markupModal');
+            // 显示导入设置弹窗
+            function showImportModal() {
+                const modal = document.getElementById('importModal');
                 modal.style.display = 'flex';
                 
-                // 重置默认值为1（价格不变）
-                document.getElementById('markupInput').value = '1.0';
-                
-                // 重置跳过B2B开关
-                document.getElementById('skipB2bCheckbox').checked = false;
+                // 重置状态
+                currentImportMode = null;
+                document.querySelectorAll('.import-mode-option').forEach(el => el.classList.remove('selected'));
+                document.getElementById('enableCompare').checked = false;
+                updateDynamicContent();
             }
 
-            // 隐藏加价设置弹窗
-            function hideMarkupModal() {
-                const modal = document.getElementById('markupModal');
+            // 隐藏导入设置弹窗
+            function hideImportModal() {
+                const modal = document.getElementById('importModal');
                 modal.style.display = 'none';
             }
 
-            // 初始化加价弹窗事件
-            initMarkupModalEvents();
+            // 更新动态内容区域
+            function updateDynamicContent() {
+                const container = document.getElementById('dynamicContent');
+                
+                if (!currentImportMode) {
+                    container.innerHTML = '<div class="no-selection-hint">请选择一种导入方式</div>';
+                    return;
+                }
+                
+                if (currentImportMode === 'normal') {
+                    container.innerHTML = `
+                        <div class="markup-section">
+                            <div class="markup-input-container">
+                                <button class="markup-btn" id="markupDecrease">−</button>
+                                <input type="number" class="markup-input" id="markupInput" value="1.00" min="0.05" step="0.05">
+                                <button class="markup-btn" id="markupIncrease">+</button>
+                            </div>
+                            <div class="markup-hint">
+                                最终价格 = 原价 × 倍数 | 1 = 价格不变 | 1.1 = 加价10%
+                            </div>
+                        </div>
+                    `;
+                    initMarkupInputEvents();
+                } else if (currentImportMode === 'direct') {
+                    container.innerHTML = `
+                        <div class="direct-import-hint">
+                            <div class="hint-icon">📦</div>
+                            <div>直接入库模式</div>
+                            <div style="font-size: 12px; color: #999; margin-top: 4px;">跳过B2B推送，直接入库</div>
+                        </div>
+                    `;
+                }
+            }
 
-            // 实际执行文件上传（异步版本）
-            async function handleFileUpload(file, markupRate, skipB2b = false) {
+            // 初始化加价输入框事件
+            function initMarkupInputEvents() {
+                const markupDecrease = document.getElementById('markupDecrease');
+                const markupIncrease = document.getElementById('markupIncrease');
+                const markupInput = document.getElementById('markupInput');
+                
+                if (!markupDecrease || !markupInput) return;
+
+                markupDecrease.addEventListener('click', () => {
+                    let value = parseFloat(markupInput.value) || 1;
+                    value = Math.max(0.05, value - 0.05);
+                    markupInput.value = value.toFixed(2);
+                });
+
+                markupIncrease.addEventListener('click', () => {
+                    let value = parseFloat(markupInput.value) || 1;
+                    value = value + 0.05;
+                    markupInput.value = value.toFixed(2);
+                });
+
+                markupInput.addEventListener('input', () => {
+                    let value = markupInput.value;
+                    value = value.replace(/[^0-9.]/g, '');
+                    const parts = value.split('.');
+                    if (parts.length > 2) {
+                        value = parts[0] + '.' + parts.slice(1).join('');
+                    }
+                    markupInput.value = value;
+                });
+
+                markupInput.addEventListener('blur', () => {
+                    let value = parseFloat(markupInput.value);
+                    if (isNaN(value) || value < 0.05) {
+                        value = 1;
+                    }
+                    markupInput.value = value.toFixed(2);
+                });
+            }
+
+            // 初始化导入设置弹窗事件
+            function initImportModalEvents() {
+                const modal = document.getElementById('importModal');
+                const importCancel = document.getElementById('importCancel');
+                const importConfirm = document.getElementById('importConfirm');
+                
+                // 导入方式选择（支持重复点击取消）
+                document.querySelectorAll('.import-mode-option').forEach(option => {
+                    option.addEventListener('click', () => {
+                        const mode = option.dataset.mode;
+                        // 如果点击的是已选中的，则取消选择
+                        if (currentImportMode === mode) {
+                            document.querySelectorAll('.import-mode-option').forEach(el => el.classList.remove('selected'));
+                            currentImportMode = null;
+                        } else {
+                            // 选择新的模式
+                            document.querySelectorAll('.import-mode-option').forEach(el => el.classList.remove('selected'));
+                            option.classList.add('selected');
+                            currentImportMode = mode;
+                        }
+                        updateDynamicContent();
+                    });
+                });
+
+                // 采购历史比对开关 - 控制品牌输入框显示
+                document.getElementById('enableCompare').addEventListener('change', function() {
+                    const brandInputDiv = document.getElementById('compareBrandInput');
+                    brandInputDiv.style.display = this.checked ? 'block' : 'none';
+                    if (!this.checked) {
+                        document.getElementById('compareBrand').value = '';
+                    }
+                });
+
+                // 取消按钮
+                importCancel.addEventListener('click', () => {
+                    hideImportModal();
+                    pendingFile = null;
+                    fileInput.value = '';
+                });
+
+                // 确认上传按钮
+                importConfirm.addEventListener('click', () => {
+                    const enableCompare = document.getElementById('enableCompare').checked;
+                    
+                    // 验证：必须选择导入方式或开启比对
+                    if (!currentImportMode && !enableCompare) {
+                        alert('请选择导入方式或开启采购历史比对');
+                        return;
+                    }
+                    
+                    hideImportModal();
+                    
+                    if (pendingFile) {
+                        handleFileUpload(pendingFile, currentImportMode, enableCompare);
+                    }
+                });
+
+                // 点击遮罩关闭
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        hideImportModal();
+                        pendingFile = null;
+                        fileInput.value = '';
+                    }
+                });
+
+                // ESC键关闭
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && modal.style.display === 'flex') {
+                        hideImportModal();
+                        pendingFile = null;
+                        fileInput.value = '';
+                    }
+                });
+            }
+
+            // 初始化弹窗事件
+            initImportModalEvents();
+
+            // 实际执行文件上传
+            async function handleFileUpload(file, importMode, enableCompare) {
+                const markupRate = importMode === 'normal' ? 
+                    (parseFloat(document.getElementById('markupInput')?.value) || 1) : 1;
+                const skipB2b = importMode === 'direct';
+
+                // 如果只开启比对，不导入
+                if (!importMode && enableCompare) {
+                    await handleCompareOnly(file);
+                    return;
+                }
+
+                // 导入 + 可选比对
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('markup_rate', markupRate);
                 formData.append('skip_b2b', skipB2b ? 'true' : 'false');
+                formData.append('enable_compare', enableCompare ? 'true' : 'false');
 
                 uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">提交任务中...</div>';
 
                 try {
-                    // 步骤1：提交异步任务
                     const response = await fetch('/api/purchase_plan/inquiry/import', {
                         method: 'POST',
                         body: formData
@@ -1085,7 +1374,7 @@
                     const taskId = result.data.task_id;
                     uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">任务已提交，处理中...</div>';
 
-                    // 步骤2：轮询查询任务状态
+                    // 轮询查询任务状态
                     const checkStatus = setInterval(async () => {
                         try {
                             const statusRes = await fetch('/api/purchase_plan/inquiry/import/status/' + taskId);
@@ -1102,7 +1391,6 @@
                             const status = statusResult.data;
 
                             if (status.status === 'running') {
-                                // 更新进度
                                 const progress = status.progress || 0;
                                 const total = status.total || 0;
                                 const message = status.message || '处理中...';
@@ -1110,19 +1398,18 @@
                                                          '<strong>处理中：</strong>' + progress + '/' + total + ' - ' + message +
                                                          '</div>';
                             } else if (status.status === 'completed') {
-                                // 任务完成，下载结果
                                 clearInterval(checkStatus);
-                                uploadResult.innerHTML = '<div class="result-info result-success">' +
-                                                         '<strong>处理完成！</strong><br>正在下载结果文件...' +
-                                                         '</div>';
+                                // 静默完成，结果文件可在历史记录中下载
 
-                                // 下载结果文件
-                                window.location.href = '/api/purchase_plan/inquiry/import/download/' + taskId;
+                                // 如果开启比对，自动下载比对结果
+                                if (enableCompare) {
+                                    setTimeout(() => {
+                                        window.location.href = '/api/purchase_plan/purchase_history_compare/export';
+                                    }, 1000);
+                                }
 
-                                // 刷新数据列表
                                 loadData();
                             } else if (status.status === 'failed') {
-                                // 任务失败
                                 clearInterval(checkStatus);
                                 uploadResult.innerHTML = '<div class="result-info result-error">' +
                                                          '<strong>处理失败：</strong>' + (status.error || '未知错误') +
@@ -1134,7 +1421,7 @@
                                                      '<strong>查询状态失败：</strong>' + error.message +
                                                      '</div>';
                         }
-                    }, 2000); // 每2秒查询一次
+                    }, 2000);
 
                 } catch (error) {
                     uploadResult.innerHTML = '<div class="result-info result-error">' +
@@ -1146,85 +1433,84 @@
                 pendingFile = null;
             }
 
-            // 初始化加价弹窗事件
-            function initMarkupModalEvents() {
-                const markupDecrease = document.getElementById('markupDecrease');
-                const markupIncrease = document.getElementById('markupIncrease');
-                const markupInput = document.getElementById('markupInput');
-                const markupCancel = document.getElementById('markupCancel');
-                const markupConfirm = document.getElementById('markupConfirm');
-                const modal = document.getElementById('markupModal');
-
-                // 减号按钮（步长0.1）
-                markupDecrease.addEventListener('click', () => {
-                    let value = parseFloat(markupInput.value) || 1;
-                    value = Math.max(0.1, value - 0.1);
-                    markupInput.value = value.toFixed(1);
-                });
-
-                // 加号按钮（步长0.1）
-                markupIncrease.addEventListener('click', () => {
-                    let value = parseFloat(markupInput.value) || 1;
-                    value = value + 0.1;
-                    markupInput.value = value.toFixed(1);
-                });
-
-                // 输入框限制
-                markupInput.addEventListener('input', () => {
-                    let value = markupInput.value;
-                    // 只允许数字和小数点
-                    value = value.replace(/[^0-9.]/g, '');
-                    // 确保只有一个小数点
-                    const parts = value.split('.');
-                    if (parts.length > 2) {
-                        value = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    markupInput.value = value;
-                });
-
-                markupInput.addEventListener('blur', () => {
-                    let value = parseFloat(markupInput.value);
-                    if (isNaN(value) || value < 0.1) {
-                        value = 1;
-                    }
-                    markupInput.value = value.toFixed(1);
-                });
-
-                // 取消按钮
-                markupCancel.addEventListener('click', () => {
-                    hideMarkupModal();
-                    pendingFile = null;
-                    fileInput.value = '';
-                });
-
-                // 确认上传按钮
-                markupConfirm.addEventListener('click', () => {
-                    const markupRate = parseFloat(markupInput.value) || 0;
-                    const skipB2b = document.getElementById('skipB2bCheckbox').checked;
-                    hideMarkupModal();
+            // 仅比对模式（不导入）
+            async function handleCompareOnly(file) {
+                uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">正在解析文件...</div>';
+                
+                try {
+                    // 先解析文件获取OE列表
+                    const formData = new FormData();
+                    formData.append('file', file);
                     
-                    if (pendingFile) {
-                        handleFileUpload(pendingFile, markupRate, skipB2b);
+                    const parseRes = await fetch('/api/purchase_plan/inquiry/parse_oe_list', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const parseResult = await parseRes.json();
+                    
+                    if (parseResult.code !== 0) {
+                        uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                                 '<strong>解析失败：</strong>' + parseResult.msg +
+                                                 '</div>';
+                        return;
                     }
-                });
+                    
+                    const oeList = parseResult.data;
+                    if (!oeList || oeList.length === 0) {
+                        uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                                 '<strong>文件中没有找到OE数据</strong>' +
+                                                 '</div>';
+                        return;
+                    }
+                    
+                    // 获取用户输入的品牌（可选）
+                    const brand = document.getElementById('compareBrand').value.trim();
 
-                // 点击遮罩关闭
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) {
-                        hideMarkupModal();
-                        pendingFile = null;
-                        fileInput.value = '';
+                    // 为每个OE添加品牌和价格
+                    const items = oeList.map(item => ({
+                        oe: item.oe,
+                        brand: brand || item.brand || '',  // 优先使用用户输入的品牌，其次使用文件中的品牌
+                        price: item.price || ''  // 从文件读取的价格
+                    }));
+                    
+                    uploadResult.innerHTML = '<div class="result-info" style="background-color: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff;">正在生成比对结果...</div>';
+                    
+                    // 调用比对接口
+                    const compareRes = await fetch('/api/purchase_plan/purchase_history_compare/export', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({items: items})
+                    });
+                    
+                    if (compareRes.ok) {
+                        const blob = await compareRes.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'purchase_history_compare.xlsx';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        uploadResult.innerHTML = '<div class="result-info result-success">' +
+                                                 '<strong>比对结果已生成！</strong>' +
+                                                 '</div>';
+                    } else {
+                        const errorResult = await compareRes.json();
+                        uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                                 '<strong>生成失败：</strong>' + (errorResult.msg || '未知错误') +
+                                                 '</div>';
                     }
-                });
-
-                // ESC键关闭
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape' && modal.style.display === 'flex') {
-                        hideMarkupModal();
-                        pendingFile = null;
-                        fileInput.value = '';
-                    }
-                });
+                    
+                } catch (error) {
+                    uploadResult.innerHTML = '<div class="result-info result-error">' +
+                                             '<strong>处理失败：</strong>' + error.message +
+                                             '</div>';
+                }
+                
+                fileInput.value = '';
+                pendingFile = null;
             }
         }
 

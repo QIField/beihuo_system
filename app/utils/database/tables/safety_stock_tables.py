@@ -17,9 +17,11 @@ def init_safety_stock_calculation_table():
             create_table_sql = """
             CREATE TABLE IF NOT EXISTS crmapp_safety_stock_calculation (
                 id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                oe VARCHAR(100) NOT NULL COMMENT 'OE号',
-                brand VARCHAR(100) NOT NULL COMMENT '品牌',
+                frey_no VARCHAR(100) NOT NULL COMMENT 'Frey编号/物料条码',
+                oe VARCHAR(100) DEFAULT NULL COMMENT 'OE号',
+                brand VARCHAR(100) DEFAULT NULL COMMENT '品牌',
                 product_name VARCHAR(255) DEFAULT NULL COMMENT '产品名称',
+                company VARCHAR(100) NOT NULL DEFAULT 'fsbbr' COMMENT '组织代码',
                 abc_class VARCHAR(10) DEFAULT NULL COMMENT 'ABC分类(A/B/C)',
                 avg_daily_sales DECIMAL(10,2) DEFAULT 0.00 COMMENT '平均日销量',
                 sales_std DECIMAL(10,2) DEFAULT 0.00 COMMENT '销量标准差',
@@ -32,17 +34,18 @@ def init_safety_stock_calculation_table():
                 in_transit_qty DECIMAL(10,2) DEFAULT 0.00 COMMENT '在途数量',
                 available_stock DECIMAL(10,2) DEFAULT 0.00 COMMENT '可用库存',
                 inventory_amount DECIMAL(12,2) DEFAULT 0.00 COMMENT '库存金额',
-                sellable_days DECIMAL(5,1) DEFAULT 0.0 COMMENT '可卖天数',
+                sellable_days DECIMAL(8,1) DEFAULT 0.0 COMMENT '可卖天数',
                 stock_status VARCHAR(20) DEFAULT '正常' COMMENT '库存状态',
                 calc_date DATE NOT NULL COMMENT '计算日期',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-                
-                UNIQUE KEY uk_oe_brand_date (oe, brand, calc_date),
+
+                UNIQUE KEY uk_frey_no_company_date (frey_no, company, calc_date),
                 INDEX idx_abc_class (abc_class),
                 INDEX idx_stock_status (stock_status),
                 INDEX idx_calc_date (calc_date),
-                INDEX idx_available_stock (available_stock)
+                INDEX idx_available_stock (available_stock),
+                INDEX idx_company (company)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全库存计算结果表';
             """
             cursor.execute(create_table_sql)

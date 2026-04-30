@@ -6,13 +6,14 @@
 
 from .calculation_service import SafetyStockCalculator
 from .db_service import SafetyStockDBService
-from .task_service import execute_daily_calculation
+from .task_service import execute_daily_calculation, execute_calculation_for_company
 from .config import ABC_CONFIG, SEASONAL_CONFIG, OVERSTOCK_THRESHOLD, WARNING_DAYS, LEAD_TIME, TABLE_NAME
 
 __all__ = [
     'SafetyStockCalculator',
     'SafetyStockDBService',
     'execute_daily_calculation',
+    'execute_calculation_for_company',
     'ABC_CONFIG',
     'SEASONAL_CONFIG',
     'OVERSTOCK_THRESHOLD',

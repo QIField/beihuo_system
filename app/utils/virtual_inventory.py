@@ -61,38 +61,50 @@ def clear_brand_cache():
     print("品牌缓存已清除")
 
 
-def process_price_by_brand(price, brand):
+def process_price_by_brand(price, brand, is_wantuo=False):
     """
     根据品牌精准匹配处理价格：
-    - 品牌为'原厂'：价格 × 1.05
-    - 品牌匹配 crm_brand_list 且 type_cn='品牌'：价格 × 1.06
-    - 其他所有情况（包括 type_cn='其他品牌' 或未匹配到的品牌）：价格 × 1.08
+    - 品牌为'原厂'：价格 × 1.05（万拓时×1.20，即5%+15%）
+    - 品牌匹配 crm_brand_list 且 type_cn='品牌'：价格 × 1.06（万拓时×1.21，即6%+15%）
+    - 其他所有情况（包括 type_cn='其他品牌' 或未匹配到的品牌）：价格 × 1.08（万拓时×1.23，即8%+15%）
+
+    :param price: 原始价格
+    :param brand: 品牌名称
+    :param is_wantuo: 是否为万拓数据，如果是则额外加15%
     """
     if not price or price == '':
         return 0.0
-    
+
     try:
         price_float = float(price)
-        
+
         # 获取品牌缓存
         brand_dict = load_crm_brand_list()
-        
+
         # 检查品牌是否在 crm_brand_list 中
         if brand in brand_dict:
             type_cn = brand_dict[brand]
-            # 原厂品牌直接 × 1.05
+            # 原厂品牌
             if type_cn == '原厂':
+                if is_wantuo:
+                    return round(price_float * 1.20, 2)  # 5% + 15% = 20%
                 return round(price_float * 1.05, 2)
-            # type_cn='品牌' 的 × 1.06
+            # type_cn='品牌'
             elif type_cn == '品牌':
+                if is_wantuo:
+                    return round(price_float * 1.21, 2)  # 6% + 15% = 21%
                 return round(price_float * 1.06, 2)
-            # type_cn='其他品牌' 或未匹配到的 × 1.08
+            # type_cn='其他品牌'
             else:
+                if is_wantuo:
+                    return round(price_float * 1.23, 2)  # 8% + 15% = 23%
                 return round(price_float * 1.08, 2)
         else:
-            # 品牌不在 crm_brand_list 中，× 1.08
+            # 品牌不在 crm_brand_list 中
+            if is_wantuo:
+                return round(price_float * 1.23, 2)  # 8% + 15% = 23%
             return round(price_float * 1.08, 2)
-        
+
     except (ValueError, TypeError):
         return 0.0
 
@@ -1648,16 +1660,19 @@ def delete_old_data():
 def save_supplier_to_virtual_inventory(df, supplier_name="供应商"):
     """
     保存供应商库存数据到virtual_inventory表
-    
+
     :param df: 供应商库存DataFrame
     :param supplier_name: 供应商名称（用于日志显示）
     """
     if df is None or df.empty:
         print(f"{supplier_name}库存数据为空，跳过保存")
         return
-    
-    # 根据品牌处理价格
-    df['价格'] = df.apply(lambda row: process_price_by_brand(row['价格'], row['品牌']), axis=1)
+
+    # 判断是否为万拓数据
+    is_wantuo = supplier_name == "佛山万拓"
+
+    # 根据品牌处理价格（万拓数据额外加15%）
+    df['价格'] = df.apply(lambda row: process_price_by_brand(row['价格'], row['品牌'], is_wantuo=is_wantuo), axis=1)
     
     # 添加拉取时间
     fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

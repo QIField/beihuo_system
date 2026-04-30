@@ -24,29 +24,31 @@ class SafetyStockDBService:
         init_safety_stock_calculation_table()
     
     @staticmethod
-    def get_sales_data(start_date: str = None, end_date: str = None) -> Dict[str, Dict]:
+    def get_sales_data(start_date: str = None, end_date: str = None, company: str = 'fsbbr') -> Dict[str, Dict]:
         """
         从销量明细表读取数据
-        
+
         Args:
             start_date: 开始日期，默认近1年
             end_date: 结束日期，默认今天
-            
+            company: 组织代码，默认fsbbr
+
         Returns:
-            字典，key为 "oe|brand"，value包含销量统计信息
+            字典，key为 "frey_no"，value包含销量统计信息
         """
         if end_date is None:
             end_date = datetime.now().strftime('%Y-%m-%d')
         if start_date is None:
             start_date = (datetime.now() - timedelta(days=SALES_HISTORY_DAYS)).strftime('%Y-%m-%d')
-            
+
         conn = get_db_connection()
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # 读取销量明细，按OE+品牌分组
+                # 读取销量明细，按frey_no分组
                 # 简化SQL，在Python中处理日期格式化
                 sql = """
-                    SELECT 
+                    SELECT
+                        frey_no,
                         number as oe,
                         brand_name as brand,
                         quantity,
@@ -54,17 +56,17 @@ class SafetyStockDBService:
                     FROM crmapp_sales_history_detail
                     WHERE create_date >= %s
                       AND create_date <= %s
-                      AND number IS NOT NULL 
-                      AND number != ''
-                      AND brand_name IS NOT NULL
-                      AND brand_name != ''
-                    ORDER BY number, brand_name, create_date
+                      AND frey_no IS NOT NULL
+                      AND frey_no != ''
+                      AND company = %s
+                    ORDER BY frey_no, create_date
                 """
-                cursor.execute(sql, (start_date, end_date))
+                cursor.execute(sql, (start_date, end_date, company))
                 rows = cursor.fetchall()
                 
-                # 按OE+品牌分组统计
+                # 按frey_no分组统计
                 product_data = defaultdict(lambda: {
+                    'frey_no': '',
                     'oe': '',
                     'brand': '',
                     'daily_sales': defaultdict(float),  # 按天统计销量
@@ -74,7 +76,7 @@ class SafetyStockDBService:
                 })
                 
                 for row in rows:
-                    key = f"{row['oe']}|{row['brand']}"
+                    key = f"{row['frey_no']}"
                     # 在Python中处理日期格式化
                     create_date = row['create_date']
                     if isinstance(create_date, str):
@@ -83,6 +85,7 @@ class SafetyStockDBService:
                     sale_date = create_date.strftime('%Y-%m-%d')
                     year_month = create_date.strftime('%Y-%m')
                     
+                    product_data[key]['frey_no'] = row['frey_no']
                     product_data[key]['oe'] = row['oe']
                     product_data[key]['brand'] = row['brand']
                     product_data[key]['daily_sales'][sale_date] += float(row['quantity'] or 0)
@@ -114,6 +117,7 @@ class SafetyStockDBService:
                         monthly_sales[month] = monthly_sales.get(month, 0) + qty
                     
                     result[key] = {
+                        'frey_no': data['frey_no'],
                         'oe': data['oe'],
                         'brand': data['brand'],
                         'total_sales': data['total_sales'],
@@ -128,138 +132,172 @@ class SafetyStockDBService:
             conn.close()
     
     @staticmethod
-    def get_inventory_data() -> Dict[str, Dict]:
+    def get_inventory_data(company: str = 'fsbbr') -> Dict[str, Dict]:
         """
         从库存表读取当前库存数据
-        
+
+        Args:
+            company: 组织代码，默认fsbbr
+
         Returns:
-            字典，key为 "oe|品牌"，value包含库存信息
+            字典，key为 "frey_no"，value包含库存信息
         """
         conn = get_db_connection()
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 sql = """
-                    SELECT 
+                    SELECT
+                        物料条码 as frey_no,
                         oe,
                         品牌 as brand,
                         物料名称 as product_name,
                         库存数量 as stock_qty,
                         库存金额 as inventory_amount
                     FROM crmapp_beihuo
-                    WHERE oe IS NOT NULL 
-                      AND oe != ''
-                      AND 品牌 IS NOT NULL
-                      AND 品牌 != ''
+                    WHERE 物料条码 IS NOT NULL
+                      AND 物料条码 != ''
+                      AND company = %s
                 """
-                cursor.execute(sql)
+                cursor.execute(sql, (company,))
                 rows = cursor.fetchall()
-                
-                result = {}
+
+                # 按 frey_no 分组，合并同一物料条码下的多个 oe+品牌
+                from collections import defaultdict
+                product_data = defaultdict(lambda: {
+                    'frey_no': '',
+                    'oes': set(),
+                    'brands': set(),
+                    'product_name': '',
+                    'stock_qty': 0,
+                    'inventory_amount': 0
+                })
+
                 for row in rows:
-                    key = f"{row['oe']}|{row['brand']}"
+                    key = f"{row['frey_no']}"
+                    product_data[key]['frey_no'] = row['frey_no']
+                    if row['oe']:
+                        product_data[key]['oes'].add(row['oe'])
+                    if row['brand']:
+                        product_data[key]['brands'].add(row['brand'])
+                    product_data[key]['product_name'] = row['product_name']
+                    product_data[key]['stock_qty'] += float(row['stock_qty'] or 0)
+                    product_data[key]['inventory_amount'] += float(row['inventory_amount'] or 0)
+
+                # 转换为最终结果，oe 和 brand 用逗号分隔
+                result = {}
+                for key, data in product_data.items():
                     result[key] = {
-                        'oe': row['oe'],
-                        'brand': row['brand'],
-                        'product_name': row['product_name'],
-                        'stock_qty': float(row['stock_qty'] or 0),
-                        'inventory_amount': float(row['inventory_amount'] or 0)
+                        'frey_no': data['frey_no'],
+                        'oe': ','.join(data['oes']) if data['oes'] else '',
+                        'brand': ','.join(data['brands']) if data['brands'] else '',
+                        'product_name': data['product_name'],
+                        'stock_qty': data['stock_qty'],
+                        'inventory_amount': data['inventory_amount']
                     }
-                
+
                 return result
-                
+
         finally:
             conn.close()
     
     @staticmethod
-    def get_in_transit_data() -> Dict[str, float]:
+    def get_in_transit_data(company: str = 'fsbbr') -> Dict[str, float]:
         """
         从在途库存表读取在途数量
-        
+
+        Args:
+            company: 组织代码，默认fsbbr
+
         Returns:
-            字典，key为 "oe|brand"，value为在途数量
+            字典，key为 "frey_no"，value为在途数量
         """
         conn = get_db_connection()
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 sql = """
-                    SELECT 
-                        oe,
-                        brand,
+                    SELECT
+                        frey_no,
                         stock_zaitu_list
                     FROM crmapp_compare_summary
                     WHERE stock_zaitu_list IS NOT NULL
                       AND stock_zaitu_list != ''
                       AND stock_zaitu_list != '[]'
                       AND stock_zaitu_list != '{}'
+                      AND frey_no IS NOT NULL
+                      AND frey_no != ''
+                      AND company = %s
                 """
-                cursor.execute(sql)
+                cursor.execute(sql, (company,))
                 rows = cursor.fetchall()
-                
+
                 result = {}
                 for row in rows:
-                    key = f"{row['oe']}|{row['brand']}"
+                    key = f"{row['frey_no']}"
                     try:
                         zaitu_list = json.loads(row['stock_zaitu_list'])
                         if isinstance(zaitu_list, list):
                             # 累加所有在途数量
                             total_qty = sum(
-                                float(item.get('purchase_quantity', 0) or 0) 
+                                float(item.get('purchase_quantity', 0) or 0)
                                 for item in zaitu_list
                             )
                             result[key] = total_qty
                     except:
                         continue
-                
+
                 return result
-                
+
         finally:
             conn.close()
     
     @staticmethod
-    def save_calculation_results(results: List[Dict], calc_date: str = None) -> int:
+    def save_calculation_results(results: List[Dict], calc_date: str = None, company: str = 'fsbbr') -> int:
         """
         保存计算结果到数据库
-        
+
         Args:
             results: 计算结果列表
             calc_date: 计算日期，默认今天
-            
+            company: 组织代码，默认fsbbr
+
         Returns:
             保存的记录数
         """
         if calc_date is None:
             calc_date = datetime.now().strftime('%Y-%m-%d')
-            
+
         if not results:
             return 0
-            
+
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
-                # 先删除当天的旧数据
-                delete_sql = f"DELETE FROM {TABLE_NAME} WHERE calc_date = %s"
-                cursor.execute(delete_sql, (calc_date,))
-                
+                # 先删除当天的旧数据（按组织和日期）
+                delete_sql = f"DELETE FROM {TABLE_NAME} WHERE calc_date = %s AND company = %s"
+                cursor.execute(delete_sql, (calc_date, company))
+
                 # 插入新数据
                 insert_sql = f"""
                     INSERT INTO {TABLE_NAME} (
-                        oe, brand, product_name, abc_class,
+                        frey_no, oe, brand, product_name, company, abc_class,
                         avg_daily_sales, sales_std, seasonal_factor,
                         base_safety_stock, safety_stock,
                         reorder_point, target_stock,
                         current_stock, in_transit_qty, available_stock, inventory_amount,
                         sellable_days, stock_status, calc_date
                     ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                     )
                 """
-                
+
                 values = []
                 for r in results:
                     values.append((
-                        r['oe'],
-                        r['brand'],
+                        r['frey_no'],
+                        r.get('oe', ''),
+                        r.get('brand', ''),
                         r.get('product_name', ''),
+                        r.get('company', company),
                         r['abc_class'],
                         r['avg_daily_sales'],
                         r['sales_std'],

@@ -93,6 +93,9 @@ def import_price_data():
         # 获取是否跳过B2B推送
         skip_b2b = request.form.get('skip_b2b', 'false').lower() == 'true'
         
+        # 获取是否启用采购历史比对
+        enable_compare = request.form.get('enable_compare', 'false').lower() == 'true'
+        
         # 提交异步任务
         from app.core.async_task_store import submit_excel_task
         task_id = submit_excel_task(
@@ -101,7 +104,8 @@ def import_price_data():
             markup_rate,
             creator,
             company,
-            skip_b2b
+            skip_b2b,
+            enable_compare
         )
         
         return jsonify({
@@ -159,7 +163,7 @@ def download_inquiry_import_result(task_id):
     )
 
 
-def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str, company: str, skip_b2b: bool = False, progress_callback=None):
+def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str, company: str, skip_b2b: bool = False, enable_compare: bool = False, progress_callback=None):
     """
     询价导入异步处理函数（完整版）
     支持进度回调，包含完整8步流程
@@ -214,7 +218,15 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     # 准备数据
     from app.utils.b2b_inquiry_upload.uploader import prepare_data, batch_upload_with_callback
     valid_items, skipped_items = prepare_data(df)
-    
+
+    # 询价模块专用：过滤价格为空或为0的数据
+    for item in valid_items[:]:
+        price = item.get('price', 0)
+        if not price or price == 0:
+            item['skip_reason'] = '价格为空或为0'
+            skipped_items.append(item)
+            valid_items.remove(item)
+
     if not valid_items:
         raise ValueError('没有有效的数据可导入')
     
@@ -370,83 +382,96 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     if upload_success_items:
         insert_data = []
         for item in upload_success_items:
-            try:
-                oe = item['oe']
-                brand = item.get('mapped_brand') or item.get('brand') or None
-                supplier = item.get('supplier') or None
-                price = item.get('price', 0)
-                original_price = item.get('original_price', price)
-                warehouse = item.get('warehouse') or None
-                expire_time = item.get('expire_time')
-                remark = item.get('remark')
-                if remark and str(remark).lower() == 'nan':
-                    remark = None
-                elif remark:
-                    remark = str(remark).strip() or None
-                stock_quantity = item.get('stock_quantity', 0)
-                
-                # 处理失效时间
-                if expire_time and pd.notna(expire_time):
-                    if isinstance(expire_time, str):
-                        expire_time = expire_time.strip()
-                        parsed = False
-                        for fmt in ['%Y/%m/%d %H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d', '%Y/%m/%d']:
-                            try:
-                                expire_time = datetime.strptime(expire_time, fmt)
-                                parsed = True
-                                break
-                            except ValueError:
-                                continue
-                        if not parsed:
-                            expire_time = None
-                else:
-                    expire_time = None
-                
-                insert_data.append({
-                    'oe': oe, 'brand': brand, 'supplier': supplier, 'price': price,
-                    'original_price': original_price, 'warehouse': warehouse,
-                    'expire_time': expire_time, 'remark': remark,
-                    'stock_quantity': stock_quantity, 'common_number': None,
-                    'company': company
-                })
-            except Exception as e:
-                pass
+            oe = item['oe']
+            brand = item.get('mapped_brand') or item.get('brand') or None
+            supplier = item.get('supplier') or None
+            price = item.get('price', 0)
+            original_price = item.get('original_price', price)
+            warehouse = item.get('warehouse') or None
+            expire_time = item.get('expire_time')
+            remark = item.get('remark')
+            if remark and str(remark).lower() == 'nan':
+                remark = None
+            elif remark:
+                remark = str(remark).strip() or None
+            stock_quantity = item.get('stock_quantity', 0)
+            
+            # 处理失效时间
+            if expire_time and pd.notna(expire_time):
+                if isinstance(expire_time, str):
+                    expire_time = expire_time.strip()
+                    parsed = False
+                    for fmt in ['%Y/%m/%d %H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d', '%Y/%m/%d']:
+                        try:
+                            expire_time = datetime.strptime(expire_time, fmt)
+                            parsed = True
+                            break
+                        except ValueError:
+                            continue
+                    if not parsed:
+                        expire_time = None
+            else:
+                expire_time = None
+            
+            insert_data.append({
+                'oe': oe, 'brand': brand, 'supplier': supplier, 'price': price,
+                'original_price': original_price, 'warehouse': warehouse,
+                'expire_time': expire_time, 'remark': remark,
+                'stock_quantity': stock_quantity, 'common_number': None,
+                'company': company
+            })
         
         if insert_data:
             conn = get_db_connection()
             cursor = conn.cursor()
-            try:
-                batch_insert_data = []
-                for data in insert_data:
-                    cursor.execute("""
-                        SELECT replace_number, is_cass FROM crmapp_compare_summary 
-                        WHERE oe = %s AND brand = %s AND company = %s
-                    """, (data['oe'], data['brand'], data['company']))
-                    compare_result = cursor.fetchone()
-                    
-                    sync_common_number = compare_result[0] if compare_result and compare_result[0] else ''
-                    sync_ks_sync = 1 if compare_result and compare_result[1] and str(compare_result[1]) == '1' else 0
-                    
-                    batch_insert_data.append((
-                        data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['warehouse'],
-                        data['expire_time'], data['remark'], data['stock_quantity'],
-                        sync_common_number, sync_ks_sync, data['company']
-                    ))
+            batch_insert_data = []
+            for data in insert_data:
+                cursor.execute("""
+                    SELECT replace_number, is_cass FROM crmapp_compare_summary 
+                    WHERE oe = %s AND brand = %s AND company = %s
+                """, (data['oe'], data['brand'], data['company']))
+                compare_result = cursor.fetchone()
+                
+                # 使用字段名访问，兼容字典和元组两种返回格式
+                if compare_result:
+                    if isinstance(compare_result, dict):
+                        sync_common_number = compare_result.get('replace_number', '') or ''
+                        sync_ks_sync = 1 if compare_result.get('is_cass') and str(compare_result.get('is_cass')) == '1' else 0
+                    else:
+                        sync_common_number = compare_result[0] if compare_result[0] else ''
+                        sync_ks_sync = 1 if compare_result[1] and str(compare_result[1]) == '1' else 0
+                else:
+                    sync_common_number = ''
+                    sync_ks_sync = 0
+                
+                batch_insert_data.append((
+                    data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['warehouse'],
+                    data['expire_time'], data['remark'], data['stock_quantity'],
+                    sync_common_number, sync_ks_sync, data['company']
+                ))
 
-                cursor.executemany("""
-                    INSERT IGNORE INTO crmapp_price_inquiry
+            # 使用 INSERT ... ON DUPLICATE KEY UPDATE 实现覆盖更新
+            for row_data in batch_insert_data:
+                cursor.execute("""
+                    INSERT INTO crmapp_price_inquiry
                     (oe, brand, supplier, price, original_price, warehouse, expire_time, remark,
                      stock_quantity, common_number, ks_sync, company)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, batch_insert_data)
-                
-                conn.commit()
-                inserted_count = cursor.rowcount
-            except Exception as e:
-                conn.rollback()
-            finally:
-                cursor.close()
-                conn.close()
+                    ON DUPLICATE KEY UPDATE
+                        original_price = VALUES(original_price),
+                        warehouse = VALUES(warehouse),
+                        expire_time = VALUES(expire_time),
+                        remark = VALUES(remark),
+                        stock_quantity = VALUES(stock_quantity),
+                        common_number = VALUES(common_number),
+                        ks_sync = VALUES(ks_sync),
+                        import_time = CURRENT_TIMESTAMP
+                """, row_data)
+            
+            conn.commit()
+            inserted_count = len(batch_insert_data)
+            cursor.close()
+            conn.close()
     
     # 步骤8：触发聚合和同步（异步执行，不阻塞返回）
     if inserted_count > 0:
@@ -530,85 +555,100 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
     # 导入到直接入库表（所有有效数据）
     insert_data = []
     for item in valid_items:
-        try:
-            oe = item['oe']
-            brand = item.get('mapped_brand') or item.get('brand') or None
-            supplier = item.get('supplier') or None
-            price = item.get('price', 0)
-            original_price = item.get('original_price', price)
-            warehouse = item.get('warehouse') or None
-            expire_time = item.get('expire_time')
-            remark = item.get('remark')
-            if remark and str(remark).lower() == 'nan':
-                remark = None
-            elif remark:
-                remark = str(remark).strip() or None
-            stock_quantity = item.get('stock_quantity', 0)
-            
-            # 处理失效时间
-            if expire_time and pd.notna(expire_time):
-                if isinstance(expire_time, str):
-                    expire_time = expire_time.strip()
-                    parsed = False
-                    for fmt in ['%Y/%m/%d %H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d', '%Y/%m/%d']:
-                        try:
-                            expire_time = datetime.strptime(expire_time, fmt)
-                            parsed = True
-                            break
-                        except ValueError:
-                            continue
-                    if not parsed:
-                        expire_time = None
-            else:
-                expire_time = None
-            
-            insert_data.append({
-                'oe': oe, 'brand': brand, 'supplier': supplier, 'price': price,
-                'original_price': original_price, 'warehouse': warehouse,
-                'expire_time': expire_time, 'remark': remark,
-                'stock_quantity': stock_quantity, 'common_number': None,
-                'company': company, 'creator': creator,
-                'source_file': os.path.basename(file_path)
-            })
-        except Exception as e:
-            pass
+        oe = item['oe']
+        brand = item.get('mapped_brand') or item.get('brand') or None
+        supplier = item.get('supplier') or None
+        price = item.get('price', 0)
+        original_price = item.get('original_price', price)
+        warehouse = item.get('warehouse') or None
+        expire_time = item.get('expire_time')
+        remark = item.get('remark')
+        if remark and str(remark).lower() == 'nan':
+            remark = None
+        elif remark:
+            remark = str(remark).strip() or None
+        stock_quantity = item.get('stock_quantity', 0)
+        
+        # 处理失效时间
+        if expire_time and pd.notna(expire_time):
+            if isinstance(expire_time, str):
+                expire_time = expire_time.strip()
+                parsed = False
+                for fmt in ['%Y/%m/%d %H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d', '%Y/%m/%d']:
+                    try:
+                        expire_time = datetime.strptime(expire_time, fmt)
+                        parsed = True
+                        break
+                    except ValueError:
+                        continue
+                if not parsed:
+                    expire_time = None
+        else:
+            expire_time = None
+        
+        insert_data.append({
+            'oe': oe, 'brand': brand, 'supplier': supplier, 'price': price,
+            'original_price': original_price, 'warehouse': warehouse,
+            'expire_time': expire_time, 'remark': remark,
+            'stock_quantity': stock_quantity, 'common_number': None,
+            'company': company, 'creator': creator,
+            'source_file': os.path.basename(file_path)
+        })
     
     inserted_count = 0
     if insert_data:
         conn = get_db_connection()
         cursor = conn.cursor()
-        try:
-            batch_insert_data = []
-            for data in insert_data:
-                cursor.execute("""
-                    SELECT replace_number, is_cass FROM crmapp_compare_summary 
-                    WHERE oe = %s AND brand = %s AND company = %s
-                """, (data['oe'], data['brand'], data['company']))
-                compare_result = cursor.fetchone()
-                
-                sync_common_number = compare_result[0] if compare_result and compare_result[0] else ''
-                sync_ks_sync = 1 if compare_result and compare_result[1] and str(compare_result[1]) == '1' else 0
-                
-                batch_insert_data.append((
-                    data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['warehouse'],
-                    data['expire_time'], data['remark'], data['stock_quantity'],
-                    sync_common_number, sync_ks_sync, data['company'], data['creator'], data['source_file']
-                ))
+        batch_insert_data = []
+        for data in insert_data:
+            cursor.execute("""
+                SELECT replace_number, is_cass FROM crmapp_compare_summary 
+                WHERE oe = %s AND brand = %s AND company = %s
+            """, (data['oe'], data['brand'], data['company']))
+            compare_result = cursor.fetchone()
+            
+            # 使用字段名访问，兼容字典和元组两种返回格式
+            if compare_result:
+                if isinstance(compare_result, dict):
+                    sync_common_number = compare_result.get('replace_number', '') or ''
+                    sync_ks_sync = 1 if compare_result.get('is_cass') and str(compare_result.get('is_cass')) == '1' else 0
+                else:
+                    sync_common_number = compare_result[0] if compare_result[0] else ''
+                    sync_ks_sync = 1 if compare_result[1] and str(compare_result[1]) == '1' else 0
+            else:
+                sync_common_number = ''
+                sync_ks_sync = 0
+            
+            batch_insert_data.append((
+                data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['warehouse'],
+                data['expire_time'], data['remark'], data['stock_quantity'],
+                sync_common_number, sync_ks_sync, data['company'], data['creator'], data['source_file']
+            ))
 
-            cursor.executemany("""
-                INSERT IGNORE INTO crmapp_price_inquiry_direct
+        # 使用 INSERT ... ON DUPLICATE KEY UPDATE 实现覆盖更新
+        for row_data in batch_insert_data:
+            cursor.execute("""
+                INSERT INTO crmapp_price_inquiry_direct
                 (oe, brand, supplier, price, original_price, warehouse, expire_time, remark,
                  stock_quantity, common_number, ks_sync, company, creator, source_file)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, batch_insert_data)
-            
-            conn.commit()
-            inserted_count = cursor.rowcount
-        except Exception as e:
-            conn.rollback()
-        finally:
-            cursor.close()
-            conn.close()
+                ON DUPLICATE KEY UPDATE
+                    original_price = VALUES(original_price),
+                    warehouse = VALUES(warehouse),
+                    expire_time = VALUES(expire_time),
+                    remark = VALUES(remark),
+                    stock_quantity = VALUES(stock_quantity),
+                    common_number = VALUES(common_number),
+                    ks_sync = VALUES(ks_sync),
+                    creator = VALUES(creator),
+                    source_file = VALUES(source_file),
+                    import_time = CURRENT_TIMESTAMP
+            """, row_data)
+        
+        conn.commit()
+        inserted_count = len(batch_insert_data)
+        cursor.close()
+        conn.close()
     
     # 触发聚合和同步（异步执行，不阻塞返回）
     if inserted_count > 0:
@@ -981,3 +1021,70 @@ def get_crm_brands():
             
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'查询品牌失败: {str(e)}', 'data': []}), 500
+
+
+@inquiry_bp.route('/parse_oe_list', methods=['POST'])
+@login_required
+def parse_oe_list():
+    """
+    解析上传文件，返回OE列表（用于采购历史比对）
+    
+    返回:
+    {
+        "code": 0,
+        "data": [{"oe": "12345", "brand": "博世"}, ...]
+    }
+    """
+    if 'file' not in request.files:
+        return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
+
+    try:
+        # 保存临时文件
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        temp_path = os.path.join(tempfile.gettempdir(), f"parse_oe_{timestamp}_{file.filename}")
+        file.save(temp_path)
+        
+        # 读取文件
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(temp_path, encoding='utf-8', dtype=str)
+        else:
+            df = pd.read_excel(temp_path, dtype=str)
+        
+        # 列名映射
+        column_mapping = {
+            'oe': 'oe', 'OE': 'oe', 'OE号': 'oe',
+            '品牌': 'brand', 'brand': 'brand',
+            '单价': 'price', '价格': 'price', 'price': 'price', '价格/促销价': 'price',
+        }
+        
+        rename_dict = {old: new for old, new in column_mapping.items() 
+                       if old in df.columns and new not in df.columns}
+        if rename_dict:
+            df = df.rename(columns=rename_dict)
+        
+        # 提取OE、品牌和价格
+        oe_list = []
+        for _, row in df.iterrows():
+            oe = str(row.get('oe', '')).strip() if pd.notna(row.get('oe')) else ''
+            brand = str(row.get('brand', '')).strip() if pd.notna(row.get('brand')) else ''
+            price = str(row.get('price', '')).strip() if pd.notna(row.get('price')) else ''
+            if oe:
+                oe_list.append({'oe': oe, 'brand': brand, 'price': price})
+        
+        # 清理临时文件
+        os.remove(temp_path)
+        
+        return jsonify({
+            'code': 0,
+            'msg': '解析成功',
+            'data': oe_list
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'code': 1, 'msg': f'解析失败: {str(e)}'}), 500

@@ -132,27 +132,16 @@ def send_order_to_crm(order_id, connection=None):
     payload = {'orders_no': order_id}
     headers = {}
     
-    try:
-        response = requests.request("POST", CRM_API_URL, headers=headers, data=payload)
-        
-        # 尝试解析JSON
-        data = json.loads(response.text)
-        print(f"         响应: {json.dumps(data, ensure_ascii=False)}")
-        
-        # 保存订单结果到数据库
-        save_order_result_to_db(order_id, data, connection)
-        
-        return data
-    except json.JSONDecodeError as e:
-        print(f"         ✗ JSON解析失败: {e}")
-        # 当JSON解析失败时，将订单状态更新为"开单失败"
-        save_order_result_to_db(order_id, None, connection, status='开单失败')
-        return None
-    except Exception as e:
-        print(f"         ✗ 发送订单 {order_id} 失败: {e}")
-        # 当其他异常发生时，也将订单状态更新为"开单失败"
-        save_order_result_to_db(order_id, None, connection, status='开单失败')
-        return None
+    response = requests.request("POST", CRM_API_URL, headers=headers, data=payload)
+    
+    # 尝试解析JSON
+    data = json.loads(response.text)
+    print(f"         响应: {json.dumps(data, ensure_ascii=False)}")
+    
+    # 保存订单结果到数据库
+    save_order_result_to_db(order_id, data, connection)
+    
+    return data
 
 
 def send_orders_to_crm(order_ids, connection=None):
