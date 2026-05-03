@@ -32,6 +32,10 @@ from .virtual_inventory_stats_tables import (
     init_virtual_inventory_stats_log_table,
 )
 
+from .virtual_inventory_tables import (
+    init_all_virtual_inventory_tables,
+)
+
 from .shop_event_tables import (
     init_shop_event_summary_table,
     init_shop_event_detail_table,
@@ -58,4 +62,5 @@ __all__ = [
     'init_shop_business_indicator_table',
     'init_price_inquiry_direct_table',
     'init_safety_stock_calculation_table',
+    'init_all_virtual_inventory_tables',
 ]

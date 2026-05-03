@@ -27,66 +27,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def init_virtual_inventory_table():
-    """初始化虚拟库存表"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 创建虚拟库存表
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS virtual_inventory (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            supplier_name VARCHAR(100) COMMENT '供应商名称',
-            oe_code VARCHAR(100) COMMENT 'OE码',
-            brand VARCHAR(255) DEFAULT NULL COMMENT '品牌',
-            price DECIMAL(10,2) COMMENT '价格',
-            expiry_date DATETIME COMMENT '过期时间',
-            warehouse VARCHAR(255) COMMENT '仓库',
-            stock INT DEFAULT 0 COMMENT '库存',
-            remark TEXT COMMENT '备注',
-            fetch_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '获取时间',
-            update_msg TEXT COMMENT '更新信息',
-            INDEX idx_brand (brand),
-            INDEX idx_warehouse (warehouse),
-            INDEX idx_expiry_date (expiry_date),
-            INDEX idx_fetch_time (fetch_time),
-            INDEX idx_oe_code (oe_code),
-            INDEX idx_supplier_name (supplier_name),
-            FULLTEXT INDEX idx_update_msg_fulltext (update_msg)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='虚拟库存表';
-        """
-        cursor.execute(create_table_sql)
-        conn.commit()
-
-        # 检查并添加 update_msg 分类标记字段（用于优化查询）
-        try:
-            cursor.execute("""
-                SELECT COUNT(*) as count FROM information_schema.COLUMNS
-                WHERE TABLE_NAME = 'virtual_inventory'
-                AND COLUMN_NAME = 'update_status'
-                AND TABLE_SCHEMA = DATABASE()
-            """)
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("""
-                    ALTER TABLE virtual_inventory
-                    ADD COLUMN update_status VARCHAR(20) DEFAULT NULL COMMENT '更新状态分类',
-                    ADD INDEX idx_update_status (update_status)
-                """)
-                conn.commit()
-                print("已添加 update_status 字段和索引")
-        except Exception as e:
-            print(f"添加 update_status 字段失败: {e}")
-
-    except Exception as e:
-        if 'conn' in locals():
-            conn.rollback()
-    finally:
-        if 'cursor' in locals():
-            cursor.close()
-        if 'conn' in locals():
-            conn.close()
-
 def get_update_status(update_msg):
     """
     根据 update_msg 内容判断更新状态
@@ -209,8 +149,6 @@ def get_business_date_range(target_time=None):
 @login_required
 def virtual_inventory_page():
     """虚拟库存管理页面"""
-    # 确保表存在
-    init_virtual_inventory_table()
     return render_template('virtual_inventory.html')
 
 @virtual_inventory_bp.route('/api/virtual_inventory')
@@ -1644,7 +1582,7 @@ def trigger_virtual_inventory_task():
                 print("=" * 60)
                 print("手动触发虚拟库存任务开始")
                 print("=" * 60)
-                main_process(skip_table_creation=True)
+                main_process()
                 print("=" * 60)
                 print("手动触发虚拟库存任务完成")
                 print("=" * 60)

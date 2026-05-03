@@ -61,16 +61,17 @@ def clear_brand_cache():
     print("品牌缓存已清除")
 
 
-def process_price_by_brand(price, brand, is_wantuo=False):
+def process_price_by_brand(price, brand, is_wantuo=False, is_changsheng_special=False):
     """
     根据品牌精准匹配处理价格：
-    - 品牌为'原厂'：价格 × 1.05（万拓时×1.20，即5%+15%）
-    - 品牌匹配 crm_brand_list 且 type_cn='品牌'：价格 × 1.06（万拓时×1.21，即6%+15%）
-    - 其他所有情况（包括 type_cn='其他品牌' 或未匹配到的品牌）：价格 × 1.08（万拓时×1.23，即8%+15%）
+    - 品牌为'原厂'：价格 × 1.05（万拓时×1.20，即5%+15%；昌盛特殊产品时×1.15，即5%+10%）
+    - 品牌匹配 crm_brand_list 且 type_cn='品牌'：价格 × 1.06（万拓时×1.21，即6%+15%；昌盛特殊产品时×1.16，即6%+10%）
+    - 其他所有情况（包括 type_cn='其他品牌' 或未匹配到的品牌）：价格 × 1.08（万拓时×1.23，即8%+15%；昌盛特殊产品时×1.18，即8%+10%）
 
     :param price: 原始价格
     :param brand: 品牌名称
     :param is_wantuo: 是否为万拓数据，如果是则额外加15%
+    :param is_changsheng_special: 是否为昌盛特殊产品（尾号80结尾+原厂再制造），如果是则额外加10%
     """
     if not price or price == '':
         return 0.0
@@ -88,21 +89,29 @@ def process_price_by_brand(price, brand, is_wantuo=False):
             if type_cn == '原厂':
                 if is_wantuo:
                     return round(price_float * 1.20, 2)  # 5% + 15% = 20%
+                elif is_changsheng_special:
+                    return round(price_float * 1.15, 2)  # 5% + 10% = 15%
                 return round(price_float * 1.05, 2)
             # type_cn='品牌'
             elif type_cn == '品牌':
                 if is_wantuo:
                     return round(price_float * 1.21, 2)  # 6% + 15% = 21%
+                elif is_changsheng_special:
+                    return round(price_float * 1.16, 2)  # 6% + 10% = 16%
                 return round(price_float * 1.06, 2)
             # type_cn='其他品牌'
             else:
                 if is_wantuo:
                     return round(price_float * 1.23, 2)  # 8% + 15% = 23%
+                elif is_changsheng_special:
+                    return round(price_float * 1.18, 2)  # 8% + 10% = 18%
                 return round(price_float * 1.08, 2)
         else:
             # 品牌不在 crm_brand_list 中
             if is_wantuo:
                 return round(price_float * 1.23, 2)  # 8% + 15% = 23%
+            elif is_changsheng_special:
+                return round(price_float * 1.18, 2)  # 8% + 10% = 18%
             return round(price_float * 1.08, 2)
 
     except (ValueError, TypeError):
@@ -318,142 +327,6 @@ def load_crm_aliases_mapping():
         return {}
 
 
-def create_tables():
-    """创建数据库表"""
-    db_manager = get_db_connection()
-    try:
-        cursor = db_manager.connection.cursor()
-        
-        # 创建腾隆数据表
-        cursor.execute("""  
-            CREATE TABLE IF NOT EXISTS tenglong_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        # 创建贝尔马勒数据表
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS beiermale_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        # 创建爱车贝母数据表（按地区分表）
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS aichebeimu_foshan_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS aichebeimu_dongguan_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS aichebeimu_zhongshan_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS robot_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier_name VARCHAR(100),
-                oe_number VARCHAR(100),
-                brand_name VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                city_name VARCHAR(100),
-                quantity INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS external_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier_name VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS virtual_inventory (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier_name VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME,
-                update_msg TEXT,
-                update_status VARCHAR(50) DEFAULT NULL COMMENT '更新状态'
-            )
-        """)
-
-        db_manager.connection.commit()
-    finally:
-        db_manager.close()
-
-
 def clear_all_tables():
     """清空所有表的数据并重置自动递增ID，但保留virtual_inventory表"""
     db_manager = get_db_connection()
@@ -528,10 +401,9 @@ def process_supplier_data(all_data, valid_brands=None):
     """
     处理多家供应商数据：
     1. 去除编码末尾的特定序号
-    2. 对于相同编码和品牌，如果三家数据不同，取中间值
-    3. 统一供应商为腾隆
-    4. 只保留brands.json中存在的品牌
-    5. 除了腾隆外，其他供应商只有库存大于等于2的才保留
+    2. 保留各自供应商名称（腾隆、宝翼隆、沐博分开显示）
+    3. 只保留brands.json中存在的品牌
+    4. 除了腾隆外，其他供应商只有库存大于等于2的才保留
     """
     print("处理供应商数据")
 
@@ -570,20 +442,18 @@ def process_supplier_data(all_data, valid_brands=None):
         key = (processed_code, item['brand'])
         grouped_data[key].append(item)
 
-    # 对每组数据进行处理
+    # 对每组数据进行处理：去重取中间值，但保留原始供应商名称
     final_data = []
     for key, items in grouped_data.items():
         if len(items) == 1:
-            # 只有一个数据，直接使用，并统一供应商为腾隆
-            items[0]['supplier'] = '腾隆'
+            # 只有一个数据，直接使用
             final_data.append(items[0])
         else:
             # 多个数据，按库存数量排序，取中间值
             sorted_items = sorted(items, key=lambda x: int(x['stock']))
             middle_index = len(sorted_items) // 2
             selected_item = sorted_items[middle_index]
-            # 统一供应商为腾隆
-            selected_item['supplier'] = '腾隆'
+            # 保留原始供应商名称，不统一改为"腾隆"
             final_data.append(selected_item)
 
     return final_data
@@ -647,7 +517,8 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
                 'supplier': supplier_name,
                 'code': code,
                 'brand': brand,
-                'price': price,  # 现在是乘以1.1后的价格
+                'price': price,  # 处理后的价格
+                'original_price': original_price,  # 原价格
                 'expiry_date': expiry_date,
                 'warehouse': '广州越秀仓',
                 'stock': stock,
@@ -735,7 +606,8 @@ def sql_sever_data():
                     item['supplier'],  # 供应商名称
                     item['code'],     # OE码
                     item['brand'],    # 品牌
-                    item['price'],    # 价格
+                    item['price'],    # 处理后的价格
+                    item.get('original_price', None),  # 原价格
                     item['expiry_date'], # 失效时间
                     item['warehouse'],   # 仓库
                     item['stock'],       # 库存
@@ -745,8 +617,8 @@ def sql_sever_data():
             
             # 批量插入到整合表
             sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(final_data))} / {len(final_data)} 条腾隆数据到整合表")
@@ -886,7 +758,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                     continue
             adjusted_price = process_price_by_brand(price_value, '贝洱')
             data.append([
-                number, '贝洱', adjusted_price, male[number]['stock']
+                number, '贝洱', adjusted_price, price_value, male[number]['stock']
             ])
     
     for number in beier:
@@ -901,7 +773,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                     continue
             adjusted_price = process_price_by_brand(price_value, '马勒')
             data.append([
-                number, '马勒', adjusted_price, beier[number]['stock']
+                number, '马勒', adjusted_price, price_value, beier[number]['stock']
             ])
 
     # 纳铁福-吉凯恩对比组
@@ -917,7 +789,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                     continue
             adjusted_price = process_price_by_brand(price_value, '吉凯恩')
             data.append([
-                number, '吉凯恩', adjusted_price, ntf[number]['stock']
+                number, '吉凯恩', adjusted_price, price_value, ntf[number]['stock']
             ])
     
     for number in jky:
@@ -932,7 +804,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                     continue
             adjusted_price = process_price_by_brand(price_value, '纳铁福')
             data.append([
-                number, '纳铁福', adjusted_price, jky[number]['stock']
+                number, '纳铁福', adjusted_price, price_value, jky[number]['stock']
             ])
 
     return data
@@ -985,18 +857,19 @@ def save_beiermale_to_db(data):
                     '佛山巴博瑞',  # 供应商名称
                     row[0],       # OE码
                     row[1],       # 品牌
-                    row[2],       # 价格
+                    row[2],       # 处理后的价格
+                    row[3],       # 原价格
                     expiry_date,  # 失效时间（当前时间+1天）
                     '佛山禅城仓', # 仓库
-                    row[3],       # 库存
+                    row[4],       # 库存
                     '',           # 备注
                     fetch_time_str  # 拉取时间
                 ))
             
             # 批量插入到整合表
             sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(data))} / {len(data)} 条贝尔马勒数据到整合表")
@@ -1084,7 +957,7 @@ def gylqp_start():
                 "%Y-%m-%d %H:%M:%S")
             ck = '佛山禅城仓'
             foshan_data.append([
-                gys, bm, pp, price, next_day_later, ck, kc, '', fetch_time
+                gys, bm, pp, price, original_price, next_day_later, ck, kc, '', fetch_time
             ])
         if '东莞' in i[6]:
             bm = i[0].replace(' ','')
@@ -1099,7 +972,7 @@ def gylqp_start():
                 "%Y-%m-%d %H:%M:%S")
             ck = '东莞寮步仓'
             dongguan_data.append([
-                gys, bm, pp, price, next_day_later, ck, kc, '', fetch_time
+                gys, bm, pp, price, original_price, next_day_later, ck, kc, '', fetch_time
             ])
         if '中山' in i[6]:
             bm = i[0].replace(' ','')
@@ -1114,7 +987,7 @@ def gylqp_start():
                 "%Y-%m-%d %H:%M:%S")
             ck = '中山西区街道仓'
             zhongshan_data.append([
-                gys, bm, pp, price, next_day_later, ck, kc, '', fetch_time
+                gys, bm, pp, price, original_price, next_day_later, ck, kc, '', fetch_time
             ])
 
     # 批量保存到数据库
@@ -1125,10 +998,10 @@ def gylqp_start():
         for i in range(0, len(foshan_data), batch_size):
             batch = foshan_data[i:i + batch_size]
             
-            # 准备批量插入数据
+            # 准备批量插入数据（跳过 original_price 字段）
             batch_data = []
             for row in batch:
-                batch_data.append(tuple(row))
+                batch_data.append((row[0], row[1], row[2], row[3], row[5], row[6], row[7], row[8], row[9]))
             
             # 批量插入
             sql = """
@@ -1142,10 +1015,10 @@ def gylqp_start():
         for i in range(0, len(dongguan_data), batch_size):
             batch = dongguan_data[i:i + batch_size]
             
-            # 准备批量插入数据
+            # 准备批量插入数据（跳过 original_price 字段）
             batch_data = []
             for row in batch:
-                batch_data.append(tuple(row))
+                batch_data.append((row[0], row[1], row[2], row[3], row[5], row[6], row[7], row[8], row[9]))
             
             # 批量插入
             sql = """
@@ -1159,10 +1032,10 @@ def gylqp_start():
         for i in range(0, len(zhongshan_data), batch_size):
             batch = zhongshan_data[i:i + batch_size]
             
-            # 准备批量插入数据
+            # 准备批量插入数据（跳过 original_price 字段）
             batch_data = []
             for row in batch:
-                batch_data.append(tuple(row))
+                batch_data.append((row[0], row[1], row[2], row[3], row[5], row[6], row[7], row[8], row[9]))
             
             # 批量插入
             sql = """
@@ -1184,18 +1057,19 @@ def gylqp_start():
                     row[0],  # 供应商名称
                     row[1],  # OE码
                     row[2],  # 品牌
-                    row[3],  # 价格
-                    row[4],  # 失效时间
-                    row[5],  # 仓库
-                    row[6],  # 库存
-                    row[7],  # 备注
-                    row[8]   # 拉取时间
+                    row[3],  # 处理后的价格
+                    row[4],  # 原价格
+                    row[5],  # 失效时间
+                    row[6],  # 仓库
+                    row[7],  # 库存
+                    row[8],  # 备注
+                    row[9]   # 拉取时间
                 ))
-            
+
             # 批量插入到整合表
             sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(all_data))} / {len(all_data)} 条爱车贝母数据到整合表")
@@ -1445,7 +1319,10 @@ def fetch_and_process_latest_data():
             # 批量插入数据
             batch_size = 1000  # 批量处理大小
             fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+
+            # 保存原价格
+            result_df['原价格'] = result_df['价格']
+
             # 根据品牌处理价格
             result_df['价格'] = result_df.apply(lambda row: process_price_by_brand(row['价格'], row['品牌']), axis=1)
 
@@ -1480,26 +1357,27 @@ def fetch_and_process_latest_data():
             # 同时保存到整合表
             for i in range(0, len(result_df), batch_size):
                 batch = result_df.iloc[i:i + batch_size]
-                
+
                 # 准备批量插入数据
                 batch_data = []
                 for index, row in batch.iterrows():
-                    batch_data.append((  
+                    batch_data.append((
                         row['供应商名称'],
                         row['原厂OE码'],
                         row['品牌'],
                         row['价格'],
+                        row['原价格'],
                         row['失效时间'],
                         row['仓库名称'],
                         row['库存'],
                         row['备注'],
                         fetch_time  # 拉取时间
                     ))
-                
+
                 # 批量插入到整合表
                 sql = """
-                    INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 db_manager.execute_many(sql, batch_data)
                 print(f"已批量保存 {min(i + batch_size, len(result_df))} / {len(result_df)} 条机器人数据到整合表")
@@ -1565,7 +1443,10 @@ def ggg2():
     fd_df = pd.concat(xs_df_list)
     fd_df['原厂OE码'] = fd_df['原厂oe码']
     fd_df = fd_df[['供应商名称','原厂OE码','品牌','价格','失效时间','仓库名称','库存','备注']]
-    
+
+    # 保存原价格
+    fd_df['原价格'] = fd_df['价格']
+
     # 根据品牌处理价格
     fd_df['价格'] = fd_df.apply(
         lambda row: process_price_by_brand(row['价格'], row['品牌']) if row['价格'] != '' and pd.notna(row['价格']) and row['价格'] is not None else row['价格'],
@@ -1613,7 +1494,7 @@ def ggg2():
         # 同时保存到整合表
         for i in range(0, len(fd_df), batch_size):
             batch = fd_df.iloc[i:i + batch_size]
-            
+
             # 准备批量插入数据
             batch_data = []
             for index, row in batch.iterrows():
@@ -1622,17 +1503,18 @@ def ggg2():
                     row['原厂OE码'],
                     row['品牌'],
                     row['价格'],
+                    row['原价格'],
                     row['失效时间'],
                     row['仓库名称'],
                     row['库存'],
                     row['备注'],
                     row['fetch_time']
                 ))
-            
+
             # 批量插入到整合表
             sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(fd_df))} / {len(fd_df)} 条外部数据到整合表")
@@ -1671,8 +1553,24 @@ def save_supplier_to_virtual_inventory(df, supplier_name="供应商"):
     # 判断是否为万拓数据
     is_wantuo = supplier_name == "佛山万拓"
 
-    # 根据品牌处理价格（万拓数据额外加15%）
-    df['价格'] = df.apply(lambda row: process_price_by_brand(row['价格'], row['品牌'], is_wantuo=is_wantuo), axis=1)
+    # 判断是否为昌盛数据（需要特殊处理尾号80+原厂再制造的产品）
+    is_changsheng = supplier_name == "昌盛" or supplier_name == "广州昌盛"
+
+    # 保存原价格
+    df['原价格'] = df['价格']
+
+    # 根据品牌处理价格（万拓数据额外加15%，昌盛特殊产品额外加10%）
+    def process_row_price(row):
+        # 判断是否为昌盛特殊产品：尾号80结尾 + 备注包含"是惠选件"
+        is_changsheng_special = False
+        if is_changsheng:
+            oe_code = str(row.get('原厂OE码', ''))
+            remark = str(row.get('备注', ''))
+            if oe_code.endswith('80') and '是惠选件' in remark:
+                is_changsheng_special = True
+        return process_price_by_brand(row['价格'], row['品牌'], is_wantuo=is_wantuo, is_changsheng_special=is_changsheng_special)
+
+    df['价格'] = df.apply(process_row_price, axis=1)
     
     # 添加拉取时间
     fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1693,17 +1591,18 @@ def save_supplier_to_virtual_inventory(df, supplier_name="供应商"):
                     row['原厂OE码'],
                     row['品牌'],
                     row['价格'],
+                    row['原价格'],
                     row['失效时间'],
                     row['仓库名称'],
                     row['库存'],
                     row['备注'],
                     row['fetch_time']
                 ))
-            
+
             # 批量插入到整合表
             sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(df))} / {len(df)} 条{supplier_name}库存数据到整合表")
@@ -2119,13 +2018,8 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
 
 
 
-def main_process(skip_table_creation=False):
-    """主处理流程
-    
-    参数:
-        skip_table_creation: 是否跳过表创建检查，默认为False
-                            当在应用启动时已创建表，后续定时任务可设为True跳过
-    """
+def main_process():
+    """主处理流程"""
     # 清除品牌缓存，确保每次运行都重新加载
     clear_brand_cache()
     
@@ -2135,10 +2029,6 @@ def main_process(skip_table_creation=False):
     
     # 清理当前业务时间范围内的数据
     clean_business_time_data()
-    
-    # 只在需要时创建表（应用启动时），定时任务可跳过此步骤
-    if not skip_table_creation:
-        create_tables()
     
     # 清空其他表的数据（除了virtual_inventory表）
     clear_all_tables()

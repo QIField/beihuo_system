@@ -5,6 +5,7 @@
 """
 
 import time
+import pymysql
 from typing import List, Dict, Set, Tuple
 from app.utils.database_connection import get_db_connection
 
@@ -39,32 +40,27 @@ class BlacklistFilter:
             return len(self._blacklist_set)
         
         conn = get_db_connection()
-        cursor = conn.cursor()
-        try:
-            # 清空旧数据
-            self._blacklist_set.clear()
-            
-            # 从数据库加载
-            cursor.execute("SELECT supplier_name, oe_code, brand FROM inventory_blacklist")
-            rows = cursor.fetchall()
-            
-            # 构建哈希集合
-            for row in rows:
-                # 使用元组作为key,支持组合匹配
-                key = (row[0], row[1], row[2])
-                self._blacklist_set.add(key)
-            
-            self._last_load_time = current_time
-            
-            print(f"[黑名单过滤] 已加载 {len(self._blacklist_set)} 条黑名单到内存")
-            return len(self._blacklist_set)
-            
-        except Exception as e:
-            print(f"[黑名单过滤] 加载黑名单失败: {e}")
-            return 0
-        finally:
-            cursor.close()
-            conn.close()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        # 清空旧数据
+        self._blacklist_set.clear()
+        
+        # 从数据库加载
+        cursor.execute("SELECT supplier_name, oe_code, brand FROM inventory_blacklist")
+        rows = cursor.fetchall()
+        
+        # 构建哈希集合
+        for row in rows:
+            # 使用元组作为key,支持组合匹配
+            key = (row.get('supplier_name') or '', row.get('oe_code') or '', row.get('brand') or '')
+            self._blacklist_set.add(key)
+        
+        self._last_load_time = current_time
+        
+        print(f"[黑名单过滤] 已加载 {len(self._blacklist_set)} 条黑名单到内存")
+        
+        cursor.close()
+        conn.close()
+        return len(self._blacklist_set)
     
     def is_blacklisted(self, supplier_name: str, oe_code: str, brand: str) -> bool:
         """

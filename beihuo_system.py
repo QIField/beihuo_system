@@ -309,8 +309,8 @@ def run_virtual_inventory_task():
             # 使用绝对导入方式加载模块
             from app.utils import virtual_inventory
             
-            # 调用主处理函数，跳过表创建（已在应用启动时创建）
-            virtual_inventory.main_process(skip_table_creation=True)
+            # 调用主处理函数
+            virtual_inventory.main_process()
             print(f"[{datetime.now()}] 虚拟库存数据同步任务执行完成！")
             
             # 在虚拟库存任务完成后，立即执行CRM新建产品任务（保持原有串行逻辑）

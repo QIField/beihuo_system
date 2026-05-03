@@ -19,6 +19,7 @@ from .tables import (
     init_shop_business_indicator_table,
     init_price_inquiry_direct_table,
     init_safety_stock_calculation_table,
+    init_all_virtual_inventory_tables,
 )
 
 
@@ -842,6 +843,7 @@ def init_all_tables():
         ('店铺经营指标', init_shop_business_indicator_table),
         ('询价直接入库', init_price_inquiry_direct_table),
         ('安全库存计算', init_safety_stock_calculation_table),
+        ('虚拟库存', init_all_virtual_inventory_tables),
     ]
 
     completed = []
