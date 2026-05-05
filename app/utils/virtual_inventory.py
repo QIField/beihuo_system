@@ -480,15 +480,30 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
         # 创建游标对象
         cursor = conn.cursor()
 
-        # 执行查询
-        if supplier_name == '腾隆':
-            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='腾隆' and LEN(REPLACE(bianma, ' ', '')) = 11")
-        elif supplier_name == '宝翼隆':
-            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='宝翼隆' and LEN(REPLACE(bianma, ' ', '')) = 11")
-        elif supplier_name == '沐博':
-            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='沐博' and LEN(REPLACE(bianma, ' ', '')) = 11")
-        else:
-            cursor.execute("SELECT * FROM kucun where shuliang > 1 and LEN(REPLACE(bianma, ' ', '')) = 11")
+        # 执行查询 - 统一查询三家供应商数据
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN LEN(REPLACE(bianma, ' ', '')) = 13 
+                         AND RIGHT(REPLACE(bianma, ' ', ''), 2) IN ('01', '02', '03', '04', '05', '06', '07', '08', '09') 
+                    THEN LEFT(REPLACE(bianma, ' ', ''), LEN(REPLACE(bianma, ' ', '')) - 2) 
+                    ELSE REPLACE(bianma, ' ', '') 
+                END AS bianma, 
+                CASE 
+                    WHEN mingcheng LIKE '%下线%' THEN 'XX' 
+                    WHEN REPLACE(fenleima, ' ', '') = '正厂' THEN '原厂' 
+                    ELSE fenleima 
+                END AS fenleima, 
+                shuliang, 
+                shoujia, 
+                gs 
+            FROM kucun 
+            WHERE chexing != '奔驰' 
+              AND gs IN ('腾隆', '沐博', '宝翼隆') 
+              AND shuliang > 1 
+              AND mingcheng NOT LIKE '%一比一%' 
+              AND fenleima NOT LIKE '%一比一%'
+        """)
 
         # 获取结果
         rows = cursor.fetchall()
@@ -499,24 +514,30 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
         processed_data = []
 
         for row in rows:
-            brand = row[5].replace(' ', '').replace('正厂','原厂')
-            if not brand:
+            # SQL查询结果：bianma, fenleima, shuliang, shoujia, gs
+            bianma = row[0]      # 编码（已在SQL中处理）
+            fenleima = row[1]    # 分类码/品牌（已在SQL中处理）
+            shuliang = row[2]    # 数量
+            shoujia = row[3]     # 售价
+            gs = row[4]          # 供应商
+            
+            # 品牌过滤
+            if not fenleima:
                 continue
 
-            code = row[1].replace(' ', '')
             # 根据品牌处理价格
-            original_price = float(row[7])
-            price = process_price_by_brand(original_price, brand)
+            original_price = float(shoujia)
+            price = process_price_by_brand(original_price, fenleima)
             if price < 1:
                 continue
 
-            stock = row[6]
+            stock = shuliang
             expiry_date = (current_time + timedelta(days=int(stock))).strftime("%Y-%m-%d %H:%M:%S")
 
             processed_data.append({
-                'supplier': supplier_name,
-                'code': code,
-                'brand': brand,
+                'supplier': gs,
+                'code': bianma,
+                'brand': fenleima,
                 'price': price,  # 处理后的价格
                 'original_price': original_price,  # 原价格
                 'expiry_date': expiry_date,
