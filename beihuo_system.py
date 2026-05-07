@@ -4511,7 +4511,7 @@ def init_background_tasks():
             run_virtual_inventory_task,
             'cron',
             'virtual_inventory_daily',
-            hour=0,
+            hour=22,
             minute=0,
             replace_existing=True
         )

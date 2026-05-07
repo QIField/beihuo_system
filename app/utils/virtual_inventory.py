@@ -530,6 +530,10 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
             shoujia = row[3]     # 售价
             gs = row[4]          # 供应商
             
+            # 去除品牌名称前后的空格（SQL Server可能返回固定长度字符串）
+            if fenleima:
+                fenleima = fenleima.strip()
+            
             # 品牌过滤
             if not fenleima:
                 continue
@@ -1449,6 +1453,33 @@ def ggg2():
         'dghf': 'virtual_inventory_dghf'
     }
 
+    # 供应商名称映射（用于非佛山表）
+    supplier_mapping = {
+        '东莞佳配': '佛山1',
+        '佛山万拓': '佛山2',
+        '佛山巴博瑞': '佛山3',
+        '佛山德孚': '佛山4',
+        '佛山新奔裕汽配': '佛山5',
+        '佳配': '佛山6',
+        '宝翼隆': '佛山7',
+        '广州佳配': '佛山8',
+        '广州德之宝': '佛山9',
+        '广州日昇': '佛山10',
+        '广州昌盛': '佛山11',
+        '广州犇宝': '佛山12',
+        '广星': '佛山13',
+        '沐博': '佛山14',
+        '爱车贝母': '佛山15',
+        '腾隆': '佛山16',
+        '鑫峰': '佛山17'
+    }
+
+    # 佛山表上传用供应商名称映射
+    fsbbr_upload_mapping = {
+        '广州昌盛': '昌盛',
+        '佛山万拓': '万拓'
+    }
+
     db_manager = get_db_connection()
     try:
         for company in companies:
@@ -1457,8 +1488,19 @@ def ggg2():
             # 准备数据
             batch_data = []
             for _, row in fd_df.iterrows():
+                # 处理供应商名称和上传用供应商名称
+                original_supplier = row['供应商名称']
+                if company == 'fsbbr':
+                    # 佛山表：supplier_name保持原名称，upload_supplier_name使用映射
+                    supplier_name = original_supplier
+                    upload_supplier_name = fsbbr_upload_mapping.get(original_supplier, original_supplier)
+                else:
+                    # 其他表：supplier_name保持原名称，upload_supplier_name使用佛山X映射
+                    supplier_name = original_supplier
+                    upload_supplier_name = supplier_mapping.get(original_supplier, original_supplier)
+
                 batch_data.append((
-                    row['供应商名称'],
+                    supplier_name,
                     row['原厂OE码'],
                     row['品牌'],
                     row['价格'],  # 已经处理过的价格
@@ -1467,7 +1509,8 @@ def ggg2():
                     row['仓库名称'],
                     row['库存'],
                     row['备注'],
-                    row['fetch_time']
+                    row['fetch_time'],
+                    upload_supplier_name
                 ))
 
             # 批量插入
@@ -1475,8 +1518,8 @@ def ggg2():
             for i in range(0, len(batch_data), batch_size):
                 batch = batch_data[i:i + batch_size]
                 sql = f"""
-                    INSERT INTO {table_name} (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO {table_name} (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time, upload_supplier_name)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 db_manager.execute_many(sql, batch)
                 print(f"[{company}] 已批量保存 {min(i + batch_size, len(batch_data))} / {len(batch_data)} 条外部数据")
@@ -1512,6 +1555,8 @@ def delete_old_data():
 def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changsheng_special_fn=None):
     """
     保存数据到各公司虚拟库存表，按各公司价格规则处理
+    非佛山表的供应商名称会映射为佛山X格式
+    新增 upload_supplier_name 列用于上传时的供应商名称
 
     :param df: 数据DataFrame
     :param is_wantuo: 是否为万拓数据
@@ -1530,8 +1575,60 @@ def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changshe
         'dghf': 'virtual_inventory_dghf'
     }
 
+    # 供应商名称映射（用于非佛山表）
+    supplier_mapping = {
+        '东莞佳配': '佛山1',
+        '佛山万拓': '佛山2',
+        '佛山巴博瑞': '佛山3',
+        '佛山德孚': '佛山4',
+        '佛山新奔裕汽配': '佛山5',
+        '佳配': '佛山6',
+        '宝翼隆': '佛山7',
+        '广州佳配': '佛山8',
+        '广州德之宝': '佛山9',
+        '广州日昇': '佛山10',
+        '广州昌盛': '佛山11',
+        '广州犇宝': '佛山12',
+        '广星': '佛山13',
+        '沐博': '佛山14',
+        '爱车贝母': '佛山15',
+        '腾隆': '佛山16',
+        '鑫峰': '佛山17'
+    }
+
+    # 佛山表上传用供应商名称映射
+    fsbbr_upload_mapping = {
+        '广州昌盛': '昌盛',
+        '佛山万拓': '万拓'
+    }
+
+    # 仓库名称映射（用于非佛山表）
+    # 中山、东莞巴友、东莞恒发：佛山禅城仓 -> 广州越秀仓
+    # 珠海：佛山禅城仓 -> 广州越秀1仓，广州越秀仓 -> 广州越秀1仓
+    warehouse_mapping = {
+        'zsbbr': {
+            '佛山禅城仓': '广州越秀仓'
+        },
+        'dgby': {
+            '佛山禅城仓': '广州越秀仓'
+        },
+        'dghf': {
+            '佛山禅城仓': '广州越秀仓'
+        },
+        'zhbbr': {
+            '佛山禅城仓': '广州越秀1仓',
+            '广州越秀仓': '广州越秀1仓'
+        }
+    }
+
     fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db_manager = get_db_connection()
+
+    # 统一去除所有字符串字段的前后空格
+    string_columns = ['供应商名称', '原厂OE码', '品牌', '仓库名称', '备注']
+    for col in string_columns:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip()
 
     try:
         for company in companies:
@@ -1554,17 +1651,36 @@ def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changshe
                     company=company
                 )
 
+                # 处理供应商名称和上传用供应商名称
+                original_supplier = row['供应商名称']
+                if company == 'fsbbr':
+                    # 佛山表：supplier_name保持原名称，upload_supplier_name使用映射
+                    supplier_name = original_supplier
+                    upload_supplier_name = fsbbr_upload_mapping.get(original_supplier, original_supplier)
+                else:
+                    # 其他表：supplier_name保持原名称，upload_supplier_name使用佛山X映射
+                    supplier_name = original_supplier
+                    upload_supplier_name = supplier_mapping.get(original_supplier, original_supplier)
+
+                # 处理仓库名称映射
+                original_warehouse = row['仓库名称']
+                if company in warehouse_mapping:
+                    warehouse_name = warehouse_mapping[company].get(original_warehouse, original_warehouse)
+                else:
+                    warehouse_name = original_warehouse
+
                 processed_data.append((
-                    row['供应商名称'],
+                    supplier_name,
                     row['原厂OE码'],
                     row['品牌'],
                     processed_price,
                     original_price,
                     row['失效时间'],
-                    row['仓库名称'],
+                    warehouse_name,
                     row['库存'],
                     row['备注'],
-                    fetch_time
+                    fetch_time,
+                    upload_supplier_name
                 ))
 
             # 批量插入
@@ -1572,8 +1688,8 @@ def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changshe
             for i in range(0, len(processed_data), batch_size):
                 batch = processed_data[i:i + batch_size]
                 sql = f"""
-                    INSERT INTO {table_name} (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO {table_name} (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time, upload_supplier_name)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 db_manager.execute_many(sql, batch)
                 print(f"[{company}] 已保存 {min(i + batch_size, len(processed_data))} / {len(processed_data)} 条")
@@ -1893,11 +2009,6 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
     # 创建反向映射：从真实品牌名到别名
     reverse_brand_mapping = {v: k for k, v in brand_mapping.items()}
 
-    # 预加载API数据（使用 fsbbr 的 token，假设这些数据对所有公司相同）
-    token = login('fsbbr')
-    ck_data = getAllCassWarehouse(token)
-    gys_data = getAllSupplierChannel(token)
-
     # 定义要推送的所有公司及对应表
     companies = ['fsbbr', 'zhbbr', 'zsbbr', 'dgby', 'dghf']
     table_map = {
@@ -1918,18 +2029,37 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         print(f"从表 [{table_name}] 读取数据")
         print(f"{'='*60}")
 
+        # 获取该公司对应的token和仓库/供应商数据
+        print(f"[{company}] 正在获取token和仓库/供应商数据...")
+        token = login(company)
+        if not token:
+            print(f"[{company}] 获取token失败，跳过")
+            continue
+
+        ck_data = getAllCassWarehouse(token)
+        if ck_data is None or ck_data.empty:
+            print(f"[{company}] 获取仓库数据失败，跳过")
+            continue
+
+        gys_data = getAllSupplierChannel(token)
+        if gys_data is None or gys_data.empty:
+            print(f"[{company}] 获取供应商数据失败，跳过")
+            continue
+
+        print(f"[{company}] 成功获取token和仓库/供应商数据")
+
         # 从对应公司表查询数据
         db_manager = get_db_connection()
         try:
             if today_only:
                 query = f"""
-                    SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg
+                    SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg, upload_supplier_name
                     FROM {table_name}
                     WHERE DATE(fetch_time) = CURDATE()
                 """
             else:
                 query = f"""
-                    SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg
+                    SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg, upload_supplier_name
                     FROM {table_name}
                 """
             rows = db_manager.execute_query(query)
@@ -1956,10 +2086,23 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
             print(f"[{company}] 过滤后没有数据需要上传")
             continue
 
+        # 非佛山公司过滤掉菲尔品牌
+        if company != 'fsbbr':
+            rows_before_feier = len(rows)
+            rows = [row for row in rows if row.get('brand') != '菲尔']
+            rows_after_feier = len(rows)
+            feier_removed = rows_before_feier - rows_after_feier
+            if feier_removed > 0:
+                print(f"[{company}] 菲尔品牌过滤: 剔除 {feier_removed} 条菲尔品牌数据, 剩余 {rows_after_feier} 条")
+
+        if not rows:
+            print(f"[{company}] 过滤后没有数据需要上传")
+            continue
+
         print(f"[{company}] 准备上传 {len(rows)} 条{'当天' if today_only else '全部'}数据")
 
         # 构建DataFrame
-        df = pd.DataFrame(rows, columns=['id', 'supplier_name', 'oe_code', 'brand', 'price', 'expiry_date', 'warehouse', 'stock', 'remark', 'update_msg'])
+        df = pd.DataFrame(rows, columns=['id', 'supplier_name', 'oe_code', 'brand', 'price', 'expiry_date', 'warehouse', 'stock', 'remark', 'update_msg', 'upload_supplier_name'])
 
         # 记录原始品牌用于判断是否使用了别名
         original_brand_series = df['brand'].copy()
@@ -1977,24 +2120,24 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
             'warehouse': '仓库名称',
             'stock': '库存',
             'remark': '备注',
-            'update_msg': '更新信息'
+            'update_msg': '更新信息',
+            'upload_supplier_name': '上传供应商名称'
         })
 
         # 使用映射后的品牌
         df['品牌'] = df['temp_brand']
 
-        # 供应商名称映射（用于B2B上传时匹配，不改变数据库中的名称）
-        supplier_mapping = {
-            '广州昌盛': '昌盛',
-            '佛山万拓': '万拓'
-        }
-        df['供应商名称_映射'] = df['供应商名称'].map(supplier_mapping).fillna(df['供应商名称'])
+        # 直接使用upload_supplier_name列作为上传用的供应商名称
+        # 如果upload_supplier_name为NULL，则使用supplier_name作为回退
+        df['供应商名称_映射'] = df['上传供应商名称'].fillna(df['供应商名称'])
+        # 确保是字符串类型并去除空格
+        df['供应商名称_映射'] = df['供应商名称_映射'].astype(str).str.strip()
 
         # 在合并前保存原始品牌信息
         df_with_original = df.copy()
         df_with_original['original_brand'] = original_brand_series.values
 
-        # 合并数据（使用映射后的供应商名称进行匹配）
+        # 合并数据（使用upload_supplier_name进行匹配）
         df_merged = pd.merge(df_with_original, ck_data, left_on='仓库名称', right_on='warehouse_name', how='inner')
         df_merged = pd.merge(df_merged, gys_data, left_on='供应商名称_映射', right_on='name', how='inner')
 
