@@ -133,6 +133,16 @@ def get_all_parts(api_key, api_secret, page_size=1000, update_time=None):
     return all_parts
 
 
+def remove_trailing_non_digit(oe_str):
+    """去掉末尾非数字字符"""
+    if pd.isna(oe_str):
+        return oe_str
+    oe_str = str(oe_str)
+    while oe_str and not oe_str[-1].isdigit():
+        oe_str = oe_str[:-1]
+    return oe_str
+
+
 def start():
     """
     广州昌盛库存数据
@@ -142,7 +152,9 @@ def start():
                        update_time=None)
     df['stock_amount'] = df['stock_amount'].astype(int)
     df['供应商名称'] = '广州昌盛'
+    # OE码处理：去空格 → 去掉末尾非数字
     df['原厂OE码'] = df['part_number'].str.replace(' ', '')
+    df['原厂OE码'] = df['原厂OE码'].apply(remove_trailing_non_digit)
     df['品牌'] = df['brand_name']
     df['价格'] = df['sale_price']
     tomorrow_ts = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")

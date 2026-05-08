@@ -42,7 +42,7 @@ class PurchaseSyncService:
     def sync_to_compare_summary(self, company: str = COMPANY) -> Dict[str, int]:
         """
         将采购历史数据同步到比价汇总表
-        主入口方法
+        使用批量 SQL 替代逐条处理，提升性能
 
         Args:
             company: 公司代码
@@ -59,34 +59,122 @@ class PurchaseSyncService:
             'duplicate': 0
         }
 
-        # 获取所有需要同步的 OE+品牌 组合
-        oe_brand_list = self._get_all_oe_brand(company)
-        print(f"共有 {len(oe_brand_list)} 个 OE+品牌 组合需要同步")
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                # 使用批量 SQL 一次性计算并更新所有价格数据
+                # 1. 先创建临时表存储基础价格数据
+                create_temp_sql = """
+                    CREATE TEMPORARY TABLE IF NOT EXISTS temp_all_prices (
+                        oe VARCHAR(255),
+                        brand VARCHAR(255),
+                        unit_price DECIMAL(10,2),
+                        purchase_date DATETIME,
+                        src INT,
+                        INDEX idx_oe_brand (oe, brand),
+                        INDEX idx_date (purchase_date)
+                    )
+                """
+                cursor.execute(create_temp_sql)
 
-        for idx, (oe, brand) in enumerate(oe_brand_list, 1):
-            try:
-                # 计算该 OE+品牌 的各项价格数据（从三个表查询）
-                max_price, min_price = self._calculate_max_min_price(oe, brand, company)
-                supplier_price = self._get_latest_price(oe, brand, company)
+                # 2. 将三个表的数据插入临时表
+                insert_prices_sql = """
+                    INSERT INTO temp_all_prices (oe, brand, unit_price, purchase_date, src)
+                    SELECT oe, brand, unit_price, purchase_date, 1 as src
+                    FROM crmapp_procurement_history
+                    WHERE company = %s AND unit_price > 0
+                    UNION ALL
+                    SELECT oe, brand, original_price as unit_price, import_time as purchase_date, 2 as src
+                    FROM crmapp_price_inquiry
+                    WHERE company = %s AND original_price > 0
+                    UNION ALL
+                    SELECT oe, brand, original_price as unit_price, import_time as purchase_date, 3 as src
+                    FROM crmapp_price_inquiry_direct
+                    WHERE company = %s AND original_price > 0
+                """
+                cursor.execute(insert_prices_sql, (company, company, company))
 
-                # 更新比价表
-                updated = self._update_compare_summary(
-                    oe, brand, company,
-                    max_price, min_price, supplier_price
-                )
+                # 3. 创建临时表存储统计结果
+                create_stats_sql = """
+                    CREATE TEMPORARY TABLE IF NOT EXISTS temp_price_stats (
+                        oe VARCHAR(255),
+                        brand VARCHAR(255),
+                        max_price DECIMAL(10,2),
+                        min_price DECIMAL(10,2),
+                        supplier_price DECIMAL(10,2),
+                        PRIMARY KEY (oe, brand)
+                    )
+                """
+                cursor.execute(create_stats_sql)
 
-                if updated:
-                    result['saved'] += 1
-                else:
-                    result['duplicate'] += 1
+                # 4. 计算最高和最低价格
+                insert_stats_sql = """
+                    INSERT INTO temp_price_stats (oe, brand, max_price, min_price, supplier_price)
+                    SELECT 
+                        oe,
+                        brand,
+                        MAX(unit_price) as max_price,
+                        MIN(unit_price) as min_price,
+                        0 as supplier_price
+                    FROM temp_all_prices
+                    GROUP BY oe, brand
+                """
+                cursor.execute(insert_stats_sql)
 
-                # 每100条输出进度
-                if idx % 100 == 0:
-                    print(f"已处理 {idx}/{len(oe_brand_list)} 条...")
+                # 5. 更新最新价格（使用关联子查询）
+                update_latest_sql = """
+                    UPDATE temp_price_stats tps
+                    SET supplier_price = (
+                        SELECT unit_price 
+                        FROM temp_all_prices tap 
+                        WHERE tap.oe = tps.oe 
+                        AND tap.brand = tps.brand
+                        ORDER BY tap.purchase_date DESC, tap.src ASC 
+                        LIMIT 1
+                    )
+                """
+                cursor.execute(update_latest_sql)
 
-            except Exception as e:
-                print(f"同步失败 OE={oe}, brand={brand}: {e}")
-                result['duplicate'] += 1
+                # 6. 获取统计数量
+                cursor.execute("SELECT COUNT(*) as cnt FROM temp_price_stats")
+                count_result = cursor.fetchone()
+                temp_count = count_result['cnt'] if isinstance(count_result, dict) else count_result[0]
+                print(f"计算出 {temp_count} 条价格统计")
+
+                # 7. 批量更新到比价汇总表（使用 INSERT ... ON DUPLICATE KEY UPDATE）
+                upsert_sql = """
+                    INSERT INTO crmapp_compare_summary 
+                    (oe, brand, company, max_price, min_price, supplier_price, updated_time)
+                    SELECT oe, brand, %s, max_price, min_price, supplier_price, NOW()
+                    FROM temp_price_stats
+                    ON DUPLICATE KEY UPDATE
+                        max_price = VALUES(max_price),
+                        min_price = VALUES(min_price),
+                        supplier_price = VALUES(supplier_price),
+                        updated_time = VALUES(updated_time)
+                """
+                cursor.execute(upsert_sql, (company,))
+                affected_rows = cursor.rowcount
+
+                # 8. 清理临时表
+                cursor.execute("DROP TEMPORARY TABLE IF EXISTS temp_all_prices")
+                cursor.execute("DROP TEMPORARY TABLE IF EXISTS temp_price_stats")
+
+                conn.commit()
+
+                result['saved'] = temp_count
+                result['duplicate'] = 0
+
+                print(f"同步完成: 计算 {temp_count} 条, 影响 {affected_rows} 条")
+
+        except Exception as e:
+            conn.rollback()
+            print(f"批量同步失败: {e}")
+            import traceback
+            traceback.print_exc()
+            result['duplicate'] = 1
+        finally:
+            conn.close()
 
         print(f"\n{'='*60}")
         print(f"采购数据同步完成!")

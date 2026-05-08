@@ -475,11 +475,11 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     
     # 步骤8：触发聚合和同步（异步执行，不阻塞返回）
     if inserted_count > 0:
-        _trigger_aggregate_async(company)
-    
+        _trigger_aggregate_async(company, upload_success_items)
+
     # 清理临时文件
     os.remove(file_path)
-    
+
     return result_path
 
 
@@ -651,26 +651,31 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
         conn.close()
     
     # 触发聚合和同步（异步执行，不阻塞返回）
+    # 直接入库模式不传 upload_success_items，跳过 BatchChannel 推送
     if inserted_count > 0:
         _trigger_aggregate_async(company)
-    
+
     # 清理临时文件
     os.remove(file_path)
-    
+
     return result_path
 
 
-def _trigger_aggregate_async(company: str):
+def _trigger_aggregate_async(company: str, upload_success_items: list = None):
     """
     异步触发聚合和同步任务
     不阻塞主流程，在后台线程中执行
+
+    Args:
+        company: 门店代码
+        upload_success_items: 上传成功的数据列表（仅上传模式有值）
     """
     import threading
-    
+
     def run_aggregate():
         try:
             print(f"[InquiryImport] 开始异步聚合和同步, company={company}")
-            
+
             # 1. 聚合三个表数据
             from app.services.procurement_service.purchase_history_aggregate_service import PurchaseHistoryAggregateService
             aggregate_service = PurchaseHistoryAggregateService()
@@ -679,18 +684,23 @@ def _trigger_aggregate_async(company: str):
                 company=company
             )
             print(f"[InquiryImport] 聚合完成: {aggregate_result}")
-            
+
             # 2. 同步到比价表
             from app.services.procurement_service.purchase_sync_service import PurchaseSyncService
             sync_service = PurchaseSyncService()
             sync_result = sync_service.sync_to_compare_summary(company)
             print(f"[InquiryImport] 同步完成: {sync_result}")
-            
+
+            # 3. 批量推送渠道价格（仅在上传模式下）
+            if upload_success_items:
+                from app.services.procurement_service.batch_channel_push_service import push_to_batch_channel
+                push_to_batch_channel(upload_success_items, company)
+
         except Exception as e:
             print(f"[InquiryImport] 异步聚合同步失败: {e}")
             import traceback
             traceback.print_exc()
-    
+
     # 在后台线程中执行
     thread = threading.Thread(target=run_aggregate)
     thread.daemon = True

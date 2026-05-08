@@ -32,21 +32,15 @@ def filter_unprocessed_orders(order_ids):
         # 使用 DBCursorContext 上下文管理器，自动管理连接和事务
         # dict_cursor=True 表示使用字典游标，可以通过列名访问数据
         with db_cursor(dict_cursor=True) as cursor:
-            # 计算一周前的时间（从当前时间往前一周）
-            one_week_ago = datetime.now() - timedelta(days=7)
-            one_week_ago_str = one_week_ago.strftime('%Y-%m-%d %H:%M:%S')
-            
-            # 构建SQL查询，获取一周内且在提供的订单ID列表中的记录
+            # 构建SQL查询，直接根据订单ID列表查询（不限制日期，避免漏掉历史订单）
             placeholders = ','.join(['%s'] * len(order_ids))
             sql = f"""
             SELECT `开思订单号`, `crm订单状态` 
             FROM crmapp_ks_auto_bill 
-            WHERE `日期` >= %s 
-            AND `开思订单号` IN ({placeholders})
+            WHERE `开思订单号` IN ({placeholders})
             """
             
-            params = [one_week_ago_str] + order_ids
-            cursor.execute(sql, params)
+            cursor.execute(sql, order_ids)
             results = cursor.fetchall()
             
             # 使用集合优化：将已处理的订单ID存储到集合中，方便O(1)时间复杂度查找

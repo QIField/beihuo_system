@@ -61,16 +61,18 @@ def clear_brand_cache():
     print("品牌缓存已清除")
 
 
-def process_price_by_brand(price, brand, is_wantuo=False):
+def process_price_by_brand(price, brand, is_wantuo=False, is_changsheng_special=False, company='fsbbr'):
     """
     根据品牌精准匹配处理价格：
-    - 品牌为'原厂'：价格 × 1.05（万拓时×1.20，即5%+15%）
-    - 品牌匹配 crm_brand_list 且 type_cn='品牌'：价格 × 1.06（万拓时×1.21，即6%+15%）
-    - 其他所有情况（包括 type_cn='其他品牌' 或未匹配到的品牌）：价格 × 1.08（万拓时×1.23，即8%+15%）
+    - 佛山/中山/东莞：原厂+5%，品牌+6%，其他+8%
+    - 珠海：原厂+8%，国际+12%，其他+20%
+    - 万拓额外+15%，昌盛特殊产品额外+10%
 
     :param price: 原始价格
     :param brand: 品牌名称
     :param is_wantuo: 是否为万拓数据，如果是则额外加15%
+    :param is_changsheng_special: 是否为昌盛特殊产品（尾号80结尾+原厂再制造），如果是则额外加10%
+    :param company: 公司标识，'zhbbr'为珠海，其他为默认规则
     """
     if not price or price == '':
         return 0.0
@@ -81,29 +83,37 @@ def process_price_by_brand(price, brand, is_wantuo=False):
         # 获取品牌缓存
         brand_dict = load_crm_brand_list()
 
+        # 判断是否为珠海
+        is_zhuhai = (company == 'zhbbr')
+
+        # 基础加点
+        base_multiplier = 1.0
+
         # 检查品牌是否在 crm_brand_list 中
         if brand in brand_dict:
             type_cn = brand_dict[brand]
             # 原厂品牌
             if type_cn == '原厂':
-                if is_wantuo:
-                    return round(price_float * 1.20, 2)  # 5% + 15% = 20%
-                return round(price_float * 1.05, 2)
+                base_multiplier = 1.08 if is_zhuhai else 1.05
             # type_cn='品牌'
             elif type_cn == '品牌':
-                if is_wantuo:
-                    return round(price_float * 1.21, 2)  # 6% + 15% = 21%
-                return round(price_float * 1.06, 2)
+                base_multiplier = 1.12 if is_zhuhai else 1.06
             # type_cn='其他品牌'
             else:
-                if is_wantuo:
-                    return round(price_float * 1.23, 2)  # 8% + 15% = 23%
-                return round(price_float * 1.08, 2)
+                base_multiplier = 1.20 if is_zhuhai else 1.08
         else:
             # 品牌不在 crm_brand_list 中
-            if is_wantuo:
-                return round(price_float * 1.23, 2)  # 8% + 15% = 23%
-            return round(price_float * 1.08, 2)
+            base_multiplier = 1.20 if is_zhuhai else 1.08
+
+        # 额外加点（万拓+15%，昌盛特殊+10%）
+        extra_multiplier = 1.0
+        if is_wantuo:
+            extra_multiplier += 0.15
+        elif is_changsheng_special:
+            extra_multiplier += 0.10
+
+        final_price = price_float * base_multiplier * extra_multiplier
+        return round(final_price, 2)
 
     except (ValueError, TypeError):
         return 0.0
@@ -131,38 +141,46 @@ def get_business_time_range(current_time):
 
 def clean_business_time_data():
     """
-    清理当前业务时间范围内的数据
+    清理当前业务时间范围内的数据（所有公司表）
     """
     current_time = datetime.now()
     business_start, business_end = get_business_time_range(current_time)
-    
+
     print(f"当前时间: {current_time}")
     print(f"业务时间范围: {business_start} 到 {business_end}")
-    
+
+    tables = [
+        'virtual_inventory',
+        'virtual_inventory_zhbbr',
+        'virtual_inventory_zsbbr',
+        'virtual_inventory_dgby',
+        'virtual_inventory_dghf'
+    ]
+
     db_manager = get_db_connection()
     try:
-        # 检查是否存在该业务时间段的数据
-        check_query = """
-            SELECT COUNT(*) as count 
-            FROM virtual_inventory 
-            WHERE fetch_time >= %s AND fetch_time < %s
-        """
-        result = db_manager.execute_query(check_query, (business_start, business_end))
-        count = result[0]['count']
-        
-        if count > 0:
-            print(f"发现 {count} 条属于当前业务时间段的数据，正在删除...")
-            
-            # 删除该业务时间段的数据
-            delete_query = """
-                DELETE FROM virtual_inventory 
+        for table in tables:
+            # 检查是否存在该业务时间段的数据
+            check_query = f"""
+                SELECT COUNT(*) as count
+                FROM {table}
                 WHERE fetch_time >= %s AND fetch_time < %s
             """
-            deleted_count = db_manager.execute_update(delete_query, (business_start, business_end))
-            print(f"已删除 {deleted_count} 条属于当前业务时间段的数据")
-        else:
-            print("当前业务时间段内没有数据")
-    
+            result = db_manager.execute_query(check_query, (business_start, business_end))
+            count = result[0]['count']
+
+            if count > 0:
+                print(f"[{table}] 发现 {count} 条属于当前业务时间段的数据，正在删除...")
+
+                delete_query = f"""
+                    DELETE FROM {table}
+                    WHERE fetch_time >= %s AND fetch_time < %s
+                """
+                deleted_count = db_manager.execute_update(delete_query, (business_start, business_end))
+                print(f"[{table}] 已删除 {deleted_count} 条数据")
+            else:
+                print(f"[{table}] 当前业务时间段内没有数据")
+
     except Exception as e:
         print(f"清理业务时间数据时出错: {e}")
     finally:
@@ -318,142 +336,6 @@ def load_crm_aliases_mapping():
         return {}
 
 
-def create_tables():
-    """创建数据库表"""
-    db_manager = get_db_connection()
-    try:
-        cursor = db_manager.connection.cursor()
-        
-        # 创建腾隆数据表
-        cursor.execute("""  
-            CREATE TABLE IF NOT EXISTS tenglong_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        # 创建贝尔马勒数据表
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS beiermale_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        # 创建爱车贝母数据表（按地区分表）
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS aichebeimu_foshan_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS aichebeimu_dongguan_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS aichebeimu_zhongshan_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS robot_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier_name VARCHAR(100),
-                oe_number VARCHAR(100),
-                brand_name VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                city_name VARCHAR(100),
-                quantity INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS external_data (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier_name VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS virtual_inventory (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                supplier_name VARCHAR(100),
-                oe_code VARCHAR(100),
-                brand VARCHAR(100),
-                price DECIMAL(10,2),
-                expiry_date DATETIME,
-                warehouse VARCHAR(100),
-                stock INT,
-                remark TEXT,
-                fetch_time DATETIME,
-                update_msg TEXT,
-                update_status VARCHAR(50) DEFAULT NULL COMMENT '更新状态'
-            )
-        """)
-
-        db_manager.connection.commit()
-    finally:
-        db_manager.close()
-
-
 def clear_all_tables():
     """清空所有表的数据并重置自动递增ID，但保留virtual_inventory表"""
     db_manager = get_db_connection()
@@ -528,10 +410,9 @@ def process_supplier_data(all_data, valid_brands=None):
     """
     处理多家供应商数据：
     1. 去除编码末尾的特定序号
-    2. 对于相同编码和品牌，如果三家数据不同，取中间值
-    3. 统一供应商为腾隆
-    4. 只保留brands.json中存在的品牌
-    5. 除了腾隆外，其他供应商只有库存大于等于2的才保留
+    2. 保留各自供应商名称（腾隆、宝翼隆、沐博分开显示）
+    3. 只保留brands.json中存在的品牌
+    4. 除了腾隆外，其他供应商只有库存大于等于2的才保留
     """
     print("处理供应商数据")
 
@@ -570,20 +451,18 @@ def process_supplier_data(all_data, valid_brands=None):
         key = (processed_code, item['brand'])
         grouped_data[key].append(item)
 
-    # 对每组数据进行处理
+    # 对每组数据进行处理：去重取中间值，但保留原始供应商名称
     final_data = []
     for key, items in grouped_data.items():
         if len(items) == 1:
-            # 只有一个数据，直接使用，并统一供应商为腾隆
-            items[0]['supplier'] = '腾隆'
+            # 只有一个数据，直接使用
             final_data.append(items[0])
         else:
             # 多个数据，按库存数量排序，取中间值
             sorted_items = sorted(items, key=lambda x: int(x['stock']))
             middle_index = len(sorted_items) // 2
             selected_item = sorted_items[middle_index]
-            # 统一供应商为腾隆
-            selected_item['supplier'] = '腾隆'
+            # 保留原始供应商名称，不统一改为"腾隆"
             final_data.append(selected_item)
 
     return final_data
@@ -610,15 +489,30 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
         # 创建游标对象
         cursor = conn.cursor()
 
-        # 执行查询
-        if supplier_name == '腾隆':
-            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='腾隆' and LEN(REPLACE(bianma, ' ', '')) = 11")
-        elif supplier_name == '宝翼隆':
-            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='宝翼隆' and LEN(REPLACE(bianma, ' ', '')) = 11")
-        elif supplier_name == '沐博':
-            cursor.execute("SELECT * FROM kucun where shuliang > 1 and gs='沐博' and LEN(REPLACE(bianma, ' ', '')) = 11")
-        else:
-            cursor.execute("SELECT * FROM kucun where shuliang > 1 and LEN(REPLACE(bianma, ' ', '')) = 11")
+        # 执行查询 - 统一查询三家供应商数据
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN LEN(REPLACE(bianma, ' ', '')) = 13 
+                         AND RIGHT(REPLACE(bianma, ' ', ''), 2) IN ('01', '02', '03', '04', '05', '06', '07', '08', '09') 
+                    THEN LEFT(REPLACE(bianma, ' ', ''), LEN(REPLACE(bianma, ' ', '')) - 2) 
+                    ELSE REPLACE(bianma, ' ', '') 
+                END AS bianma, 
+                CASE 
+                    WHEN mingcheng LIKE '%下线%' THEN 'XX' 
+                    WHEN REPLACE(fenleima, ' ', '') = '正厂' THEN '原厂' 
+                    ELSE fenleima 
+                END AS fenleima, 
+                shuliang, 
+                shoujia, 
+                gs 
+            FROM kucun 
+            WHERE chexing != '奔驰' 
+              AND gs IN ('腾隆', '沐博', '宝翼隆') 
+              AND shuliang > 1 
+              AND mingcheng NOT LIKE '%一比一%' 
+              AND fenleima NOT LIKE '%一比一%'
+        """)
 
         # 获取结果
         rows = cursor.fetchall()
@@ -629,25 +523,36 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
         processed_data = []
 
         for row in rows:
-            brand = row[5].replace(' ', '').replace('正厂','原厂')
-            if not brand:
+            # SQL查询结果：bianma, fenleima, shuliang, shoujia, gs
+            bianma = row[0]      # 编码（已在SQL中处理）
+            fenleima = row[1]    # 分类码/品牌（已在SQL中处理）
+            shuliang = row[2]    # 数量
+            shoujia = row[3]     # 售价
+            gs = row[4]          # 供应商
+            
+            # 去除品牌名称前后的空格（SQL Server可能返回固定长度字符串）
+            if fenleima:
+                fenleima = fenleima.strip()
+            
+            # 品牌过滤
+            if not fenleima:
                 continue
 
-            code = row[1].replace(' ', '')
             # 根据品牌处理价格
-            original_price = float(row[7])
-            price = process_price_by_brand(original_price, brand)
+            original_price = float(shoujia)
+            price = process_price_by_brand(original_price, fenleima)
             if price < 1:
                 continue
 
-            stock = row[6]
+            stock = shuliang
             expiry_date = (current_time + timedelta(days=int(stock))).strftime("%Y-%m-%d %H:%M:%S")
 
             processed_data.append({
-                'supplier': supplier_name,
-                'code': code,
-                'brand': brand,
-                'price': price,  # 现在是乘以1.1后的价格
+                'supplier': gs,
+                'code': bianma,
+                'brand': fenleima,
+                'price': price,  # 处理后的价格
+                'original_price': original_price,  # 原价格
                 'expiry_date': expiry_date,
                 'warehouse': '广州越秀仓',
                 'stock': stock,
@@ -724,35 +629,28 @@ def sql_sever_data():
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(final_data))} / {len(final_data)} 条腾隆数据")
         
-        # 同时将处理后的数据保存到整合表
-        for i in range(0, len(final_data), batch_size):
-            batch = final_data[i:i + batch_size]
-            
-            # 准备批量插入数据
-            batch_data = []
-            for item in batch:
-                batch_data.append((
-                    item['supplier'],  # 供应商名称
-                    item['code'],     # OE码
-                    item['brand'],    # 品牌
-                    item['price'],    # 价格
-                    item['expiry_date'], # 失效时间
-                    item['warehouse'],   # 仓库
-                    item['stock'],       # 库存
-                    item['remark'],      # 备注
-                    item['fetch_time']   # 拉取时间
-                ))
-            
-            # 批量插入到整合表
-            sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(final_data))} / {len(final_data)} 条腾隆数据到整合表")
-    
     finally:
         db_manager.close()
+
+    # 将处理后的数据保存到各公司整合表
+    # 转换为DataFrame格式
+    import pandas as pd
+    df = pd.DataFrame(final_data)
+    df = df.rename(columns={
+        'supplier': '供应商名称',
+        'code': '原厂OE码',
+        'brand': '品牌',
+        'price': '价格',
+        'expiry_date': '失效时间',
+        'warehouse': '仓库名称',
+        'stock': '库存',
+        'remark': '备注'
+    })
+    df['原价格'] = df.get('original_price', df['价格'])
+
+    # 保存到各公司表（腾隆数据不是万拓也不是昌盛）
+    save_to_company_tables(df, is_wantuo=False, is_changsheng=False)
+
     print("腾隆数据已批量保存到数据库")
 
 
@@ -886,7 +784,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                     continue
             adjusted_price = process_price_by_brand(price_value, '贝洱')
             data.append([
-                number, '贝洱', adjusted_price, male[number]['stock']
+                number, '贝洱', adjusted_price, price_value, male[number]['stock']
             ])
     
     for number in beier:
@@ -901,7 +799,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                     continue
             adjusted_price = process_price_by_brand(price_value, '马勒')
             data.append([
-                number, '马勒', adjusted_price, beier[number]['stock']
+                number, '马勒', adjusted_price, price_value, beier[number]['stock']
             ])
 
     # 纳铁福-吉凯恩对比组
@@ -917,7 +815,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                     continue
             adjusted_price = process_price_by_brand(price_value, '吉凯恩')
             data.append([
-                number, '吉凯恩', adjusted_price, ntf[number]['stock']
+                number, '吉凯恩', adjusted_price, price_value, ntf[number]['stock']
             ])
     
     for number in jky:
@@ -932,7 +830,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                     continue
             adjusted_price = process_price_by_brand(price_value, '纳铁福')
             data.append([
-                number, '纳铁福', adjusted_price, jky[number]['stock']
+                number, '纳铁福', adjusted_price, price_value, jky[number]['stock']
             ])
 
     return data
@@ -974,35 +872,18 @@ def save_beiermale_to_db(data):
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(data))} / {len(data)} 条贝尔马勒数据")
         
-        # 同时保存到整合表
-        for i in range(0, len(data), batch_size):
-            batch = data[i:i + batch_size]
-            
-            # 准备批量插入数据
-            batch_data = []
-            for row in batch:
-                batch_data.append((
-                    '佛山巴博瑞',  # 供应商名称
-                    row[0],       # OE码
-                    row[1],       # 品牌
-                    row[2],       # 价格
-                    expiry_date,  # 失效时间（当前时间+1天）
-                    '佛山禅城仓', # 仓库
-                    row[3],       # 库存
-                    '',           # 备注
-                    fetch_time_str  # 拉取时间
-                ))
-            
-            # 批量插入到整合表
-            sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(data))} / {len(data)} 条贝尔马勒数据到整合表")
-
     finally:
         db_manager.close()
+
+    # 将数据保存到各公司整合表
+    df = pd.DataFrame(data, columns=['原厂OE码', '品牌', '价格', '原价格', '库存'])
+    df['供应商名称'] = '佛山巴博瑞'
+    df['失效时间'] = expiry_date
+    df['仓库名称'] = '佛山禅城仓'
+    df['备注'] = ''
+
+    # 保存到各公司表（贝尔马勒数据不是万拓也不是昌盛）
+    save_to_company_tables(df, is_wantuo=False, is_changsheng=False)
 
 
 def male_bier_start():
@@ -1084,7 +965,7 @@ def gylqp_start():
                 "%Y-%m-%d %H:%M:%S")
             ck = '佛山禅城仓'
             foshan_data.append([
-                gys, bm, pp, price, next_day_later, ck, kc, '', fetch_time
+                gys, bm, pp, price, original_price, next_day_later, ck, kc, '', fetch_time
             ])
         if '东莞' in i[6]:
             bm = i[0].replace(' ','')
@@ -1099,7 +980,7 @@ def gylqp_start():
                 "%Y-%m-%d %H:%M:%S")
             ck = '东莞寮步仓'
             dongguan_data.append([
-                gys, bm, pp, price, next_day_later, ck, kc, '', fetch_time
+                gys, bm, pp, price, original_price, next_day_later, ck, kc, '', fetch_time
             ])
         if '中山' in i[6]:
             bm = i[0].replace(' ','')
@@ -1114,7 +995,7 @@ def gylqp_start():
                 "%Y-%m-%d %H:%M:%S")
             ck = '中山西区街道仓'
             zhongshan_data.append([
-                gys, bm, pp, price, next_day_later, ck, kc, '', fetch_time
+                gys, bm, pp, price, original_price, next_day_later, ck, kc, '', fetch_time
             ])
 
     # 批量保存到数据库
@@ -1125,10 +1006,10 @@ def gylqp_start():
         for i in range(0, len(foshan_data), batch_size):
             batch = foshan_data[i:i + batch_size]
             
-            # 准备批量插入数据
+            # 准备批量插入数据（跳过 original_price 字段）
             batch_data = []
             for row in batch:
-                batch_data.append(tuple(row))
+                batch_data.append((row[0], row[1], row[2], row[3], row[5], row[6], row[7], row[8], row[9]))
             
             # 批量插入
             sql = """
@@ -1142,10 +1023,10 @@ def gylqp_start():
         for i in range(0, len(dongguan_data), batch_size):
             batch = dongguan_data[i:i + batch_size]
             
-            # 准备批量插入数据
+            # 准备批量插入数据（跳过 original_price 字段）
             batch_data = []
             for row in batch:
-                batch_data.append(tuple(row))
+                batch_data.append((row[0], row[1], row[2], row[3], row[5], row[6], row[7], row[8], row[9]))
             
             # 批量插入
             sql = """
@@ -1159,10 +1040,10 @@ def gylqp_start():
         for i in range(0, len(zhongshan_data), batch_size):
             batch = zhongshan_data[i:i + batch_size]
             
-            # 准备批量插入数据
+            # 准备批量插入数据（跳过 original_price 字段）
             batch_data = []
             for row in batch:
-                batch_data.append(tuple(row))
+                batch_data.append((row[0], row[1], row[2], row[3], row[5], row[6], row[7], row[8], row[9]))
             
             # 批量插入
             sql = """
@@ -1172,52 +1053,15 @@ def gylqp_start():
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(zhongshan_data))} / {len(zhongshan_data)} 条爱车贝母中山数据")
         
-        # 同时保存到整合表
-        all_data = foshan_data + dongguan_data + zhongshan_data
-        for i in range(0, len(all_data), batch_size):
-            batch = all_data[i:i + batch_size]
-            
-            # 准备批量插入数据到整合表
-            batch_data = []
-            for row in batch:
-                batch_data.append((
-                    row[0],  # 供应商名称
-                    row[1],  # OE码
-                    row[2],  # 品牌
-                    row[3],  # 价格
-                    row[4],  # 失效时间
-                    row[5],  # 仓库
-                    row[6],  # 库存
-                    row[7],  # 备注
-                    row[8]   # 拉取时间
-                ))
-            
-            # 批量插入到整合表
-            sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(all_data))} / {len(all_data)} 条爱车贝母数据到整合表")
-
     finally:
         db_manager.close()
 
+    # 将数据保存到各公司整合表
+    all_data = foshan_data + dongguan_data + zhongshan_data
+    df = pd.DataFrame(all_data, columns=['供应商名称', '原厂OE码', '品牌', '价格', '原价格', '失效时间', '仓库名称', '库存', '备注', 'fetch_time'])
 
-def process_oe_number(oe_number):
-    # 转换为字符串处理
-    oe_str = str(oe_number)
-
-    # 删除开头的'A'
-    if oe_str.startswith('A'):
-        oe_str = oe_str[1:]
-
-    # 删除末尾的字母和文字组合
-    # 从末尾开始检查，删除连续的非数字字符
-    while oe_str and not oe_str[-1].isdigit():
-        oe_str = oe_str[:-1]
-
-    return oe_str
+    # 保存到各公司表（爱车贝母数据不是万拓也不是昌盛）
+    save_to_company_tables(df, is_wantuo=False, is_changsheng=False)
 
 
 def get_zhuozhixing_multi():
@@ -1420,7 +1264,8 @@ def fetch_and_process_latest_data():
 
         # 应用仓库名称映射
         df['city_name'] = df['city_name'].replace(city_mapping)
-        df['oe_number1'] = df['oe_number1'].astype(str).apply(process_oe_number)
+        # 直接使用 ys_oe1 作为 OE 码，不做处理
+        df['oe_number1'] = df['ys_oe1']
         # 计算当前时间+1天作为失效时间
         expiry_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -1445,7 +1290,10 @@ def fetch_and_process_latest_data():
             # 批量插入数据
             batch_size = 1000  # 批量处理大小
             fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+
+            # 保存原价格
+            result_df['原价格'] = result_df['价格']
+
             # 根据品牌处理价格
             result_df['价格'] = result_df.apply(lambda row: process_price_by_brand(row['价格'], row['品牌']), axis=1)
 
@@ -1477,35 +1325,12 @@ def fetch_and_process_latest_data():
                 db_manager.execute_many(sql, batch_data)
                 print(f"已批量保存 {min(i + batch_size, len(result_df))} / {len(result_df)} 条机器人数据到机器人数据表")
             
-            # 同时保存到整合表
-            for i in range(0, len(result_df), batch_size):
-                batch = result_df.iloc[i:i + batch_size]
-                
-                # 准备批量插入数据
-                batch_data = []
-                for index, row in batch.iterrows():
-                    batch_data.append((  
-                        row['供应商名称'],
-                        row['原厂OE码'],
-                        row['品牌'],
-                        row['价格'],
-                        row['失效时间'],
-                        row['仓库名称'],
-                        row['库存'],
-                        row['备注'],
-                        fetch_time  # 拉取时间
-                    ))
-                
-                # 批量插入到整合表
-                sql = """
-                    INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """
-                db_manager.execute_many(sql, batch_data)
-                print(f"已批量保存 {min(i + batch_size, len(result_df))} / {len(result_df)} 条机器人数据到整合表")
-            
         finally:
             db_manager.close()
+
+        # 将数据保存到各公司整合表（机器人数据不是万拓也不是昌盛）
+        save_to_company_tables(result_df, is_wantuo=False, is_changsheng=False)
+
         print(f"成功保存 {len(result_df)} 条机器人数据到数据库")
         return result_df
 
@@ -1565,7 +1390,10 @@ def ggg2():
     fd_df = pd.concat(xs_df_list)
     fd_df['原厂OE码'] = fd_df['原厂oe码']
     fd_df = fd_df[['供应商名称','原厂OE码','品牌','价格','失效时间','仓库名称','库存','备注']]
-    
+
+    # 保存原价格
+    fd_df['原价格'] = fd_df['价格']
+
     # 根据品牌处理价格
     fd_df['价格'] = fd_df.apply(
         lambda row: process_price_by_brand(row['价格'], row['品牌']) if row['价格'] != '' and pd.notna(row['价格']) and row['价格'] is not None else row['价格'],
@@ -1610,105 +1438,287 @@ def ggg2():
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(fd_df))} / {len(fd_df)} 条外部数据到外部数据表")
         
-        # 同时保存到整合表
-        for i in range(0, len(fd_df), batch_size):
-            batch = fd_df.iloc[i:i + batch_size]
-            
-            # 准备批量插入数据
+    finally:
+        db_manager.close()
+
+    # 将数据保存到各公司整合表（外部数据不是万拓也不是昌盛）
+    # 注意：ggg2函数已经对价格进行了处理，这里需要重新按各公司规则处理
+    # 所以不使用save_to_company_tables，而是直接保存到各表（价格已在上面处理过）
+    companies = ['fsbbr', 'zhbbr', 'zsbbr', 'dgby', 'dghf']
+    table_map = {
+        'fsbbr': 'virtual_inventory',
+        'zhbbr': 'virtual_inventory_zhbbr',
+        'zsbbr': 'virtual_inventory_zsbbr',
+        'dgby': 'virtual_inventory_dgby',
+        'dghf': 'virtual_inventory_dghf'
+    }
+
+    # 供应商名称映射（用于非佛山表）
+    supplier_mapping = {
+        '东莞佳配': '佛山1',
+        '佛山万拓': '佛山2',
+        '佛山巴博瑞': '佛山3',
+        '佛山德孚': '佛山4',
+        '佛山新奔裕汽配': '佛山5',
+        '佳配': '佛山6',
+        '宝翼隆': '佛山7',
+        '广州佳配': '佛山8',
+        '广州德之宝': '佛山9',
+        '广州日昇': '佛山10',
+        '广州昌盛': '佛山11',
+        '广州犇宝': '佛山12',
+        '广星': '佛山13',
+        '沐博': '佛山14',
+        '爱车贝母': '佛山15',
+        '腾隆': '佛山16',
+        '鑫峰': '佛山17'
+    }
+
+    # 佛山表上传用供应商名称映射
+    fsbbr_upload_mapping = {
+        '广州昌盛': '昌盛',
+        '佛山万拓': '万拓'
+    }
+
+    db_manager = get_db_connection()
+    try:
+        for company in companies:
+            table_name = table_map[company]
+
+            # 准备数据
             batch_data = []
-            for index, row in batch.iterrows():
+            for _, row in fd_df.iterrows():
+                # 处理供应商名称和上传用供应商名称
+                original_supplier = row['供应商名称']
+                if company == 'fsbbr':
+                    # 佛山表：supplier_name保持原名称，upload_supplier_name使用映射
+                    supplier_name = original_supplier
+                    upload_supplier_name = fsbbr_upload_mapping.get(original_supplier, original_supplier)
+                else:
+                    # 其他表：supplier_name保持原名称，upload_supplier_name使用佛山X映射
+                    supplier_name = original_supplier
+                    upload_supplier_name = supplier_mapping.get(original_supplier, original_supplier)
+
                 batch_data.append((
-                    row['供应商名称'],
+                    supplier_name,
                     row['原厂OE码'],
                     row['品牌'],
-                    row['价格'],
+                    row['价格'],  # 已经处理过的价格
+                    row['原价格'],
                     row['失效时间'],
                     row['仓库名称'],
                     row['库存'],
                     row['备注'],
-                    row['fetch_time']
+                    row['fetch_time'],
+                    upload_supplier_name
                 ))
-            
-            # 批量插入到整合表
-            sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(fd_df))} / {len(fd_df)} 条外部数据到整合表")
+
+            # 批量插入
+            batch_size = 1000
+            for i in range(0, len(batch_data), batch_size):
+                batch = batch_data[i:i + batch_size]
+                sql = f"""
+                    INSERT INTO {table_name} (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time, upload_supplier_name)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                db_manager.execute_many(sql, batch)
+                print(f"[{company}] 已批量保存 {min(i + batch_size, len(batch_data))} / {len(batch_data)} 条外部数据")
 
     finally:
         db_manager.close()
-    
+
     return fd_df
 
 def delete_old_data():
-    """删除50天前的数据"""
+    """删除50天前的数据（所有公司汇总表）"""
     db_manager = get_db_connection()
     try:
-        # 删除50天前的数据
-        delete_sql = """
-            DELETE FROM virtual_inventory 
-            WHERE fetch_time < DATE_SUB(NOW(), INTERVAL 50 DAY)
-        """
-        deleted_count = db_manager.execute_update(delete_sql)
-        print(f"已删除 {deleted_count} 条50天前的数据")
+        tables = [
+            'virtual_inventory',
+            'virtual_inventory_zhbbr',
+            'virtual_inventory_zsbbr',
+            'virtual_inventory_dgby',
+            'virtual_inventory_dghf'
+        ]
+
+        for table in tables:
+            delete_sql = f"""
+                DELETE FROM {table}
+                WHERE fetch_time < DATE_SUB(NOW(), INTERVAL 50 DAY)
+            """
+            deleted_count = db_manager.execute_update(delete_sql)
+            print(f"[{table}] 已删除 {deleted_count} 条50天前的数据")
+    finally:
+        db_manager.close()
+
+
+def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changsheng_special_fn=None):
+    """
+    保存数据到各公司虚拟库存表，按各公司价格规则处理
+    非佛山表的供应商名称会映射为佛山X格式
+    新增 upload_supplier_name 列用于上传时的供应商名称
+
+    :param df: 数据DataFrame
+    :param is_wantuo: 是否为万拓数据
+    :param is_changsheng: 是否为昌盛数据
+    :param is_changsheng_special_fn: 判断是否为昌盛特殊产品的函数
+    """
+    if df is None or df.empty:
+        return
+
+    companies = ['fsbbr', 'zhbbr', 'zsbbr', 'dgby', 'dghf']
+    table_map = {
+        'fsbbr': 'virtual_inventory',
+        'zhbbr': 'virtual_inventory_zhbbr',
+        'zsbbr': 'virtual_inventory_zsbbr',
+        'dgby': 'virtual_inventory_dgby',
+        'dghf': 'virtual_inventory_dghf'
+    }
+
+    # 供应商名称映射（用于非佛山表）
+    supplier_mapping = {
+        '东莞佳配': '佛山1',
+        '佛山万拓': '佛山2',
+        '佛山巴博瑞': '佛山3',
+        '佛山德孚': '佛山4',
+        '佛山新奔裕汽配': '佛山5',
+        '佳配': '佛山6',
+        '宝翼隆': '佛山7',
+        '广州佳配': '佛山8',
+        '广州德之宝': '佛山9',
+        '广州日昇': '佛山10',
+        '广州昌盛': '佛山11',
+        '广州犇宝': '佛山12',
+        '广星': '佛山13',
+        '沐博': '佛山14',
+        '爱车贝母': '佛山15',
+        '腾隆': '佛山16',
+        '鑫峰': '佛山17'
+    }
+
+    # 佛山表上传用供应商名称映射
+    fsbbr_upload_mapping = {
+        '广州昌盛': '昌盛',
+        '佛山万拓': '万拓'
+    }
+
+    # 仓库名称映射（用于非佛山表）
+    # 中山、东莞巴友、东莞恒发：佛山禅城仓 -> 广州越秀仓
+    # 珠海：佛山禅城仓 -> 广州越秀1仓，广州越秀仓 -> 广州越秀1仓
+    warehouse_mapping = {
+        'zsbbr': {
+            '佛山禅城仓': '广州越秀仓'
+        },
+        'dgby': {
+            '佛山禅城仓': '广州越秀仓'
+        },
+        'dghf': {
+            '佛山禅城仓': '广州越秀仓'
+        },
+        'zhbbr': {
+            '佛山禅城仓': '广州越秀1仓',
+            '广州越秀仓': '广州越秀1仓'
+        }
+    }
+
+    fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db_manager = get_db_connection()
+
+    # 统一去除所有字符串字段的前后空格
+    string_columns = ['供应商名称', '原厂OE码', '品牌', '仓库名称', '备注']
+    for col in string_columns:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip()
+
+    try:
+        for company in companies:
+            table_name = table_map[company]
+            processed_data = []
+
+            for _, row in df.iterrows():
+                # 判断是否为昌盛特殊产品
+                is_changsheng_special = False
+                if is_changsheng_special_fn:
+                    is_changsheng_special = is_changsheng_special_fn(row)
+
+                # 按公司规则处理价格
+                original_price = row['价格']
+                processed_price = process_price_by_brand(
+                    original_price,
+                    row['品牌'],
+                    is_wantuo=is_wantuo,
+                    is_changsheng_special=is_changsheng_special,
+                    company=company
+                )
+
+                # 处理供应商名称和上传用供应商名称
+                original_supplier = row['供应商名称']
+                if company == 'fsbbr':
+                    # 佛山表：supplier_name保持原名称，upload_supplier_name使用映射
+                    supplier_name = original_supplier
+                    upload_supplier_name = fsbbr_upload_mapping.get(original_supplier, original_supplier)
+                else:
+                    # 其他表：supplier_name保持原名称，upload_supplier_name使用佛山X映射
+                    supplier_name = original_supplier
+                    upload_supplier_name = supplier_mapping.get(original_supplier, original_supplier)
+
+                # 处理仓库名称映射
+                original_warehouse = row['仓库名称']
+                if company in warehouse_mapping:
+                    warehouse_name = warehouse_mapping[company].get(original_warehouse, original_warehouse)
+                else:
+                    warehouse_name = original_warehouse
+
+                processed_data.append((
+                    supplier_name,
+                    row['原厂OE码'],
+                    row['品牌'],
+                    processed_price,
+                    original_price,
+                    row['失效时间'],
+                    warehouse_name,
+                    row['库存'],
+                    row['备注'],
+                    fetch_time,
+                    upload_supplier_name
+                ))
+
+            # 批量插入
+            batch_size = 1000
+            for i in range(0, len(processed_data), batch_size):
+                batch = processed_data[i:i + batch_size]
+                sql = f"""
+                    INSERT INTO {table_name} (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time, upload_supplier_name)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                db_manager.execute_many(sql, batch)
+                print(f"[{company}] 已保存 {min(i + batch_size, len(processed_data))} / {len(processed_data)} 条")
+
     finally:
         db_manager.close()
 
 
 def save_supplier_to_virtual_inventory(df, supplier_name="供应商"):
     """
-    保存供应商库存数据到virtual_inventory表
-
-    :param df: 供应商库存DataFrame
-    :param supplier_name: 供应商名称（用于日志显示）
+    保存供应商库存数据到各公司虚拟库存表
     """
     if df is None or df.empty:
         print(f"{supplier_name}库存数据为空，跳过保存")
         return
 
-    # 判断是否为万拓数据
     is_wantuo = supplier_name == "佛山万拓"
+    is_changsheng = supplier_name == "昌盛" or supplier_name == "广州昌盛"
 
-    # 根据品牌处理价格（万拓数据额外加15%）
-    df['价格'] = df.apply(lambda row: process_price_by_brand(row['价格'], row['品牌'], is_wantuo=is_wantuo), axis=1)
-    
-    # 添加拉取时间
-    fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    df['fetch_time'] = fetch_time
-    
-    # 批量保存到数据库
-    db_manager = get_db_connection()
-    try:
-        batch_size = 1000
-        for i in range(0, len(df), batch_size):
-            batch = df.iloc[i:i + batch_size]
-            
-            # 准备批量插入数据
-            batch_data = []
-            for index, row in batch.iterrows():
-                batch_data.append((
-                    row['供应商名称'],
-                    row['原厂OE码'],
-                    row['品牌'],
-                    row['价格'],
-                    row['失效时间'],
-                    row['仓库名称'],
-                    row['库存'],
-                    row['备注'],
-                    row['fetch_time']
-                ))
-            
-            # 批量插入到整合表
-            sql = """
-                INSERT INTO virtual_inventory (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(df))} / {len(df)} 条{supplier_name}库存数据到整合表")
-    finally:
-        db_manager.close()
+    # 昌盛特殊产品判断函数
+    def is_changsheng_special_fn(row):
+        if is_changsheng:
+            oe_code = str(row.get('原厂OE码', ''))
+            remark = str(row.get('备注', ''))
+            return oe_code.endswith('80') and '是惠选件' in remark
+        return False
+
+    # 保存到各公司表
+    save_to_company_tables(df, is_wantuo, is_changsheng, is_changsheng_special_fn)
 
 
 def start_b2b_upload_with_brand_mapping(today_only=False):
@@ -1737,10 +1747,28 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
             return obj
 
     def login(company):
-        config = {'fsbbr': {
-            "AccessKeyId": "tdFsi8qAQVDz0PAotz56CNFJib3evY8H",
-            "AccessKeySecret": "wHsV0V1Fk7MJBQ8tcy6XTd4VhLMxgtEr9vZhDjU9yxrtDwyBTFE8QI0WQY3c7Npp"
-        }}
+        config = {
+            'fsbbr': {
+                "AccessKeyId": "tdFsi8qAQVDz0PAotz56CNFJib3evY8H",
+                "AccessKeySecret": "wHsV0V1Fk7MJBQ8tcy6XTd4VhLMxgtEr9vZhDjU9yxrtDwyBTFE8QI0WQY3c7Npp"
+            },
+            'zhbbr': {
+                "AccessKeyId": "D6xZVa6tn3zK9vOxd7TGh6d5XLhHWoEe",
+                "AccessKeySecret": "DOYRvIlOHVParozgWaS3I79BgKSs5cBz5ZBCaYAfUwWfDUGGmSryHdKBKxeuKYQ1"
+            },
+            'zsbbr': {
+                "AccessKeyId": "4UjFNIabklprFwUtXVn4Rof4xeA2A79m",
+                "AccessKeySecret": "UeJoyb6MeeXKBJmZBtTbgnazHujKDN2X4Xqi3kKZuCAVZdzWZT49V0UKX25D4i7F"
+            },
+            'dgby': {
+                "AccessKeyId": "QChRLkBRG8iZTmmC4T3tRk9R1Xgn6EVr",
+                "AccessKeySecret": "BfXAdzONLHKb1yoW2Eeuvb4ui7Z0W6GBjWegO4OZzahKQGzPmofhjOLekLxFhFyX"
+            },
+            'dghf': {
+                "AccessKeyId": "p5yr2EjeLxY4MhmWNcTi9gS9mOJi7Unp",
+                "AccessKeySecret": "nvnugyGdVwecdwdUbkUpHsLEDyKdYPXAfGL6aZx1rZnmjqDdyDt5JNYQGCKtRXEK"
+            }
+        }
         url = "https://openapi.gzbbr.com/login/index"
         data = config[company]
         
@@ -1798,10 +1826,10 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
             start += 500
         return split_groups
 
-    def batchSave(records, original_rows, brand_mapping_info, reverse_brand_mapping, original_df):
+    def batchSave(records, original_rows, brand_mapping_info, reverse_brand_mapping, original_df, company='fsbbr'):
         # 转换所有记录中的不可序列化类型为可序列化类型
         serializable_records = [convert_decimal_to_serializable(record) for record in records]
-        
+
         record_groups = split_array_by_500_loop(serializable_records)
         original_row_groups = split_array_by_500_loop(original_rows)
 
@@ -1810,21 +1838,21 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
             token = None
             for attempt in range(3):
                 try:
-                    token = login('fsbbr')
+                    token = login(company)
                     break
                 except requests.exceptions.ConnectTimeout:
                     if attempt == 2:
-                        print(f'获取token失败，跳过批次 {i+1}')
+                        print(f'[{company}] 获取token失败，跳过批次 {i+1}')
                         continue
                     time.sleep(5)
                 except Exception as e:
                     if attempt == 2:
-                        print(f'获取token失败，跳过批次 {i+1}')
+                        print(f'[{company}] 获取token失败，跳过批次 {i+1}')
                         continue
                     time.sleep(5)
-            
+
             if token is None:
-                print(f"无法获取token，跳过批次 {i+1}")
+                print(f"[{company}] 无法获取token，跳过批次 {i+1}")
                 continue
 
             url = "https://openapi.gzbbr.com/Product.Quote/batchSave"
@@ -1844,42 +1872,42 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                     break
                 except requests.exceptions.ConnectTimeout:
                     if attempt == 2:
-                        print(f'批次 {i+1} 连接超时，跳过此批次')
+                        print(f'[{company}] 批次 {i+1} 连接超时，跳过此批次')
                         continue
                     time.sleep(10)
                 except requests.exceptions.ReadTimeout:
                     if attempt == 2:
-                        print(f'批次 {i+1} 读取超时，跳过此批次')
+                        print(f'[{company}] 批次 {i+1} 读取超时，跳过此批次')
                         continue
                     time.sleep(10)
                 except requests.exceptions.ConnectionError as e:
                     if "Read timed out" in str(e):
                         if attempt == 2:
-                            print(f'批次 {i+1} 读取超时，跳过此批次')
+                            print(f'[{company}] 批次 {i+1} 读取超时，跳过此批次')
                             continue
                         time.sleep(10)
                     else:
                         if attempt == 2:
-                            print(f'批次 {i+1} 连接错误，跳过此批次')
+                            print(f'[{company}] 批次 {i+1} 连接错误，跳过此批次')
                             continue
                         time.sleep(10)
                 except Exception as e:
                     if attempt == 2:
-                        print(f'批次 {i+1} 发生未知错误，跳过此批次')
+                        print(f'[{company}] 批次 {i+1} 发生未知错误，跳过此批次')
                         continue
                     time.sleep(10)
-            
+
             if response is None:
-                print(f"批次 {i+1} 响应为空，跳过")
+                print(f"[{company}] 批次 {i+1} 响应为空，跳过")
                 continue
-                
+
             try:
                 result = json.loads(response.text)
             except json.JSONDecodeError:
-                print(f'批次 {i+1} 响应不是有效的JSON格式')
+                print(f'[{company}] 批次 {i+1} 响应不是有效的JSON格式')
                 continue
             except Exception as e:
-                print(f'批次 {i+1} 解析响应时发生错误: {e}')
+                print(f'[{company}] 批次 {i+1} 解析响应时发生错误: {e}')
                 continue
 
             # 更新数据库中的update_msg字段
@@ -1889,13 +1917,23 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                     # 获取成功和失败的数据
                     succes_data = result['data']['succes_data'] if result['data']['succes_data'] else []
                     error_data = result['data']['error_data'] if result['data']['error_data'] else []
-                    
+
                     # 将成功和失败的数据合并到一个列表，按no排序
                     all_results = succes_data + error_data
                     all_results.sort(key=lambda x: x['no'])
-                    
-                    print(f'批次 {i+1}: 成功上传 {result["data"]["succes_num"]} 条, 失败 {result["data"]["error_num"]} 条')
-                    
+
+                    print(f'[{company}] 批次 {i+1}: 成功上传 {result["data"]["succes_num"]} 条, 失败 {result["data"]["error_num"]} 条')
+
+                    # 根据公司确定要更新的表
+                    table_map = {
+                        'fsbbr': 'virtual_inventory',
+                        'zhbbr': 'virtual_inventory_zhbbr',
+                        'zsbbr': 'virtual_inventory_zsbbr',
+                        'dgby': 'virtual_inventory_dgby',
+                        'dghf': 'virtual_inventory_dghf'
+                    }
+                    table_name = table_map.get(company, 'virtual_inventory')
+
                     # 收集所有需要更新的数据
                     update_data = []
                     original_group = original_row_groups[i]
@@ -1903,14 +1941,14 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                         if j < len(original_group):
                             # 获取原始记录的ID
                             original_row = original_group[j]
-                            
+
                             # 根据原始行的格式确定ID字段
                             # 如果是字典格式，则使用键访问
                             if isinstance(original_row, dict):
                                 record_id = original_row['id']
                             else:  # 如果是元组或列表格式
                                 record_id = original_row[0]
-                            
+
                             # 获取上传结果信息
                             if 'error_msg' in result_item:
                                 update_msg = result_item['error_msg']
@@ -1922,10 +1960,10 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                                     # 使用正确的列名 '品牌' 而不是 'brand'
                                     original_brand_values = original_df.loc[original_df['id'] == record_id, '品牌'].values
                                     mapped_brand_values = original_df.loc[original_df['id'] == record_id, 'temp_brand'].values
-                                    
+
                                     original_brand = original_brand_values[0] if len(original_brand_values) > 0 else ''
                                     mapped_brand = mapped_brand_values[0] if len(mapped_brand_values) > 0 else ''
-                                    
+
                                     if original_brand != mapped_brand and mapped_brand in reverse_brand_mapping:
                                         alias_used = reverse_brand_mapping[mapped_brand]
                                         update_msg = f"update，使用{alias_used}上传成功"
@@ -1935,26 +1973,27 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                                     update_msg = operation_name
                             else:
                                 update_msg = 'unknown'
-                            
+
                             # 检查是否有品牌映射，并更新update_msg
                             if record_id in brand_mapping_info:
                                 if update_msg == 'unknown':  # 如果还没有设置过更新信息
                                     mapped_brand = brand_mapping_info[record_id]
                                     update_msg = f"update，使用{mapped_brand}上传"
-                            
+
                             update_data.append((update_msg, record_id))
-                    
+
                     # 批量更新数据库
                     if update_data:
-                        update_sql = """
-                            UPDATE virtual_inventory 
-                            SET update_msg = %s 
+                        update_sql = f"""
+                            UPDATE {table_name}
+                            SET update_msg = %s
                             WHERE id = %s
                         """
                         db_manager.execute_many(update_sql, update_data)
-                        
+                        print(f"[{company}] 已更新 {len(update_data)} 条记录到 {table_name}")
+
             except Exception as e:
-                print(f"更新数据库时出错: {e}")
+                print(f"[{company}] 更新数据库时出错: {e}")
                 import traceback
                 traceback.print_exc()  # 打印详细错误信息
             finally:
@@ -1963,169 +2002,187 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         return result
     
     start_time = time.time()
-    
+
     # 加载品牌映射
     brand_mapping = load_crm_aliases_mapping()
-    
+
     # 创建反向映射：从真实品牌名到别名
     reverse_brand_mapping = {v: k for k, v in brand_mapping.items()}
-    
-    # 从数据库获取数据
-    db_manager = get_db_connection()
-    try:
-        # 根据today_only参数决定查询条件
-        if today_only:
-            # 只查询当天的数据
-            query = """
-                SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg 
-                FROM virtual_inventory 
-                WHERE DATE(fetch_time) = CURDATE()
-            """
-        else:
-            # 查询所有数据
-            query = """
-                SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg 
-                FROM virtual_inventory
-            """
-        rows = db_manager.execute_query(query)
-    except Exception as e:
-        print(f"查询数据时出错: {e}")
-        return
-    finally:
-        db_manager.close()
-    
-    if not rows:
-        print("没有数据需要上传")
-        return
-    
-    # 👇 新增: 黑名单过滤
-    print("开始黑名单过滤...")
-    from .inventory_tasks import filter_by_blacklist
-    rows_before_filter = len(rows)
-    rows = filter_by_blacklist(rows)
-    rows_after_filter = len(rows)
-    removed_count = rows_before_filter - rows_after_filter
-    print(f"黑名单过滤完成: 原始 {rows_before_filter} 条, 剔除 {removed_count} 条, 剩余 {rows_after_filter} 条")
-    
-    if not rows:
-        print("过滤后没有数据需要上传")
-        return
-    
-    print(f"准备上传 {len(rows)} 条{'当天' if today_only else '全部'}数据")
-    
-    # 构建DataFrame并立即释放原始数据
-    df = pd.DataFrame(rows, columns=['id', 'supplier_name', 'oe_code', 'brand', 'price', 'expiry_date', 'warehouse', 'stock', 'remark', 'update_msg'])
-    
-    # 记录原始品牌用于判断是否使用了别名
-    original_brand_series = df['brand'].copy()
-    
-    # 向量化品牌映射和价格计算
-    df['temp_brand'] = df['brand'].map(brand_mapping).fillna(df['brand'])
-    df['combo_key'] = df['oe_code'] + df['temp_brand']
-    
-    # 创建价格映射
-    price_map = df.groupby('combo_key')['price'].max()
-    df['price'] = df['combo_key'].map(price_map)
-    
-    # 批量更新数据库
-    db_manager = get_db_connection()
-    try:
-        # 准备批量更新数据
-        batch_size = 5000
-        updates = [(row['price'], row['id']) for _, row in df.iterrows()]
-        
-        # 分批批量更新
-        for i in range(0, len(updates), batch_size):
-            batch = updates[i:i + batch_size]
-            if batch:
-                update_placeholders = ','.join(['(%s, %s)'] * len(batch))
-                update_sql = f"""
-                    INSERT INTO virtual_inventory (price, id) 
-                    VALUES {update_placeholders}
-                    ON DUPLICATE KEY UPDATE price = VALUES(price)
-                """
-                params = [val for pair in batch for val in pair]
-                db_manager.execute_update(update_sql, params)
-                
-    finally:
-        db_manager.close()
-    
-    # 优化品牌映射信息记录
-    brand_mapping_info = dict(df[df['brand'] != df['temp_brand']].set_index('id')['temp_brand'])
-    
-    # 预加载API数据
-    token = login('fsbbr')
-    ck_data = getAllCassWarehouse(token)
-    gys_data = getAllSupplierChannel(token)
-    
-    # 重命名列
-    df = df.rename(columns={
-        'supplier_name': '供应商名称',
-        'oe_code': '原厂OE码',
-        'brand': '品牌',
-        'price': '价格',
-        'expiry_date': '失效时间',
-        'warehouse': '仓库名称',
-        'stock': '库存',
-        'remark': '备注',
-        'update_msg': '更新信息'
-    })
-    
-    # 使用映射后的品牌
-    df['品牌'] = df['temp_brand']
-    
-    # 供应商名称映射（用于B2B上传时匹配，不改变数据库中的名称）
-    # 广州昌盛 -> 昌盛
-    # 佛山万拓 -> 万拓
-    supplier_mapping = {
-        '广州昌盛': '昌盛',
-        '佛山万拓': '万拓'
+
+    # 定义要推送的所有公司及对应表
+    companies = ['fsbbr', 'zhbbr', 'zsbbr', 'dgby', 'dghf']
+    table_map = {
+        'fsbbr': 'virtual_inventory',
+        'zhbbr': 'virtual_inventory_zhbbr',
+        'zsbbr': 'virtual_inventory_zsbbr',
+        'dgby': 'virtual_inventory_dgby',
+        'dghf': 'virtual_inventory_dghf'
     }
-    df['供应商名称_映射'] = df['供应商名称'].map(supplier_mapping).fillna(df['供应商名称'])
-    
-    # 在合并前保存原始品牌信息
-    df_with_original = df.copy()
-    df_with_original['original_brand'] = original_brand_series.values
-    
-    # 合并数据（使用映射后的供应商名称进行匹配）
-    df_merged = pd.merge(df_with_original, ck_data, left_on='仓库名称', right_on='warehouse_name', how='inner')
-    df_merged = pd.merge(df_merged, gys_data, left_on='供应商名称_映射', right_on='name', how='inner')
-    
-    if df_merged.empty:
-        print("没有匹配的仓库或供应商数据，无法上传")
-        return
-    
-    # 重命名和筛选
-    df_final = df_merged.rename(columns={'supplier_channel_id': 'supplier_channel_id', '原厂OE码': 'number', '品牌': 'brand_name',
-                            '价格': 'price', 'cass_warehouse_id': 'cass_warehouse_id', '库存': 'stock',
-                            '失效时间': 'lose_date', '备注': 'remark'})
-    df_final = df_final[['id', 'supplier_channel_id', 'number', 'brand_name', 'price', 'cass_warehouse_id', 'stock', 'lose_date', 'remark', 'original_brand']]
-    df_final = df_final.fillna('')
-    
-    # 分离ID和数据
-    ids = df_final['id'].tolist()
-    df_data = df_final.drop(columns=['id', 'original_brand'])
-    records = df_data.to_dict(orient='records')
-    
-    # 优化filtered_rows构建，包含原始品牌信息
-    id_to_row = {row['id']: row for row in df_merged.to_dict('records')}
-    filtered_rows = [id_to_row[record_id] for record_id in ids if record_id in id_to_row]
-    
-    # 上传数据
-    result = batchSave(records, filtered_rows, brand_mapping_info, reverse_brand_mapping, df_with_original)
-    
-    print(f"上传完成，共处理 {len(records)} 条记录，总耗时: {time.time() - start_time:.2f}s")
+
+    # 循环推送到各公司
+    for company in companies:
+        company_start_time = time.time()
+        table_name = table_map[company]
+
+        print(f"\n{'='*60}")
+        print(f"开始向 [{company}] 推送数据...")
+        print(f"从表 [{table_name}] 读取数据")
+        print(f"{'='*60}")
+
+        # 获取该公司对应的token和仓库/供应商数据
+        print(f"[{company}] 正在获取token和仓库/供应商数据...")
+        token = login(company)
+        if not token:
+            print(f"[{company}] 获取token失败，跳过")
+            continue
+
+        ck_data = getAllCassWarehouse(token)
+        if ck_data is None or ck_data.empty:
+            print(f"[{company}] 获取仓库数据失败，跳过")
+            continue
+
+        gys_data = getAllSupplierChannel(token)
+        if gys_data is None or gys_data.empty:
+            print(f"[{company}] 获取供应商数据失败，跳过")
+            continue
+
+        print(f"[{company}] 成功获取token和仓库/供应商数据")
+
+        # 从对应公司表查询数据
+        db_manager = get_db_connection()
+        try:
+            if today_only:
+                query = f"""
+                    SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg, upload_supplier_name
+                    FROM {table_name}
+                    WHERE DATE(fetch_time) = CURDATE()
+                """
+            else:
+                query = f"""
+                    SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg, upload_supplier_name
+                    FROM {table_name}
+                """
+            rows = db_manager.execute_query(query)
+        except Exception as e:
+            print(f"[{company}] 查询数据时出错: {e}")
+            continue
+        finally:
+            db_manager.close()
+
+        if not rows:
+            print(f"[{company}] 没有数据需要上传")
+            continue
+
+        # 👇 新增: 黑名单过滤
+        print(f"[{company}] 开始黑名单过滤...")
+        from .inventory_tasks import filter_by_blacklist
+        rows_before_filter = len(rows)
+        rows = filter_by_blacklist(rows)
+        rows_after_filter = len(rows)
+        removed_count = rows_before_filter - rows_after_filter
+        print(f"[{company}] 黑名单过滤完成: 原始 {rows_before_filter} 条, 剔除 {removed_count} 条, 剩余 {rows_after_filter} 条")
+
+        if not rows:
+            print(f"[{company}] 过滤后没有数据需要上传")
+            continue
+
+        # 非佛山公司过滤掉菲尔品牌
+        if company != 'fsbbr':
+            rows_before_feier = len(rows)
+            rows = [row for row in rows if row.get('brand') != '菲尔']
+            rows_after_feier = len(rows)
+            feier_removed = rows_before_feier - rows_after_feier
+            if feier_removed > 0:
+                print(f"[{company}] 菲尔品牌过滤: 剔除 {feier_removed} 条菲尔品牌数据, 剩余 {rows_after_feier} 条")
+
+        if not rows:
+            print(f"[{company}] 过滤后没有数据需要上传")
+            continue
+
+        print(f"[{company}] 准备上传 {len(rows)} 条{'当天' if today_only else '全部'}数据")
+
+        # 构建DataFrame
+        df = pd.DataFrame(rows, columns=['id', 'supplier_name', 'oe_code', 'brand', 'price', 'expiry_date', 'warehouse', 'stock', 'remark', 'update_msg', 'upload_supplier_name'])
+
+        # 记录原始品牌用于判断是否使用了别名
+        original_brand_series = df['brand'].copy()
+
+        # 向量化品牌映射
+        df['temp_brand'] = df['brand'].map(brand_mapping).fillna(df['brand'])
+
+        # 重命名列
+        df = df.rename(columns={
+            'supplier_name': '供应商名称',
+            'oe_code': '原厂OE码',
+            'brand': '品牌',
+            'price': '价格',
+            'expiry_date': '失效时间',
+            'warehouse': '仓库名称',
+            'stock': '库存',
+            'remark': '备注',
+            'update_msg': '更新信息',
+            'upload_supplier_name': '上传供应商名称'
+        })
+
+        # 使用映射后的品牌
+        df['品牌'] = df['temp_brand']
+
+        # 直接使用upload_supplier_name列作为上传用的供应商名称
+        # 如果upload_supplier_name为NULL，则使用supplier_name作为回退
+        df['供应商名称_映射'] = df['上传供应商名称'].fillna(df['供应商名称'])
+        # 确保是字符串类型并去除空格
+        df['供应商名称_映射'] = df['供应商名称_映射'].astype(str).str.strip()
+
+        # 在合并前保存原始品牌信息
+        df_with_original = df.copy()
+        df_with_original['original_brand'] = original_brand_series.values
+
+        # 合并数据（使用upload_supplier_name进行匹配）
+        df_merged = pd.merge(df_with_original, ck_data, left_on='仓库名称', right_on='warehouse_name', how='inner')
+        df_merged = pd.merge(df_merged, gys_data, left_on='供应商名称_映射', right_on='name', how='inner')
+
+        if df_merged.empty:
+            print(f"[{company}] 没有匹配的仓库或供应商数据，无法上传")
+            continue
+
+        # 重命名和筛选
+        df_final = df_merged.rename(columns={'supplier_channel_id': 'supplier_channel_id', '原厂OE码': 'number', '品牌': 'brand_name',
+                                '价格': 'price', 'cass_warehouse_id': 'cass_warehouse_id', '库存': 'stock',
+                                '失效时间': 'lose_date', '备注': 'remark'})
+        df_final = df_final[['id', 'supplier_channel_id', 'number', 'brand_name', 'price', 'cass_warehouse_id', 'stock', 'lose_date', 'remark', 'original_brand']]
+        df_final = df_final.fillna('')
+
+        # 分离ID和数据
+        ids = df_final['id'].tolist()
+        df_data = df_final.drop(columns=['id', 'original_brand'])
+        records = df_data.to_dict(orient='records')
+
+        # 优化filtered_rows构建，包含原始品牌信息
+        id_to_row = {row['id']: row for row in df_merged.to_dict('records')}
+        filtered_rows = [id_to_row[record_id] for record_id in ids if record_id in id_to_row]
+
+        # 品牌映射信息记录
+        brand_mapping_info = dict(df[df['品牌'] != df['temp_brand']].set_index('id')['temp_brand'])
+
+        # 上传数据
+        try:
+            result = batchSave(records, filtered_rows, brand_mapping_info, reverse_brand_mapping, df_with_original, company)
+            print(f"[{company}] 推送完成，耗时: {time.time() - company_start_time:.2f}s")
+        except Exception as e:
+            print(f"[{company}] 推送失败: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+
+    print(f"\n{'='*60}")
+    print(f"所有公司推送完成，总耗时: {time.time() - start_time:.2f}s")
+    print(f"{'='*60}")
     return result
 
 
 
-def main_process(skip_table_creation=False):
-    """主处理流程
-    
-    参数:
-        skip_table_creation: 是否跳过表创建检查，默认为False
-                            当在应用启动时已创建表，后续定时任务可设为True跳过
-    """
+def main_process():
+    """主处理流程"""
     # 清除品牌缓存，确保每次运行都重新加载
     clear_brand_cache()
     
@@ -2135,10 +2192,6 @@ def main_process(skip_table_creation=False):
     
     # 清理当前业务时间范围内的数据
     clean_business_time_data()
-    
-    # 只在需要时创建表（应用启动时），定时任务可跳过此步骤
-    if not skip_table_creation:
-        create_tables()
     
     # 清空其他表的数据（除了virtual_inventory表）
     clear_all_tables()
@@ -2192,12 +2245,19 @@ def main_process(skip_table_creation=False):
     # 读取所有数据并整合到虚拟库存表（已通过各模块自动添加）
     db_manager = get_db_connection()
     try:
-        # 统计整合表数据量
-        count = db_manager.execute_query("SELECT COUNT(*) FROM virtual_inventory")[0]['COUNT(*)']
+        # 统计各公司表的数据量
+        tables = [
+            ('virtual_inventory', '佛山'),
+            ('virtual_inventory_zhbbr', '珠海'),
+            ('virtual_inventory_zsbbr', '中山'),
+            ('virtual_inventory_dgby', '东莞巴友'),
+            ('virtual_inventory_dghf', '东莞恒发')
+        ]
+        for table, name in tables:
+            count = db_manager.execute_query(f"SELECT COUNT(*) FROM {table}")[0]['COUNT(*)']
+            print(f"[{name}] 虚拟库存表处理了 {count} 条数据")
     finally:
         db_manager.close()
-    
-    print(f"总共处理了 {count} 条数据")
     
     # 上传到B2B系统（使用品牌映射版本），只上传当天数据
     start_b2b_upload_with_brand_mapping(today_only=True)
