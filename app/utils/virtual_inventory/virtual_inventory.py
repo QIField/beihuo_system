@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 import time
 from collections import defaultdict
 import math
-from .database_connection import get_db_connection as get_pooled_db_connection  # 导入统一的连接池实现并重命名
-from .supplier_data_fetchers.changsheng_inventory import start as fetch_changsheng_data
-from .supplier_data_fetchers.wantuo_inventory import start as fetch_wantuo_data
+from ..database_connection import get_db_connection as get_pooled_db_connection  # 导入统一的连接池实现并重命名
+from ..supplier_data_fetchers.changsheng_inventory import start as fetch_changsheng_data
+from ..supplier_data_fetchers.wantuo_inventory import start as fetch_wantuo_data
 
 
 # 全局品牌缓存

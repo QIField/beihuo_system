@@ -110,6 +110,11 @@
             border: 1px solid #d9d9d9;
         }
         
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+        
         /* 统计信息 */
         .stats-bar {
             background: #fff;
@@ -377,6 +382,7 @@
                         <th class="col-purchase">采购历史</th>
                         <th class="col-stock">库存数量</th>
                         <th class="col-replace">替换号</th>
+                        <th class="col-action">操作</th>
                     </tr>
                 </thead>
                 <tbody id="dataTableBody">
@@ -554,7 +560,7 @@
             const tbody = document.getElementById('dataTableBody');
             tbody.innerHTML = '';
             
-            items.forEach(item => {
+            items.forEach((item, index) => {
                 const row = document.createElement('tr');
                 
                 // 采购历史显示
@@ -569,12 +575,23 @@
                     ? `<span class="stock-yes">${stockQty}</span>` 
                     : '<span class="stock-no">0</span>';
                 
+                // 获取同OE下其他行的product_id
+                const otherProductIds = items
+                    .filter((_, i) => i !== index)
+                    .map(x => x.product_id)
+                    .filter(Boolean);
+                
                 row.innerHTML = `
                     <td>${item.oe || '-'}</td>
                     <td>${item.brand || '-'}</td>
                     <td class="col-purchase">${purchaseHtml}</td>
                     <td class="col-stock">${stockHtml}</td>
                     <td>${item.replace_number ? item.replace_number : '<span class="empty-cell">（空）</span>'}</td>
+                    <td>
+                        ${item.replace_number && otherProductIds.length > 0 
+                            ? `<button class="btn btn-primary btn-sm" onclick="useReplaceNumber('${item.replace_number}', ${JSON.stringify(otherProductIds).replace(/"/g, '&quot;')})">一键使用</button>` 
+                            : '-'}
+                    </td>
                 `;
                 tbody.appendChild(row);
             });
@@ -624,6 +641,38 @@
             groupedData = {};
             oeList = [];
             currentIndex = 0;
+        }
+        
+        // 一键使用替换号
+        async function useReplaceNumber(replaceNumber, productIds) {
+            if (!confirm(`确定要将此替换号应用到其他 ${productIds.length} 个产品吗？`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/new/api/compare/diff-replace-numbers/use', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        product_ids: productIds,
+                        replace_number: replaceNumber
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.code === 0) {
+                    const successCount = result.data.results.filter(r => r.success).length;
+                    alert(`更新完成：成功 ${successCount} 条，失败 ${result.data.results.length - successCount} 条`);
+                    searchData();  // 刷新数据
+                } else {
+                    alert('操作失败：' + result.message);
+                }
+            } catch (e) {
+                alert('请求失败：' + e.message);
+            }
         }
     </script>
 </body>

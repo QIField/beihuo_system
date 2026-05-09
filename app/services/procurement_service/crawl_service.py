@@ -35,8 +35,9 @@ PRODUCT_GRADE_MAP = {
 class CRMDataCrawlService:
     """CRM数据全量爬取服务类"""
 
-    def __init__(self):
+    def __init__(self, company='fsbbr'):
         self.session = None
+        self.company = company
         self.total_saved = 0
         self.total_failed = 0
         self.model_sync_service = VehicleModelSyncService()
@@ -46,7 +47,7 @@ class CRMDataCrawlService:
         获取第1页数据，返回 (total, last_page)
         同时初始化session
         """
-        self.session = create_crm_session()
+        self.session = create_crm_session(self.company)
         payload = {'page': 1, 'limit': LIMIT}
 
         for attempt in range(MAX_RETRY):
@@ -68,7 +69,7 @@ class CRMDataCrawlService:
                     time.sleep(RETRY_DELAY)
                     # 重建session
                     try:
-                        self.session = create_crm_session()
+                        self.session = create_crm_session(self.company)
                     except:
                         pass
                     continue
@@ -98,7 +99,7 @@ class CRMDataCrawlService:
                     time.sleep(RETRY_DELAY)
                     # 尝试重建session
                     try:
-                        self.session = create_crm_session()
+                        self.session = create_crm_session(self.company)
                     except:
                         pass
                     continue
@@ -159,7 +160,7 @@ class CRMDataCrawlService:
             'product_id': product.get('product_id', ''),
             'oe': product.get('number', ''),
             'brand': product.get('brand_name', ''),
-            'company': COMPANY,
+            'company': self.company,
             'product_name': product.get('l_name_zh', ''),
             'vehicle_brand': product.get('cass_oebrand_name', ''),
             'replace_number': self._extract_replace_numbers(product.get('display_number')),
@@ -176,14 +177,18 @@ class CRMDataCrawlService:
             'min_price': 0.0
         }
 
-    def clear_table(self) -> bool:
-        """清空 crmapp_compare_summary 表（重置自增ID）"""
+    def clear_table(self, company=None) -> bool:
+        """清空 crmapp_compare_summary 表，支持按组织清空"""
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("TRUNCATE TABLE crmapp_compare_summary")
+                if company:
+                    cursor.execute("DELETE FROM crmapp_compare_summary WHERE company = %s", (company,))
+                    print(f"✅ 已清空 {company} 的 crmapp_compare_summary 数据")
+                else:
+                    cursor.execute("TRUNCATE TABLE crmapp_compare_summary")
+                    print("✅ 已清空 crmapp_compare_summary 表")
                 conn.commit()
-                print("✅ 已清空 crmapp_compare_summary 表")
                 return True
         except Exception as e:
             conn.rollback()
@@ -218,7 +223,7 @@ class CRMDataCrawlService:
                 p.get('product_id', ''),
                 p.get('oe', ''),
                 p.get('brand', ''),
-                p.get('company', COMPANY),
+                p.get('company', self.company),
                 p.get('product_name', ''),
                 p.get('vehicle_brand', ''),
                 p.get('replace_number', ''),
@@ -273,10 +278,10 @@ class CRMDataCrawlService:
         主入口：爬取所有产品并保存
 
         Returns:
-            {'total': 总记录数, 'saved': 成功保存数, 'failed': 失败数}
+            {'total': 总记录数, 'saved': 成功保存数, 'failed': 失败数, 'company': 组织代码}
         """
         print("=" * 80)
-        print("开始CRM全量爬取")
+        print(f"开始CRM全量爬取 - 组织: {self.company}")
         print("=" * 80)
 
         try:
@@ -286,9 +291,9 @@ class CRMDataCrawlService:
             print(f"📄 总页数: {last_page}")
             print(f"📦 每页数量: {LIMIT}")
 
-            # 清空表（全量爬取前清空旧数据）
-            if not self.clear_table():
-                return {'total': 0, 'saved': 0, 'failed': 0}
+            # 清空该组织的旧数据
+            if not self.clear_table(self.company):
+                return {'total': 0, 'saved': 0, 'failed': 0, 'company': self.company}
 
             batch_buffer = []
             total_processed = 0
@@ -353,7 +358,7 @@ class CRMDataCrawlService:
 
             # 输出统计
             print("\n" + "=" * 80)
-            print("爬取完成统计")
+            print(f"爬取完成统计 - 组织: {self.company}")
             print("=" * 80)
             print(f"📊 总记录数: {total}")
             print(f"✅ 成功保存: {self.total_saved} 条")
@@ -364,18 +369,19 @@ class CRMDataCrawlService:
             result = {
                 'total': total,
                 'saved': self.total_saved,
-                'failed': self.total_failed
+                'failed': self.total_failed,
+                'company': self.company
             }
             
             # 全量爬取完成后，同步车型数据
             print("\n" + "="*80)
-            print("CRM全量爬取完成，开始同步车型数据...")
+            print(f"CRM全量爬取完成，开始同步车型数据 - 组织: {self.company}")
             print("="*80)
-            self.model_sync_service.sync_to_database(company=COMPANY)
+            self.model_sync_service.sync_to_database(company=self.company)
 
             # 从备货表同步销量数据
             print("\n" + "="*80)
-            print("开始从备货表同步销量数据...")
+            print(f"开始从备货表同步销量数据 - 组织: {self.company}")
             print("="*80)
             self._sync_sales_from_beihuo()
 
@@ -385,7 +391,7 @@ class CRMDataCrawlService:
             print(f"\n❌ 爬取过程出错: {e}")
             import traceback
             traceback.print_exc()
-            return {'total': 0, 'saved': self.total_saved, 'failed': self.total_failed}
+            return {'total': 0, 'saved': self.total_saved, 'failed': self.total_failed, 'company': self.company}
 
         finally:
             if self.session:
@@ -404,6 +410,7 @@ class CRMDataCrawlService:
                     UPDATE crmapp_compare_summary s
                     JOIN crmapp_beihuo b ON s.oe = b.oe COLLATE utf8mb4_unicode_ci
                         AND s.brand = b.`品牌` COLLATE utf8mb4_unicode_ci
+                        AND s.company = b.company
                     SET
                         s.today_sales = b.today_sales,
                         s.yesterday_sales = b.sales_yesterday,
@@ -415,7 +422,7 @@ class CRMDataCrawlService:
                         s.sales_12m = b.`近12个月销量`
                     WHERE s.company = %s
                 """
-                cursor.execute(sql, (COMPANY,))
+                cursor.execute(sql, (self.company,))
                 conn.commit()
                 affected = cursor.rowcount
 
