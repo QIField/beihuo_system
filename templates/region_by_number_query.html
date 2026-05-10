@@ -151,6 +151,42 @@
         .result-card {
             position: relative;
         }
+        /* 统计表格样式 */
+        .stats-title {
+            font-size: 20px;
+            font-weight: 500;
+            color: #1d2129;
+            margin-bottom: 20px;
+            margin-top: 30px;
+        }
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .stats-table th,
+        .stats-table td {
+            border: 1px solid #e5e6eb;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 15px;
+        }
+        .stats-table th {
+            background-color: #f2f3f5;
+            font-weight: 500;
+            color: #1d2129;
+        }
+        .stats-table td {
+            color: #4e5969;
+        }
+        .stats-table tr:hover {
+            background-color: #f7f8fa;
+        }
+        .no-data {
+            color: #86909c;
+            font-size: 15px;
+            padding: 20px 0;
+        }
     </style>
 </head>
 <body>
@@ -209,16 +245,51 @@
                 <div class="loading-spinner"></div>
                 <div class="loading-text">正在查询中...</div>
             </div>
+            
+            <!-- 溯源码统计数据区域 -->
+            <div id="statsContainer" style="display: none;">
+                <div class="stats-title">溯源码统计</div>
+                <div id="statsContent"></div>
+            </div>
         </div>
     </div>
 
 <script>
+/**
+ * 自动检查并显示统计数据
+ */
+function checkAndShowStatistics() {
+    const orgValue = document.getElementById('orgSelect').value;
+    const startCode = document.getElementById('startCode').value.trim();
+    const endCode = document.getElementById('endCode').value.trim();
+    
+    // 当有选择组织，并且开始溯源码和结束溯源码都为空时，显示统计数据
+    if (orgValue && !startCode && !endCode) {
+        queryStatistics();
+    }
+}
+
 /**
  * 页面加载完成后绑定提交按钮事件
  */
 window.onload = function() {
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.addEventListener('click', queryData);
+    
+    // 绑定组织选择事件
+    const orgSelect = document.getElementById('orgSelect');
+    orgSelect.addEventListener('change', checkAndShowStatistics);
+    
+    // 绑定开始溯源码输入事件
+    const startCodeInput = document.getElementById('startCode');
+    startCodeInput.addEventListener('input', checkAndShowStatistics);
+    
+    // 绑定结束溯源码输入事件
+    const endCodeInput = document.getElementById('endCode');
+    endCodeInput.addEventListener('input', checkAndShowStatistics);
+    
+    // 页面加载时检查一次
+    checkAndShowStatistics();
 };
 
 /**
@@ -247,6 +318,69 @@ function hideLoading() {
 }
 
 /**
+ * 查询溯源码统计数据
+ */
+async function queryStatistics() {
+    const orgValue = document.getElementById('orgSelect').value;
+    const statsContainer = document.getElementById('statsContainer');
+    const statsContent = document.getElementById('statsContent');
+    const resultArea = document.getElementById('resultArea');
+    
+    // 如果没有选择组织，隐藏统计区域
+    if (!orgValue) {
+        statsContainer.style.display = 'none';
+        return;
+    }
+    
+    // 显示统计区域时，隐藏溯源结果区域（恢复到默认状态）
+    resultArea.innerText = '请提交查询后查看结果...';
+    statsContainer.style.display = 'block';
+    
+    // 转换组织编码
+    const md = orgCodeMap[orgValue];
+    
+    try {
+        // 请求统计数据
+        const apiUrl = `/suyuan_statistics?md=${md}`;
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            mode: 'cors'
+        });
+        
+        const result = await response.json();
+        console.log('统计数据返回：', result);
+        
+        if (result.code === 0 && result.data) {
+            // 渲染表格
+            if (result.data.length > 0) {
+                let tableHtml = '<table class="stats-table">';
+                tableHtml += '<thead><tr><th>start_m</th><th>end_m</th><th>count</th></tr></thead>';
+                tableHtml += '<tbody>';
+                
+                result.data.forEach(item => {
+                    tableHtml += '<tr>';
+                    tableHtml += `<td>${item.start_m || '-'}</td>`;
+                    tableHtml += `<td>${item.end_m || '-'}</td>`;
+                    tableHtml += `<td>${item.count || 0}</td>`;
+                    tableHtml += '</tr>';
+                });
+                
+                tableHtml += '</tbody></table>';
+                statsContent.innerHTML = tableHtml;
+            } else {
+                statsContent.innerHTML = '<div class="no-data">暂无数据</div>';
+            }
+        } else {
+            statsContainer.style.display = 'none';
+        }
+        
+    } catch (error) {
+        console.error('查询统计数据失败：', error);
+        statsContainer.style.display = 'none';
+    }
+}
+
+/**
  * 核心查询函数（使用 fetch 解决跨域问题）
  */
 async function queryData() {
@@ -257,8 +391,9 @@ async function queryData() {
 
     // 2. 表单校验
     if (!orgValue) { alert('请选择组织！'); return; }
-    if (!startCode) { alert('请输入开始溯源码！'); return; }
+      if (!startCode) { alert('请输入开始溯源码！'); return; }
     if (!endCode) { alert('请输入结束溯源码！'); return; }
+    
 
     // 3. 显示加载动画
     showLoading();
@@ -293,7 +428,11 @@ async function queryData() {
         console.log(' ========== 控制台输出返回结果 ==========');
         console.log('✅ 后端返回JSON数据：', result);
         // ========= 显示到【溯源结果】下方 =========
-        document.getElementById('resultArea').innerText = JSON.stringify(result, null, 2);
+        const resultArea = document.getElementById('resultArea');
+        const statsContainer = document.getElementById('statsContainer');
+        // 显示溯源结果时，隐藏统计区域
+        statsContainer.style.display = 'none';
+        resultArea.innerText = JSON.stringify(result, null, 2);
 
     } catch (error) {
         console.error('❌ 请求失败：', error);
