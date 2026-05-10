@@ -35,7 +35,7 @@ from app.sockets import register_socket_events, notification_manager
 from app.utils.database_connection import get_db_connection
 from app.utils.search import parse_space, parse_comma
 from app.utils.export_tools import handle_export_request
-from app.utils.database.table_manager import init_all_tables
+
 
 # 导入轻量级任务管理器（延迟初始化）
 from app.core.task_manager import task_manager
@@ -158,8 +158,7 @@ def get_valid_db_connection():
 
 
 
-# 在应用启动时调用初始化函数
-init_all_tables()
+
 
 # 检查并修复可能存在的错误数据
 def fix_user_store_data():
@@ -4473,27 +4472,6 @@ notification_manager.init_app(app, socketio)
 # 初始化全局SocketIO引用
 from app.sockets.notification_manager import init_global_socketio
 init_global_socketio(app, socketio)
-
-# 全局标志：虚拟库存表是否已初始化
-_virtual_inventory_tables_initialized = False
-
-def init_virtual_inventory_tables():
-    """
-    初始化虚拟库存相关数据库表（全局只执行一次）
-    在应用启动时调用，确保所有表已创建
-    """
-    global _virtual_inventory_tables_initialized
-
-    if _virtual_inventory_tables_initialized:
-        return
-
-    try:
-        from app.utils import virtual_inventory
-        virtual_inventory.create_tables()
-        _virtual_inventory_tables_initialized = True
-    except:
-        pass
-
 # 初始化后台任务（单 worker 极简版）
 def init_background_tasks():
     """
@@ -4575,9 +4553,6 @@ def init_background_tasks():
 
 # 应用启动配置
 if __name__ == '__main__':
-    # 先在主进程中初始化数据库表
-    init_virtual_inventory_tables()
-    
     # 初始化后台任务
     init_background_tasks()
     
@@ -4586,12 +4561,6 @@ if __name__ == '__main__':
 
 # uWSGI/gunicorn 环境下的初始化
 if IS_UWSGI or not __name__ == '__main__':
-    # 初始化数据库表
-    try:
-        init_virtual_inventory_tables()
-    except:
-        pass
-
     # 延迟初始化后台任务
     def delayed_init():
         try:

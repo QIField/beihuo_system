@@ -7,19 +7,47 @@ import requests
 from .crm_config import get_crm_cookies
 
 
-def create_crm_session():
+# 门店代码映射表
+STORE_KEY_MAP = {
+    'fsbbr': 'fs',   # 佛山
+    'zsbbr': 'zs',   # 中山
+    'zhbbr': 'zh',   # 珠海
+    'dghf': 'hf',    # 合峰
+    'dgby': 'by',    # 百业
+}
+
+
+def get_store_key(store_code):
+    """
+    根据门店代码获取对应的cookie key
+    
+    Args:
+        store_code: 门店代码，如 fsbbr, zsbbr等
+    
+    Returns:
+        str: cookie接口的key
+    """
+    return STORE_KEY_MAP.get(store_code, 'fs')
+
+
+def create_crm_session(store_code='fsbbr'):
     """
     创建带有 CRM 认证信息的 requests Session
+    
+    Args:
+        store_code: 门店代码，如 fsbbr, zsbbr等
     
     Returns:
         requests.Session: 已配置好认证信息的 session 对象
         
     Example:
-        >>> session = create_crm_session()
+        >>> session = create_crm_session('fsbbr')
         >>> response = session.get('https://crm.gzbbr.com/api/...')
     """
+    store_key = get_store_key(store_code)
+    
     # 获取 CRM cookie 认证信息
-    crm_cookies = get_crm_cookies()
+    crm_cookies = get_crm_cookies(store_key)
     
     # 创建 session
     session = requests.Session()

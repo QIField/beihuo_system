@@ -5,7 +5,7 @@
 
 from .crm_config import get_crm_cookies
 from .db_config import get_mysql_config, is_local_environment
-from .cookie_config import create_crm_session, get_auth_headers, create_authenticated_headers
+from .cookie_config import create_crm_session, get_auth_headers, create_authenticated_headers, get_store_key, STORE_KEY_MAP
 
 __all__ = [
     'get_crm_cookies',
@@ -13,5 +13,7 @@ __all__ = [
     'is_local_environment',
     'create_crm_session',
     'get_auth_headers',
-    'create_authenticated_headers'
+    'create_authenticated_headers',
+    'get_store_key',
+    'STORE_KEY_MAP'
 ]

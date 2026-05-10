@@ -21,7 +21,39 @@ sys.path.insert(0, project_root)
 
 import time
 import traceback
+import threading
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from config import STORE_KEY_MAP
+
+# 线程安全的打印锁
+_print_lock = threading.Lock()
+
+def thread_safe_print(*args, **kwargs):
+    """线程安全的打印函数"""
+    with _print_lock:
+        print(*args, **kwargs)
+
+def crawl_company_crm(company):
+    """单个门店的CRM爬取任务（在线程中运行）"""
+    try:
+        thread_safe_print(f"\n{'='*80}")
+        thread_safe_print(f"🚀 [CRM爬取] 开始处理: {company}")
+        thread_safe_print(f"{'='*80}")
+        
+        from app.services.procurement_service.crawl_service import CRMDataCrawlService
+        service = CRMDataCrawlService(company)
+        result = service.crawl_all()
+        
+        thread_safe_print(f"\n✅ [CRM爬取] 完成: {company}")
+        return (company, result)
+        
+    except Exception as e:
+        thread_safe_print(f"\n❌ [CRM爬取] {company} 出现异常: {e}")
+        import traceback
+        with _print_lock:
+            traceback.print_exc()
+        return (company, {'error': str(e)})
 
 
 def execute_daily_pipeline():
@@ -39,29 +71,38 @@ def execute_daily_pipeline():
         'tasks': {}
     }
 
-    # 1. CRM全量爬取
+    # 1. CRM全量爬取 - 多线程并发
     try:
-        print(f"\n{'='*60}")
-        print(f"1. 开始CRM全量爬取")
-        print(f"{'='*60}")
+        thread_safe_print(f"\n{'='*60}")
+        thread_safe_print(f"1. 开始CRM全量爬取（多线程并发）")
+        thread_safe_print(f"{'='*60}")
 
-        from app.services.procurement_service.crawl_service import CRMDataCrawlService
-        service = CRMDataCrawlService()
-        crm_result = service.crawl_all()
+        companies = list(STORE_KEY_MAP.keys())
+        thread_safe_print(f"待处理组织: {', '.join(companies)}")
+        
+        # 使用线程池并发执行（最多3个线程，剩下的排队）
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {executor.submit(crawl_company_crm, company): company for company in companies}
+            
+            for future in as_completed(futures):
+                company, result = future.result()
+                
+                if 'error' not in result:
+                    all_results['tasks'][f'crm_crawl_{company}'] = result
+                    all_results['total_synced'] += result.get('saved', 0)
+                    all_results['total_failed'] += result.get('failed', 0)
+                else:
+                    all_results['tasks'][f'crm_crawl_{company}'] = result
+                    all_results['total_failed'] += 1
 
-        all_results['tasks']['crm_crawl'] = crm_result
-        all_results['total_synced'] += crm_result.get('saved', 0)
-        all_results['total_failed'] += crm_result.get('failed', 0)
-
-        print(f"\n[CRM全量爬取] 结束:")
-        print(f"  - 总记录数: {crm_result.get('total', 0)}")
-        print(f"  - 成功保存: {crm_result.get('saved', 0)}")
-        print(f"  - 失败: {crm_result.get('failed', 0)}")
+        thread_safe_print(f"\n{'='*60}")
+        thread_safe_print(f"1. CRM全量爬取（多线程并发）完成")
+        thread_safe_print(f"{'='*60}")
 
     except Exception as e:
-        print(f"\n[CRM全量爬取] 出现异常: {e}")
+        thread_safe_print(f"\n[CRM全量爬取（多线程并发）] 出现异常: {e}")
         traceback.print_exc()
-        all_results['tasks']['crm_crawl'] = {'error': str(e)}
+        all_results['tasks']['crm_crawl_all'] = {'error': str(e)}
         all_results['total_failed'] += 1
 
     # 2. 采购历史爬取（近5天）+ 聚合到旧表

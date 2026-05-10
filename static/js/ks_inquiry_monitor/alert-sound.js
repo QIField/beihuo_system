@@ -1,6 +1,6 @@
 /**
  * 询价单报警声音提醒模块
- * 功能：循环播放声音，直到用户确认
+ * 功能：数据更新后如果超出阈值，播放声音提醒
  */
 
 (function(global) {
@@ -11,7 +11,7 @@
         AUDIO_ID: 'alertSound',
         ALERT_TITLE: '⚠️ 紧急提醒',
         ALERT_MESSAGE: '询价单超过阈值！当前有 {count} 单待认领，请及时处理！',
-        CONFIRM_BUTTON: '已处理，停止提醒',
+        CONFIRM_BUTTON: '确定',
         SHADE: 0.8,
         CLOSE_BTN: 0
     };
@@ -20,7 +20,6 @@
     let state = {
         audio: null,
         isPlaying: false,
-        isConfirmed: false,
         currentAlertCount: 0
     };
 
@@ -42,7 +41,7 @@
             initAudio();
         }
 
-        if (state.isPlaying || state.isConfirmed) {
+        if (state.isPlaying) {
             return;
         }
 
@@ -73,9 +72,7 @@
                 area: ['400px', '200px']
             }, function(index) {
                 stopAlertSound();
-                state.isConfirmed = true;
                 layui.layer.close(index);
-                notifyBackendConfirmed();
             });
         });
     }
@@ -92,25 +89,6 @@
     }
 
     /**
-     * 重置报警状态
-     */
-    function resetAlertState() {
-        state.isConfirmed = false;
-        state.isPlaying = false;
-        console.log('[AlertSound] 报警状态已重置');
-    }
-
-    /**
-     * 通知后端用户已确认报警
-     */
-    function notifyBackendConfirmed() {
-        fetch('/api/ks_inquiry/confirm_alert', {
-            method: 'POST',
-            credentials: 'same-origin'
-        }).catch(err => console.log('[AlertSound] 确认通知失败:', err));
-    }
-
-    /**
      * 触发报警
      */
     function triggerAlert(alertCount) {
@@ -121,7 +99,6 @@
     global.KsInquiryAlert = {
         play: triggerAlert,
         stop: stopAlertSound,
-        reset: resetAlertState,
         getState: () => ({ ...state })
     };
 

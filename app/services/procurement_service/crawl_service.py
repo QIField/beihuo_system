@@ -17,7 +17,7 @@ from app.services.procurement_service.vehicle_model_sync import VehicleModelSync
 LIMIT = 500
 BATCH_SIZE = 5000
 MAX_RETRY = 3
-RETRY_DELAY = 2
+RETRY_DELAY = 10
 COMPANY = 'fsbbr'
 CRM_PRODUCT_LIST_URL = 'https://crm.gzbbr.com/api/Product.Product/list'
 
@@ -35,8 +35,9 @@ PRODUCT_GRADE_MAP = {
 class CRMDataCrawlService:
     """CRM数据全量爬取服务类"""
 
-    def __init__(self):
+    def __init__(self, company='fsbbr'):
         self.session = None
+        self.company = company
         self.total_saved = 0
         self.total_failed = 0
         self.model_sync_service = VehicleModelSyncService()
@@ -46,12 +47,12 @@ class CRMDataCrawlService:
         获取第1页数据，返回 (total, last_page)
         同时初始化session
         """
-        self.session = create_crm_session()
+        self.session = create_crm_session(self.company)
         payload = {'page': 1, 'limit': LIMIT}
 
         for attempt in range(MAX_RETRY):
             try:
-                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=30)
+                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=120)
                 response.raise_for_status()
                 result = response.json()
 
@@ -64,11 +65,13 @@ class CRMDataCrawlService:
                     print(f"API返回错误: {result.get('msg')}")
             except Exception as e:
                 print(f"[{attempt + 1}/{MAX_RETRY}] 获取总页数失败: {e}")
+                import traceback
+                traceback.print_exc()
                 if attempt < MAX_RETRY - 1:
                     time.sleep(RETRY_DELAY)
                     # 重建session
                     try:
-                        self.session = create_crm_session()
+                        self.session = create_crm_session(self.company)
                     except:
                         pass
                     continue
@@ -83,7 +86,7 @@ class CRMDataCrawlService:
 
         for attempt in range(MAX_RETRY):
             try:
-                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=30)
+                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=120)
                 response.raise_for_status()
                 result = response.json()
 
@@ -94,11 +97,13 @@ class CRMDataCrawlService:
                     print(f"[第{page}页] API返回错误: {result.get('msg')}")
             except Exception as e:
                 print(f"[第{page}页][{attempt + 1}/{MAX_RETRY}] 请求失败: {e}")
+                import traceback
+                traceback.print_exc()
                 if attempt < MAX_RETRY - 1:
                     time.sleep(RETRY_DELAY)
                     # 尝试重建session
                     try:
-                        self.session = create_crm_session()
+                        self.session = create_crm_session(self.company)
                     except:
                         pass
                     continue
@@ -159,7 +164,7 @@ class CRMDataCrawlService:
             'product_id': product.get('product_id', ''),
             'oe': product.get('number', ''),
             'brand': product.get('brand_name', ''),
-            'company': COMPANY,
+            'company': self.company,
             'product_name': product.get('l_name_zh', ''),
             'vehicle_brand': product.get('cass_oebrand_name', ''),
             'replace_number': self._extract_replace_numbers(product.get('display_number')),
@@ -176,14 +181,18 @@ class CRMDataCrawlService:
             'min_price': 0.0
         }
 
-    def clear_table(self) -> bool:
-        """清空 crmapp_compare_summary 表（重置自增ID）"""
+    def clear_table(self, company=None) -> bool:
+        """清空 crmapp_compare_summary 表，支持按组织清空"""
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("TRUNCATE TABLE crmapp_compare_summary")
+                if company:
+                    cursor.execute("DELETE FROM crmapp_compare_summary WHERE company = %s", (company,))
+                    print(f"✅ 已清空 {company} 的 crmapp_compare_summary 数据")
+                else:
+                    cursor.execute("TRUNCATE TABLE crmapp_compare_summary")
+                    print("✅ 已清空 crmapp_compare_summary 表")
                 conn.commit()
-                print("✅ 已清空 crmapp_compare_summary 表")
                 return True
         except Exception as e:
             conn.rollback()
@@ -218,7 +227,7 @@ class CRMDataCrawlService:
                 p.get('product_id', ''),
                 p.get('oe', ''),
                 p.get('brand', ''),
-                p.get('company', COMPANY),
+                p.get('company', self.company),
                 p.get('product_name', ''),
                 p.get('vehicle_brand', ''),
                 p.get('replace_number', ''),
@@ -248,12 +257,22 @@ class CRMDataCrawlService:
                     except Exception:
                         # 整块失败，逐条重试
                         conn.rollback()
+                        failed_reasons = []
                         for p in chunk:
                             try:
                                 cursor.execute(sql, make_row(p))
                                 total_saved += 1
-                            except Exception:
+                            except Exception as e:
                                 total_failed += 1
+                                # 只记录前3条失败原因
+                                if len(failed_reasons) < 3:
+                                    failed_reasons.append((p.get('oe', ''), p.get('brand', ''), str(e)))
+                        
+                        # 打印前几条失败原因
+                        if failed_reasons:
+                            print(f"  ⚠️  失败示例（前{len(failed_reasons)}条）：")
+                            for idx, (oe, brand, reason) in enumerate(failed_reasons, 1):
+                                print(f"     {idx}. OE: {oe}, 品牌: {brand}, 原因: {reason}")
 
                 conn.commit()
 
@@ -273,10 +292,10 @@ class CRMDataCrawlService:
         主入口：爬取所有产品并保存
 
         Returns:
-            {'total': 总记录数, 'saved': 成功保存数, 'failed': 失败数}
+            {'total': 总记录数, 'saved': 成功保存数, 'failed': 失败数, 'company': 组织代码}
         """
         print("=" * 80)
-        print("开始CRM全量爬取")
+        print(f"开始CRM全量爬取 - 组织: {self.company}")
         print("=" * 80)
 
         try:
@@ -286,9 +305,9 @@ class CRMDataCrawlService:
             print(f"📄 总页数: {last_page}")
             print(f"📦 每页数量: {LIMIT}")
 
-            # 清空表（全量爬取前清空旧数据）
-            if not self.clear_table():
-                return {'total': 0, 'saved': 0, 'failed': 0}
+            # 清空该组织的旧数据
+            if not self.clear_table(self.company):
+                return {'total': 0, 'saved': 0, 'failed': 0, 'company': self.company}
 
             batch_buffer = []
             total_processed = 0
@@ -353,7 +372,7 @@ class CRMDataCrawlService:
 
             # 输出统计
             print("\n" + "=" * 80)
-            print("爬取完成统计")
+            print(f"爬取完成统计 - 组织: {self.company}")
             print("=" * 80)
             print(f"📊 总记录数: {total}")
             print(f"✅ 成功保存: {self.total_saved} 条")
@@ -364,18 +383,19 @@ class CRMDataCrawlService:
             result = {
                 'total': total,
                 'saved': self.total_saved,
-                'failed': self.total_failed
+                'failed': self.total_failed,
+                'company': self.company
             }
             
             # 全量爬取完成后，同步车型数据
             print("\n" + "="*80)
-            print("CRM全量爬取完成，开始同步车型数据...")
+            print(f"CRM全量爬取完成，开始同步车型数据 - 组织: {self.company}")
             print("="*80)
-            self.model_sync_service.sync_to_database(company=COMPANY)
+            self.model_sync_service.sync_to_database(company=self.company)
 
             # 从备货表同步销量数据
             print("\n" + "="*80)
-            print("开始从备货表同步销量数据...")
+            print(f"开始从备货表同步销量数据 - 组织: {self.company}")
             print("="*80)
             self._sync_sales_from_beihuo()
 
@@ -385,7 +405,7 @@ class CRMDataCrawlService:
             print(f"\n❌ 爬取过程出错: {e}")
             import traceback
             traceback.print_exc()
-            return {'total': 0, 'saved': self.total_saved, 'failed': self.total_failed}
+            return {'total': 0, 'saved': self.total_saved, 'failed': self.total_failed, 'company': self.company}
 
         finally:
             if self.session:
@@ -404,6 +424,7 @@ class CRMDataCrawlService:
                     UPDATE crmapp_compare_summary s
                     JOIN crmapp_beihuo b ON s.oe = b.oe COLLATE utf8mb4_unicode_ci
                         AND s.brand = b.`品牌` COLLATE utf8mb4_unicode_ci
+                        AND s.company = b.company COLLATE utf8mb4_unicode_ci
                     SET
                         s.today_sales = b.today_sales,
                         s.yesterday_sales = b.sales_yesterday,
@@ -415,7 +436,7 @@ class CRMDataCrawlService:
                         s.sales_12m = b.`近12个月销量`
                     WHERE s.company = %s
                 """
-                cursor.execute(sql, (COMPANY,))
+                cursor.execute(sql, (self.company,))
                 conn.commit()
                 affected = cursor.rowcount
 

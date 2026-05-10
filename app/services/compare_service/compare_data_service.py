@@ -846,6 +846,43 @@ class CompareDataService:
             conn.close()
     
     @staticmethod
+    def use_replace_number(product_ids: List[str], replace_number: str, store_code: str) -> List[Dict]:
+        """
+        一键使用替换号，循环更新多个产品
+        
+        Args:
+            product_ids: 要更新的产品ID列表
+            replace_number: 要使用的替换号
+            store_code: 门店代码
+        
+        Returns:
+            List[Dict]: 更新结果列表
+        """
+        from app.utils.Crm_Updatenumber import update_product_numbers
+        
+        results = []
+        for product_id in product_ids:
+            try:
+                result = update_product_numbers(
+                    product_id=product_id,
+                    numbers=[replace_number],
+                    store_code=store_code
+                )
+                results.append({
+                    'product_id': product_id,
+                    'success': result.get('status') == 200,
+                    'message': result.get('msg', '')
+                })
+            except Exception as e:
+                results.append({
+                    'product_id': product_id,
+                    'success': False,
+                    'message': str(e)
+                })
+        
+        return results
+    
+    @staticmethod
     def _batch_get_stock_quantity(cursor, oe_brand_list: List[Tuple[str, str]], company: str) -> Dict[Tuple[str, str], int]:
         """
         批量查询库存数量
@@ -1031,3 +1068,10 @@ def get_oe_with_different_replace_numbers(
         vehicle_brand=vehicle_brand, company=company,
         page=page, limit=limit
     )
+
+
+def use_replace_number(product_ids: List[str], replace_number: str, store_code: str) -> List[Dict]:
+    """
+    一键使用替换号，循环更新多个产品
+    """
+    return CompareDataService.use_replace_number(product_ids, replace_number, store_code)

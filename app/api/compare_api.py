@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request, session
 
 from app.services.compare_service.compare_data_service import (
     get_oe_with_different_replace_numbers,
+    use_replace_number,
 )
 
 # 创建蓝图（不设置 url_prefix，在 __init__.py 中统一设置）
@@ -273,5 +274,72 @@ def api_export_diff_replace_numbers():
         return jsonify({
             'code': -1,
             'message': f'导出失败: {str(e)}',
+            'data': None
+        }), 500
+
+
+@bp.route('/diff-replace-numbers/use', methods=['POST'])
+@login_required
+def api_use_replace_number():
+    """
+    一键使用替换号
+    
+    请求参数:
+        {
+            "product_ids": ["123", "456"],  // 要更新的产品ID列表
+            "replace_number": "A000000001119"  // 要使用的替换号
+        }
+    
+    返回:
+        {
+            "code": 0,
+            "message": "success",
+            "data": {
+                "results": [...]  // 更新结果列表
+            }
+        }
+    """
+    try:
+        data = request.get_json()
+        
+        product_ids = data.get('product_ids', [])
+        replace_number = data.get('replace_number', '')
+        
+        if not product_ids:
+            return jsonify({
+                'code': -1,
+                'message': '请选择要更新的产品',
+                'data': None
+            }), 400
+        
+        if not replace_number:
+            return jsonify({
+                'code': -1,
+                'message': '替换号不能为空',
+                'data': None
+            }), 400
+        
+        # 获取用户门店
+        store_code = get_user_company()
+        
+        # 调用服务层
+        results = use_replace_number(
+            product_ids=product_ids,
+            replace_number=replace_number,
+            store_code=store_code
+        )
+        
+        return jsonify({
+            'code': 0,
+            'message': 'success',
+            'data': {
+                'results': results
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'code': -1,
+            'message': f'操作失败: {str(e)}',
             'data': None
         }), 500

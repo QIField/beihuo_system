@@ -220,7 +220,6 @@
     <script src="{{ url_for('static', filename='js/ks_inquiry_monitor/test-button.js') }}"></script>
     <script>
         const ALERT_THRESHOLD = 7;
-        let lastAlert = false;
 
         // ========== 原有询价单监控代码 ==========
         function render(data) {
@@ -249,7 +248,7 @@
                             </div>
                             <div class="sub-stat">
                                 <div class="sub-stat-value">${item.unquoted_count}</div>
-                                <div class="sub-stat-label">未报价</div>
+                                <div class="sub-stat-label">报价中</div>
                             </div>
                         </div>
                         <div class="update-time">更新于 ${data.update_time}</div>
@@ -260,12 +259,12 @@
             document.getElementById('cards').innerHTML = html;
             document.getElementById('checkTime').textContent = '最新检查时间: ' + data.update_time;
 
-            if (data.alert && !lastAlert) {
+            // 每次数据更新，如果超出阈值就报警（移除确认机制）
+            if (data.alert) {
                 if (window.KsInquiryAlert) {
                     window.KsInquiryAlert.play(maxUnclaimedCount);
                 }
             }
-            lastAlert = data.alert;
         }
 
         // WebSocket连接
