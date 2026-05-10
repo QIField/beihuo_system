@@ -17,7 +17,7 @@ from app.services.procurement_service.vehicle_model_sync import VehicleModelSync
 LIMIT = 500
 BATCH_SIZE = 5000
 MAX_RETRY = 3
-RETRY_DELAY = 2
+RETRY_DELAY = 10
 COMPANY = 'fsbbr'
 CRM_PRODUCT_LIST_URL = 'https://crm.gzbbr.com/api/Product.Product/list'
 
@@ -52,7 +52,7 @@ class CRMDataCrawlService:
 
         for attempt in range(MAX_RETRY):
             try:
-                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=30)
+                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=120)
                 response.raise_for_status()
                 result = response.json()
 
@@ -65,6 +65,8 @@ class CRMDataCrawlService:
                     print(f"API返回错误: {result.get('msg')}")
             except Exception as e:
                 print(f"[{attempt + 1}/{MAX_RETRY}] 获取总页数失败: {e}")
+                import traceback
+                traceback.print_exc()
                 if attempt < MAX_RETRY - 1:
                     time.sleep(RETRY_DELAY)
                     # 重建session
@@ -84,7 +86,7 @@ class CRMDataCrawlService:
 
         for attempt in range(MAX_RETRY):
             try:
-                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=30)
+                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=120)
                 response.raise_for_status()
                 result = response.json()
 
@@ -95,6 +97,8 @@ class CRMDataCrawlService:
                     print(f"[第{page}页] API返回错误: {result.get('msg')}")
             except Exception as e:
                 print(f"[第{page}页][{attempt + 1}/{MAX_RETRY}] 请求失败: {e}")
+                import traceback
+                traceback.print_exc()
                 if attempt < MAX_RETRY - 1:
                     time.sleep(RETRY_DELAY)
                     # 尝试重建session
@@ -253,12 +257,22 @@ class CRMDataCrawlService:
                     except Exception:
                         # 整块失败，逐条重试
                         conn.rollback()
+                        failed_reasons = []
                         for p in chunk:
                             try:
                                 cursor.execute(sql, make_row(p))
                                 total_saved += 1
-                            except Exception:
+                            except Exception as e:
                                 total_failed += 1
+                                # 只记录前3条失败原因
+                                if len(failed_reasons) < 3:
+                                    failed_reasons.append((p.get('oe', ''), p.get('brand', ''), str(e)))
+                        
+                        # 打印前几条失败原因
+                        if failed_reasons:
+                            print(f"  ⚠️  失败示例（前{len(failed_reasons)}条）：")
+                            for idx, (oe, brand, reason) in enumerate(failed_reasons, 1):
+                                print(f"     {idx}. OE: {oe}, 品牌: {brand}, 原因: {reason}")
 
                 conn.commit()
 
@@ -410,7 +424,7 @@ class CRMDataCrawlService:
                     UPDATE crmapp_compare_summary s
                     JOIN crmapp_beihuo b ON s.oe = b.oe COLLATE utf8mb4_unicode_ci
                         AND s.brand = b.`品牌` COLLATE utf8mb4_unicode_ci
-                        AND s.company = b.company
+                        AND s.company = b.company COLLATE utf8mb4_unicode_ci
                     SET
                         s.today_sales = b.today_sales,
                         s.yesterday_sales = b.sales_yesterday,
