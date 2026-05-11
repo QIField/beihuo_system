@@ -21,6 +21,11 @@ def expansion_app(app):
 
     from app.routes.customer_quota_manager_web import customer_quota_manager_web_bp
     app.register_blueprint(customer_quota_manager_web_bp)
-    
+
     from app.routes.report_wx_quote_data_web import report_wx_quote_data_web_bp
     app.register_blueprint(report_wx_quote_data_web_bp)
+
+
+    # 注册仓库管理蓝图
+    from app.routes.warehouse_manager_web import warehouse_manager_web_bp
+    app.register_blueprint(warehouse_manager_web_bp)
