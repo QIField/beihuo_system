@@ -1,23 +1,34 @@
 import requests
 import time
+import sys
+from pathlib import Path
 
-COOKIE_API_URL = "http://113.45.176.129:8001/md_ks.get_cookies?md=fs"
+# 添加项目根目录到Python路径
+current_dir = Path(__file__).parent
+project_root = current_dir.parent.parent
+sys.path.insert(0, str(project_root))
+
+# 从 model 导入配置
+from app.utils.ks_auto_bill_model import COMPANY_CONFIG, COMPANIES, get_company_key
 
 
-def login_with_cookie_api():
-    """使用 Cookie 接口登录"""
+def login_with_cookie_api(company='fsbbr'):
+    """使用 Cookie 接口登录指定公司"""
+    key = get_company_key(company)
+    cookie_api_url = f"http://113.45.176.129:8001/md_ks.get_cookies?md={key}"
+
     try:
-        print("[开思登录] 尝试使用 Cookie 接口登录...")
-        response = requests.get(COOKIE_API_URL, timeout=10)
+        print(f"[开思登录][{company}] 尝试使用 Cookie 接口登录...")
+        response = requests.get(cookie_api_url, timeout=10)
         if response.status_code != 200:
-            print(f"[开思登录] Cookie 接口请求失败，状态码: {response.status_code}")
+            print(f"[开思登录][{company}] Cookie 接口请求失败，状态码: {response.status_code}")
             return None
 
         data = response.json()
         cookie_dict = data.get("cookie", {})
 
         if not cookie_dict:
-            print("[开思登录] Cookie 接口返回空 cookie")
+            print(f"[开思登录][{company}] Cookie 接口返回空 cookie")
             return None
 
         session = requests.Session()
@@ -32,13 +43,13 @@ def login_with_cookie_api():
         session.cookies.set("_seller_active_menu_id_", "myOrder", domain=".cassmall.com")
         session.cookies.set("_seller_active_menu_url_", "/orders/seller/order/list", domain=".cassmall.com")
 
-        print("[开思登录] Cookie 接口登录成功")
+        print(f"[开思登录][{company}] Cookie 接口登录成功")
         return session
     except Exception as e:
-        print(f"[开思登录] Cookie 接口登录失败: {e}")
+        print(f"[开思登录][{company}] Cookie 接口登录失败: {e}")
         return None
 
 
-def login():
+def login(company='fsbbr'):
     """登录开思平台，使用 Cookie 接口"""
-    return login_with_cookie_api()
+    return login_with_cookie_api(company)

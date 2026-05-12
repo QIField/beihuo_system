@@ -189,11 +189,11 @@ def init_daily_crawl_task():
             execute_daily_pipeline,
             'cron',
             'daily_crawl_pipeline',
-            hour=2,
+            hour=22,
             minute=0,
             replace_existing=True
         )
-        print("[每日爬取] 定时任务已注册（凌晨2点，不含询价次数同步）")
+        print("[每日爬取] 定时任务已注册（晚上22点，不含询价次数同步）")
 
     except Exception as e:
         logger.error(f"[每日爬取] 失败: {e}")

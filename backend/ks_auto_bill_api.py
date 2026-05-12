@@ -10,11 +10,12 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.utils.ks_auto_bill_model import (
     get_crmapp_ks_auto_bill_data, 
     get_crmapp_ks_auto_bill_count,
-    format_time_only
+    format_time_only,
+    get_companies,
+    get_company_name
 )
 
-# 导入权限服务
-from app.utils.permission_service import org_required
+
 
 # 导入统一任务管理器和简化任务
 from app.core.task_manager import task_manager
@@ -23,6 +24,15 @@ from app.ks_auto_bill.task import (
     get_ks_auto_bill_task_status,
     process_orders_once
 )
+
+# 导入获取用户当前门店函数
+try:
+    from beihuo_system import get_user_store
+except ImportError:
+    # 如果导入失败，定义一个默认实现
+    def get_user_store():
+        """获取用户当前的门店（用于数据查询）"""
+        return session.get('current_org', session.get('store', 'fsbbr'))
 
 ks_auto_bill_bp = Blueprint('ks_auto_bill', __name__)
 
@@ -42,7 +52,6 @@ def login_required(f):
 
 @ks_auto_bill_bp.route('/ks_auto_bill')
 @login_required
-@org_required(['fsbbr'])  # 只允许fsbbr组织访问
 def ks_auto_bill_page():
     """
     渲染开思自动对单页面
@@ -54,11 +63,11 @@ def ks_auto_bill_page():
 
 @ks_auto_bill_bp.route('/api/ks_auto_bill_data', methods=['GET'])
 @login_required
-@org_required(['fsbbr'])  # 只允许fsbbr组织访问
 def get_ks_auto_bill_data():
     """
     获取开思自动开单数据API
     用于前端表格展示
+    自动根据用户当前所在门店(current_org)筛选数据
     """
     try:
         page = int(request.args.get('page', 1))
@@ -77,12 +86,16 @@ def get_ks_auto_bill_data():
         else:
             target_date = datetime.now().strftime('%Y-%m-%d')
         
+        # 获取用户当前所在门店（current_org）
+        company = get_user_store()
+        
         total_count = get_crmapp_ks_auto_bill_count(
             target_date_str=target_date,
             start_date=start_date if start_date and end_date else None,
             end_date=end_date if start_date and end_date else None,
             ks_order_id=ks_order_id,
-            crm_order_id=crm_order_id
+            crm_order_id=crm_order_id,
+            company=company
         )
         
         records = get_crmapp_ks_auto_bill_data(
@@ -92,15 +105,17 @@ def get_ks_auto_bill_data():
             start_date=start_date if start_date and end_date else None,
             end_date=end_date if start_date and end_date else None,
             ks_order_id=ks_order_id,
-            crm_order_id=crm_order_id
+            crm_order_id=crm_order_id,
+            company=company
         )
         
         processed_records = []
         for record in records:
             processed_record = dict(record)
-            from app.utils.ks_auto_bill_model import format_time_only
             processed_record['time_only'] = format_time_only(processed_record['date'])
             processed_record['date'] = format_time_only(processed_record['date'])
+            # 添加公司名称
+            processed_record['company_name'] = get_company_name(processed_record.get('company', ''))
             processed_records.append(processed_record)
         
         if sort_auto_billed_first == 'true':
@@ -117,6 +132,32 @@ def get_ks_auto_bill_data():
             'code': 1,
             'msg': f'获取数据失败: {str(e)}',
             'count': 0,
+            'data': []
+        })
+
+
+@ks_auto_bill_bp.route('/api/ks_auto_bill/companies', methods=['GET'])
+@login_required
+def get_companies_api():
+    """
+    获取公司列表API
+    
+    返回:
+        code: int - 0表示成功
+        data: list - 公司列表，包含code和name
+    """
+    try:
+        companies = get_companies()
+        data = [{'code': c, 'name': get_company_name(c)} for c in companies]
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': data
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'获取公司列表失败: {str(e)}',
             'data': []
         })
 
@@ -192,6 +233,11 @@ def get_ks_auto_bill_status():
     """
     status = get_ks_auto_bill_task_status()
     
+    # 获取用户当前所在门店
+    current_store = get_user_store()
+    status['current_company'] = current_store
+    status['current_company_name'] = get_company_name(current_store)
+    
     # 补充定时任务状态
     try:
         job = task_manager._scheduler.get_job('ks_auto_bill_task')
@@ -206,7 +252,6 @@ def get_ks_auto_bill_status():
 
 @ks_auto_bill_bp.route('/api/ks_auto_bill/control', methods=['POST'])
 @login_required
-@org_required(['fsbbr'])
 def control_ks_auto_bill():
     """
     控制开思自动对单任务

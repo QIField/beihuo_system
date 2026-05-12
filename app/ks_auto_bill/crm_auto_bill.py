@@ -3,20 +3,30 @@ import json
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+import sys
+
+# 添加项目根目录到Python路径
+current_dir = Path(__file__).parent
+project_root = current_dir.parent.parent
+sys.path.insert(0, str(project_root))
 
 # 从统一的数据库连接模块导入 - 使用 DBCursorContext 上下文管理器
 from app.utils.database_connection import db_cursor, get_db_connection
+
+# 从 model 导入配置
+from app.utils.ks_auto_bill_model import get_company_key
 
 # CRM开单接口地址
 CRM_API_URL = "http://113.45.176.129:8001/ks_kaidan_api"
 
 
-def filter_unprocessed_orders(order_ids):
+def filter_unprocessed_orders(order_ids, company='fsbbr'):
     """
     根据订单ID列表，过滤出需要处理的订单（即CRM状态不是'已自动开单'或'开单失败'或不存在的订单）
     
     参数:
         order_ids: 待处理订单ID列表
+        company: 公司代码，用于筛选特定公司的订单
     
     返回:
         list: 需要发送到CRM的订单ID列表
@@ -38,9 +48,10 @@ def filter_unprocessed_orders(order_ids):
             SELECT `开思订单号`, `crm订单状态` 
             FROM crmapp_ks_auto_bill 
             WHERE `开思订单号` IN ({placeholders})
+            AND (`company` = %s OR `company` IS NULL)
             """
             
-            cursor.execute(sql, order_ids)
+            cursor.execute(sql, order_ids + [company])
             results = cursor.fetchall()
             
             # 使用集合优化：将已处理的订单ID存储到集合中，方便O(1)时间复杂度查找
@@ -64,13 +75,14 @@ def filter_unprocessed_orders(order_ids):
         return []
 
 
-def save_order_result_to_db(order_id, result_data, connection=None, status='已自动开单'):
+def save_order_result_to_db(order_id, result_data, company='fsbbr', connection=None, status='已自动开单'):
     """
     将订单结果保存到数据库中
     
     参数:
         order_id: 开思订单号
         result_data: 接口返回的数据
+        company: 公司代码
         connection: 可选的数据库连接对象，若为None则创建新连接
         status: 订单状态，默认为'已自动开单'，失败时传入'开单失败'
     """
@@ -90,30 +102,31 @@ def save_order_result_to_db(order_id, result_data, connection=None, status='已�
         with db_cursor(dict_cursor=False, connection=connection) as cursor:
             sql = """
             UPDATE crmapp_ks_auto_bill 
-            SET `crm订单号`=%s, `crm订单链接`=%s, `crm订单状态`=%s, `开单时间`=%s
+            SET `crm订单号`=%s, `crm订单链接`=%s, `crm订单状态`=%s, `开单时间`=%s, `company`=%s
             WHERE `开思订单号` = %s
             """
-            cursor.execute(sql, (crm_order_number, crm_order_url, status, current_time, order_id))
+            cursor.execute(sql, (crm_order_number, crm_order_url, status, current_time, company, order_id))
             
             # 检查是否有更新记录，如果没有则插入新记录
             if cursor.rowcount == 0:
                 insert_sql = """
-                INSERT INTO crmapp_ks_auto_bill (`开思订单号`, `crm订单号`, `crm订单链接`, `crm订单状态`, `开单时间`) 
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO crmapp_ks_auto_bill (`开思订单号`, `crm订单号`, `crm订单链接`, `crm订单状态`, `开单时间`, `company`) 
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """
-                cursor.execute(insert_sql, (order_id, crm_order_number, crm_order_url, status, current_time))
+                cursor.execute(insert_sql, (order_id, crm_order_number, crm_order_url, status, current_time, company))
                 
         print(f"         ✓ 订单 {order_id} 信息已保存到数据库")
     except Exception as e:
         print(f"         ✗ 保存订单 {order_id} 到数据库失败: {str(e)}")
 
 
-def send_order_to_crm(order_id, connection=None):
+def send_order_to_crm(order_id, company='fsbbr', connection=None):
     """
     发送单个订单号到CRM开单接口
     
     参数:
         order_id: 开思订单号（如 "S2602210009009"）
+        company: 公司代码，默认为 'fsbbr'
         connection: 可选的数据库连接对象，若为None则创建新连接
     
     返回:
@@ -123,7 +136,11 @@ def send_order_to_crm(order_id, connection=None):
     # 由于订单是从数据库查询出来的（满足特定条件），直接发送请求，不再检查状态
     print(f"         ✓ 订单 {order_id} 符合处理条件，发送到CRM系统")
     
-    payload = {'orders_no': order_id}
+    key = get_company_key(company)
+    payload = {
+        'orders_no': order_id,
+        'key': key  # 新增参数：公司key
+    }
     headers = {}
     
     response = requests.request("POST", CRM_API_URL, headers=headers, data=payload)
@@ -133,17 +150,18 @@ def send_order_to_crm(order_id, connection=None):
     print(f"         响应: {json.dumps(data, ensure_ascii=False)}")
     
     # 保存订单结果到数据库
-    save_order_result_to_db(order_id, data, connection)
+    save_order_result_to_db(order_id, data, company, connection)
     
     return data
 
 
-def send_orders_to_crm(order_ids, connection=None):
+def send_orders_to_crm(order_ids, company='fsbbr', connection=None):
     """
     批量发送订单号列表到CRM开单接口
     
     参数:
         order_ids: 订单号列表
+        company: 公司代码，默认为 'fsbbr'
         connection: 可选的数据库连接对象，若为None则创建新连接
     
     返回:
@@ -155,7 +173,7 @@ def send_orders_to_crm(order_ids, connection=None):
     
     # 过滤出需要处理的订单
     print(f"\n【过滤】正在过滤需要处理的订单...")
-    unprocessed_orders = filter_unprocessed_orders(order_ids)
+    unprocessed_orders = filter_unprocessed_orders(order_ids, company)
     
     if not unprocessed_orders:
         print("【过滤】所有订单都已处理过，无需发送请求")
@@ -175,7 +193,7 @@ def send_orders_to_crm(order_ids, connection=None):
     try:
         for i, order_id in enumerate(unprocessed_orders, 1):
             print(f"【CRM】[{i}/{len(unprocessed_orders)}] 发送订单: {order_id}")
-            result = send_order_to_crm(order_id, conn)
+            result = send_order_to_crm(order_id, company, conn)
             
             if result and not (isinstance(result, dict) and result.get("skipped")):
                 results.append({"order_id": order_id, "result": result})

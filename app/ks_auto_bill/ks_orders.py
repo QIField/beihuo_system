@@ -207,13 +207,14 @@ def extract_order_info(session, status=""):
     return order_info_list
 
 
-def save_order_info_to_db(order_info_list, order_details_map=None):
+def save_order_info_to_db(order_info_list, order_details_map=None, company='fsbbr'):
     """
     将订单信息保存到数据库，如果订单号已存在则检查其他字段是否不同，不同则更新，相同则跳过；不存在的订单则插入新数据
     
     参数:
         order_info_list: 订单信息列表，每个元素包含 'orderId', 'orderStatusDesc', 'orderDate'
         order_details_map: 订单详情映射，key为订单号，value为包含数量和金额的字典（可选）
+        company: 公司代码，默认为 'fsbbr'
     
     优化说明:
         - 批量查询现有记录，减少数据库交互次数
@@ -294,24 +295,24 @@ def save_order_info_to_db(order_info_list, order_details_map=None):
                         detail = order_details_map[order_id]
                         quantity = detail.get('total_quantity', None)
                         amount = detail.get('total_amount', None)
-                        to_insert.append((order_date, order_id, order_status_desc, buyer_company_name, quantity, amount, crm_order_status))
+                        to_insert.append((order_date, order_id, order_status_desc, buyer_company_name, quantity, amount, crm_order_status, company))
                     else:
                         # 不包含数量和金额字段的插入
-                        to_insert.append((order_date, order_id, order_status_desc, buyer_company_name, crm_order_status))
+                        to_insert.append((order_date, order_id, order_status_desc, buyer_company_name, crm_order_status, company))
             
             # 批量插入新订单
             inserted_count = 0
             if to_insert:
-                # 检查是否包含数量和金额字段（现在统一为7个字段：日期、订单号、执行日志、客户、数量、金额、crm订单状态）
-                if to_insert and len(to_insert[0]) == 7:  # 包含数量和金额
+                # 检查是否包含数量和金额字段（现在统一为8个字段：日期、订单号、执行日志、客户、数量、金额、crm订单状态、company）
+                if to_insert and len(to_insert[0]) == 8:  # 包含数量和金额
                     insert_sql = """
-                    INSERT INTO crmapp_ks_auto_bill (`日期`, `开思订单号`, `执行日志`, `客户`, `数量`, `金额`, `crm订单状态`)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO crmapp_ks_auto_bill (`日期`, `开思订单号`, `执行日志`, `客户`, `数量`, `金额`, `crm订单状态`, `company`)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """
                 else:  # 不包含数量和金额
                     insert_sql = """
-                    INSERT INTO crmapp_ks_auto_bill (`日期`, `开思订单号`, `执行日志`, `客户`, `crm订单状态`)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO crmapp_ks_auto_bill (`日期`, `开思订单号`, `执行日志`, `客户`, `crm订单状态`, `company`)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     """
                 cursor.executemany(insert_sql, to_insert)
                 inserted_count = len(to_insert)
@@ -414,13 +415,14 @@ def get_order_details(session, order_id):
         return None
 
 
-def extract_and_save_order_info(session, status=""):
+def extract_and_save_order_info(session, status="", company='fsbbr'):
     """
     获取订单信息、保存到数据库，并对新增的订单获取详细信息
     
     参数:
         session: 登录后的会话对象
         status: 订单状态ID，默认为空（获取所有状态的订单）
+        company: 公司代码，默认为 'fsbbr'
     
     返回:
         tuple: (所有订单信息列表, 状态为'等待商家确认'的订单ID列表)
@@ -458,7 +460,7 @@ def extract_and_save_order_info(session, status=""):
             print(f"订单 {order_id} 详情获取失败")
     
     # 保存订单信息到数据库（包括新订单的详情）
-    save_order_info_to_db(order_info_list, order_details_map)
+    save_order_info_to_db(order_info_list, order_details_map, company)
     
     # 筛选出需要开单的订单ID
     # ORDER_APPROVED 和 ORDER_CANCELLING 状态的订单不开单，其余全部开单
@@ -469,4 +471,3 @@ def extract_and_save_order_info(session, status=""):
     ]
     
     return order_info_list, pending_confirmation_orders
-
