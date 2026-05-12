@@ -40,7 +40,8 @@ def format_time_only(date_value):
             return str(date_value)
 
 
-def get_crmapp_ks_auto_bill_data(page=1, page_size=10, target_date_str=None, start_date=None, end_date=None, ks_order_id='', crm_order_id=''):
+def get_crmapp_ks_auto_bill_data(page=1, page_size=10, target_date_str=None, start_date=None, end_date=None, 
+                                  ks_order_id='', crm_order_id='', company=None):
     """
     根据指定条件查询crmapp_ks_auto_bill表的指定字段数据，支持分页和多种筛选条件
     使用上下文管理器自动管理数据库连接和事务
@@ -52,6 +53,7 @@ def get_crmapp_ks_auto_bill_data(page=1, page_size=10, target_date_str=None, sta
     :param end_date: 结束日期，格式为 'YYYY-MM-DD'
     :param ks_order_id: 开思订单号搜索条件
     :param crm_order_id: CRM订单号搜索条件
+    :param company: 公司代码筛选（fsbbr/zsbbr/zhbbr/dghf/dgby），为None时查询所有
     :return: 查询结果列表
     """
     try:
@@ -68,7 +70,8 @@ def get_crmapp_ks_auto_bill_data(page=1, page_size=10, target_date_str=None, sta
             crm订单状态 AS crm_order_status,
             客户 AS customer,
             数量 AS quantity,
-            金额 AS amount
+            金额 AS amount,
+            company AS company
         FROM crmapp_ks_auto_bill 
         WHERE """
         
@@ -101,6 +104,16 @@ def get_crmapp_ks_auto_bill_data(page=1, page_size=10, target_date_str=None, sta
             sql += " AND crm订单号 LIKE %s"
             params.append(f'%{crm_order_id}%')
         
+        # 添加公司筛选条件
+        # 佛山用户可以看到 company='fsbbr' 和 company IS NULL 的数据（历史数据默认属于佛山）
+        # 其他门店用户只能看到自己门店的数据
+        if company:
+            if company == 'fsbbr':
+                sql += " AND (company = %s OR company IS NULL)"
+            else:
+                sql += " AND company = %s"
+            params.append(company)
+        
         # 添加排序和分页
         sql += " ORDER BY 日期 DESC LIMIT %s OFFSET %s"
         params.extend([page_size, offset])
@@ -122,7 +135,8 @@ def get_crmapp_ks_auto_bill_data(page=1, page_size=10, target_date_str=None, sta
         return []
 
 
-def get_crmapp_ks_auto_bill_count(target_date_str=None, start_date=None, end_date=None, ks_order_id='', crm_order_id=''):
+def get_crmapp_ks_auto_bill_count(target_date_str=None, start_date=None, end_date=None, 
+                                   ks_order_id='', crm_order_id='', company=None):
     """
     根据指定条件获取crmapp_ks_auto_bill表的记录数
     使用上下文管理器自动管理数据库连接和事务
@@ -132,6 +146,7 @@ def get_crmapp_ks_auto_bill_count(target_date_str=None, start_date=None, end_dat
     :param end_date: 结束日期，格式为 'YYYY-MM-DD'
     :param ks_order_id: 开思订单号搜索条件
     :param crm_order_id: CRM订单号搜索条件
+    :param company: 公司代码筛选（fsbbr/zsbbr/zhbbr/dghf/dgby），为None时查询所有
     :return: 记录总数
     """
     try:
@@ -167,6 +182,16 @@ def get_crmapp_ks_auto_bill_count(target_date_str=None, start_date=None, end_dat
             sql += " AND crm订单号 LIKE %s"
             params.append(f'%{crm_order_id}%')
         
+        # 添加公司筛选条件
+        # 佛山用户可以看到 company='fsbbr' 和 company IS NULL 的数据（历史数据默认属于佛山）
+        # 其他门店用户只能看到自己门店的数据
+        if company:
+            if company == 'fsbbr':
+                sql += " AND (company = %s OR company IS NULL)"
+            else:
+                sql += " AND company = %s"
+            params.append(company)
+        
         # 使用高级查询函数直接获取结果（最简洁的方式）
         result = db_query_one(sql, params, dict_cursor=True)
         
@@ -175,3 +200,40 @@ def get_crmapp_ks_auto_bill_count(target_date_str=None, start_date=None, end_dat
     except Exception as e:
         print(f"查询crmapp_ks_auto_bill表记录总数时发生错误: {e}")
         return 0
+
+
+# 公司配置映射（集中定义，供其他模块导入）
+COMPANY_CONFIG = {
+    'fsbbr': {'key': 'fs', 'name': '佛山'},
+    'zsbbr': {'key': 'zs', 'name': '中山'},
+    'zhbbr': {'key': 'zh', 'name': '珠海'},
+    'dghf': {'key': 'hf', 'name': '合峰'},
+    'dgby': {'key': 'by', 'name': '百业'},
+}
+
+# 五个公司列表
+COMPANIES = ['fsbbr', 'zsbbr', 'zhbbr', 'dghf', 'dgby']
+
+
+def get_company_key(company):
+    """获取公司对应的 key（用于 Cookie API 和 CRM 接口）"""
+    return COMPANY_CONFIG.get(company, {}).get('key', 'fs')
+
+
+def get_companies():
+    """
+    获取所有公司列表
+    
+    :return: 公司代码列表
+    """
+    return COMPANIES
+
+
+def get_company_name(company_code):
+    """
+    根据公司代码获取公司名称
+    
+    :param company_code: 公司代码
+    :return: 公司名称
+    """
+    return COMPANY_CONFIG.get(company_code, {}).get('name', company_code)

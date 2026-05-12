@@ -423,9 +423,24 @@ def init_ks_auto_bill_table():
         {
             'name': '开单时间',
             'definition': "DATETIME COMMENT '开单时间'"
+        },
+        {
+            'name': 'company',
+            'definition': "VARCHAR(20) DEFAULT NULL COMMENT '公司/组织代码(fsbbr/zsbbr/zhbbr/dghf/dgby)'"
         }
     ]
     check_and_add_fields('crmapp_ks_auto_bill', ks_auto_bill_fields_to_check)
+
+    # 检查并添加 company 字段索引
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW INDEX FROM crmapp_ks_auto_bill WHERE Key_name = 'idx_company'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE crmapp_ks_auto_bill ADD INDEX idx_company (company)")
+        conn.close()
+    except Exception:
+        pass
 
 
 def ensure_table_structure():

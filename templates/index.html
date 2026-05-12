@@ -1448,10 +1448,9 @@ fetch('/api/current_user')
                 }
             }
             
-            // 控制开思菜单项的显示，只有fsbbr组织的用户可见
-            const isFsbbr = result.current_org === 'fsbbr';
-            document.getElementById('ksAutoBillMenuItem').style.display = isFsbbr ? 'block' : 'none';
-            document.getElementById('ksInquiryMonitorMenuItem').style.display = isFsbbr ? 'block' : 'none';
+            // 控制开思菜单项的显示，所有用户都可见
+            document.getElementById('ksAutoBillMenuItem').style.display = 'block';
+            document.getElementById('ksInquiryMonitorMenuItem').style.display = 'block';
 
             // 控制采购计划菜单的显示（有任一权限即显示）
             const hasPurchasePlanPermission = result.can_inquiry_module || result.can_compare_module;

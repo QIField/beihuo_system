@@ -1,8 +1,8 @@
 """
-开思订单自动开单系统 - 主程序
+开思订单自动开单系统 - 主程序 (多公司版本)
 
 功能:
-    1. 登录开思平台
+    1. 登录开思平台 (支持五个公司)
     2. 获取符合条件的订单（等待商家确认）
     3. 批量发送到CRM开单接口
     4. 循环运行（每分钟一次）
@@ -20,6 +20,7 @@
 修改说明:
     - 添加信号处理，支持优雅退出
     - 添加全局退出标志，避免强制终止导致内存损坏
+    - 支持五个公司：fsbbr, zsbbr, zhbbr, dghf, dgby
 """
 
 import time
@@ -58,7 +59,7 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
-from app.ks_auto_bill.ks_login import login
+from app.ks_auto_bill.ks_login import login, COMPANIES
 from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info, print_date_range
 from app.ks_auto_bill.crm_auto_bill import send_orders_to_crm
 from app.utils.database_connection import get_db_connection
@@ -106,28 +107,68 @@ def is_running_time():
     return (8 <= now.hour < 19) or (now.hour == 8 and now.minute >= 30)
 
 
-def process_order_batch(pending_confirmation_orders):
+def process_company_orders(company, session, order_queue):
+    """
+    处理单个公司的订单
+    
+    参数:
+        company: 公司代码
+        session: 登录会话
+        order_queue: 订单处理队列
+    
+    返回:
+        bool: 是否成功处理
+    """
+    print(f"\n{'='*60}")
+    print(f"[{company}] 开始处理订单")
+    print(f"{'='*60}")
+    
+    try:
+        # 打印本次爬取的时间范围（只打印一次）
+        print_date_range()
+        
+        # 获取订单信息和待处理订单ID列表
+        all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session, company=company)
+        print(f"[{company}] 成功获取并保存 {len(all_order_info_list)} 条订单信息到数据库")
+        print(f"[{company}] 找到 {len(pending_confirmation_orders)} 条待处理订单（等待商家确认）")
+        
+        # 将待处理订单加入队列
+        if pending_confirmation_orders:
+            order_queue.put((company, pending_confirmation_orders))
+            print(f"[{company}] 添加 {len(pending_confirmation_orders)} 条订单到处理队列")
+        else:
+            print(f"[{company}] 没有待处理的订单，跳过")
+        
+        return True
+        
+    except Exception as e:
+        print(f"[{company}] 处理订单时出错: {str(e)}")
+        return False
+
+
+def process_order_batch(company, pending_confirmation_orders):
     """
     处理一批订单
     
     参数:
+        company: 公司代码
         pending_confirmation_orders: 待处理订单列表
     
     返回:
         处理结果
     """
     if not pending_confirmation_orders:
-        print("[WARN] 没有待处理的订单")
+        print(f"[{company}] 没有待处理的订单")
         return
         
-    print(f"[OK] 获取到 {len(pending_confirmation_orders)} 条待处理订单")
+    print(f"[{company}] 获取到 {len(pending_confirmation_orders)} 条待处理订单")
     
     # 发送订单到CRM
-    results = send_orders_to_crm(pending_confirmation_orders)
+    results = send_orders_to_crm(pending_confirmation_orders, company=company)
     
     # 统计结果
     success_count = sum(1 for r in results if r.get("result") is not None)
-    print(f"\n【统计】成功: {success_count}/{len(results)}")
+    print(f"[{company}] 开单完成: 成功 {success_count}/{len(results)}")
 
 
 def order_processing_worker(order_queue):
@@ -151,8 +192,9 @@ def order_processing_worker(order_queue):
                 order_queue.task_done()
                 break
             
-            print(f"[开单模块] 开始处理队列中的订单批次，包含 {len(batch)} 个订单...")
-            process_order_batch(batch)
+            company, orders = batch
+            print(f"[开单模块] 开始处理 [{company}] 的订单，包含 {len(orders)} 个订单...")
+            process_order_batch(company, orders)
             
             # 标记任务已完成
             order_queue.task_done()
@@ -170,6 +212,57 @@ def order_processing_worker(order_queue):
     print("[开单模块] 订单处理工作线程已退出")
 
 
+def process_all_companies(order_queue):
+    """
+    处理所有公司的订单
+    
+    参数:
+        order_queue: 订单处理队列
+    
+    返回:
+        dict: 各公司的处理结果
+    """
+    results = {}
+    
+    for company in COMPANIES:
+        if _should_exit:
+            print(f"[主线程] 收到退出信号，停止处理后续公司")
+            break
+        
+        print(f"\n[主线程] 开始处理 [{company}] ...")
+        
+        # 登录
+        session = None
+        for attempt in range(3):
+            try:
+                session = login(company)
+                if session:
+                    break
+            except Exception as e:
+                print(f"[{company}] 登录尝试 {attempt+1} 失败: {e}")
+                time.sleep(2)
+        
+        if session is None:
+            print(f"[{company}] 登录失败，跳过该公司")
+            results[company] = {'success': False, 'error': '登录失败'}
+            continue
+        
+        # 检查登录状态
+        if not check_login_status(session):
+            print(f"[{company}] 登录状态无效，跳过该公司")
+            results[company] = {'success': False, 'error': '登录状态无效'}
+            continue
+        
+        # 处理订单
+        success = process_company_orders(company, session, order_queue)
+        results[company] = {'success': success}
+        
+        # 短暂休眠，避免请求过于频繁
+        time.sleep(2)
+    
+    return results
+
+
 def main(stop_event=None, heartbeat_func=None):
     """
     主函数：执行完整的自动开单流程（循环运行）
@@ -179,14 +272,11 @@ def main(stop_event=None, heartbeat_func=None):
         heartbeat_func: 外部传入的心跳函数，用于报告任务存活
 
     流程:
-        1. 登录开思平台
-        2. 检查登录状态（过期则重新登录）
-        3. 检查是否在运行时间内
-        4. 获取开思订单并保存到数据库
-        5. 将待处理订单加入队列
-        6. 等待1分钟后循环或直到非运行时间
+        1. 检查是否在运行时间内
+        2. 依次处理五个公司的订单
+        3. 等待1分钟后循环或直到非运行时间
 
-    修改：支持外部 stop_event 和 heartbeat_func
+    修改：支持外部 stop_event 和 heartbeat_func，支持多公司
     """
     global _should_exit
 
@@ -194,16 +284,15 @@ def main(stop_event=None, heartbeat_func=None):
     use_external_stop = stop_event is not None
 
     print("=" * 60)
-    print("开思订单自动开单系统（循环模式）")
+    print("开思订单自动开单系统（多公司循环模式）")
     print("=" * 60)
     print(f"[主线程] 使用外部停止事件: {use_external_stop}")
+    print(f"[主线程] 处理公司列表: {', '.join(COMPANIES)}")
 
     # 在程序启动时检查并创建数据库表
-    print("【初始化】正在检查数据库表...")
+    print("\n【初始化】正在检查数据库表...")
     init_database_table()
     print("【初始化】数据库表检查完成")
-
-    session = None
 
     # 创建订单队列
     order_queue = queue.Queue()
@@ -212,7 +301,7 @@ def main(stop_event=None, heartbeat_func=None):
     processing_thread = threading.Thread(target=order_processing_worker, args=(order_queue,))
     processing_thread.start()
 
-    print(f"[爬取模块] 系统启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\n[爬取模块] 系统启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     def should_stop():
         """检查是否应该停止"""
@@ -266,44 +355,16 @@ def main(stop_event=None, heartbeat_func=None):
                 print(f"[爬取模块] {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
                 print(f"{'=' * 60}")
 
-                # 检查登录状态，过期则重新登录
-                print("\n[爬取模块] 检查登录状态...")
-                if not check_login_status(session):
-                    print("[爬取模块] 登录已过期或未登录，重新登录...")
-                    session = login()
-
-                    if session is None:
-                        print("[爬取模块] 登录失败，1分钟后重试")
-                        if not wait_with_stop_check(60):
-                            break
-                        continue
-
-                    print("[爬取模块] 登录成功")
-                else:
-                    print("[爬取模块] 登录状态有效")
-
-            # 获取开思订单并将信息保存到数据库
-            print("\n[爬取模块] 获取开思订单并保存到数据库...")
-            # 打印本次爬取的时间范围（只打印一次）
-            print_date_range()
-            try:
-                # 获取订单信息和待处理订单ID列表
-                all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session)
-                print(f"[爬取模块] 成功获取并保存 {len(all_order_info_list)} 条订单信息到数据库")
-                print(f"[爬取模块] 找到 {len(pending_confirmation_orders)} 条待处理订单（等待商家确认）")
-            except Exception as e:
-                print(f"[爬取模块] 获取订单信息失败: {str(e)}")
-                if not wait_with_stop_check(60):
-                    break
-                continue
-
-            # 将待处理订单加入队列
-            print("\n[爬取模块] 将待处理订单加入队列...")
-            if pending_confirmation_orders:
-                order_queue.put(pending_confirmation_orders)
-                print(f"[爬取模块] 添加 {len(pending_confirmation_orders)} 条订单到处理队列，当前队列中共有 {order_queue.qsize()} 批订单")
-            else:
-                print("[爬取模块] 没有待处理的订单，跳过添加到队列")
+                # 处理所有公司的订单
+                results = process_all_companies(order_queue)
+                
+                # 打印汇总结果
+                print(f"\n{'='*60}")
+                print("[汇总] 各公司处理结果:")
+                for company, result in results.items():
+                    status = "✓ 成功" if result.get('success') else f"✗ 失败 ({result.get('error', '未知错误')})"
+                    print(f"  [{company}] {status}")
+                print(f"{'='*60}")
 
             # 等待1分钟后继续爬取，但每秒检查停止标志
             print(f"\n[爬取模块] 1分钟后进行下一次爬取...")

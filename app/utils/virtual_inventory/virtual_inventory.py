@@ -2075,7 +2075,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
 
         # 👇 新增: 黑名单过滤
         print(f"[{company}] 开始黑名单过滤...")
-        from .inventory_tasks import filter_by_blacklist
+        from ..inventory_tasks import filter_by_blacklist
         rows_before_filter = len(rows)
         rows = filter_by_blacklist(rows)
         rows_after_filter = len(rows)
