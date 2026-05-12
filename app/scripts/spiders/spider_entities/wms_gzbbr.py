@@ -1,0 +1,62 @@
+# -*- coding:utf-8 -*-
+# @Time    : 2026/4/26 10:04
+# @Author  : xingkongtub
+# @Project : beihuo_system
+# @File    : wms_gzbbr.py
+# @Software: PyCharm
+
+from app.scripts.spiders.spider_tool import SpiderTool
+
+
+class WmsGzbbrSpider:
+    """
+    WMS网站专用业务爬虫
+    职责：仅定义接口、拼接参数、调用工具
+    不写任何请求底层逻辑
+    """
+    # 网站固定配置
+    BASE_URL = "https://wms.gzbbr.com"
+
+    def __init__(self, token, timeout=10, retry_count=3):
+        # 核心：实例化独立爬虫工具（组合模式）
+        self.spider_tool = SpiderTool(timeout, retry_count)
+        # 必传Token（业务私有属性）
+        self.token = token
+
+    def _get_auth_header(self):
+        """私有方法：统一生成认证请求头（复用）"""
+        return {"Authorization": self.token}
+
+    # ===================== 业务接口 =====================
+    
+    # https://wms.gzbbr.com/api/Wms.Orders/get_status_orders
+    def get_status_orders(self, type=None, status=None, page=None):
+        """获取状态订单列表"""
+        url = f"{self.BASE_URL}/api/Wms.Orders/get_status_orders"
+        params = {
+            "type": type,
+            "status": status,
+            "page": page,
+        }
+        # ========== 打印请求信息 ==========
+        print("【请求API地址】", url)
+        print("【请求参数】", params)
+        # ==================================
+        return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
+    # https://wms.gzbbr.com/api/Wms.Orders/get_return_items
+    def get_return_items(self, orders_no=None):
+        """获取采购入库单列表"""
+        url = f"{self.BASE_URL}/api/Wms.Orders/get_return_items"
+        params = {
+            "orders_no": orders_no,
+        }
+        # ========== 打印请求信息 ==========
+        print("【请求API地址】", url)
+        print("【请求参数】", params)
+        # ==================================
+        return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
+    def close(self):
+        """关闭会话连接"""
+        self.spider_tool.close()

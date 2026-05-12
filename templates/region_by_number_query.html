@@ -391,9 +391,15 @@ async function queryData() {
 
     // 2. 表单校验
     if (!orgValue) { alert('请选择组织！'); return; }
-      if (!startCode) { alert('请输入开始溯源码！'); return; }
-    if (!endCode) { alert('请输入结束溯源码！'); return; }
+    // if (!startCode) { alert('请输入开始溯源码！'); return; }
+    // if (!endCode) { alert('请输入结束溯源码！'); return; }
     
+    //  // 只输入开始溯源码或者结束溯源码时提示
+    // if ((startCode && !endCode) || (!startCode && endCode)) {
+    //     alert('请同时输入开始溯源码和结束溯源码，或者都不输入！');
+    //     return;
+    // }
+
 
     // 3. 显示加载动画
     showLoading();

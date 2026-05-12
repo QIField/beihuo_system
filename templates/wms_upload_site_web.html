@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS采购入库单管理</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <style>
+        .layui-card {
+            margin: 15px;
+        }
+        .layui-card-header {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .table-container {
+            padding: 0;
+        }
+        .layui-table-view th {
+            background-color: #f8f9fa;
+        }
+        .toolbar {
+            margin-bottom: 15px;
+        }
+        /* 确保表格内容可以选中和复制 */
+        .layui-table-view .layui-table td,
+        .layui-table-view .layui-table th {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+    </style>
+</head>
+<body>
+    <div class="layui-card">
+        <div class="layui-card-header">WMS采购入库单管理</div>
+        <div class="layui-card-body">
+            <div class="toolbar">
+                <form class="layui-form" lay-filter="searchForm">
+                    <div class="layui-form-item" style="margin-bottom: 0;">
+                        <label class="layui-form-label">推送状态</label>
+                        <div class="layui-input-inline" style="width: 150px;">
+                            <select name="has_pushed_ks" lay-filter="has_pushed_ks">
+                                <option value="">全部</option>
+                                <option value="0">未推送</option>
+                                <option value="1">已推送</option>
+                            </select>
+                        </div>
+                        <div class="layui-input-inline">
+                            <button type="button" class="layui-btn layui-btn-normal" id="searchBtn">
+                                <i class="layui-icon layui-icon-search"></i>搜索
+                            </button>
+                        </div>
+                        <div class="layui-input-inline">
+                            <button type="button" class="layui-btn layui-btn-normal" id="reCrawlBtn">
+                                <i class="layui-icon layui-icon-download-circle"></i>重新爬取
+                            </button>
+                        </div>
+                        <div class="layui-input-inline">
+                            <button type="button" class="layui-btn layui-btn-primary" id="batchProcessBtn">
+                                <i class="layui-icon layui-icon-template"></i>批量处理
+                            </button>
+                        </div>
+                        <div class="layui-input-inline">
+                            <button type="button" class="layui-btn layui-btn-warm" id="settingsBtn">
+                                <i class="layui-icon layui-icon-set"></i>设置
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="table-container">
+                <table id="returnItemsTable" lay-filter="returnItemsTable"></table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作列模板 -->
+    <script type="text/html" id="tableToolBar">
+        <div class="layui-clear-space">
+            <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        </div>
+    </script>
+
+
+
+    <!-- 查询结果弹窗模板 -->
+    <script type="text/html" id="searchResultTemplate">
+        <form class="layui-form layui-form-pane" style="padding: 30px;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">商品编号</label>
+                <div class="layui-input-block">
+                    <input type="text" id="productPartNum" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                  <label class="layui-form-label" style="width: 180px;">商家编码（FREY编号）</label>
+                <div class="layui-input-block" style="margin-left: 180px;">
+                    <input type="text" id="internalName" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">商品id</label>
+                <div class="layui-input-block">
+                    <input type="text" id="productId" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">商品名称</label>
+                <div class="layui-input-block">
+                    <input type="text" id="productName" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">品牌</label>
+                <div class="layui-input-block">
+                    <input type="text" id="productBrandName" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">品质</label>
+                <div class="layui-input-block">
+                    <input type="text" id="qualityName" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">价格</label>
+                <div class="layui-input-block">
+                    <input type="text" id="defaultPrice" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">数量</label>
+                <div class="layui-input-block">
+                    <input type="text" id="needqty" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">仓库名称</label>
+                <div class="layui-input-block">
+                    <input type="text" id="warehouse_name" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">报价状态</label>
+                <div class="layui-input-block">
+                    <input type="text" id="inquiryStatus" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">商城状态</label>
+                <div class="layui-input-block">
+                    <input type="text" id="mallStatus" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">上架状态</label>
+                <div class="layui-input-block">
+                    <input type="text" id="statusId" readonly class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item" style="text-align: center; padding-top: 20px;">
+                <button type="button" class="layui-btn layui-btn-normal" id="pushToKaisi">推送到开思</button>
+            </div>
+        </form>
+    </script>
+
+
+    <!-- 批量处理弹窗模板 -->
+    <script type="text/html" id="batchProcessTemplate">
+        <div style="padding: 20px;">
+            <div id="batchLoading" style="text-align: center; padding: 50px;">
+                <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop" style="font-size: 50px; color: #1E9FFF;"></i>
+                <p style="margin-top: 20px; font-size: 16px;">正在加载数据...</p>
+            </div>
+            <div id="batchContent" style="display: none;">
+                <table class="layui-table" lay-skin="line">
+                    <thead>
+                        <tr>
+                            <th>商品编号</th>
+                            <th>商家编码</th>
+                            <th>商品id</th>
+                            <th>商品名称</th>
+                            <th>品牌</th>
+                            <th>数量</th>
+                            <th>仓库名称</th>
+                        </tr>
+                    </thead>
+                    <tbody id="batchProductList">
+                    </tbody>
+                </table>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button type="button" class="layui-btn layui-btn-normal" id="batchPushBtn">批量推送到开思</button>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <!-- 设置弹窗模板 -->
+    <script type="text/html" id="settingsTemplate">
+        <form class="layui-form" lay-filter="settingsForm" style="padding: 30px;">
+            <div class="layui-form-item layui-form-text">
+                <label class="layui-form-label">Cookie</label>
+                <div class="layui-input-block">
+                    <textarea id="cookieInput" name="cookie" placeholder="请输入Cookie" class="layui-textarea" style="height: 200px;"></textarea>
+                </div>
+            </div>
+            <div class="layui-form-item" style="text-align: center; padding-top: 20px;">
+                <button type="button" class="layui-btn layui-btn-normal" id="saveSettingsBtn">保存</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="cancelSettingsBtn">取消</button>
+            </div>
+        </form>
+    </script>
+
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script>
+        layui.use(['table', 'layer', 'jquery', 'form'], function(){
+            var table = layui.table;
+            var layer = layui.layer;
+            var $ = layui.$;
+            var form = layui.form;
+            
+            // 定义渲染表格的函数
+            function renderTable() {
+                return table.render({
+                    elem: '#returnItemsTable',
+                    url: '/new/api/wms_upload_site/get_return_items_from_db_api',
+                    method: 'GET',
+                    where: {
+                        // 默认参数
+                        has_pushed_ks: ''
+                    },
+                    parseData: function(res){
+                        var data = res.data || [];
+                        
+                        // 确保每条数据都有所有需要的字段
+                        for(var i = 0; i < data.length; i++){
+                            var item = data[i];
+                            
+                            // 处理空值显示
+                            item.brand_code = item.brand_code || '-';
+                            item.brand_name_en = item.brand_name_en || '-';
+                            item.suffix = item.suffix || '-';
+                            item.return_qty = item.return_qty !== undefined && item.return_qty !== null ? item.return_qty : '-';
+                            item.frey_no = item.frey_no || '-';
+                            item.number = item.number || '-';
+                            item.qty = item.qty !== undefined && item.qty !== null ? item.qty : '-';
+                            item.kw_no = item.kw_no || '-';
+                            item.warehouse_name = item.warehouse_name || '-';
+                            item.kc = item.kc !== undefined && item.kc !== null ? item.kc : '-';
+                            item.brandname = item.brandname || '-';
+                            item.l_name_zh = item.l_name_zh || '-';
+                            item.product_remark = item.product_remark || '-';
+                            item.pono = item.pono || '-';
+                            item.orders_no = item.orders_no || '-';
+                            item.orders_id = item.orders_id || '-';
+                            item.has_pushed_ks = item.has_pushed_ks !== undefined && item.has_pushed_ks !== null ? item.has_pushed_ks : 0;
+                        }
+                        
+                        return {
+                            "code": res.code === 200 ? 0 : res.code,
+                            "msg": res.msg,
+                            "count": res.count || 0,
+                            "data": data
+                        };
+                    },
+                    cols: [[
+                        {type: 'checkbox', fixed: 'left'},
+                        {type: 'numbers', title: '序号', width: 80},
+                        {field: 'orders_no', title: '订单编号', width: 160, sort: true},
+                        {field: 'pono', title: '拣货单号', width: 200, sort: true},
+                        {field: 'number', title: 'OE编号', width: 200, sort: true},
+                        {field: 'brand_name_en', title: '品牌英文', width: 100},
+                        {field: 'brandname', title: '品牌', width: 150},
+                        {field: 'frey_no', title: 'FREY编号', width: 180},
+                        {field: 'needqty', title: '数量', width: 80, sort: true},
+                        {field: 'warehouse_name', title: '仓库名称', width: 120},
+                        {field: 'has_pushed_ks', title: '是否已推送至快手', width: 120, templet: function(d){
+                            if(d.has_pushed_ks == 1){
+                                return '<span style="color: #5FB878;">是</span>';
+                            } else {
+                                return '<span style="color: #999;">否</span>';
+                            }
+                        }},
+                        {fixed: 'right', title:'操作', width: 100, templet: '#tableToolBar'},
+                    ]],
+                    page: true,
+                    limit: 10,
+                    limits: [10, 20, 50, 100],
+                    loading: true,
+                    unselect: false,
+                    text: {
+                        none: '暂无退货商品数据'
+                    }
+                });
+            }
+            
+            // 定义爬取数据的函数
+            function crawlData(callback) {
+                var loading = layer.load(2, {
+                    shade: [0.3, '#000'],
+                    content: '正在首次爬取数据，请稍候...'
+                });
+                
+                $.ajax({
+                    url: '/new/api/wms_upload_site/get_return_items_api',
+                    type: 'GET',
+                    success: function(res){
+                        layer.close(loading);
+                        if(res.code === 200){
+                            // 爬取成功后执行回调
+                            if(callback && typeof callback === 'function'){
+                                callback();
+                            }
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                            // 即使爬取失败也尝试渲染表格
+                            if(callback && typeof callback === 'function'){
+                                callback();
+                            }
+                        }
+                    },
+                    error: function(){
+                        layer.close(loading);
+                        layer.msg('首次爬取请求失败，直接加载数据库数据', {icon: 0});
+                        // 请求失败也尝试渲染表格
+                        if(callback && typeof callback === 'function'){
+                            callback();
+                        }
+                    }
+                });
+            }
+            
+            // 页面加载时：先爬取数据，再渲染表格
+            var tableIns;
+            crawlData(function(){
+                tableIns = renderTable();
+            });
+
+            // 重新爬取按钮
+            $('#reCrawlBtn').click(function(){
+                layer.confirm('确定要重新爬取数据吗？这可能需要一些时间。', {
+                    btn: ['确定', '取消'],
+                    icon: 3
+                }, function(index){
+                    var loading = layer.load(2, {
+                        shade: [0.3, '#000'],
+                        content: '正在重新爬取数据，请稍候...'
+                    });
+                    
+                    $.ajax({
+                        url: '/new/api/wms_upload_site/get_return_items_api',
+                        type: 'GET',
+                        success: function(res){
+                            layer.close(loading);
+                            layer.msg(res.msg, {
+                                icon: res.code === 200 ? 1 : 2
+                            });
+                            // 爬取成功后刷新表格
+                            if(res.code === 200){
+                                tableIns.reload({
+                                    page: {
+                                        curr: 1
+                                    }
+                                });
+                            }
+                        },
+                        error: function(){
+                            layer.close(loading);
+                            layer.msg('请求失败，请稍后重试', {icon: 2});
+                        }
+                    });
+                    
+                    layer.close(index);
+                });
+            });
+
+            // 批量处理按钮
+            $('#batchProcessBtn').click(function(){
+                var checkStatus = table.checkStatus('returnItemsTable');
+                var selectedData = checkStatus.data;
+                
+                if(selectedData.length === 0){
+                    layer.msg('请先选择要处理的数据', {icon: 0});
+                    return;
+                }
+                
+                var getTpl = batchProcessTemplate.innerHTML;
+                var layerIndex = layer.open({
+                    title: '批量处理',
+                    type: 1,
+                    area: ['900px', '500px'],
+                    content: getTpl,
+                    success: function(layero, index){
+                        // 存储所有选中行的数据和获取的商品信息
+                        var batchData = [];
+                        var loadedCount = 0;
+                        
+                        // 遍历选中的行，逐个获取商品信息
+                        for(var i = 0; i < selectedData.length; i++){
+                            (function(rowData, idx){
+                                $.ajax({
+                                    url: '/new/api/wms_upload_site/cassmall_product_list_search_api',
+                                    type: 'GET',
+                                    data: {
+                                        frey_no: rowData.frey_no
+                                    },
+                                    success: function(res){
+                                        // 检查是否是Cookie无效的情况
+                                        var message = res.data && res.data.message ? res.data.message : '';
+                                        if(message.indexOf('Cookie 无效或已过期') !== -1){
+                                            layer.msg('Cookie 无效或已过期，请配置正确的COOKIE', {icon: 2});
+                                        } else if(res.code === 200){
+                                            var productList = res.data.data ? res.data.data : [];
+                                            if(productList.length > 0){
+                                                var product = productList[0];
+                                                batchData.push({
+                                                    rowData: rowData,
+                                                    product: product
+                                                });
+                                            }
+                                        }
+                                    },
+                                    complete: function(){
+                                        loadedCount++;
+                                        if(loadedCount === selectedData.length){
+                                            renderBatchList(batchData);
+                                        }
+                                    }
+                                });
+                            })(selectedData[i], i);
+                        }
+                        
+                        // 渲染批量列表
+                        function renderBatchList(data){
+                            // 隐藏加载区域，显示内容区域
+                            $('#batchLoading').hide();
+                            $('#batchContent').show();
+                            
+                            var html = '';
+                            for(var i = 0; i < data.length; i++){
+                                var item = data[i];
+                                var row = item.rowData;
+                                var product = item.product;
+                                html += '<tr>';
+                                html += '<td>' + (product.productPartNum || '-') + '</td>';
+                                html += '<td>' + (product.internalName || '-') + '</td>';
+                                html += '<td>' + (product.productId || '-') + '</td>';
+                                html += '<td>' + (product.productName || '-') + '</td>';
+                                html += '<td>' + (product.productBrandName || '-') + '</td>';
+                                html += '<td>' + (row.needqty || '-') + '</td>';
+                                html += '<td>' + (row.warehouse_name || '-') + '</td>';
+                                html += '</tr>';
+                            }
+                            $('#batchProductList').html(html);
+                            
+                            // 绑定批量推送事件
+                            $('#batchPushBtn').off('click').on('click', function(){
+                                if(data.length === 0){
+                                    layer.msg('没有可推送的数据', {icon: 0});
+                                    return;
+                                }
+                                
+                                layer.confirm('确定要批量推送 ' + data.length + ' 条数据到开思吗？', {
+                                    btn: ['确定', '取消'],
+                                    icon: 3
+                                }, function(confirmIndex){
+                                    var loading = layer.load(2, {
+                                        shade: [0.3, '#000'],
+                                        content: '正在批量推送...'
+                                    });
+                                    
+                                    // 准备批量推送数据
+                                    var items = [];
+                                    for(var i = 0; i < data.length; i++){
+                                        var item = data[i];
+                                        var product = item.product;
+                                        var row = item.rowData;
+                                        if(product.productId){
+                                            items.push({
+                                                product_id: product.productId,
+                                                availableToPromiseTotal: row.needqty,
+                                                record_id: row.id
+                                            });
+                                        }
+                                    }
+                                    
+                                    if(items.length === 0){
+                                        layer.close(loading);
+                                        layer.msg('没有有效的商品id', {icon: 2});
+                                        return;
+                                    }
+                                    
+                                    // 调用批量推送API
+                                    $.ajax({
+                                        url: '/new/api/wms_upload_site/inventory_sync_batch_api',
+                                        type: 'POST',
+                                        contentType: 'application/json',
+                                        data: JSON.stringify({ items: items }),
+                                        success: function(res){
+                                            layer.close(loading);
+                                            if(res.code === 200){
+                                                var successCount = res.data ? res.data.success_count : 0;
+                                                var failedCount = res.data ? res.data.failed_count : 0;
+                                                layer.msg('批量同步完成！成功：' + successCount + ' 条，失败：' + failedCount + ' 条', {
+                                                    icon: 1,
+                                                    time: 2000
+                                                });
+                                                layer.close(layerIndex);
+                                                tableIns.reload({
+                                                    page: {
+                                                        curr: 1
+                                                    }
+                                                });
+                                            } else {
+                                                layer.msg(res.msg, {icon: 2});
+                                            }
+                                        },
+                                        error: function(){
+                                            layer.close(loading);
+                                            layer.msg('请求失败，请稍后重试', {icon: 2});
+                                        }
+                                    });
+                                    
+                                    layer.close(confirmIndex);
+                                });
+                            });
+                        }
+                    }
+                });
+            });
+
+            // 搜索按钮点击事件
+            $('#searchBtn').click(function(){
+                var has_pushed_ks = $('select[name="has_pushed_ks"]').val();
+                
+                // 重新加载表格，传递筛选参数
+                tableIns.reload({
+                    where: {
+                        has_pushed_ks: has_pushed_ks
+                    },
+                    page: {
+                        curr: 1 // 重新从第1页开始
+                    }
+                });
+            });
+
+            // 设置按钮点击事件
+            $('#settingsBtn').click(function(){
+                var getTpl = settingsTemplate.innerHTML;
+                var layerIndex = layer.open({
+                    title: '设置',
+                    type: 1,
+                    area: ['600px', '400px'],
+                    content: getTpl,
+                    success: function(layero, index){
+                        // 保存按钮点击事件
+                        $('#saveSettingsBtn').off('click').on('click', function(){
+                            var cookie = $('#cookieInput').val();
+                            
+                            if(!cookie || cookie.trim() === ''){
+                                layer.msg('Cookie不能为空', {icon: 0});
+                                return;
+                            }
+                            
+                            var loading = layer.load(2, {
+                                shade: [0.3, '#000'],
+                                content: '正在保存...'
+                            });
+                            
+                            $.ajax({
+                                url: '/new/api/wms_upload_site/set_cookie_api',
+                                type: 'POST',
+                                contentType: 'application/json',
+                                data: JSON.stringify({ cookie: cookie }),
+                                success: function(res){
+                                    layer.close(loading);
+                                    if(res.code === 200){
+                                        layer.msg('保存成功', {icon: 1, time: 1500});
+                                        layer.close(layerIndex);
+                                    } else {
+                                        layer.msg(res.msg || '保存失败', {icon: 2});
+                                    }
+                                },
+                                error: function(){
+                                    layer.close(loading);
+                                    layer.msg('请求失败，请稍后重试', {icon: 2});
+                                }
+                            });
+                        });
+                        
+                        // 取消按钮点击事件
+                        $('#cancelSettingsBtn').off('click').on('click', function(){
+                            layer.close(layerIndex);
+                        });
+                    }
+                });
+            });
+            
+            // 表格工具事件
+            table.on('tool(returnItemsTable)', function(obj){
+                var data = obj.data; // 获得当前行数据
+                if(obj.event === 'edit'){
+                    var loading = layer.load(2, {
+                        shade: [0.3, '#000'],
+                        content: '正在查询数据...'
+                    });
+                    
+                    $.ajax({
+                        url: '/new/api/wms_upload_site/cassmall_product_list_search_api',
+                        type: 'GET',
+                        data: {
+                            frey_no: data.frey_no
+                        },
+                        success: function(res){
+                            layer.close(loading);
+                            // 检查是否是Cookie无效的情况
+                            var message = res.data && res.data.message ? res.data.message : '';
+                            if(message.indexOf('Cookie 无效或已过期') !== -1){
+                                layer.msg('Cookie 无效或已过期，请配置正确的COOKIE', {icon: 2});
+                            } else if(res.code === 200){
+                                var productList = res.data.data ? res.data.data : [];
+                                var displayMessage = message || '暂无数据';
+                                
+                                // 保存表格行的数量、仓库名称和 id
+                                var rowNeedqty = data.needqty || '';
+                                var rowWarehouseName = data.warehouse_name || '';
+                                var rowRecordId = data.id || '';
+                                
+                                if(productList.length > 0){
+                                    var currentIndex = 0;
+                                    
+                                    // 使用layui弹窗
+                                    layui.use(['layer', 'jquery'], function(){
+                                        var layer = layui.layer;
+                                        var $ = layui.$;
+                                        
+                                        var getTpl = searchResultTemplate.innerHTML;
+                                        
+                                        // 打开弹窗
+                                        layer.open({
+                                            title: '查询结果',
+                                            type: 1,
+                                            area: ['700px', '650px'],
+                                            content: '<div id="resultContent"></div>',
+                                            success: function(layero, index){
+                                                // 渲染函数
+                                                function renderData(index){
+                                                    var data = productList[index];
+                                                    $('#resultContent').html(getTpl);
+                                                    
+                                                    // 设置表单值
+                                                    $('#productPartNum').val(data.productPartNum || '');
+                                                    $('#internalName').val(data.internalName || '');
+                                                    $('#productId').val(data.productId || '');
+                                                    $('#productName').val(data.productName || '');
+                                                    $('#productBrandName').val(data.productBrandName || '');
+                                                    $('#qualityName').val(data.qualityName || '');
+                                                    $('#defaultPrice').val(data.defaultPrice || '');
+                                                    $('#needqty').val(rowNeedqty);
+                                                    $('#warehouse_name').val(rowWarehouseName);
+                                                    $('#inquiryStatus').val(data.inquiryStatus || '');
+                                                    $('#mallStatus').val(data.mallStatus || '');
+                                                    $('#statusId').val(data.statusId || '');
+                                                    
+                                                    // 添加分页按钮
+                                                    var pagingHtml = '<div style="text-align: center; padding: 15px; border-top: 1px solid #eee;">';
+                                                    pagingHtml += '<span style="margin-right: 20px;">' + (index + 1) + ' / ' + productList.length + '</span>';
+                                                    
+                                                    if(productList.length > 1){
+                                                        if(index > 0){
+                                                            pagingHtml += '<button type="button" class="layui-btn layui-btn-sm" id="prevBtn">上一条</button>';
+                                                        }
+                                                        if(index < productList.length - 1){
+                                                            pagingHtml += '<button type="button" class="layui-btn layui-btn-sm" id="nextBtn" style="margin-left: 10px;">下一条</button>';
+                                                        }
+                                                    }
+                                                    pagingHtml += '</div>';
+                                                    
+                                                    $('#resultContent').append(pagingHtml);
+                                                    
+                                                    // 绑定上一条事件
+                                                    $('#prevBtn').off('click').on('click', function(){
+                                                        if(currentIndex > 0){
+                                                            currentIndex--;
+                                                            renderData(currentIndex);
+                                                        }
+                                                    });
+                                                    
+                                                    // 绑定下一条事件
+                                                    $('#nextBtn').off('click').on('click', function(){
+                                                        if(currentIndex < productList.length - 1){
+                                                            currentIndex++;
+                                                            renderData(currentIndex);
+                                                        }
+                                                    });
+                                                    
+                                                    // 绑定推送到开思事件
+                                                    $('#pushToKaisi').off('click').on('click', function(){
+                                                        var productId = $('#productId').val();
+                                                        var needqty = $('#needqty').val();
+                                                        
+                                                        if(!productId){
+                                                            layer.msg('商品id不能为空', {icon: 2});
+                                                            return;
+                                                        }
+                                                        
+                                                        if(!needqty){
+                                                            layer.msg('数量不能为空', {icon: 2});
+                                                            return;
+                                                        }
+                                                        
+                                                        layer.confirm('确定要推送库存到开思吗？', {
+                                                            btn: ['确定', '取消'],
+                                                            icon: 3
+                                                        }, function(index){
+                                                            var loading = layer.load(2, {
+                                                                shade: [0.3, '#000'],
+                                                                content: '正在推送...'
+                                                            });
+                                                            
+                                                            $.ajax({
+                                                                url: '/new/api/wms_upload_site/inventory_sync_api',
+                                                                type: 'GET',
+                                                                data: {
+                                                                    product_id: productId,
+                                                                    availableToPromiseTotal: needqty,
+                                                                    record_id: rowRecordId
+                                                                },
+                                                                success: function(res){
+                                                                    layer.close(loading);
+                                                                    layer.msg(res.msg, {
+                                                                        icon: res.code === 200 ? 1 : 2,
+                                                                        time: 2000
+                                                                    });
+                                                                    // 成功后关闭弹窗并刷新表格
+                                                                    // if(res.code === 200){
+                                                                    //     layer.closeAll();
+                                                                    //     tableIns.reload({
+                                                                    //         page: {
+                                                                    //             curr: 1
+                                                                    //         }
+                                                                    //     });
+                                                                    // }
+                                                                },
+                                                                error: function(){
+                                                                    layer.close(loading);
+                                                                    layer.msg('请求失败，请稍后重试', {icon: 2});
+                                                                }
+                                                            });
+                                                            
+                                                            layer.close(index);
+                                                        });
+                                                    });
+                                                }
+                                                
+                                                // 渲染初始数据
+                                                renderData(currentIndex);
+                                            }
+                                        });
+                                    });
+                                } else {
+                                    layer.msg(displayMessage, {icon: 0});
+                                }
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        },
+                        error: function(){
+                            layer.close(loading);
+                            layer.msg('请求失败，请稍后重试', {icon: 2});
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
