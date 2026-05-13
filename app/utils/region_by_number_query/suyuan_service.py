@@ -1,4 +1,6 @@
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from app.models.orm_models.ks_suyuanma import KsSuyuanma
 from app.utils.orm import orm_session
 
@@ -32,8 +34,20 @@ def query_suyuan_data(md, b1, b2):
     }
 
     try:
-        response = requests.request("POST", url, headers=headers, data=payload)
-        
+        # 创建 session 并配置重试策略
+        session = requests.Session()
+        retry_strategy = Retry(
+            total=3,  # 最多重试3次
+            backoff_factor=1,  # 重试间隔时间因子（1秒、2秒、4秒...）
+            status_forcelist=[500, 502, 503, 504],  # 对这些状态码进行重试
+            allowed_methods=["POST"]  # 允许重试 POST 请求
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+
+        response = session.request("POST", url, headers=headers, data=payload)
+
         # 检查响应状态码
         if response.status_code >= 400:
             # 如果是 4xx 或 5xx 错误，返回完整的错误信息
@@ -43,7 +57,7 @@ def query_suyuan_data(md, b1, b2):
                 'data': response.text,
                 'headers': dict(response.headers)
             }
-        
+
         # 尝试解析 JSON
         try:
             result = response.json()
