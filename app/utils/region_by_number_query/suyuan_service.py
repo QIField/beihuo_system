@@ -37,7 +37,7 @@ def query_suyuan_data(md, b1, b2):
         # 创建 session 并配置重试策略
         session = requests.Session()
         retry_strategy = Retry(
-            total=3,  # 最多重试3次
+            total=1,  # 最多重试3次
             backoff_factor=1,  # 重试间隔时间因子（1秒、2秒、4秒...）
             status_forcelist=[500, 502, 503, 504],  # 对这些状态码进行重试
             allowed_methods=["POST"]  # 允许重试 POST 请求
