@@ -31,10 +31,44 @@ def query_suyuan_data(md, b1, b2):
         'X-Requested-With': 'XMLHttpRequest'
     }
 
-    response = requests.request("POST", url, headers=headers, data=payload)
-    result = response.json()
-
-    return result
+    try:
+        response = requests.request("POST", url, headers=headers, data=payload)
+        
+        # 检查响应状态码
+        if response.status_code >= 400:
+            # 如果是 4xx 或 5xx 错误，返回完整的错误信息
+            return {
+                'success': False,
+                'status_code': response.status_code,
+                'data': response.text,
+                'headers': dict(response.headers)
+            }
+        
+        # 尝试解析 JSON
+        try:
+            result = response.json()
+            return {
+                'success': True,
+                'status_code': response.status_code,
+                'data': result,
+                'headers': dict(response.headers)
+            }
+        except ValueError:
+            # 如果不是 JSON 格式，返回原始内容
+            return {
+                'success': False,
+                'status_code': response.status_code,
+                'data': response.text,
+                'headers': dict(response.headers)
+            }
+    except Exception as e:
+        # 捕获所有可能的异常，包括网络错误、连接超时等
+        return {
+            'success': False,
+            'status_code': None,
+            'data': str(e),
+            'headers':None
+        }
 
 
 def get_suyuan_statistics(md=None):
@@ -53,5 +87,6 @@ def get_suyuan_statistics(md=None):
         return dict_list
 
 if __name__ == '__main__':
-    a=query_suyuan_data('fs','DS495579','DS498578')
+
+    a=query_suyuan_data('fs','','')
     print(a)
