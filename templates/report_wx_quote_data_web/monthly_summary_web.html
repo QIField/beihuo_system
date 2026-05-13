@@ -9,22 +9,39 @@
                 </div>
             </div>
             <div class="layui-inline">
-                <button class="layui-btn" id="searchBtn">查询</button>
-                <button class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+                <label class="layui-form-label" style="width: 80px;">群名称</label>
+                <div class="layui-input-inline" style="width: auto;">
+                    <button class="layui-btn layui-btn-primary" id="groupnameBtn">
+                        <span>全部</span>
+                        <i class="layui-icon layui-icon-down layui-font-12"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="layui-inline">
+                <button class="layui-btn" id="searchBtn">
+                    <i class="layui-icon layui-icon-search"></i> 查询
+                </button>
+                <button class="layui-btn layui-btn-primary" id="resetBtn">
+                    <i class="layui-icon layui-icon-refresh"></i> 重置
+                </button>
             </div>
         </div>
-        <br>
         <table id="monthlySummaryTable" lay-filter="monthlySummaryTable"></table>
     </div>
 </div>
 
 <script>
-layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
+layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(){
     const table = layui.table;
     const layer = layui.layer;
     const form = layui.form;
     const $ = layui.jquery;
     const laydate = layui.laydate;
+    const dropdown = layui.dropdown;
+    
+    let currentGroupname = '全部';
+    let groupnameList = [];
     
     // 获取今天的月份
     function getCurrentMonth(){
@@ -36,6 +53,39 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
     
     const currentMonth = getCurrentMonth();
     $('#month').val(currentMonth);
+    
+    // 加载群名称列表
+    function loadGroupnameList() {
+        $.ajax({
+            url: '/new/api/report_wx_quote_data/groupname_list_api',
+            type: 'GET',
+            success: function(res) {
+                if (res.code === 200 && res.data) {
+                    groupnameList = [{title: '全部', id: '全部'}];
+                    res.data.forEach(function(groupname) {
+                        groupnameList.push({title: groupname, id: groupname});
+                    });
+                    initGroupnameDropdown();
+                }
+            }
+        });
+    }
+    
+    // 初始化群名称下拉框
+    function initGroupnameDropdown() {
+        dropdown.render({
+            elem: '#groupnameBtn',
+            data: groupnameList,
+            click: function(obj){
+                this.elem.find('span').text(obj.title);
+                currentGroupname = obj.id;
+                reloadTable();
+            }
+        });
+    }
+    
+    // 加载群名称列表
+    loadGroupnameList();
     
     // 渲染月份选择器
     laydate.render({
@@ -49,14 +99,15 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
         url: '/new/api/report_wx_quote_data/monthly_summary_list_api',
         method: 'get',
         page: true,
-        limits: [10, 20, 50, 100, 200,500,2000],
+        limits: [10, 20, 50, 100, 200, 500, 2000],
         limit: 500,
         request: {
             pageName: 'page',
             limitName: 'limit'
         },
         where: {
-            month: $('#month').val()
+            month: $('#month').val(),
+            groupname: '全部'
         },
         parseData: function(res){
             return {
@@ -67,18 +118,23 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
             };
         },
         cols: [[
-            {field: 'month', title: '月份', width: 120},
-            {field: 'groupname', title: '群名称', width: 200},
+            {field: 'month', title: '月份', width: 120, },
+            {field: 'groupname', title: '群名称', width: 200, },
             {field: 'part_name', title: '配件名称', width: 200},
             {field: 'oe_code', title: 'OE码', width: 150},
+            {
+                field: 'quote_info', 
+                title: '品牌价格', 
+                width: 300,
+                templet: function(d) {
+                    if (!d.quote_info) return '';
+                    return d.quote_info.split(/\s*\/\s*/).join('<br>');
+                }
+            },
             {field: 'inquiry_count', title: '询价次数', width: 100, sort: true},
             {field: 'out_of_stock_count', title: '缺货次数', width: 100, sort: true},
-            {title: '成交次数', width: 100, templet: function(d){
-                return 0;
-            }},
-            {title: '成交率', width: 100, templet: function(d){
-                return '0%';
-            }}
+            {title: '成交次数', width: 100, templet: function(d){ return 0; }},
+            {title: '成交率', width: 100, templet: function(d){ return '0%'; }}
         ]],
         height: 'full-250'
     });
@@ -87,7 +143,8 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
     function reloadTable(){
         table.reload('monthlySummaryTable', {
             where: {
-                month: $('#month').val()
+                month: $('#month').val(),
+                groupname: currentGroupname
             },
             page: {
                 curr: 1
@@ -104,6 +161,8 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
     $('#resetBtn').off().on('click', function(){
         const current = getCurrentMonth();
         $('#month').val(current);
+        $('#groupnameBtn span').text('全部');
+        currentGroupname = '全部';
         reloadTable();
     });
 });
