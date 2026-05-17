@@ -25,6 +25,9 @@
                 <button class="layui-btn layui-btn-primary" id="resetBtn">
                     <i class="layui-icon layui-icon-refresh"></i> 重置
                 </button>
+                <button class="layui-btn layui-btn-warm" id="updateDataBtn">
+                    <i class="layui-icon layui-icon-upload-drag"></i> 更新数据
+                </button>
             </div>
         </div>
         <table id="dailySummaryTable" lay-filter="dailySummaryTable"></table>
@@ -134,8 +137,14 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(
             },
             {field: 'inquiry_count', title: '询价次数', width: 100, sort: true},
             {field: 'out_of_stock_count', title: '缺货次数', width: 100, sort: true},
-            {title: '成交次数', width: 100, templet: function(d){ return 0; }},
-            {title: '成交率', width: 100, templet: function(d){ return '0%'; }}
+            {field: 'deal_count', title: '成交次数', width: 100, sort: true},
+            {title: '成交率', width: 100, templet: function(d){ 
+                if (d.inquiry_count > 0) {
+                    var rate = (d.deal_count / d.inquiry_count * 100).toFixed(1);
+                    return rate + '%';
+                }
+                return '0%';
+            }}
         ]],
         height: 'full-250'
     });
@@ -165,6 +174,52 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(
         $('#groupnameBtn span').text('全部');
         currentGroupname = '全部';
         reloadTable();
+    });
+    
+    // 更新数据按钮
+    $('#updateDataBtn').off().on('click', function(){
+        const selectedDate = $('#date').val();
+        
+        if (!selectedDate) {
+            layer.msg('请先选择日期', {icon: 2});
+            return;
+        }
+        
+        layer.confirm('确定要更新日期为 ' + selectedDate + ' 的数据吗？', {
+            icon: 3,
+            title: '确认更新'
+        }, function(index){
+            layer.close(index);
+            
+            // 显示加载层
+            const loadingIndex = layer.load(1, {
+                shade: [0.3, '#000']
+            });
+            
+            $.ajax({
+                url: '/new/api/report_wx_quote_data/fetch_data_and_save_to_database',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    start_date: selectedDate,
+                    end_date: selectedDate
+                }),
+                success: function(res) {
+                    layer.close(loadingIndex);
+                    if (res.code === 200) {
+                        layer.msg('数据更新成功', {icon: 1});
+                        // 刷新表格
+                        reloadTable();
+                    } else {
+                        layer.msg(res.msg || '数据更新失败', {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error) {
+                    layer.close(loadingIndex);
+                    layer.msg('数据更新失败: ' + error, {icon: 2});
+                }
+            });
+        });
     });
 });
 </script>

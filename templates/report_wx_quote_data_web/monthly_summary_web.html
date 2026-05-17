@@ -25,6 +25,9 @@
                 <button class="layui-btn layui-btn-primary" id="resetBtn">
                     <i class="layui-icon layui-icon-refresh"></i> 重置
                 </button>
+                <button class="layui-btn layui-btn-warm" id="updateDataBtn">
+                    <i class="layui-icon layui-icon-upload-drag"></i> 更新数据
+                </button>
             </div>
         </div>
         <table id="monthlySummaryTable" lay-filter="monthlySummaryTable"></table>
@@ -100,7 +103,7 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(
         method: 'get',
         page: true,
         limits: [10, 20, 50, 100, 200, 500, 2000],
-        limit: 500,
+        limit: 50,
         request: {
             pageName: 'page',
             limitName: 'limit'
@@ -118,7 +121,10 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(
             };
         },
         cols: [[
-            {field: 'month', title: '月份', width: 120, },
+            {field: 'create_date', title: '月份', width: 120, templet: function(d){
+                if (!d.create_date) return '';
+                return d.create_date.substring(0, 7);
+            }},
             {field: 'groupname', title: '群名称', width: 200, },
             {field: 'part_name', title: '配件名称', width: 200},
             {field: 'oe_code', title: 'OE码', width: 150},
@@ -133,8 +139,14 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(
             },
             {field: 'inquiry_count', title: '询价次数', width: 100, sort: true},
             {field: 'out_of_stock_count', title: '缺货次数', width: 100, sort: true},
-            {title: '成交次数', width: 100, templet: function(d){ return 0; }},
-            {title: '成交率', width: 100, templet: function(d){ return '0%'; }}
+            {field: 'deal_count', title: '成交次数', width: 100, sort: true},
+            {title: '成交率', width: 100, templet: function(d){ 
+                if (d.inquiry_count > 0) {
+                    var rate = (d.deal_count / d.inquiry_count * 100).toFixed(1);
+                    return rate + '%';
+                }
+                return '0%';
+            }}
         ]],
         height: 'full-250'
     });
@@ -164,6 +176,63 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(
         $('#groupnameBtn span').text('全部');
         currentGroupname = '全部';
         reloadTable();
+    });
+    
+    // 获取某月的第一天和最后一天
+    function getMonthRange(monthStr) {
+        const [year, month] = monthStr.split('-').map(Number);
+        const firstDay = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        return { startDate: firstDay, endDate: endDate };
+    }
+    
+    // 更新数据按钮
+    $('#updateDataBtn').off().on('click', function(){
+        const selectedMonth = $('#month').val();
+        
+        if (!selectedMonth) {
+            layer.msg('请先选择月份', {icon: 2});
+            return;
+        }
+        
+        const { startDate, endDate } = getMonthRange(selectedMonth);
+        
+        layer.confirm('确定要更新 ' + selectedMonth + ' 月的数据吗？\n日期范围：' + startDate + ' 至 ' + endDate, {
+            icon: 3,
+            title: '确认更新'
+        }, function(index){
+            layer.close(index);
+            
+            // 显示加载层
+            const loadingIndex = layer.load(1, {
+                shade: [0.3, '#000']
+            });
+            
+            $.ajax({
+                url: '/new/api/report_wx_quote_data/fetch_data_and_save_to_database',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate
+                }),
+                success: function(res) {
+                    layer.close(loadingIndex);
+                    if (res.code === 200) {
+                        layer.msg('数据更新成功', {icon: 1});
+                        // 刷新表格
+                        reloadTable();
+                    } else {
+                        layer.msg(res.msg || '数据更新失败', {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error) {
+                    layer.close(loadingIndex);
+                    layer.msg('数据更新失败: ' + error, {icon: 2});
+                }
+            });
+        });
     });
 });
 </script>
