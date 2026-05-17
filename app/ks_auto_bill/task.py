@@ -228,40 +228,40 @@ def is_running_time():
 def process_company_once(company):
     """
     处理单个公司的订单
-    
+
     参数:
         company: 公司代码
-    
+
     返回:
-        tuple: (success: bool, message: str, count: int)
+        tuple: (success: bool, message: str, total_count: int, success_count: int, fail_count: int)
     """
     print(f"\n{'='*60}")
     print(f"[开思自动对单][{company}] 开始处理")
     print(f"{'='*60}")
-    
+
     # 检查登录状态
     session = get_session(company)
     print(f"\n[开思自动对单][{company}] 检查登录状态...")
-    
+
     if not check_login_status(session):
         print(f"[开思自动对单][{company}] 登录已过期或未登录，重新登录...")
         session = login(company)
-        
+
         if session is None:
             error_msg = "登录失败"
             print(f"[开思自动对单][{company}] {error_msg}")
-            return False, error_msg, 0
-        
+            return False, error_msg, 0, 0, 0
+
         set_session(session, company)
         print(f"[开思自动对单][{company}] 登录成功")
     else:
         print(f"[开思自动对单][{company}] 登录状态有效")
-    
+
     # 获取订单并保存到数据库
     print(f"\n[开思自动对单][{company}] 获取开思订单并保存到数据库...")
     # 打印本次爬取的时间范围（只打印一次）
     print_date_range()
-    
+
     try:
         all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session, company=company)
         print(f"[开思自动对单][{company}] 成功获取并保存 {len(all_order_info_list)} 条订单信息")
@@ -269,23 +269,25 @@ def process_company_once(company):
     except Exception as e:
         error_msg = f"获取订单信息失败: {str(e)}"
         print(f"[开思自动对单][{company}] {error_msg}")
-        return False, error_msg, 0
-    
+        return False, error_msg, 0, 0, 0
+
     # 发送订单到 CRM
     if pending_confirmation_orders:
         print(f"\n[开思自动对单][{company}] 开始处理 {len(pending_confirmation_orders)} 条待处理订单...")
         try:
             results = send_orders_to_crm(pending_confirmation_orders, company=company)
             success_count = sum(1 for r in results if r.get("result") is not None)
+            fail_count = len(results) - success_count
+            total_count = len(results)
             print(f"[开思自动对单][{company}] 处理完成: {success_count}/{len(results)} 成功")
-            return True, f"成功 {success_count}/{len(results)}", len(pending_confirmation_orders)
+            return True, f"成功 {success_count}/{len(results)}", total_count, success_count, fail_count
         except Exception as e:
             error_msg = f"发送订单到 CRM 失败: {str(e)}"
             print(f"[开思自动对单][{company}] {error_msg}")
-            return False, error_msg, 0
+            return False, error_msg, 0, 0, 0
     else:
         print(f"\n[开思自动对单][{company}] 没有待处理订单，跳过 CRM 开单")
-        return True, "没有待处理订单", 0
+        return True, "没有待处理订单", 0, 0, 0
 
 
 def process_orders_once():
@@ -311,26 +313,31 @@ def process_orders_once():
     results = {}
     total_success = 0
     total_count = 0
-    
+    total_success_count = 0
+    total_fail_count = 0
+
     for company in COMPANIES:
-        success, message, count = process_company_once(company)
+        success, message, count, success_count, fail_count = process_company_once(company)
         results[company] = {
             'success': success,
             'message': message,
-            'count': count
+            'count': count,
+            'success_count': success_count,
+            'fail_count': fail_count
         }
         if success:
             total_success += 1
         total_count += count
-        
+        total_success_count += success_count
+        total_fail_count += fail_count
+
         # 短暂休眠，避免请求过于频繁
         time.sleep(2)
-    
+
     print(f"\n{'='*60}")
     print("[开思自动对单] 汇总结果:")
     for company, result in results.items():
-        status = "✓" if result['success'] else "✗"
-        print(f"  [{company}] {status} {result['message']} ({result['count']} 条)")
+        print(f"  [{company}] 成功 {result['success_count']} 条，失败 {result['fail_count']} 条")
     print(f"{'='*60}")
     
     print(f"\n[开思自动对单] 执行完成: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

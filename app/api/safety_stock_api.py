@@ -38,6 +38,8 @@ def get_safety_stock_list():
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 50))
         
+        print(f'[API调试] 接收参数: calc_date={calc_date}, stock_status={stock_status}, abc_class={abc_class}, keyword={keyword}, page={page}, limit={limit}')
+        
         # 查询数据（取消500条限制，最大支持10万条）
         results = SafetyStockDBService.get_calculation_results(
             calc_date=calc_date,
@@ -45,6 +47,20 @@ def get_safety_stock_list():
             abc_class=abc_class,
             limit=100000  # 查询大量数据用于内存筛选
         )
+        
+        print(f'[API调试] 数据库查询返回: {len(results)} 条')
+        if results:
+            print(f'[API调试] 第一条数据: stock_status={results[0].get("stock_status")}, abc_class={results[0].get("abc_class")}')
+            # 统计分布
+            status_count = {}
+            abc_count = {}
+            for r in results:
+                status = r.get('stock_status') or '空'
+                abc = r.get('abc_class') or '空'
+                status_count[status] = status_count.get(status, 0) + 1
+                abc_count[abc] = abc_count.get(abc, 0) + 1
+            print(f'[API调试] 库存状态分布: {status_count}')
+            print(f'[API调试] ABC分类分布: {abc_count}')
         
         # 关键词筛选
         if keyword:
@@ -55,12 +71,15 @@ def get_safety_stock_list():
                     keyword_lower in (r.get('brand') or '').lower() or
                     keyword_lower in (r.get('product_name') or '').lower())
             ]
+            print(f'[API调试] 关键词筛选后: {len(results)} 条')
         
         # 内存分页（保留分页功能）
         total = len(results)
         start = (page - 1) * limit
         end = start + limit
         paged_results = results[start:end]
+        
+        print(f'[API调试] 最终返回: {len(paged_results)} 条 (总数 {total})')
         
         return jsonify({
             'code': 0,
@@ -72,6 +91,7 @@ def get_safety_stock_list():
         })
         
     except Exception as e:
+        print(f'[API调试] 异常: {str(e)}')
         return jsonify({
             'code': 1,
             'msg': f'查询失败: {str(e)}',

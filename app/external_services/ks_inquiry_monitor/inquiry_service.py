@@ -124,8 +124,8 @@ def save_stats_to_db(stores_data: list):
         conn.close()
 
 
-def get_stats_from_db() -> list:
-    """从数据库获取统计数据"""
+def get_stats_from_db() -> tuple:
+    """从数据库获取统计数据，返回 (stores列表, 更新时间) """
     try:
         with db_cursor(dict_cursor=True) as cursor:
             cursor.execute("""
@@ -135,11 +135,20 @@ def get_stats_from_db() -> list:
                 ORDER BY store_code
             """)
             results = cursor.fetchall()
-            print(f"[询价单监控] 从数据库读取到 {len(results)} 条数据: {results}")
-            return results
+            
+            # 获取最新的更新时间
+            cursor.execute("""
+                SELECT MAX(updated_at) as latest_update 
+                FROM crmapp_ks_inquiry_monitor
+            """)
+            row = cursor.fetchone()
+            latest_update = row['latest_update'] if row and row['latest_update'] else None
+            
+            print(f"[询价单监控] 从数据库读取到 {len(results)} 条数据, 更新时间: {latest_update}")
+            return results, latest_update
     except Exception as e:
         print(f"[询价单监控] 从数据库读取数据失败: {e}")
-        return []
+        return [], None
 
 
 def get_all_stats(force_refresh: bool = False) -> dict:
@@ -148,10 +157,11 @@ def get_all_stats(force_refresh: bool = False) -> dict:
     优先从数据库读取，如果数据库为空或强制刷新，则实时获取并保存到数据库
     """
     stores = []
+    db_update_time = None
 
     if not force_refresh:
         # 先尝试从数据库读取
-        stores = get_stats_from_db()
+        stores, db_update_time = get_stats_from_db()
         print(f"[询价单监控] get_all_stats 从数据库获取: {len(stores)} 条")
 
     # 如果数据库没有数据或强制刷新，实时获取
@@ -164,12 +174,15 @@ def get_all_stats(force_refresh: bool = False) -> dict:
 
     alert = any(s['unclaimed_count'] > ALERT_THRESHOLD for s in stores)
 
+    # 使用数据库的实际更新时间，如果没有则为空
+    update_time_str = db_update_time.strftime('%H:%M:%S') if db_update_time else ''
+
     result = {
         'stores': stores,
         'alert': alert,
-        'update_time': datetime.now().strftime('%H:%M:%S')
+        'update_time': update_time_str
     }
-    print(f"[询价单监控] 返回数据: stores={len(stores)}, alert={alert}")
+    print(f"[询价单监控] 返回数据: stores={len(stores)}, alert={alert}, update_time={update_time_str or '-'}")
     return result
 
 

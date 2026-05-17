@@ -308,10 +308,3 @@ def init_ks_inquiry_monitor_task():
         logger.error(f"[询价单监控] 失败: {e}")
 
 
-def init_ks_merchant_task():
-    """初始化开思商家数据同步任务（每10分钟执行一次）"""
-    try:
-        from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
-        register_ks_merchant_tasks()
-    except Exception as e:
-        logger.error(f"[开思商家数据同步] 失败: {e}")

@@ -1,14 +1,18 @@
 """
 Excel异步任务状态存储模块
-复用 task_manager 的线程池，管理任务状态和进度
+使用线程安全的共享存储，管理任务状态和进度
 """
 import uuid
 import threading
 from datetime import datetime
 from typing import Optional, Callable
 
-# 任务状态存储（内存）
-_task_store = {}
+# 使用线程安全的共享存储
+from multiprocessing import Manager
+
+# 创建Manager实例（在模块级别创建，确保所有线程共享）
+_manager = Manager()
+_task_store = _manager.dict()
 _task_lock = threading.Lock()
 
 
@@ -50,40 +54,53 @@ def _execute_wrapper(task_id: str, func: Callable, *args, **kwargs):
     try:
         # 更新为运行中
         with _task_lock:
-            _task_store[task_id]['status'] = 'running'
-            _task_store[task_id]['message'] = '处理中...'
+            task = dict(_task_store[task_id])
+            task['status'] = 'running'
+            task['message'] = '处理中...'
+            _task_store[task_id] = task
         
         # 定义进度回调函数
         def progress_callback(current: int, total: int, message: str = ""):
             with _task_lock:
-                _task_store[task_id]['progress'] = current
-                _task_store[task_id]['total'] = total
+                task = dict(_task_store[task_id])
+                task['progress'] = current
+                task['total'] = total
                 if message:
-                    _task_store[task_id]['message'] = message
+                    task['message'] = message
+                _task_store[task_id] = task
         
         # 执行业务函数
         result = func(progress_callback=progress_callback, *args, **kwargs)
         
         # 更新完成状态
         with _task_lock:
-            _task_store[task_id]['status'] = 'completed'
-            _task_store[task_id]['progress'] = _task_store[task_id]['total']
-            _task_store[task_id]['message'] = '处理完成'
-            _task_store[task_id]['result_file'] = result
-            _task_store[task_id]['completed_at'] = datetime.now().isoformat()
+            task = dict(_task_store[task_id])
+            task['status'] = 'completed'
+            task['progress'] = task['total']
+            task['message'] = '处理完成'
+            task['result_file'] = result
+            task['completed_at'] = datetime.now().isoformat()
+            _task_store[task_id] = task
             
     except Exception as e:
         # 更新失败状态
         with _task_lock:
-            _task_store[task_id]['status'] = 'failed'
-            _task_store[task_id]['message'] = f'处理失败: {str(e)}'
-            _task_store[task_id]['error'] = str(e)
-            _task_store[task_id]['completed_at'] = datetime.now().isoformat()
+            task = dict(_task_store[task_id])
+            task['status'] = 'failed'
+            task['message'] = f'处理失败: {str(e)}'
+            task['error'] = str(e)
+            task['completed_at'] = datetime.now().isoformat()
+            _task_store[task_id] = task
 
 
 def get_task_status(task_id: str) -> Optional[dict]:
     """获取任务状态"""
-    return _task_store.get(task_id)
+    with _task_lock:
+        task = _task_store.get(task_id)
+        if task:
+            # 返回普通字典的副本
+            return dict(task)
+        return None
 
 
 def cleanup_old_tasks(max_age_hours: int = 24):
@@ -93,7 +110,8 @@ def cleanup_old_tasks(max_age_hours: int = 24):
     
     with _task_lock:
         expired = []
-        for tid, task in _task_store.items():
+        for tid in list(_task_store.keys()):
+            task = _task_store[tid]
             completed_at = task.get('completed_at')
             if completed_at:
                 task_time = datetime.fromisoformat(completed_at).timestamp()

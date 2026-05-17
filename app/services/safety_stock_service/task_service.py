@@ -8,7 +8,7 @@ from .calculation_service import SafetyStockCalculator
 from .db_service import SafetyStockDBService
 
 # 五个组织列表
-COMPANIES = ['fsbbr', 'szbbr', 'gzbbr', 'hzbbr', 'shbbr']
+COMPANIES = ['fsbbr', 'zhbbr', 'zsbbr', 'dghf', 'dgby']
 
 
 def execute_daily_calculation():
@@ -55,13 +55,18 @@ def execute_daily_calculation():
         in_transit_data = SafetyStockDBService.get_in_transit_data(company=company)
         print(f"  ✓ 读取到 {len(in_transit_data)} 个产品的在途数据")
 
-        # 2.4 计算安全库存
+        # 2.4 读取产品额外信息（替换号、产品等级、中文车型）
+        print(f"  → 读取产品额外信息...")
+        extra_data = SafetyStockDBService.get_product_extra_data(company=company)
+        print(f"  ✓ 读取到 {len(extra_data)} 个产品的额外信息")
+
+        # 2.5 计算安全库存
         print(f"  → 执行安全库存计算...")
         calculator = SafetyStockCalculator()
         calc_results = calculator.calculate_all(sales_data)
         print(f"  ✓ 完成 {len(calc_results)} 个产品的安全库存计算")
 
-        # 2.5 合并库存数据，判断状态
+        # 2.6 合并库存数据，判断状态
         print(f"  → 合并库存数据并判断状态...")
         final_results = []
         for result in calc_results:
@@ -75,6 +80,9 @@ def execute_daily_calculation():
 
             # 获取在途数量
             in_transit_qty = in_transit_data.get(key, 0)
+
+            # 获取额外信息
+            extra = extra_data.get(key, {})
 
             # 计算可用库存
             available_stock = current_stock + in_transit_qty
@@ -96,7 +104,10 @@ def execute_daily_calculation():
                 'available_stock': available_stock,
                 'inventory_amount': inventory_amount,
                 'stock_status': status_info['status'],
-                'sellable_days': status_info['sellable_days']
+                'sellable_days': status_info['sellable_days'],
+                'replace_number': extra.get('replace_number', ''),
+                'product_level': extra.get('product_level', ''),
+                'l_model_zh': extra.get('l_model_zh', '')
             })
 
         # 2.6 保存计算结果
@@ -147,13 +158,18 @@ def execute_calculation_for_company(company: str = 'fsbbr'):
     in_transit_data = SafetyStockDBService.get_in_transit_data(company=company)
     print(f"  ✓ 读取到 {len(in_transit_data)} 个产品的在途数据")
 
-    # 5. 计算安全库存
+    # 5. 读取产品额外信息（替换号、产品等级、中文车型）
+    print(f"  → 读取产品额外信息...")
+    extra_data = SafetyStockDBService.get_product_extra_data(company=company)
+    print(f"  ✓ 读取到 {len(extra_data)} 个产品的额外信息")
+
+    # 6. 计算安全库存
     print("  → 执行安全库存计算...")
     calculator = SafetyStockCalculator()
     calc_results = calculator.calculate_all(sales_data)
     print(f"  ✓ 完成 {len(calc_results)} 个产品的安全库存计算")
 
-    # 6. 合并库存数据，判断状态
+    # 7. 合并库存数据，判断状态
     print("  → 合并库存数据并判断状态...")
     final_results = []
     for result in calc_results:
@@ -167,6 +183,9 @@ def execute_calculation_for_company(company: str = 'fsbbr'):
 
         # 获取在途数量
         in_transit_qty = in_transit_data.get(key, 0)
+
+        # 获取额外信息
+        extra = extra_data.get(key, {})
 
         # 计算可用库存
         available_stock = current_stock + in_transit_qty
@@ -188,7 +207,10 @@ def execute_calculation_for_company(company: str = 'fsbbr'):
             'available_stock': available_stock,
             'inventory_amount': inventory_amount,
             'stock_status': status_info['status'],
-            'sellable_days': status_info['sellable_days']
+            'sellable_days': status_info['sellable_days'],
+            'replace_number': extra.get('replace_number', ''),
+            'product_level': extra.get('product_level', ''),
+            'l_model_zh': extra.get('l_model_zh', '')
         })
 
     # 7. 保存计算结果

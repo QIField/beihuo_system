@@ -4001,6 +4001,13 @@ function bindEventHandlers(myTable, form, table) {
             var taskId = result.data.task_id;
             layer.msg('任务已提交，处理中...', {icon: 1});
 
+            // 创建进度提示层
+            var progressMsgIndex = layer.msg('处理中: 0/0 - 初始化...', {
+                icon: 16,
+                time: 0,  // 不自动关闭
+                shade: 0.3
+            });
+
             // 步骤2：轮询查询任务状态
             var checkInterval = setInterval(function() {
                 fetch('/api/excel/async/status/' + taskId)
@@ -4009,6 +4016,7 @@ function bindEventHandlers(myTable, form, table) {
                     if (statusResult.code !== 0) {
                         clearInterval(checkInterval);
                         layer.close(loadingIndex);
+                        layer.close(progressMsgIndex);
                         layer.msg('查询状态失败: ' + statusResult.msg, {icon: 2});
                         return;
                     }
@@ -4020,11 +4028,21 @@ function bindEventHandlers(myTable, form, table) {
                         var progress = status.progress || 0;
                         var total = status.total || 0;
                         var message = status.message || '处理中...';
-                        layer.msg('处理中: ' + progress + '/' + total + ' - ' + message, {icon: 16, time: 1000});
+                        // 关闭旧弹窗，创建新弹窗（确保内容更新）
+                        layer.close(progressMsgIndex);
+                        progressMsgIndex = layer.msg('处理中: ' + progress + '/' + total + ' - ' + message, {
+                            icon: 16,
+                            time: 0,  // 不自动关闭
+                            shade: 0.3
+                        });
+                        // 同时更新页面title显示进度
+                        document.title = '处理中 ' + progress + '/' + total + ' - 巴博瑞科技';
                     } else if (status.status === 'completed') {
                         // 任务完成
                         clearInterval(checkInterval);
                         layer.close(loadingIndex);
+                        layer.close(progressMsgIndex);
+                        document.title = '巴博瑞科技';
                         layer.msg('处理完成，开始下载...', {icon: 1});
 
                         // 下载结果文件
@@ -4033,12 +4051,16 @@ function bindEventHandlers(myTable, form, table) {
                         // 任务失败
                         clearInterval(checkInterval);
                         layer.close(loadingIndex);
+                        layer.close(progressMsgIndex);
+                        document.title = '巴博瑞科技';
                         layer.msg('处理失败: ' + (status.error || '未知错误'), {icon: 2});
                     }
                 })
                 .catch(error => {
                     clearInterval(checkInterval);
                     layer.close(loadingIndex);
+                    layer.close(progressMsgIndex);
+                    document.title = '巴博瑞科技';
                     layer.msg('查询状态失败: ' + error.message, {icon: 2});
                 });
             }, 2000); // 每2秒查询一次

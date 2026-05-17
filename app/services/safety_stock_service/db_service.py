@@ -251,6 +251,48 @@ class SafetyStockDBService:
             conn.close()
     
     @staticmethod
+    def get_product_extra_data(company: str = 'fsbbr') -> Dict[str, Dict]:
+        """
+        从crmapp_compare_summary读取产品额外信息
+        
+        Args:
+            company: 组织代码，默认fsbbr
+            
+        Returns:
+            字典，key为 "frey_no"，value包含replace_number, product_level, l_model_zh
+        """
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                sql = """
+                    SELECT
+                        frey_no,
+                        replace_number,
+                        product_level,
+                        l_model_zh
+                    FROM crmapp_compare_summary
+                    WHERE frey_no IS NOT NULL
+                      AND frey_no != ''
+                      AND company = %s
+                """
+                cursor.execute(sql, (company,))
+                rows = cursor.fetchall()
+                
+                result = {}
+                for row in rows:
+                    key = f"{row['frey_no']}"
+                    result[key] = {
+                        'replace_number': row.get('replace_number', ''),
+                        'product_level': row.get('product_level', ''),
+                        'l_model_zh': row.get('l_model_zh', '')
+                    }
+                
+                return result
+                
+        finally:
+            conn.close()
+    
+    @staticmethod
     def save_calculation_results(results: List[Dict], calc_date: str = None, company: str = 'fsbbr') -> int:
         """
         保存计算结果到数据库
@@ -284,9 +326,9 @@ class SafetyStockDBService:
                         base_safety_stock, safety_stock,
                         reorder_point, target_stock,
                         current_stock, in_transit_qty, available_stock, inventory_amount,
-                        sellable_days, stock_status, calc_date
+                        sellable_days, stock_status, replace_number, product_level, l_model_zh, calc_date
                     ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                     )
                 """
 
@@ -312,6 +354,9 @@ class SafetyStockDBService:
                         r.get('inventory_amount', 0),
                         r['sellable_days'],
                         r['stock_status'],
+                        r.get('replace_number', ''),
+                        r.get('product_level', ''),
+                        r.get('l_model_zh', ''),
                         calc_date
                     ))
                 

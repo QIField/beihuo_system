@@ -1,73 +1,332 @@
-这是线下的：
-id	int(11)	NO	PRI		auto_increment
-oe	varchar(255)	NO	MUL		
-brand	varchar(255)	YES	MUL		
-company	varchar(100)	YES	MUL	fsbbr	
-product_name	varchar(500)	YES	MUL		
-vehicle_brand	varchar(255)	YES	MUL		
-replace_number	text	YES			
-brand_code	varchar(255)	YES	MUL		
-inquiry_count	int(11)	YES		0	
-product_level	varchar(50)	YES			
-best_sales_month	varchar(20)	YES			
-best_sales_season	varchar(20)	YES			
-max_price	decimal(10,2)	YES		0.00	
-min_price	decimal(10,2)	YES		0.00	
-supplier_price	decimal(10,2)	YES		0.00	
-dealer_purchase_price	decimal(10,2)	YES		0.00	
-dealer_sale_price	decimal(10,2)	YES		0.00	
-price_update_time	datetime	YES			
-today_sales	int(11)	YES		0	
-yesterday_sales	int(11)	YES		0	
-month_sales	int(11)	YES		0	
-avg_sales_12m	decimal(10,2)	YES		0.00	
-avg_sales_6m	decimal(10,2)	YES		0.00	
-sales_7d	int(11)	YES		0	
-sales_6m	int(11)	YES		0	
-sales_12m	int(11)	YES		0	
-product_remark	text	YES			
-is_cass	varchar(10)	YES			
-created_time	datetime	YES		CURRENT_TIMESTAMP	
-updated_time	datetime	YES	MUL	CURRENT_TIMESTAMP	on update CURRENT_TIMESTAMP
-l_model_zh	text	YES			
-stock_zaitu_list	json	YES			
-frey_no	varchar(255)	YES			
-product_id	varchar(100)	YES			
-replace_number_with_keys	varchar(500)	YES			
-
-这是线上的：
-id	int(11)	NO	PRI		auto_increment
-oe	varchar(255)	NO	MUL		
-brand	varchar(255)	YES	MUL		
-company	varchar(100)	YES	MUL	fsbbr	
-product_name	varchar(500)	YES	MUL		
-vehicle_brand	varchar(255)	YES	MUL		
-replace_number	text	YES			
-brand_code	varchar(255)	YES	MUL		
-inquiry_count	int(11)	YES		0	
-product_level	varchar(50)	YES			
-best_sales_month	varchar(20)	YES			
-best_sales_season	varchar(20)	YES			
-max_price	decimal(10,2)	YES		0.00	
-min_price	decimal(10,2)	YES		0.00	
-supplier_price	decimal(10,2)	YES		0.00	
-dealer_purchase_price	decimal(10,2)	YES		0.00	
-dealer_sale_price	decimal(10,2)	YES		0.00	
-price_update_time	datetime	YES			
-today_sales	int(11)	YES		0	
-yesterday_sales	int(11)	YES		0	
-month_sales	int(11)	YES		0	
-avg_sales_12m	decimal(10,2)	YES		0.00	
-avg_sales_6m	decimal(10,2)	YES		0.00	
-sales_7d	int(11)	YES		0	
-product_remark	text	YES			
-created_time	datetime	YES		CURRENT_TIMESTAMP	
-updated_time	datetime	YES	MUL	CURRENT_TIMESTAMP	on update CURRENT_TIMESTAMP
-is_cass	varchar(10)	YES			
-l_model_zh	text	YES			
-stock_zaitu_list	json	YES			
-frey_no	varchar(255)	YES			
-sales_6m	int(11)	YES		0	
-sales_12m	int(11)	YES		0	
-product_id	varchar(100)	YES			
-replace_number_with_keys	varchar(500)	YES			
+{
+    "status": 200,
+    "msg": "返回成功",
+    "data": {
+        "total": 777,
+        "per_page": 20,
+        "current_page": 1,
+        "last_page": 39,
+        "data": [
+            {
+                "supplier_link_id": "42677",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "苏伟良",
+                "buyer": "苏伟良",
+                "payment_description": "月结",
+                "partner_id": "206740",
+                "sap_no": "CNCD0087",
+                "fullname": "成都缤世贸易有限公司（友隆顺）",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42673",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "林建烊",
+                "buyer": "林建烊",
+                "payment_description": "现金",
+                "partner_id": "206716",
+                "sap_no": "CNHE0012",
+                "fullname": "唐山宝锋商贸有限公司",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "朱凯",
+                "contacts_phone": "0315-2232450",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42628",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "黄锐洪",
+                "buyer": "黄锐洪",
+                "payment_description": "现金",
+                "partner_id": "206261",
+                "sap_no": "CNGD3138",
+                "fullname": "佛山伟业隆",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42552",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "邓宇圣",
+                "buyer": "邓宇圣",
+                "payment_description": "现金",
+                "partner_id": "205581",
+                "sap_no": "CNZJ0287",
+                "fullname": "杭州聚骋汽配",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42551",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "佛山采购专用",
+                "buyer": "佛山采购专用",
+                "payment_description": "月结",
+                "partner_id": "205579",
+                "sap_no": "CNSD0302",
+                "fullname": "奔裕海拉",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "欧总",
+                "contacts_phone": "15699181808",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42548",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "林建烊",
+                "buyer": "林建烊",
+                "payment_description": "现金",
+                "partner_id": "205555",
+                "sap_no": "CNBJ0408",
+                "fullname": "（北京）京北汇名车配件",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "无",
+                "contacts_phone": ":010\/87332988",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42516",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "黄锐洪",
+                "buyer": "黄锐洪",
+                "payment_description": "现金",
+                "partner_id": "205338",
+                "sap_no": "CNGD3102",
+                "fullname": "广州亿佳",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42512",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "林建烊",
+                "buyer": "林建烊",
+                "payment_description": "现金",
+                "partner_id": "205325",
+                "sap_no": "CNGD3099",
+                "fullname": "汕头麒林汽配",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42503",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "林建烊",
+                "buyer": "林建烊",
+                "payment_description": "现金",
+                "partner_id": "205265",
+                "sap_no": "CNGD3096",
+                "fullname": "广州新和丰",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "13922165590",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42498",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "佛山采购专用",
+                "buyer": "佛山采购专用",
+                "payment_description": "月结",
+                "partner_id": "205219",
+                "sap_no": "CNMO0166",
+                "fullname": "康配(浙江)汽车零部件有限公司   ",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "商宝国",
+                "contacts_phone": "18618411715",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42497",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "周振辉",
+                "buyer": "周振辉",
+                "payment_description": "现金",
+                "partner_id": "205217",
+                "sap_no": "CNMO0165",
+                "fullname": "广州桀绮",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "无",
+                "contacts_phone": "无",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42493",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "佛山采购专用",
+                "buyer": "佛山采购专用",
+                "payment_description": "月结",
+                "partner_id": "205178",
+                "sap_no": "CNSD0298",
+                "fullname": "OSSA",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "时",
+                "contacts_phone": "020-86296686",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42491",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "邓宇圣",
+                "buyer": "邓宇圣",
+                "payment_description": "现金",
+                "partner_id": "205167",
+                "sap_no": "CNHA0071",
+                "fullname": "郑州富业汽配",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "15517190303",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42485",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "周振辉",
+                "buyer": "周振辉",
+                "payment_description": "现金",
+                "partner_id": "205142",
+                "sap_no": "CNMO0164",
+                "fullname": "上海嘉喜源",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "无",
+                "contacts_phone": "无",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42464",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "佛山采购专用",
+                "buyer": "佛山采购专用",
+                "payment_description": "现金",
+                "partner_id": "205023",
+                "sap_no": "CNMO0163",
+                "fullname": "光束未来（北京） ",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "淮朝阳",
+                "contacts_phone": "13311203738",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42462",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "邓宇圣",
+                "buyer": "邓宇圣",
+                "payment_description": "现金",
+                "partner_id": "205005",
+                "sap_no": "CNGD3081",
+                "fullname": "广州展耀贸易有限公司",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42456",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "林建烊",
+                "buyer": "林建烊",
+                "payment_description": "现金",
+                "partner_id": "204918",
+                "sap_no": "CNJX0006",
+                "fullname": " 南昌宝驰通",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "无",
+                "contacts_phone": " 13767438479",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42455",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "林建烊",
+                "buyer": "林建烊",
+                "payment_description": "现金",
+                "partner_id": "204903",
+                "sap_no": "CNGD3078",
+                "fullname": "东莞宝星汽配",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "无",
+                "contacts_phone": "0769-81190378 ",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42441",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "邓宇圣",
+                "buyer": "邓宇圣",
+                "payment_description": "现金",
+                "partner_id": "204810",
+                "sap_no": "CNGD3073",
+                "fullname": "广州曜德汽配",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "",
+                "is_bbr": "0"
+            },
+            {
+                "supplier_link_id": "42426",
+                "company_name": "佛山市巴博瑞汽车零配件有限公司",
+                "creator": "黄锐洪",
+                "buyer": "黄锐洪",
+                "payment_description": "现金",
+                "partner_id": "204624",
+                "sap_no": "CNCQ0009",
+                "fullname": "重庆大昌行",
+                "upload_kingdee": "1",
+                "status": "1",
+                "is_disabled": "0",
+                "contacts": "",
+                "contacts_phone": "",
+                "is_bbr": "0"
+            }
+        ]
+    }
+}

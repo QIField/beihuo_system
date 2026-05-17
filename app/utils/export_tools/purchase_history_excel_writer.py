@@ -13,29 +13,41 @@ class PurchaseHistoryExcelWriter:
     """采购历史比对Excel写入器"""
     
     # 列定义（根据模板文件 compare_price.xlsx）
-    COL_INDEX = 1        # A列: 序号
-    COL_OE = 2           # B列: oe
-    COL_PRICE = 3        # C列: 价格/促销价
-    COL_BRAND = 4        # D列: 品牌
-    COL_NAME = 5         # E列: 名称
-    COL_SPEC = 6         # F列: 规格
-    COL_REPLACE = 7      # G列: 替换号
-    COL_LOWEST = 8       # H列: 最低价
-    COL_HIGHEST = 9      # I列: 最高价
-    COL_4S_COST = 10     # J列: 4s含税进价
-    COL_4S_PRICE = 11    # K列: 4s含税售价
-    COL_JAN = 12         # L列: 一月
-    COL_FEB = 13         # M列: 二月
-    COL_MAR = 14         # N列: 三月
-    COL_APR = 15         # O列: 四月
-    COL_MAY = 16         # P列: 五月
-    COL_JUN = 17         # Q列: 六月
-    COL_JUL = 18         # R列: 七月
-    COL_AUG = 19         # S列: 八月
-    COL_SEP = 20         # T列: 九月
-    COL_OCT = 21         # U列: 十月
-    COL_NOV = 22         # V列: 十一月
-    COL_DEC = 23         # W列: 十二月
+    # 新增列：库存数量、标签、近1个月询价量、近3个月月均询价量、近6个月月均销量
+    #         全国近1个月询价量、全国近3个月月均询价量、销量数据(合并列)
+    COL_INDEX = 1              # A列: 序号
+    COL_OE = 2                 # B列: oe
+    COL_PRICE = 3              # C列: 价格/促销价
+    COL_BRAND = 4              # D列: 品牌
+    COL_NAME = 5               # E列: 名称
+    COL_SPEC = 6               # F列: 规格
+    COL_REPLACE = 7            # G列: 替换号
+    # 新增列（从crmapp_beihuo表获取）
+    COL_STOCK = 8              # H列: 库存数量
+    COL_TAG = 9                # I列: 标签
+    COL_INQUIRY_1M = 10        # J列: 近1个月询价量
+    COL_INQUIRY_3M = 11        # K列: 近3个月月均询价量
+    COL_SALES_6M_AVG = 12      # L列: 近6个月月均销量
+    COL_INQUIRY_1M_NATIONAL = 13   # M列: 全国近1个月询价量
+    COL_INQUIRY_3M_NATIONAL = 14   # N列: 全国近3个月月均询价量
+    COL_SALES_DATA = 15        # O列: 销量数据(合并列)
+    # 原有列后移
+    COL_LOWEST = 16            # P列: 最低价
+    COL_HIGHEST = 17           # Q列: 最高价
+    COL_4S_COST = 18           # R列: 4s含税进价
+    COL_4S_PRICE = 19          # S列: 4s含税售价
+    COL_JAN = 20               # T列: 一月
+    COL_FEB = 21               # U列: 二月
+    COL_MAR = 22               # V列: 三月
+    COL_APR = 23               # W列: 四月
+    COL_MAY = 24               # X列: 五月
+    COL_JUN = 25               # Y列: 六月
+    COL_JUL = 26               # Z列: 七月
+    COL_AUG = 27               # AA列: 八月
+    COL_SEP = 28               # AB列: 九月
+    COL_OCT = 29               # AC列: 十月
+    COL_NOV = 30               # AD列: 十一月
+    COL_DEC = 31               # AE列: 十二月
 
     # 月份列映射
     MONTH_COLS = {
@@ -114,6 +126,48 @@ class PurchaseHistoryExcelWriter:
         replace_cell = self.ws.cell(row=row, column=self.COL_REPLACE)
         replace_cell.value = result.replace_name if result.replace_name else ""
 
+        # 写入备货数据（从crmapp_beihuo表获取）
+        # H列: 库存数量
+        stock_cell = self.ws.cell(row=row, column=self.COL_STOCK)
+        stock_cell.value = result.stock_quantity if result.stock_quantity is not None else ""
+        
+        # I列: 标签
+        tag_cell = self.ws.cell(row=row, column=self.COL_TAG)
+        tag_cell.value = result.tag if result.tag else ""
+        
+        # J列: 近1个月询价量
+        inquiry_1m_cell = self.ws.cell(row=row, column=self.COL_INQUIRY_1M)
+        inquiry_1m_cell.value = result.inquiry_1m if result.inquiry_1m is not None else ""
+        
+        # K列: 近3个月月均询价量
+        inquiry_3m_cell = self.ws.cell(row=row, column=self.COL_INQUIRY_3M)
+        inquiry_3m_cell.value = result.inquiry_3m_avg if result.inquiry_3m_avg is not None else ""
+        
+        # L列: 近6个月月均销量
+        sales_6m_avg_cell = self.ws.cell(row=row, column=self.COL_SALES_6M_AVG)
+        sales_6m_avg_cell.value = result.sales_6m_avg if result.sales_6m_avg is not None else ""
+        
+        # M列: 全国近1个月询价量
+        inquiry_1m_national_cell = self.ws.cell(row=row, column=self.COL_INQUIRY_1M_NATIONAL)
+        inquiry_1m_national_cell.value = result.inquiry_1m_national if result.inquiry_1m_national is not None else ""
+        
+        # N列: 全国近3个月月均询价量
+        inquiry_3m_national_cell = self.ws.cell(row=row, column=self.COL_INQUIRY_3M_NATIONAL)
+        inquiry_3m_national_cell.value = result.inquiry_3m_avg_national if result.inquiry_3m_avg_national is not None else ""
+        
+        # O列: 销量数据(合并列)
+        # 格式: 今/昨/近7天: {今日销量}/{昨日销量}/{近7天销量}
+        #       近1/6/12月: {本月销量}/{近6个月销量}/{近12个月销量}
+        sales_data_cell = self.ws.cell(row=row, column=self.COL_SALES_DATA)
+        today = result.sales_today if result.sales_today is not None else 0
+        yesterday = result.sales_yesterday if result.sales_yesterday is not None else 0
+        sales_7d = result.sales_7d if result.sales_7d is not None else 0
+        sales_month = result.sales_month if result.sales_month is not None else 0
+        sales_6m = result.sales_6m if result.sales_6m is not None else 0
+        sales_12m = result.sales_12m if result.sales_12m is not None else 0
+        sales_data_cell.value = f"今/昨/近7天: {today}/{yesterday}/{sales_7d}\n近1/6/12月: {sales_month}/{sales_6m}/{sales_12m}"
+        sales_data_cell.alignment = Alignment(wrap_text=True, vertical='center')
+
         # 写入4S价格（查不到时保持为空）
         cost_cell = self.ws.cell(row=row, column=self.COL_4S_COST)
         if result.price_4s_cost is not None:
@@ -148,14 +202,14 @@ class PurchaseHistoryExcelWriter:
         
         # 写入最低价列
         lowest_cell = self.ws.cell(row=row, column=self.COL_LOWEST)
-        if result.overall_lowest and result.overall_lowest[2] > 0:
+        if result.overall_lowest and result.overall_lowest[0]:
             lowest_cell.value = result.get_overall_lowest_text()
         else:
             lowest_cell.value = ""
         
         # 写入最高价列
         highest_cell = self.ws.cell(row=row, column=self.COL_HIGHEST)
-        if result.overall_highest and result.overall_highest[2] > 0:
+        if result.overall_highest and result.overall_highest[0]:
             highest_cell.value = result.get_overall_highest_text()
         else:
             highest_cell.value = ""
@@ -174,14 +228,23 @@ class PurchaseHistoryExcelWriter:
         self.ws.column_dimensions['E'].width = 20
         self.ws.column_dimensions['F'].width = 15
         self.ws.column_dimensions['G'].width = 20
+        # 新增列（从crmapp_beihuo表获取）
+        self.ws.column_dimensions['H'].width = 12  # 库存数量
+        self.ws.column_dimensions['I'].width = 15  # 标签
+        self.ws.column_dimensions['J'].width = 15  # 近1个月询价量
+        self.ws.column_dimensions['K'].width = 18  # 近3个月月均询价量
+        self.ws.column_dimensions['L'].width = 18  # 近6个月月均销量
+        self.ws.column_dimensions['M'].width = 18  # 全国近1个月询价量
+        self.ws.column_dimensions['N'].width = 20  # 全国近3个月月均询价量
+        self.ws.column_dimensions['O'].width = 20  # 销量数据(合并列)
         # 最低价最高价列
-        self.ws.column_dimensions['H'].width = 30
-        self.ws.column_dimensions['I'].width = 30
+        self.ws.column_dimensions['P'].width = 30
+        self.ws.column_dimensions['Q'].width = 30
         # 4s价格列
-        self.ws.column_dimensions['J'].width = 15
-        self.ws.column_dimensions['K'].width = 15
-        # 月份列 (L-W)
-        for col_letter in ['L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W']:
+        self.ws.column_dimensions['R'].width = 15
+        self.ws.column_dimensions['S'].width = 15
+        # 月份列 (T-AE)
+        for col_letter in ['T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE']:
             self.ws.column_dimensions[col_letter].width = 12
     
     def save(self, output_path: str):

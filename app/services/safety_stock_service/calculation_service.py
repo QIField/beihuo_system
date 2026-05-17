@@ -30,10 +30,10 @@ class SafetyStockCalculator:
         ABC分类 - 按销量降序排列，分为A(20%)、B(60%)、C(20%)
         
         Args:
-            products_sales: 产品销量列表，每项包含 {'oe': str, 'brand': str, 'total_sales': float}
+            products_sales: 产品销量列表，每项包含 {'frey_no': str, 'total_sales': float}
         
         Returns:
-            字典，key为 "oe|brand"，value为分类 'A'/'B'/'C'
+            字典，key为 "frey_no"，value为分类 'A'/'B'/'C'
         """
         if not products_sales:
             return {}
@@ -47,13 +47,13 @@ class SafetyStockCalculator:
         b_count = int(total * self.abc_config['B']['percent'])
         
         for i, prod in enumerate(sorted_products):
-            oe_brand = f"{prod['oe']}|{prod['brand']}"
+            key = prod['frey_no']
             if i < a_count:
-                abc_classes[oe_brand] = 'A'
+                abc_classes[key] = 'A'
             elif i < a_count + b_count:
-                abc_classes[oe_brand] = 'B'
+                abc_classes[key] = 'B'
             else:
-                abc_classes[oe_brand] = 'C'
+                abc_classes[key] = 'C'
                 
         return abc_classes
     
@@ -210,8 +210,7 @@ class SafetyStockCalculator:
         # 1. 获取所有产品的销量列表，用于ABC分类
         products_list = [
             {
-                'oe': data['oe'],
-                'brand': data['brand'],
+                'frey_no': data['frey_no'],
                 'total_sales': data['total_sales']
             }
             for key, data in product_sales_data.items()
