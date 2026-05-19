@@ -142,9 +142,11 @@ def init_ks_bill_monitor():
             minutes=1,
             replace_existing=True
         )
+        print("[开思自动对单] 定时任务已注册（每分钟）")
 
     except Exception as e:
         logger.error(f"[开思自动对单] 失败: {e}")
+        raise
 
 
 def init_zhuozhixing_sync():

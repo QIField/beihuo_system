@@ -5,8 +5,9 @@
 
 from .daily_crawl_pipeline import execute_daily_pipeline
 from .beihuo_tasks import register_beihuo_tasks
-from .data_gzbbr_token_task import data_gzbbr_token_register
+from .openapi_gzbbr_token_task import openapi_gzbbr_token_register
 from .crm_data_sync_task import register_crm_data_sync_tasks
+from .safety_stock_tasks import register_safety_stock_tasks
 from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
 
 
@@ -21,7 +22,7 @@ def register_all_tasks(task_manager):
     register_beihuo_tasks(task_manager)
     
     # 2. 注册 B2B Token 刷新定时任务
-    data_gzbbr_token_register(task_manager)
+    openapi_gzbbr_token_register(task_manager)
     
     # 3. 注册开思商家数据同步定时任务
     register_ks_merchant_tasks()

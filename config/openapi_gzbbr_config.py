@@ -13,11 +13,11 @@ B2B_CONFIG = {
 
 # 公司代码与 config_key 映射
 COMPANY_KEY_MAP = {
-    'fsbbr': 'data_gzbbr_com_fs',
-    'zhbbr': 'data_gzbbr_com_zh',
-    'zsbbr': 'data_gzbbr_com_zs',
-    'dgby': 'data_gzbbr_com_by',
-    'dghf': 'data_gzbbr_com_hf'
+    'fsbbr': 'openapi_gzbbr_com_fs',
+    'zhbbr': 'openapi_gzbbr_com_zh',
+    'zsbbr': 'openapi_gzbbr_com_zs',
+    'dgby': 'openapi_gzbbr_com_by',
+    'dghf': 'openapi_gzbbr_com_hf'
 }
 
 

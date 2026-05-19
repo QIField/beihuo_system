@@ -1,9 +1,9 @@
 """B2B Token 刷新定时任务"""
 from datetime import datetime
-from config.data_gzbbr_config import COMPANY_KEY_MAP, get_b2b_token, save_b2b_token
+from config.openapi_gzbbr_config import COMPANY_KEY_MAP, get_b2b_token, save_b2b_token
 
 
-def data_gzbbr_token_task():
+def openapi_gzbbr_token_task():
     """刷新所有公司 token 并保存到数据库"""
     print(f"\n[Token刷新] 开始 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
@@ -16,12 +16,12 @@ def data_gzbbr_token_task():
             print(f"[{company}] 失败: {e}")
 
 
-def data_gzbbr_token_register(task_manager):
+def openapi_gzbbr_token_register(task_manager):
     """注册定时任务（每6小时）"""
     task_manager.schedule(
-        data_gzbbr_token_task,
+        openapi_gzbbr_token_task,
         'cron',
-        'data_gzbbr_token_task',
+        'openapi_gzbbr_token_task',
         hour='*/6',
         minute=0,
         replace_existing=True
@@ -29,4 +29,4 @@ def data_gzbbr_token_register(task_manager):
 
 
 if __name__ == '__main__':
-    data_gzbbr_token_task()
+    openapi_gzbbr_token_task()

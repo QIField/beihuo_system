@@ -1752,11 +1752,11 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         
         # 公司代码转 config_key
         company_map = {
-            'fsbbr': 'data_gzbbr_com_fs',
-            'zhbbr': 'data_gzbbr_com_zh',
-            'zsbbr': 'data_gzbbr_com_zs',
-            'dgby': 'data_gzbbr_com_by',
-            'dghf': 'data_gzbbr_com_hf'
+            'fsbbr': 'openapi_gzbbr_com_fs',
+            'zhbbr': 'openapi_gzbbr_com_zh',
+            'zsbbr': 'openapi_gzbbr_com_zs',
+            'dgby': 'openapi_gzbbr_com_by',
+            'dghf': 'openapi_gzbbr_com_hf'
         }
         
         config_key = company_map.get(company)

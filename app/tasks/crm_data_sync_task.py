@@ -20,16 +20,16 @@ def run_crm_data_sync():
 def register_crm_data_sync_tasks(task_manager):
     """
     注册CRM数据同步定时任务
-    
+
     Args:
         task_manager: 任务管理器实例
     """
-    task_manager.add_job(
+    task_manager.schedule(
         run_crm_data_sync,
         'cron',
+        'crm_data_sync',
         day=1,
         hour=0,
         minute=0,
-        id='crm_data_sync',
-        name='CRM数据同步'
+        replace_existing=True
     )

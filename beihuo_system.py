@@ -4543,8 +4543,10 @@ def init_background_tasks():
 
         print("[系统] 定时任务已启动")
 
-    except:
-        pass
+    except Exception as e:
+        print(f"[系统] 定时任务初始化失败: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 
