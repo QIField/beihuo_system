@@ -9,14 +9,96 @@
                 </div>
             </div>
             <div class="layui-inline">
-                <button class="layui-btn" id="searchBtn">查询</button>
-                <button class="layui-btn layui-btn-primary" id="resetBtn">重置</button>
+                <label class="layui-form-label" style="width: 80px;">选择群</label>
+                <div class="layui-input-inline" style="width: auto;">
+                    <button class="layui-btn layui-btn-primary" id="groupnameBtn">
+                        <span>全部</span>
+                        <i class="layui-icon layui-icon-down layui-font-12"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">业务员</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="text" name="nickname" id="nickname" placeholder="输入业务员名称" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">成交状态</label>
+                <div class="layui-input-inline" style="width: auto;">
+                    <button class="layui-btn layui-btn-primary" id="dealStatusBtn">
+                        <span>全部</span>
+                        <i class="layui-icon layui-icon-down layui-font-12"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="layui-inline">
+                <button class="layui-btn" id="searchBtn">
+                    <i class="layui-icon layui-icon-search"></i> 查询
+                </button>
+                <button class="layui-btn layui-btn-primary" id="resetBtn">
+                    <i class="layui-icon layui-icon-refresh"></i> 重置
+                </button>
+                <button class="layui-btn layui-btn-warm" id="updateDataBtn">
+                    <i class="layui-icon layui-icon-upload-drag"></i> 更新数据
+                </button>
+                <button class="layui-btn layui-btn-normal" id="autoUpdateDealBtn">
+                    <i class="layui-icon layui-icon-template-1"></i> 自动匹配成交
+                </button>
             </div>
         </div>
-        <br>
         <table id="weixinDecodingResultTable" lay-filter="weixinDecodingResultTable"></table>
     </div>
 </div>
+
+<script type="text/html" id="tableToolBar">
+  <div class="layui-clear-space">
+    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+  </div>
+</script>
+
+<script type="text/html" id="editFormTemplate">
+  <div style="padding: 20px;">
+    <form class="layui-form" lay-filter="editForm">
+     
+      <div class="layui-form-item">
+        <label class="layui-form-label">成交客户</label>
+        <div class="layui-input-block">
+          <input type="text" name="deal_customer" value="" placeholder="请输入成交客户" autocomplete="off" class="layui-input" id="customerInput">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">成交品牌</label>
+        <div class="layui-input-block">
+          <input type="text" name="deal_brand" value="" placeholder="请输入成交品牌" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">成交金额</label>
+        <div class="layui-input-block">
+          <input type="text" name="deal_amount" value="" placeholder="请输入成交金额" autocomplete="off" class="layui-input">
+        </div>
+      </div>
+      
+       <div class="layui-form-item">
+        <label class="layui-form-label">成交状态</label>
+        <div class="layui-input-block">
+          <select name="deal_status" lay-verify="required">
+            <option value="0">未知</option>
+            <option value="1">成交</option>
+            <option value="2">未成交</option>
+          </select>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <div class="layui-input-block">
+          <button type="button" class="layui-btn" lay-submit lay-filter="saveEdit">保存</button>
+          <button type="button" class="layui-btn layui-btn-primary" lay-submit lay-filter="cancelEdit">取消</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</script>
 
 <style>
 /* 强制表格单元格不限制高度 */
@@ -33,24 +115,32 @@
 </style>
 
 <script>
-layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
+layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(){
     const table = layui.table;
     const layer = layui.layer;
     const form = layui.form;
     const $ = layui.jquery;
     const laydate = layui.laydate;
+    const dropdown = layui.dropdown;
+    
+    let currentGroupname = '全部';
+    let groupnameList = [];
+    let currentDealStatus = '';
+    let dealStatusList = [
+        {title: '全部', id: ''},
+        {title: '未知', id: '0'},
+        {title: '成交', id: '1'},
+        {title: '未成交', id: '2'}
+    ];
     
     // 原生JS合并单元格函数
-    function mergeCellsByField(fieldName, colspan) {
-        // 获取表格body
+    function mergeCellsByField(fieldName) {
         var tableBody = document.querySelector('#weixinDecodingResultTable + .layui-table-view .layui-table-body table');
         if (!tableBody) return;
         
-        // 获取所有行
         var rows = tableBody.querySelectorAll('tr');
         if (rows.length === 0) return;
         
-        // 遍历每一行，找到需要合并的单元格
         for (var i = 0; i < rows.length; ) {
             var currentRow = rows[i];
             var currentCell = currentRow.querySelector('td[data-field="' + fieldName + '"]');
@@ -60,7 +150,6 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
                 continue;
             }
             
-            // 获取当前行的rowId（存储在data属性中或通过LAY_TABLE_INDEX获取）
             var rowData = table.cache['weixinDecodingResultTable'][i];
             var currentRowId = rowData ? rowData['rowId'] : null;
             
@@ -69,7 +158,6 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
                 continue;
             }
             
-            // 计算有多少连续的相同rowId
             var rowspanCount = 1;
             for (var j = i + 1; j < rows.length; j++) {
                 var nextRowData = table.cache['weixinDecodingResultTable'][j];
@@ -82,13 +170,10 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
                 }
             }
             
-            // 如果有多行需要合并
             if (rowspanCount > 1) {
-                // 设置当前单元格的rowspan
                 currentCell.setAttribute('rowspan', rowspanCount);
                 currentCell.style.verticalAlign = 'middle';
                 
-                // 隐藏后续行的对应单元格
                 for (var k = i + 1; k < i + rowspanCount; k++) {
                     var nextRow = rows[k];
                     var nextCell = nextRow.querySelector('td[data-field="' + fieldName + '"]');
@@ -98,8 +183,36 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
                 }
             }
             
-            // 跳过已经处理的行
             i += rowspanCount;
+        }
+    }
+    
+    // 固定操作列
+    function fixOperationColumn() {
+        var tableView = document.querySelector('#weixinDecodingResultTable + .layui-table-view');
+        if (!tableView) return;
+        
+        var tableBody = tableView.querySelector('.layui-table-body');
+        if (!tableBody) return;
+        
+        var operationCells = tableBody.querySelectorAll('td[data-field="operation"]');
+        operationCells.forEach(function(cell) {
+            cell.style.position = 'sticky';
+            cell.style.right = '0';
+            cell.style.zIndex = '2';
+            cell.style.backgroundColor = '#fff';
+        });
+        
+        // 同步表头
+        var tableHeader = tableView.querySelector('.layui-table-header');
+        if (tableHeader) {
+            var headerCell = tableHeader.querySelector('th[data-field="operation"]');
+            if (headerCell) {
+                headerCell.style.position = 'sticky';
+                headerCell.style.right = '0';
+                headerCell.style.zIndex = '2';
+                headerCell.style.backgroundColor = '#f2f2f2';
+            }
         }
     }
     
@@ -115,6 +228,54 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
     const todayDate = getTodayDate();
     $('#date').val(todayDate);
     
+    // 加载群名称列表
+    function loadGroupnameList() {
+        $.ajax({
+            url: '/new/api/report_wx_quote_data/groupname_list_api',
+            type: 'GET',
+            success: function(res) {
+                if (res.code === 200 && res.data) {
+                    groupnameList = [{title: '全部', id: '全部'}];
+                    res.data.forEach(function(groupname) {
+                        groupnameList.push({title: groupname, id: groupname});
+                    });
+                    initGroupnameDropdown();
+                }
+            }
+        });
+    }
+    
+    // 初始化群名称下拉框
+    function initGroupnameDropdown() {
+        dropdown.render({
+            elem: '#groupnameBtn',
+            data: groupnameList,
+            click: function(obj){
+                this.elem.find('span').text(obj.title);
+                currentGroupname = obj.id;
+                reloadTable();
+            }
+        });
+    }
+    
+    // 初始化成交状态下拉框
+    function initDealStatusDropdown() {
+        dropdown.render({
+            elem: '#dealStatusBtn',
+            data: dealStatusList,
+            click: function(obj){
+                this.elem.find('span').text(obj.title);
+                currentDealStatus = obj.id;
+                reloadTable();
+            }
+        });
+    }
+    
+    // 加载群名称列表
+    loadGroupnameList();
+    // 初始化成交状态下拉框
+    initDealStatusDropdown();
+    
     // 渲染日期选择器
     laydate.render({
         elem: '#date',
@@ -128,46 +289,69 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
         url: '/new/api/report_wx_quote_data/weixin_decoding_result_list_api',
         method: 'get',
         page: true,
-        limits: [5,10, 20, 50, 100],
+        limits: [5, 10, 20, 50, 100],
         limit: 5,
         request: {
             pageName: 'page',
             limitName: 'limit'
         },
         where: {
-            // 默认显示当天数据
             start_date: todayDate,
-            end_date: todayDate
+            end_date: todayDate,
+            groupname: '全部',
+            nickname: $('#nickname').val(),
+            deal_status: currentDealStatus
         },
         parseData: function(res){
-            // 把数据展开，每个 resultDetail 变成一行
             const originalData = res.data.result || [];
             const expandedData = [];
+            
+            // 截取日期格式：2026-01-10 18:02:20 -> 2026-01-10
+            function formatDate(dateStr) {
+                if (!dateStr) return '';
+                return dateStr.split(' ')[0];
+            }
             
             originalData.forEach(function(record) {
                 const resultDetails = record.result_details || [];
                 
                 if (resultDetails.length === 0) {
-                    // 没有 result_details，添加一行空数据
                     expandedData.push({
+                        quote_number: null,
+                        weixin_decoding_result_id: record.id,
                         rowId: record.id,
-                        create_time: record.create_time,
+                        create_time: formatDate(record.create_time),
                         groupname: record.groupname,
                         nickname: record.nickname,
                         content: record.content,
-                        quote: '',
+                        part_name: '',
+                        oe_code: '',
+                        quote_info: '',
+                        item: '',
+                        deal_customer: '',
+                        deal_brand: '',
+                        deal_amount: '',
+                        deal_status: 0,
                         is_out_of_stock: false
                     });
                 } else {
-                    // 有 result_details，每个 detail 一行
                     resultDetails.forEach(function(detail) {
                         expandedData.push({
+                            quote_number: detail.quote_number,
+                            weixin_decoding_result_id: record.id,
                             rowId: record.id,
-                            create_time: record.create_time,
+                            create_time: formatDate(record.create_time),
                             groupname: record.groupname,
                             nickname: record.nickname,
                             content: record.content,
-                            quote: detail.item,
+                            item: detail.item,
+                            part_name: detail.part_name,
+                            oe_code: detail.oe_code,
+                            quote_info: detail.quote_info,
+                            deal_customer: detail.deal_customer || '',
+                            deal_brand: detail.deal_brand || '',
+                            deal_amount: detail.deal_amount || '',
+                            deal_status: detail.deal_status !== undefined ? detail.deal_status : 0,
                             is_out_of_stock: detail.is_out_of_stock
                         });
                     });
@@ -186,7 +370,18 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
             {field: 'groupname', title: '群名称', width: 160},
             {field: 'nickname', title: '用户', width: 160},
             {field: 'content', title: '询价', minWidth: 100},
-            {field: 'quote', title: '报价', minWidth: 200},
+            {field: 'part_name', title: '配件名称', width: 200},
+            {field: 'oe_code', title: 'OE码', width: 150},
+            {
+                field: 'quote_info', 
+                title: '品牌价格', 
+                width: 300,
+                templet: function(d) {
+                    if (!d.quote_info) return '';
+                    return d.quote_info.split(/\s*\/\s*/).join('<br>');
+                }
+            },
+            {field: 'item', title: '原始报价', minWidth: 300},
             {
                 title: '缺货', 
                 width: 80, 
@@ -196,32 +391,67 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
                     return '<span style="color: ' + color + ';">' + text + '</span>';
                 }
             },
-            {field: 't1', title: '成交客户', minWidth: 120},
-            {field: 't2', title: '成交品牌', minWidth: 120},
-            {field: 't3', title: '成交金额', minWidth: 120},
+            {
+                title: '成交状态', 
+                width: 100, 
+                templet: function(d){
+                    const statusMap = {0: '未知', 1: '成交', 2: '未成交'};
+                    const colorMap = {0: 'gray', 1: 'green', 2: 'red'};
+                    const status = d.deal_status !== undefined ? d.deal_status : 0;
+                    const color = colorMap[status];
+                    const text = statusMap[status];
+                    return '<span style="color: ' + color + ';">' + text + '</span>';
+                }
+            },
+            {field: 'deal_customer', title: '成交客户', minWidth: 120},
+            {field: 'deal_brand', title: '成交品牌', minWidth: 120},
+            {field: 'deal_amount', title: '成交金额', minWidth: 120, templet: function(d){
+                if(d.deal_amount){
+                    return d.deal_amount;
+                }
+                return '';
+            }},
+            {field: 'operation', title: '操作', width: 100, templet: '#tableToolBar'}
         ]],
+        height: 'full-250',
         done: function(res, curr, count) {
-            // 延迟执行合并，确保DOM渲染完成
             setTimeout(function() {
-                // 使用原生JS合并前4列
-                mergeCellsByField('create_time'); // 创建日期
-                mergeCellsByField('groupname');   // 群名称
-                mergeCellsByField('nickname');    // 用户
-                mergeCellsByField('content');     // 询价
+                mergeCellsByField('create_time');
+                mergeCellsByField('groupname');
+                mergeCellsByField('nickname');
+                mergeCellsByField('content');
+                fixOperationColumn();
             }, 100);
         }
     });
     
-    // 刷新表格
+    // 刷新表格（回到第一页）
     function reloadTable(){
         const selectedDate = $('#date').val();
         table.reload('weixinDecodingResultTable', {
             where: {
                 start_date: selectedDate,
-                end_date: selectedDate
+                end_date: selectedDate,
+                groupname: currentGroupname,
+                nickname: $('#nickname').val(),
+                deal_status: currentDealStatus
             },
             page: {
                 curr: 1
+            }
+        });
+    }
+    
+    // 刷新当前页（保持当前页码）
+    function reloadCurrentPage(){
+        const selectedDate = $('#date').val();
+        table.reload('weixinDecodingResultTable', {
+            where: {
+                start_date: selectedDate,
+                end_date: selectedDate,
+                groupname: currentGroupname,
+                nickname: $('#nickname').val(),
+                deal_status: currentDealStatus
             }
         });
     }
@@ -231,11 +461,237 @@ layui.use(['table', 'layer', 'form', 'jquery', 'laydate'], function(){
         reloadTable();
     });
     
-    // 重置按钮 - 恢复当天日期
+    // 重置按钮 - 恢复当天日期和全部群、清空业务员、清空成交状态
     $('#resetBtn').off().on('click', function(){
         const today = getTodayDate();
         $('#date').val(today);
+        $('#groupnameBtn span').text('全部');
+        currentGroupname = '全部';
+        $('#nickname').val('');
+        $('#dealStatusBtn span').text('全部');
+        currentDealStatus = '';
         reloadTable();
+    });
+    
+    // 更新数据按钮
+    $('#updateDataBtn').off().on('click', function(){
+        const selectedDate = $('#date').val();
+        
+        if (!selectedDate) {
+            layer.msg('请先选择日期', {icon: 2});
+            return;
+        }
+        
+        layer.confirm('确定要更新日期为 ' + selectedDate + ' 的数据吗？', {
+            icon: 3,
+            title: '确认更新'
+        }, function(index){
+            layer.close(index);
+            
+            // 显示加载层
+            const loadingIndex = layer.load(1, {
+                shade: [0.3, '#000']
+            });
+            
+            $.ajax({
+                url: '/new/api/report_wx_quote_data/fetch_data_and_save_to_database',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    start_date: selectedDate,
+                    end_date: selectedDate
+                }),
+                success: function(res) {
+                    layer.close(loadingIndex);
+                    if (res.code === 200) {
+                        layer.msg('数据更新成功', {icon: 1});
+                        // 刷新表格
+                        reloadTable();
+                    } else {
+                        layer.msg(res.msg || '数据更新失败', {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error) {
+                    layer.close(loadingIndex);
+                    layer.msg('数据更新失败: ' + error, {icon: 2});
+                }
+            });
+        });
+    });
+    
+    // 自动匹配成交按钮
+    $('#autoUpdateDealBtn').off().on('click', function(){
+        const selectedDate = $('#date').val();
+        
+        if (!selectedDate) {
+            layer.msg('请先选择日期', {icon: 2});
+            return;
+        }
+        
+        layer.confirm('确定要对 ' + selectedDate + ' 的数据自动匹配成交信息吗？<br><br>处理规则：<br>1. 缺货的记录直接标记为未成交<br>2. 根据 OE 码和日期从 crmapp_sales_history_detail 表查找匹配记录<br>3. 找到且仅找到 1 条匹配记录时，自动回填成交信息（标记为成交）<br>4. 未找到匹配记录时，标记为未成交<br>5. 找到多条匹配记录时，保持状态不变<br>6. 无 OE 码的记录跳过处理', {
+            icon: 3,
+            title: '确认自动匹配'
+        }, function(index){
+            layer.close(index);
+            
+            // 显示加载层
+            const loadingIndex = layer.load(1, {
+                shade: [0.3, '#000']
+            });
+            
+            $.ajax({
+                url: '/new/api/report_wx_quote_data/batch_get_update_deal_info',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    start_date: selectedDate,
+                    end_date: selectedDate
+                }),
+                success: function(res) {
+                    layer.close(loadingIndex);
+                    if (res.code === 200) {
+                        const stats = res.data || {};
+                        const msg = `自动匹配成交完成！<br><br>总记录数：${stats.total || 0}<br>成功更新：${stats.updated || 0}<br>未找到匹配：${stats.not_found || 0}<br>多条匹配：${stats.multi_found || 0}<br>无OE码：${stats.no_oe_code || 0}<br>失败：${stats.failed || 0}`;
+                        layer.alert(msg, {icon: 1, title: '处理完成'});
+                        // 刷新表格
+                        reloadTable();
+                    } else {
+                        layer.msg(res.msg || '自动匹配成交失败', {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error) {
+                    layer.close(loadingIndex);
+                    layer.msg('自动匹配成交失败: ' + error, {icon: 2});
+                }
+            });
+        });
+    });
+    
+    // 表格工具事件监听
+    table.on('tool(weixinDecodingResultTable)', function(obj){
+        const data = obj.data;
+        
+        if(obj.event === 'edit'){
+            // 先请求获取客户数据，再打开弹窗
+            $.ajax({
+                url: '/new/api/report_wx_quote_data/get_customer_list_api',
+                type: 'GET',
+                data: {
+                    oe_code: data.oe_code || '',
+                    row_id: data.rowId || '',
+                    create_date: data.create_time || ''
+                },
+                success: function(res){
+                    // 打开编辑弹窗
+                    layer.open({
+                        title: '编辑报价明细 - ID: ' + data.rowId,
+                        type: 1,
+                        area: ['800px', '600px'],
+                        content: $('#editFormTemplate').html(),
+                        success: function(layero, index){
+                            // 设置表单值
+                            layero.find('select[name="deal_status"]').val(data.deal_status !== undefined ? data.deal_status : 0);
+                            layero.find('input[name="deal_customer"]').val(data.deal_customer || '');
+                            layero.find('input[name="deal_brand"]').val(data.deal_brand || '');
+                            layero.find('input[name="deal_amount"]').val(data.deal_amount || '');
+                            
+                            // 渲染表单
+                            form.render();
+                            
+                            // 成交客户选择 - 使用 dropdown 组件
+                            const customerInput = layero.find('#customerInput');
+                            
+                            // 从API返回获取客户数据
+                            let customerData = [];
+                            if(res.code === 200 && res.data && res.data.length > 0){
+                                // 转换数据格式，添加title字段供dropdown使用
+                                customerData = res.data.map(function(item){
+                                    return {
+                                        id: item.id,
+                                        title: item.fullname,
+                                        fullname: item.fullname,
+                                        total_price: item.total_price,
+                                        brand_name: item.brand_name
+                                    };
+                                });
+                            }
+                            
+                            // 输入框点击时显示下拉选择
+                            customerInput.on('click', function(){
+                                if(customerData.length > 0){
+                                    dropdown.render({
+                                        elem: customerInput,
+                                        data: customerData,
+                                        show: true,
+                                        click: function(obj){
+                                        customerInput.val(obj.fullname);
+                                        layero.find('input[name="deal_brand"]').val(obj.brand_name || '');
+                                        layero.find('input[name="deal_amount"]').val(obj.total_price || '');
+                                        layero.find('select[name="deal_status"]').val(1);  // 选择客户后自动设置为成交
+                                        form.render();  // 重新渲染表单
+                                        dropdown.close(customerInput);
+                                    }
+                                    });
+                                } else {
+                                    layer.msg('暂无客户数据');
+                                }
+                            });
+                            
+                            // 保存按钮事件
+                            form.on('submit(saveEdit)', function(formData){
+                                if(data.quote_number === null || data.weixin_decoding_result_id === null){
+                                    layer.msg('缺少必要参数，无法保存');
+                                    return false;
+                                }
+                                
+                                // 获取表单数据
+                                const deal_status = parseInt(layero.find('select[name="deal_status"]').val());
+                                const deal_customer = layero.find('input[name="deal_customer"]').val();
+                                const deal_brand = layero.find('input[name="deal_brand"]').val();
+                                const deal_amount = layero.find('input[name="deal_amount"]').val();
+                                
+                                // 调用API保存
+                                $.ajax({
+                                    url: '/new/api/report_wx_quote_data/update_deal_info',
+                                    type: 'POST',
+                                    contentType: 'application/json',
+                                    data: JSON.stringify({
+                                        quote_number: data.quote_number,
+                                        weixin_decoding_result_id: data.weixin_decoding_result_id,
+                                        deal_status: deal_status,
+                                        deal_customer: deal_customer,
+                                        deal_brand: deal_brand,
+                                        deal_amount: deal_amount
+                                    }),
+                                    success: function(res){
+                                        if(res.code === 200){
+                                            layer.msg('保存成功');
+                                            layer.close(index);
+                                            reloadCurrentPage();
+                                        } else {
+                                            layer.msg(res.msg || '保存失败');
+                                        }
+                                    },
+                                    error: function(){
+                                        layer.msg('保存失败');
+                                    }
+                                });
+                                
+                                return false;
+                            });
+                            
+                            // 取消按钮事件
+                            form.on('submit(cancelEdit)', function(){
+                                layer.close(index);
+                            });
+                        }
+                    });
+                },
+                error: function(){
+                    layer.msg('获取客户数据失败');
+                }
+            });
+        }
     });
 });
 </script>

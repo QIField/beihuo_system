@@ -101,6 +101,107 @@
             line-height: 1.8;
             white-space: pre-wrap;
         }
+        /* 结果卡片列表样式 */
+        .result-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 8px;
+        }
+        .result-item {
+            background: #ffffff;
+            border-radius: 6px;
+            padding: 12px 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e6eb;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .result-item-index {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            background: #4e6ef2;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .result-item-content {
+            font-size: 14px;
+            color: #1d2129;
+            line-height: 1.6;
+            word-break: break-all;
+            flex: 1;
+        }
+        .error-content {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            border-radius: 8px;
+            padding: 20px;
+            color: #ff4d4f;
+            font-size: 15px;
+            line-height: 1.8;
+            word-break: break-all;
+        }
+        /* 分页样式 */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e6eb;
+            flex-wrap: wrap;
+        }
+        .pagination-btn {
+            padding: 6px 12px;
+            border: 1px solid #e5e6eb;
+            background: #ffffff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #1d2129;
+            transition: all 0.2s;
+        }
+        .pagination-btn:hover:not(:disabled) {
+            border-color: #4e6ef2;
+            color: #4e6ef2;
+        }
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pagination-btn.active {
+            background: #4e6ef2;
+            color: white;
+            border-color: #4e6ef2;
+        }
+        .pagination-info {
+            font-size: 13px;
+            color: #86909c;
+            margin: 0 10px;
+        }
+        .pagination-select {
+            padding: 5px 8px;
+            border: 1px solid #e5e6eb;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #1d2129;
+            background: #ffffff;
+            cursor: pointer;
+        }
+        .pagination-select:focus {
+            outline: none;
+            border-color: #4e6ef2;
+        }
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
@@ -255,6 +356,88 @@
     </div>
 
 <script>
+// 全局分页变量
+let currentPageData = null;  // 当前所有数据
+let currentPage = 1;         // 当前页码
+let pageSize = 10;           // 每页显示数量
+
+/**
+ * 渲染分页数据
+ */
+function renderPageData() {
+    if (!currentPageData || !Array.isArray(currentPageData)) {
+        return;
+    }
+    
+    const totalPages = Math.ceil(currentPageData.length / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageData = currentPageData.slice(startIndex, endIndex);
+    
+    // 渲染当前页数据
+    let html = '<div class="result-list">';
+    pageData.forEach((item, index) => {
+        const globalIndex = startIndex + index;
+        html += '<div class="result-item">';
+        html += `<div class="result-item-index">${globalIndex + 1}</div>`;
+        html += `<div class="result-item-content">${typeof item === 'string' ? item : JSON.stringify(item, null, 2)}</div>`;
+        html += '</div>';
+    });
+    html += '</div>';
+    
+    // 渲染分页控件
+    html += '<div class="pagination">';
+    html += `<button class="pagination-btn" onclick="goToPage(1)" ${currentPage === 1 ? 'disabled' : ''}>首页</button>`;
+    html += `<button class="pagination-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>`;
+    
+    // 页码按钮（最多显示5个）
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) {
+        startPage = Math.max(1, endPage - 4);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="pagination-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+    }
+    
+    html += `<button class="pagination-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>下一页</button>`;
+    html += `<button class="pagination-btn" onclick="goToPage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}>末页</button>`;
+    html += `<span class="pagination-info">共 ${currentPageData.length} 条，第 ${currentPage}/${totalPages} 页</span>`;
+    
+    // 每页显示数量选择
+    html += `<select class="pagination-select" onchange="changePageSize(this.value)">`;
+    [5, 10, 20, 50, 100].forEach(size => {
+        html += `<option value="${size}" ${pageSize === size ? 'selected' : ''}>${size}条/页</option>`;
+    });
+    html += '</select>';
+    
+    html += '</div>';
+    
+    document.getElementById('resultArea').innerHTML = html;
+}
+
+/**
+ * 跳转到指定页
+ */
+function goToPage(page) {
+    if (!currentPageData) return;
+    const totalPages = Math.ceil(currentPageData.length / pageSize);
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    renderPageData();
+}
+
+/**
+ * 改变每页显示数量
+ */
+function changePageSize(size) {
+    if (!currentPageData) return;
+    pageSize = parseInt(size);
+    currentPage = 1;  // 回到第一页
+    renderPageData();
+}
+
 /**
  * 自动检查并显示统计数据
  */
@@ -438,7 +621,52 @@ async function queryData() {
         const statsContainer = document.getElementById('statsContainer');
         // 显示溯源结果时，隐藏统计区域
         statsContainer.style.display = 'none';
-        resultArea.innerText = JSON.stringify(result, null, 2);
+        
+        // 根据 success 字段判断显示方式
+        if (result.success) {
+            // 成功：显示卡片列表（带分页）
+            const data = result.data;
+            // 获取 res_list（优先使用 res_list）
+            const listData = (data && data.res_list) ? data.res_list : (Array.isArray(data) ? data : null);
+            
+            if (Array.isArray(listData) && listData.length > 0) {
+               
+               
+               //=================================
+                // let html = '<div class="result-list">';
+                // listData.forEach((item, index) => {
+                //     html += '<div class="result-item">';
+                //     html += `<div class="result-item-index">${index + 1}</div>`;
+                //     html += `<div class="result-item-content">${typeof item === 'string' ? item : JSON.stringify(item, null, 2)}</div>`;
+                //     html += '</div>';
+                // });
+                // html += '</div>';
+                // resultArea.innerHTML = html;
+               //=================================
+               
+               
+               
+               
+               
+               
+                // 设置分页数据并渲染
+                currentPageData = listData;
+                currentPage = 1;
+                renderPageData();
+            } else {
+                // 数据不是数组或为空
+                currentPageData = null;
+                resultArea.innerHTML = `<div class="result-item">
+                    <div class="result-item-content">${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}</div>
+                </div>`;
+            }
+        } else {
+            // 失败：显示错误信息（data字段）
+            resultArea.innerHTML = `<div class="error-content">
+                <strong>❌ 请求失败</strong><br><br>
+                ${result.data ? result.data : '未知错误'}
+            </div>`;
+        }
 
     } catch (error) {
         console.error('❌ 请求失败：', error);
