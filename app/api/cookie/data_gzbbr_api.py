@@ -49,6 +49,6 @@ def get_company_cookie(company):
         'data': {
             'company': company,
             'config_key': config_key,
-            'cookie': cookie
+            'token': cookie
         }
     })

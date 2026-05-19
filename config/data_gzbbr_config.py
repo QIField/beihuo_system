@@ -39,9 +39,13 @@ def get_b2b_token(company):
 def save_b2b_token(config_key, token):
     """保存 token 到数据库"""
     from app.utils.database_connection import db_execute
+    from config.config_list_manager.config_cache import refresh_sys_config
+    
     sql = """
         UPDATE beihuo_system_config 
         SET config_value = %s, updated_at = NOW() 
         WHERE config_key = %s
     """
     db_execute(sql, (token, config_key))
+    
+    refresh_sys_config(config_key)
