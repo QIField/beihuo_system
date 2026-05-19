@@ -55,10 +55,10 @@ def execute_daily_calculation():
         in_transit_data = SafetyStockDBService.get_in_transit_data(company=company)
         print(f"  ✓ 读取到 {len(in_transit_data)} 个产品的在途数据")
 
-        # 2.4 读取产品额外信息（替换号、产品等级、中文车型）
-        print(f"  → 读取产品额外信息...")
-        extra_data = SafetyStockDBService.get_product_extra_data(company=company)
-        print(f"  ✓ 读取到 {len(extra_data)} 个产品的额外信息")
+        # 2.4 读取产品主数据信息（oe、brand、product_name、替换号、产品等级、中文车型）
+        print(f"  → 读取产品主数据信息...")
+        master_data = SafetyStockDBService.get_product_master_data(company=company)
+        print(f"  ✓ 读取到 {len(master_data)} 个产品的主数据信息")
 
         # 2.5 计算安全库存
         print(f"  → 执行安全库存计算...")
@@ -75,14 +75,13 @@ def execute_daily_calculation():
             # 获取库存信息
             inv = inventory_data.get(key, {})
             current_stock = inv.get('stock_qty', 0)
-            product_name = inv.get('product_name', '')
             inventory_amount = inv.get('inventory_amount', 0)
 
             # 获取在途数量
             in_transit_qty = in_transit_data.get(key, 0)
 
-            # 获取额外信息
-            extra = extra_data.get(key, {})
+            # 获取产品主数据信息
+            master = master_data.get(key, {})
 
             # 计算可用库存
             available_stock = current_stock + in_transit_qty
@@ -98,16 +97,18 @@ def execute_daily_calculation():
             final_results.append({
                 **result,
                 'company': company,
-                'product_name': product_name,
+                'oe': master.get('oe', ''),
+                'brand': master.get('brand', ''),
+                'product_name': master.get('product_name', ''),
                 'current_stock': current_stock,
                 'in_transit_qty': in_transit_qty,
                 'available_stock': available_stock,
                 'inventory_amount': inventory_amount,
                 'stock_status': status_info['status'],
                 'sellable_days': status_info['sellable_days'],
-                'replace_number': extra.get('replace_number', ''),
-                'product_level': extra.get('product_level', ''),
-                'l_model_zh': extra.get('l_model_zh', '')
+                'replace_number': master.get('replace_number', ''),
+                'product_level': master.get('product_level', ''),
+                'l_model_zh': master.get('l_model_zh', '')
             })
 
         # 2.6 保存计算结果
@@ -158,10 +159,10 @@ def execute_calculation_for_company(company: str = 'fsbbr'):
     in_transit_data = SafetyStockDBService.get_in_transit_data(company=company)
     print(f"  ✓ 读取到 {len(in_transit_data)} 个产品的在途数据")
 
-    # 5. 读取产品额外信息（替换号、产品等级、中文车型）
-    print(f"  → 读取产品额外信息...")
-    extra_data = SafetyStockDBService.get_product_extra_data(company=company)
-    print(f"  ✓ 读取到 {len(extra_data)} 个产品的额外信息")
+    # 5. 读取产品主数据信息（oe、brand、product_name、替换号、产品等级、中文车型）
+    print(f"  → 读取产品主数据信息...")
+    master_data = SafetyStockDBService.get_product_master_data(company=company)
+    print(f"  ✓ 读取到 {len(master_data)} 个产品的主数据信息")
 
     # 6. 计算安全库存
     print("  → 执行安全库存计算...")
@@ -178,14 +179,13 @@ def execute_calculation_for_company(company: str = 'fsbbr'):
         # 获取库存信息
         inv = inventory_data.get(key, {})
         current_stock = inv.get('stock_qty', 0)
-        product_name = inv.get('product_name', '')
         inventory_amount = inv.get('inventory_amount', 0)
 
         # 获取在途数量
         in_transit_qty = in_transit_data.get(key, 0)
 
-        # 获取额外信息
-        extra = extra_data.get(key, {})
+        # 获取产品主数据信息
+        master = master_data.get(key, {})
 
         # 计算可用库存
         available_stock = current_stock + in_transit_qty
@@ -201,16 +201,18 @@ def execute_calculation_for_company(company: str = 'fsbbr'):
         final_results.append({
             **result,
             'company': company,
-            'product_name': product_name,
+            'oe': master.get('oe', ''),
+            'brand': master.get('brand', ''),
+            'product_name': master.get('product_name', ''),
             'current_stock': current_stock,
             'in_transit_qty': in_transit_qty,
             'available_stock': available_stock,
             'inventory_amount': inventory_amount,
             'stock_status': status_info['status'],
             'sellable_days': status_info['sellable_days'],
-            'replace_number': extra.get('replace_number', ''),
-            'product_level': extra.get('product_level', ''),
-            'l_model_zh': extra.get('l_model_zh', '')
+            'replace_number': master.get('replace_number', ''),
+            'product_level': master.get('product_level', ''),
+            'l_model_zh': master.get('l_model_zh', '')
         })
 
     # 7. 保存计算结果

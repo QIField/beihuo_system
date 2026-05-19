@@ -67,27 +67,23 @@ class SafetyStockDBService:
                 # 按frey_no分组统计
                 product_data = defaultdict(lambda: {
                     'frey_no': '',
-                    'oe': '',
-                    'brand': '',
                     'daily_sales': defaultdict(float),  # 按天统计销量
                     'monthly_sales': defaultdict(float),  # 按月统计销量
                     'total_sales': 0,
                     'sale_days': set()  # 有销售的天数
                 })
-                
+
                 for row in rows:
                     key = f"{row['frey_no']}"
                     # 在Python中处理日期格式化
                     create_date = row['create_date']
                     if isinstance(create_date, str):
                         create_date = datetime.strptime(create_date, '%Y-%m-%d %H:%M:%S')
-                    
+
                     sale_date = create_date.strftime('%Y-%m-%d')
                     year_month = create_date.strftime('%Y-%m')
-                    
+
                     product_data[key]['frey_no'] = row['frey_no']
-                    product_data[key]['oe'] = row['oe']
-                    product_data[key]['brand'] = row['brand']
                     product_data[key]['daily_sales'][sale_date] += float(row['quantity'] or 0)
                     product_data[key]['monthly_sales'][year_month] += float(row['quantity'] or 0)
                     product_data[key]['total_sales'] += float(row['quantity'] or 0)
@@ -118,8 +114,6 @@ class SafetyStockDBService:
                     
                     result[key] = {
                         'frey_no': data['frey_no'],
-                        'oe': data['oe'],
-                        'brand': data['brand'],
                         'total_sales': data['total_sales'],
                         'avg_daily': avg_daily,
                         'std_daily': std_daily,
@@ -148,9 +142,6 @@ class SafetyStockDBService:
                 sql = """
                     SELECT
                         物料条码 as frey_no,
-                        oe,
-                        品牌 as brand,
-                        物料名称 as product_name,
                         库存数量 as stock_qty,
                         库存金额 as inventory_amount
                     FROM crmapp_beihuo
@@ -161,13 +152,10 @@ class SafetyStockDBService:
                 cursor.execute(sql, (company,))
                 rows = cursor.fetchall()
 
-                # 按 frey_no 分组，合并同一物料条码下的多个 oe+品牌
+                # 按 frey_no 分组，累加库存
                 from collections import defaultdict
                 product_data = defaultdict(lambda: {
                     'frey_no': '',
-                    'oes': set(),
-                    'brands': set(),
-                    'product_name': '',
                     'stock_qty': 0,
                     'inventory_amount': 0
                 })
@@ -175,22 +163,14 @@ class SafetyStockDBService:
                 for row in rows:
                     key = f"{row['frey_no']}"
                     product_data[key]['frey_no'] = row['frey_no']
-                    if row['oe']:
-                        product_data[key]['oes'].add(row['oe'])
-                    if row['brand']:
-                        product_data[key]['brands'].add(row['brand'])
-                    product_data[key]['product_name'] = row['product_name']
                     product_data[key]['stock_qty'] += float(row['stock_qty'] or 0)
                     product_data[key]['inventory_amount'] += float(row['inventory_amount'] or 0)
 
-                # 转换为最终结果，oe 和 brand 用逗号分隔
+                # 转换为最终结果
                 result = {}
                 for key, data in product_data.items():
                     result[key] = {
                         'frey_no': data['frey_no'],
-                        'oe': ','.join(data['oes']) if data['oes'] else '',
-                        'brand': ','.join(data['brands']) if data['brands'] else '',
-                        'product_name': data['product_name'],
                         'stock_qty': data['stock_qty'],
                         'inventory_amount': data['inventory_amount']
                     }
@@ -251,15 +231,15 @@ class SafetyStockDBService:
             conn.close()
     
     @staticmethod
-    def get_product_extra_data(company: str = 'fsbbr') -> Dict[str, Dict]:
+    def get_product_master_data(company: str = 'fsbbr') -> Dict[str, Dict]:
         """
-        从crmapp_compare_summary读取产品额外信息
-        
+        从crmapp_compare_summary读取产品主数据信息
+
         Args:
             company: 组织代码，默认fsbbr
-            
+
         Returns:
-            字典，key为 "frey_no"，value包含replace_number, product_level, l_model_zh
+            字典，key为 "frey_no"，value包含oe, brand, product_name, replace_number, product_level, l_model_zh
         """
         conn = get_db_connection()
         try:
@@ -267,6 +247,9 @@ class SafetyStockDBService:
                 sql = """
                     SELECT
                         frey_no,
+                        oe,
+                        brand,
+                        product_name,
                         replace_number,
                         product_level,
                         l_model_zh
@@ -277,18 +260,21 @@ class SafetyStockDBService:
                 """
                 cursor.execute(sql, (company,))
                 rows = cursor.fetchall()
-                
+
                 result = {}
                 for row in rows:
                     key = f"{row['frey_no']}"
                     result[key] = {
+                        'oe': row.get('oe', ''),
+                        'brand': row.get('brand', ''),
+                        'product_name': row.get('product_name', ''),
                         'replace_number': row.get('replace_number', ''),
                         'product_level': row.get('product_level', ''),
                         'l_model_zh': row.get('l_model_zh', '')
                     }
-                
+
                 return result
-                
+
         finally:
             conn.close()
     

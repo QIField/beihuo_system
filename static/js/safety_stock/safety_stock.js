@@ -14,9 +14,6 @@ let currentFilter = {
     abc_class: ''
 };
 
-// 当前排序状态
-let currentSort = { field: null, direction: null };
-
 // 所有数据缓存
 let allData = [];
 
@@ -88,7 +85,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '在途',
@@ -98,7 +96,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '可用库存',
@@ -109,6 +108,7 @@ function initGrid() {
             resizable: true,
             cellClass: 'cell-number',
             valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB,
             cellStyle: function(params) {
                 if (params.value <= 0) {
                     return { color: '#cf1322', fontWeight: 'bold' };
@@ -124,7 +124,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '基础安全库存',
@@ -134,7 +135,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '季节系数',
@@ -147,7 +149,8 @@ function initGrid() {
             valueFormatter: function(params) {
                 if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
                 return parseFloat(params.value).toFixed(2);
-            }
+            },
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '调整后安全库存',
@@ -157,7 +160,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '库存下限',
@@ -167,7 +171,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '库存上限',
@@ -177,7 +182,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '可卖天数',
@@ -190,7 +196,8 @@ function initGrid() {
             valueFormatter: function(params) {
                 if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
                 return parseFloat(params.value).toFixed(1) + '天';
-            }
+            },
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '库存状态',
@@ -222,7 +229,8 @@ function initGrid() {
             valueFormatter: function(params) {
                 if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
                 return '¥' + parseFloat(params.value).toFixed(2);
-            }
+            },
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '替换号',
@@ -299,18 +307,6 @@ function initGrid() {
             // 初始化分页大小选择器和页码跳转器
             setTimeout(initPageSizeSelector, 500);
             setTimeout(initPageJumper, 600);
-        },
-        onSortChanged: function(params) {
-            const sortModel = params.api.getSortModel();
-            if (sortModel.length > 0) {
-                currentSort = {
-                    field: sortModel[0].colId,
-                    direction: sortModel[0].sort
-                };
-            } else {
-                currentSort = { field: null, direction: null };
-            }
-            applyFilter();
         }
     };
 
@@ -488,11 +484,6 @@ function applyFilter() {
         console.log('ABC分类筛选后数量:', filteredData.length);
     }
     
-    // 应用排序（对全部筛选后的数据排序）
-    if (currentSort.field && currentSort.direction) {
-        filteredData = sortData(filteredData, currentSort.field, currentSort.direction);
-    }
-    
     console.log('最终筛选结果数量:', filteredData.length);
     console.log('========================');
     
@@ -504,38 +495,7 @@ function applyFilter() {
     }
 }
 
-/**
- * 对数据进行排序
- * @param {Array} data - 要排序的数据
- * @param {string} field - 排序字段
- * @param {string} direction - 排序方向 'asc' 或 'desc'
- * @returns {Array} 排序后的数据
- */
-function sortData(data, field, direction) {
-    if (!field || !direction) return data;
-    
-    return [...data].sort((a, b) => {
-        let valA = a[field];
-        let valB = b[field];
-        
-        // 处理空值
-        if (valA === null || valA === undefined) valA = '';
-        if (valB === null || valB === undefined) valB = '';
-        
-        // 数字排序
-        if (typeof valA === 'number' && typeof valB === 'number') {
-            return direction === 'asc' ? valA - valB : valB - valA;
-        }
-        
-        // 字符串排序（不区分大小写）
-        const strA = String(valA).toLowerCase();
-        const strB = String(valB).toLowerCase();
-        
-        if (strA < strB) return direction === 'asc' ? -1 : 1;
-        if (strA > strB) return direction === 'asc' ? 1 : -1;
-        return 0;
-    });
-}
+
 
 /**
  * 执行计算
