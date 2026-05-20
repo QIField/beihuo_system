@@ -1,0 +1,324 @@
+<style>
+        /* 搜索区域 */
+        .search-panel {
+            background: #fff;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .search-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .search-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .search-item label {
+            font-size: 14px;
+            color: #595959;
+            white-space: nowrap;
+        }
+        
+        .search-item input,
+        .search-item select {
+            width: 160px;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .search-item input:focus,
+        .search-item select:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24,144,255,0.2);
+        }
+        
+        /* 按钮 */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-primary {
+            background: #1890ff;
+            color: #fff;
+        }
+        
+        .btn-primary:hover {
+            background: #40a9ff;
+        }
+        
+        .btn-success {
+            background: #52c41a;
+            color: #fff;
+        }
+        
+        .btn-success:hover {
+            background: #73d13d;
+        }
+        
+        .btn-default {
+            background: #fff;
+            color: #595959;
+            border: 1px solid #d9d9d9;
+        }
+        
+        .btn-default:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+        }
+        
+        /* 主内容区 */
+        .main-content {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        /* 工具栏 */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .toolbar-left {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .toolbar-right {
+            display: flex;
+            gap: 8px;
+        }
+        
+        /* 表格样式 */
+        .layui-table-view {
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #e8e8e8;
+        }
+        
+        .layui-table-header {
+            background-color: #fafafa;
+            border-bottom: 2px solid #e8e8e8;
+        }
+        
+        .layui-table th {
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+            padding: 10px 5px;
+        }
+        
+        .layui-table td {
+            padding: 6px 5px;
+            font-size: 13px;
+            height: 36px;
+            line-height: 1.5;
+        }
+        
+        .layui-table tbody tr:hover {
+            background-color: #f5f7fa;
+        }
+        
+        /* 操作按钮组 */
+        .action-btns {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        .action-btns .layui-btn {
+            margin: 0;
+            padding: 0 10px;
+            height: 26px;
+            line-height: 26px;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+</style>
+
+<!-- 搜索区域 -->
+<div class="search-panel">
+    <div class="search-row">
+        <div class="search-item">
+            <label>配件编号：</label>
+            <input type="text" id="partNumber" placeholder="请输入配件编号">
+        </div>
+        <div class="search-item">
+            <label>中文描述：</label>
+            <input type="text" id="descriptionCn" placeholder="请输入中文描述">
+        </div>
+        <div class="search-item">
+            <button class="btn btn-primary" id="searchBtn">
+                <i class="layui-icon layui-icon-search"></i> 查询
+            </button>
+            <button class="btn btn-default" id="resetBtn">
+                <i class="layui-icon layui-icon-refresh"></i> 重置
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 主内容区 -->
+<div class="main-content">
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <div class="toolbar-left">
+            <button class="btn btn-success" id="addBtn">
+                <i class="layui-icon layui-icon-add-1"></i> 添加配件
+            </button>
+        </div>
+        <div class="toolbar-right">
+            <span style="font-size: 14px; color: #595959;">共 <strong id="totalCount">0</strong> 条记录</span>
+        </div>
+    </div>
+    
+    <!-- 表格 -->
+    <table id="partsTable" lay-filter="partsTable"></table>
+</div>
+
+<script type="text/html" id="tableToolBar">
+  <div class="action-btns">
+    <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">查看</a>
+    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+    <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+  </div>
+</script>
+
+<script>
+layui.use(['table', 'layer', 'form', 'jquery'], function(){
+    const table = layui.table;
+    const layer = layui.layer;
+    const form = layui.form;
+    const $ = layui.jquery;
+    
+    // 渲染表格
+    table.render({
+        elem: '#partsTable',
+        id: 'partsTable',
+        url: '/new/api/car-parts/list',
+        method: 'get',
+        page: true,
+        limit: 10,
+        limits: [10, 20, 50, 100],
+        request: {
+            pageName: 'page',
+            limitName: 'page_size'
+        },
+        parseData: function(res){
+            if(res.code === 200){
+                return {
+                    "code": 0,
+                    "msg": res.msg,
+                    "count": res.data.total,
+                    "data": res.data.list
+                };
+            } else {
+                return {
+                    "code": res.code,
+                    "msg": res.msg,
+                    "count": 0,
+                    "data": []
+                };
+            }
+        },
+        cols: [[
+            {field: 'part_number', title: '配件编号', width: 180},
+            {field: 'description_cn', title: '中文描述', width: 200},
+            {field: 'descriptions', title: '英文描述', width: 200},
+            {field: 'brand', title: '品牌', width: 100},
+            {field: 'category', title: '分类', width: 120},
+            {field: 'wholesale_price', title: '批发价', width: 120, templet: function(d){
+                return d.wholesale_price ? '¥' + d.wholesale_price.toFixed(2) : '-';
+            }},
+            {field: 'msrp', title: '市场指导价', width: 120, templet: function(d){
+                return d.msrp ? '¥' + d.msrp.toFixed(2) : '-';
+            }},
+            {field: 'effective_date', title: '生效日期', width: 120},
+            {field: 'created_at', title: '创建时间', width: 180, templet: function(d){
+                return d.created_at || '-';
+            }},
+            {title: '操作', width: 200, fixed: 'right', align: 'center', templet: '#tableToolBar'}
+        ]],
+        done: function(res, curr, count){
+            if(res.code === 0){
+                $('#totalCount').text(count);
+            } else {
+                layer.msg(res.msg || '数据加载失败', {icon: 2});
+            }
+        }
+    });
+    
+    // 刷新表格
+    function reloadTable(){
+        table.reload('partsTable', {
+            page: {
+                curr: 1
+            },
+            where: {
+                part_number: $('#partNumber').val(),
+                description_cn: $('#descriptionCn').val()
+            }
+        });
+    }
+    
+    // 查询按钮
+    $('#searchBtn').on('click', function(){
+        reloadTable();
+    });
+    
+    // 重置按钮
+    $('#resetBtn').on('click', function(){
+        $('#partNumber').val('');
+        $('#descriptionCn').val('');
+        reloadTable();
+    });
+    
+    // 添加按钮
+    $('#addBtn').on('click', function(){
+        layer.msg('添加功能开发中...', {icon: 0});
+    });
+    
+    // 表格工具事件监听
+    table.on('tool(partsTable)', function(obj){
+        const data = obj.data;
+        
+        if(obj.event === 'detail'){
+            // 跳转到详情页
+            location.hash = '/detail?part_number=' + encodeURIComponent(data.part_number);
+        } else if(obj.event === 'edit'){
+            layer.msg('编辑功能开发中...', {icon: 0});
+        } else if(obj.event === 'del'){
+            layer.confirm('确定要删除该配件吗？', function(index){
+                layer.close(index);
+                layer.msg('删除成功', {icon: 1});
+            });
+        }
+    });
+});
+</script>

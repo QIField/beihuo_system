@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>汽车配件库</title>
+  <link rel="stylesheet" href="/static/layui/css/layui.css">
+  <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        /* 头部 */
+        .header {
+            background: #fff;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .header-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #262626;
+        }
+        
+        .header-subtitle {
+            font-size: 14px;
+            color: #8c8c8c;
+            margin-top: 4px;
+        }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 头部 -->
+    <div class="header">
+        <div>
+            <div class="header-title">汽车配件库</div>
+            <div class="header-subtitle">汽车配件管理与查询系统</div>
+        </div>
+    </div>
+    
+    <!-- 主内容区（路由视图出口） -->
+    <div id="main-view">
+      <!-- 页面内容动态加载 -->
+    </div>
+  </div>
+
+  <script src="/static/layui/layui.js"></script>
+  <script>
+  layui.use(['jquery', 'layer', 'table', 'form'], function(){
+    const $ = layui.jquery;
+
+    // 1. 路由表
+    const routes = {
+      '/list': '/web/car_parts_library/list',
+      '/detail': '/web/car_parts_library/detail'
+    };
+
+    // 2. 渲染视图函数
+    function renderView() {
+      const hash = location.hash.replace('#', '') || '/list';
+      // 处理带参数的路由，如 /detail?id=1
+      const basePath = hash.split('?')[0];
+      const url = routes[basePath];
+      if (!url) {
+        $('#main-view').html('<div>404 页面不存在</div>');
+        return;
+      }
+      // 加载HTML片段
+      $('#main-view').load(url, function(response, status, xhr) {
+        if (status === 'error') {
+          $('#main-view').html('<div>页面加载失败: ' + xhr.status + ' ' + xhr.statusText + '</div>');
+        }
+      });
+    }
+
+    // 3. 监听hash变化
+    window.addEventListener('hashchange', renderView);
+    renderView(); // 首次加载
+  });
+  </script>
+</body>
+</html>
