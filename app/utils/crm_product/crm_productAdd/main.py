@@ -566,14 +566,16 @@ def process_three_column_mode(session, product_df, alias_df, file_path):
     _save_excel_results(df, results, oe_col, file_path)
 
 
-def _process_with_loop(items, product_df, alias_df, db_manager=None):
+def _process_with_loop(items, product_df, alias_df, db_manager=None, progress_callback=None, progress_offset=0, total_items=None):
     """
     使用循环逐个处理（替代并发）
     避免多线程冲突，提高稳定性
+    支持进度回调
     """
     results = {}
     completed = 0
     total = len(items)
+    overall_total = total_items if total_items is not None else total
     
     for item in items:
         oe_number = item['oe_number']
@@ -589,6 +591,11 @@ def _process_with_loop(items, product_df, alias_df, db_manager=None):
         completed += 1
         if completed % 10 == 0 or completed == total:
             print(f"进度: {completed}/{total}")
+        
+        # 调用进度回调（每处理一条调用一次，保证实时性）
+        if progress_callback:
+            overall_progress = progress_offset + completed
+            progress_callback(overall_progress, overall_total, f"已处理 {completed}/{total}")
     
     print(f"\n处理完成: {total} 条")
     return results
@@ -1135,6 +1142,7 @@ def process_excel_async_wrapper(file_path: str, mode: str, progress_callback=Non
     
     # 计算总项目数
     total_items = sum(len(sheet['df']) for sheet in valid_sheets.values())
+    
     processed = 0
     all_results = {}
     
@@ -1163,13 +1171,11 @@ def process_excel_async_wrapper(file_path: str, mode: str, progress_callback=Non
                     item['brand_code'] = brand_code
                 items.append(item)
         
-        # 处理并更新进度
-        results = _process_with_loop(items, product_df, alias_df, None)
+        # 处理并更新进度（传递progress_callback实现实时更新）
+        results = _process_with_loop(items, product_df, alias_df, None, progress_callback, processed, total_items)
         all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
         
         processed += len(items)
-        if progress_callback:
-            progress_callback(processed, total_items, f"已处理工作表: {sheet_name}")
     
     # 保存结果
     result_path = _save_multi_sheet_results(all_results, file_path)

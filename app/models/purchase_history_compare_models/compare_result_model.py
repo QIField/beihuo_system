@@ -66,6 +66,23 @@ class OECompareResult:
     replace_name: Optional[str] = None            # 替换号
     price: Optional[float] = None                 # 价格/促销价（从导入文件读取）
     
+    # 从crmapp_beihuo表获取的字段
+    stock_quantity: Optional[int] = None          # 库存数量
+    tag: Optional[str] = None                     # 标签
+    inquiry_1m: Optional[int] = None              # 近1个月询价量
+    inquiry_3m_avg: Optional[int] = None          # 近3个月月均询价量
+    sales_6m_avg: Optional[int] = None            # 近6个月月均销量
+    inquiry_1m_national: Optional[int] = None     # 全国近1个月询价量
+    inquiry_3m_avg_national: Optional[int] = None # 全国近3个月月均询价量
+    
+    # 销量数据（用于合并列显示）
+    sales_today: Optional[int] = None             # 今日销量
+    sales_yesterday: Optional[int] = None         # 昨日销量
+    sales_7d: Optional[int] = None                # 近7天销量
+    sales_month: Optional[int] = None             # 本月销量
+    sales_6m: Optional[int] = None                # 近6个月销量
+    sales_12m: Optional[int] = None               # 近12个月销量
+    
     def __post_init__(self):
         """初始化后处理"""
         # 确保month_summaries的key是整数

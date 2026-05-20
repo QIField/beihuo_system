@@ -1747,41 +1747,26 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
             return obj
 
     def login(company):
-        config = {
-            'fsbbr': {
-                "AccessKeyId": "tdFsi8qAQVDz0PAotz56CNFJib3evY8H",
-                "AccessKeySecret": "wHsV0V1Fk7MJBQ8tcy6XTd4VhLMxgtEr9vZhDjU9yxrtDwyBTFE8QI0WQY3c7Npp"
-            },
-            'zhbbr': {
-                "AccessKeyId": "D6xZVa6tn3zK9vOxd7TGh6d5XLhHWoEe",
-                "AccessKeySecret": "DOYRvIlOHVParozgWaS3I79BgKSs5cBz5ZBCaYAfUwWfDUGGmSryHdKBKxeuKYQ1"
-            },
-            'zsbbr': {
-                "AccessKeyId": "4UjFNIabklprFwUtXVn4Rof4xeA2A79m",
-                "AccessKeySecret": "UeJoyb6MeeXKBJmZBtTbgnazHujKDN2X4Xqi3kKZuCAVZdzWZT49V0UKX25D4i7F"
-            },
-            'dgby': {
-                "AccessKeyId": "QChRLkBRG8iZTmmC4T3tRk9R1Xgn6EVr",
-                "AccessKeySecret": "BfXAdzONLHKb1yoW2Eeuvb4ui7Z0W6GBjWegO4OZzahKQGzPmofhjOLekLxFhFyX"
-            },
-            'dghf': {
-                "AccessKeyId": "p5yr2EjeLxY4MhmWNcTi9gS9mOJi7Unp",
-                "AccessKeySecret": "nvnugyGdVwecdwdUbkUpHsLEDyKdYPXAfGL6aZx1rZnmjqDdyDt5JNYQGCKtRXEK"
-            }
-        }
-        url = "https://openapi.gzbbr.com/login/index"
-        data = config[company]
+        """从数据库获取 B2B token"""
+        from config.config_list_manager.config_cache import get_config_value
         
-        for attempt in range(3):
-            try:
-                response = requests.post(url, data=data, timeout=(10, 30))
-                break
-            except requests.exceptions.ConnectTimeout:
-                if attempt == 2:
-                    raise
-                time.sleep(5)
-        re_js = json.loads(response.text)
-        token = re_js['data']['token']
+        # 公司代码转 config_key
+        company_map = {
+            'fsbbr': 'openapi_gzbbr_com_fs',
+            'zhbbr': 'openapi_gzbbr_com_zh',
+            'zsbbr': 'openapi_gzbbr_com_zs',
+            'dgby': 'openapi_gzbbr_com_by',
+            'dghf': 'openapi_gzbbr_com_hf'
+        }
+        
+        config_key = company_map.get(company)
+        if not config_key:
+            raise KeyError(f"未知的公司代码: {company}")
+        
+        token = get_config_value(config_key)
+        if not token:
+            raise Exception(f"[{company}] 数据库中未找到 token")
+        
         return token
 
     def getAllCassWarehouse(token):

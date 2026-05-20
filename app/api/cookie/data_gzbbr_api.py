@@ -13,19 +13,23 @@ from config.config_list_manager.config_cache import get_config_value
 @cookie_bp.route('/<company>', methods=['GET'])
 def get_company_cookie(company):
     """
-    获取指定公司的 cookie（无需登录）
-    :param company: 公司名称，目前支持 fs
+    获取指定公司的 cookie/token（无需登录）
+    :param company: 公司简称：fs(佛山), zh(珠海), zs(中山), by(东莞百业), hf(东莞合峰)
     """
     # 定义 company 到 config_key 的映射
     company_map = {
-        'fs': 'data_gzbbr_com_fs'
+        'fs': 'data_gzbbr_com_fs',
+        'zh': 'data_gzbbr_com_zh',
+        'zs': 'data_gzbbr_com_zs',
+        'by': 'data_gzbbr_com_by',
+        'hf': 'data_gzbbr_com_hf'
     }
 
     # 如果 company 不在映射中，返回 404
     if company not in company_map:
         return jsonify({
             'code': 404,
-            'msg': f'Cookie for {company} not found',
+            'msg': f'Company {company} not found. Supported: fs, zh, zs, by, hf',
             'data': None
         }), 404
 
@@ -45,6 +49,6 @@ def get_company_cookie(company):
         'data': {
             'company': company,
             'config_key': config_key,
-            'cookie': cookie
+            'token': cookie
         }
     })

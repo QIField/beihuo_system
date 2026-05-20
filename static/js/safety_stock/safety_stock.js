@@ -85,7 +85,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '在途',
@@ -95,7 +96,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '可用库存',
@@ -106,6 +108,7 @@ function initGrid() {
             resizable: true,
             cellClass: 'cell-number',
             valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB,
             cellStyle: function(params) {
                 if (params.value <= 0) {
                     return { color: '#cf1322', fontWeight: 'bold' };
@@ -121,7 +124,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '基础安全库存',
@@ -131,7 +135,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '季节系数',
@@ -144,7 +149,8 @@ function initGrid() {
             valueFormatter: function(params) {
                 if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
                 return parseFloat(params.value).toFixed(2);
-            }
+            },
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '调整后安全库存',
@@ -154,7 +160,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '库存下限',
@@ -164,7 +171,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '库存上限',
@@ -174,7 +182,8 @@ function initGrid() {
             filter: 'agNumberColumnFilter',
             resizable: true,
             cellClass: 'cell-number',
-            valueFormatter: numberFormatter
+            valueFormatter: numberFormatter,
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '可卖天数',
@@ -187,7 +196,8 @@ function initGrid() {
             valueFormatter: function(params) {
                 if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
                 return parseFloat(params.value).toFixed(1) + '天';
-            }
+            },
+            comparator: (valueA, valueB) => valueA - valueB
         },
         {
             headerName: '库存状态',
@@ -219,7 +229,35 @@ function initGrid() {
             valueFormatter: function(params) {
                 if (params.value === null || params.value === undefined || isNaN(params.value)) return '-';
                 return '¥' + parseFloat(params.value).toFixed(2);
-            }
+            },
+            comparator: (valueA, valueB) => valueA - valueB
+        },
+        {
+            headerName: '替换号',
+            field: 'replace_number',
+            width: 120,
+            sortable: true,
+            filter: 'agTextColumnFilter',
+            resizable: true,
+            cellClass: 'cell-text'
+        },
+        {
+            headerName: '产品等级',
+            field: 'product_level',
+            width: 100,
+            sortable: true,
+            filter: 'agTextColumnFilter',
+            resizable: true,
+            cellClass: 'cell-text'
+        },
+        {
+            headerName: '中文车型',
+            field: 'l_model_zh',
+            width: 150,
+            sortable: true,
+            filter: 'agTextColumnFilter',
+            resizable: true,
+            cellClass: 'cell-text'
         }
     ];
 
@@ -262,10 +300,10 @@ function initGrid() {
             gridApi = params.api;
             gridColumnApi = params.columnApi;
             console.log('AG Grid 初始化完成');
-            
+
             // 初始化双击复制功能
             initDoubleClickCopy();
-            
+
             // 初始化分页大小选择器和页码跳转器
             setTimeout(initPageSizeSelector, 500);
             setTimeout(initPageJumper, 600);
@@ -366,8 +404,23 @@ function loadData() {
                 
                 if (res.code === 0) {
                     allData = res.data || [];
+                    console.log('=== loadData 调试信息 ===');
                     console.log('加载数据成功:', allData.length, '条');
-                    console.log('第一条数据:', allData[0]);
+                    if (allData.length > 0) {
+                        console.log('第一条数据:', allData[0]);
+                        // 统计各种状态的数据量
+                        const statusCount = {};
+                        const abcCount = {};
+                        allData.forEach(item => {
+                            const status = item.stock_status || '空';
+                            const abc = item.abc_class || '空';
+                            statusCount[status] = (statusCount[status] || 0) + 1;
+                            abcCount[abc] = (abcCount[abc] || 0) + 1;
+                        });
+                        console.log('库存状态分布:', statusCount);
+                        console.log('ABC分类分布:', abcCount);
+                    }
+                    console.log('========================');
                     applyFilter();
                 } else {
                     layer.msg(res.msg || '加载失败', { icon: 2 });
@@ -385,31 +438,54 @@ function loadData() {
  * 应用筛选
  */
 function applyFilter() {
+    console.log('=== applyFilter 调试信息 ===');
+    console.log('当前筛选条件:', currentFilter);
+    console.log('allData 总数:', allData.length);
+    
     let filteredData = allData;
     
     // 关键词筛选
     if (currentFilter.keyword) {
         const keyword = currentFilter.keyword.toLowerCase();
+        console.log('关键词筛选:', keyword);
         filteredData = filteredData.filter(item => {
             return (item.oe && item.oe.toLowerCase().includes(keyword)) ||
                    (item.brand && item.brand.toLowerCase().includes(keyword)) ||
                    (item.product_name && item.product_name.toLowerCase().includes(keyword));
         });
+        console.log('关键词筛选后数量:', filteredData.length);
     }
     
     // 状态筛选
     if (currentFilter.stock_status) {
-        filteredData = filteredData.filter(item => 
-            item.stock_status === currentFilter.stock_status
-        );
+        console.log('状态筛选:', currentFilter.stock_status);
+        console.log('筛选前数据样本:', filteredData.slice(0, 3).map(item => ({oe: item.oe, stock_status: item.stock_status})));
+        filteredData = filteredData.filter(item => {
+            const match = item.stock_status === currentFilter.stock_status;
+            if (!match && item.stock_status) {
+                console.log('不匹配项:', item.oe, '的 stock_status:', item.stock_status, '!==', currentFilter.stock_status);
+            }
+            return match;
+        });
+        console.log('状态筛选后数量:', filteredData.length);
     }
     
     // ABC分类筛选
     if (currentFilter.abc_class) {
-        filteredData = filteredData.filter(item => 
-            item.abc_class === currentFilter.abc_class
-        );
+        console.log('ABC分类筛选:', currentFilter.abc_class);
+        console.log('筛选前数据样本:', filteredData.slice(0, 3).map(item => ({oe: item.oe, abc_class: item.abc_class})));
+        filteredData = filteredData.filter(item => {
+            const match = item.abc_class === currentFilter.abc_class;
+            if (!match && item.abc_class) {
+                console.log('不匹配项:', item.oe, '的 abc_class:', item.abc_class, '!==', currentFilter.abc_class);
+            }
+            return match;
+        });
+        console.log('ABC分类筛选后数量:', filteredData.length);
     }
+    
+    console.log('最终筛选结果数量:', filteredData.length);
+    console.log('========================');
     
     // 更新表格数据
     if (gridApi) {
@@ -418,6 +494,8 @@ function applyFilter() {
         gridApi.paginationGoToPage(0);
     }
 }
+
+
 
 /**
  * 执行计算
@@ -499,7 +577,8 @@ function exportToCSV(data) {
     
     // 表头
     const headers = ['OE号', '品牌', '产品名称', 'ABC分类', '当前库存', '在途数量', '可用库存',
-                     '平均日销量', '安全库存', '库存下限', '库存上限', '可卖天数', '库存状态', '库存金额'];
+                     '平均日销量', '安全库存', '库存下限', '库存上限', '可卖天数', '库存状态', '库存金额',
+                     '替换号', '产品等级', '中文车型'];
 
     // 数据行
     const rows = data.map(item => [
@@ -516,7 +595,10 @@ function exportToCSV(data) {
         item.target_stock || 0,
         item.sellable_days || 0,
         item.stock_status || '',
-        item.inventory_amount || 0
+        item.inventory_amount || 0,
+        item.replace_number || '',
+        item.product_level || '',
+        item.l_model_zh || ''
     ]);
     
     // 创建CSV内容

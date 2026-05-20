@@ -4506,9 +4506,9 @@ def init_background_tasks():
         # 注册清理任务
         register_cleanup_tasks(task_manager)
 
-        # 注册备货数据定时任务（新的模块化实现）
-        from app.tasks.beihuo_tasks import register_beihuo_tasks
-        register_beihuo_tasks(task_manager)
+        # 注册所有定时任务（统一入口）
+        from app.tasks import register_all_tasks
+        register_all_tasks(task_manager)
 
 
 
@@ -4539,14 +4539,14 @@ def init_background_tasks():
         from app.core.task_manager import init_ks_quote_count_task
         init_ks_quote_count_task()
 
-        # 初始化开思商家数据同步任务（每10分钟）
-        from app.core.task_manager import init_ks_merchant_task
-        init_ks_merchant_task()
+
 
         print("[系统] 定时任务已启动")
 
-    except:
-        pass
+    except Exception as e:
+        print(f"[系统] 定时任务初始化失败: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 
