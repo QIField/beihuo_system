@@ -300,9 +300,9 @@ class SafetyStockDBService:
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
-                # 先删除当天的旧数据（按组织和日期）
-                delete_sql = f"DELETE FROM {TABLE_NAME} WHERE calc_date = %s AND company = %s"
-                cursor.execute(delete_sql, (calc_date, company))
+                # 清空全部旧数据
+                delete_sql = f"DELETE FROM {TABLE_NAME}"
+                cursor.execute(delete_sql)
 
                 # 插入新数据
                 insert_sql = f"""
