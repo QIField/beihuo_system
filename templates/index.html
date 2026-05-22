@@ -837,6 +837,12 @@
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:;">CRM</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="javascript:void(0);" onclick="openDiffReplaceNumberInNewTab()">替换号比对更新</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed">
                         <a href="javascript:;">仓库</a>
                         <dl class="layui-nav-child">
                             <dd><a href="javascript:void(0);" onclick="openWarehouseDashboardInNewTab()">仓库看板</a></dd>
@@ -1526,6 +1532,11 @@ function openSearchInCrmInNewTab() {
 function openSuyuanQuery() {
     // 在新标签页中打开溯源查询页面
     window.open('/region_by_number_query_page', '_blank');
+}
+
+// 添加打开替换号比对更新新标签页的函数
+function openDiffReplaceNumberInNewTab() {
+    window.open('/diff_replace_number', '_blank');
 }
 
 // 添加打开仓库看板新标签页的函数
