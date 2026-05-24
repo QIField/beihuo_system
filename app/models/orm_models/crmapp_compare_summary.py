@@ -102,6 +102,9 @@ class CrmappCompareSummary(BaseModels):
     # 是否同步开思
     is_cass = Column(String(10), nullable=True, comment="是否同步开思")
     
+    # 车型中文名
+    l_model_zh = Column(Text, nullable=True, comment="车型中文名")
+    
     # 创建时间
     created_time = Column(DateTime, nullable=True, comment="创建时间")
     

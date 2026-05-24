@@ -6,14 +6,15 @@
 # @Software: PyCharm
 
 
-from sqlalchemy import Column, String, Float, BigInteger, DateTime, DECIMAL
+from sqlalchemy import Column, String, Float, BigInteger, DateTime, DECIMAL, Text
 from datetime import datetime
+from sqlalchemy.dialects.mysql import insert, LONGTEXT
 
 from app.models.orm_models.base_models import BaseModels
 
 
-class CarPartsLibrary(BaseModels):
-    __tablename__ = 'car_parts_library'
+class CarPartsLibraryBenz(BaseModels):
+    __tablename__ = 'car_parts_library_benz'
 
     # 基础字段
     part_number = Column(String(510), primary_key=True, comment='配件编号')
@@ -32,6 +33,8 @@ class CarPartsLibrary(BaseModels):
     width = Column(String(510), nullable=True, comment='宽度')
     height = Column(String(510), nullable=True, comment='高度')
     effective_date = Column(String(510), nullable=True, comment='生效日期')
+    data_source = Column(String(100), nullable=True, comment='数据来源')
+    l_model_zh = Column(Text, nullable=True, comment='车型中文名')
 
     # 截图新增字段
     brand = Column(String(100), nullable=True, comment='品牌')
@@ -42,7 +45,10 @@ class CarPartsLibrary(BaseModels):
     origin_country = Column(String(50), nullable=True, comment='原产地')
     shelf_life = Column(String(100), nullable=True, comment='存储期限')
     is_hazmat = Column(String(10), nullable=True, comment='防盗标识/危险品')
-    purchase_price = Column(DECIMAL(18, 2), nullable=True, comment='佳配采购价')
+    purchase_price = Column(DECIMAL(18, 2), nullable=True, comment='巴博瑞采购价')
+    
+    # 零件替代关系信息（JSON格式）
+    part_nr_info_super_session = Column(LONGTEXT, nullable=True, comment='零件替代关系信息')
 
     # 时间字段
     created_at = Column(DateTime, nullable=False, default=datetime.now, comment='创建时间')
@@ -70,6 +76,8 @@ class CarPartsLibrary(BaseModels):
             'width': self.width,
             'height': self.height,
             'effective_date': self.effective_date,
+            'data_source': self.data_source,
+            'l_model_zh': self.l_model_zh,
             'brand': self.brand,
             'category': self.category,
             'ccc_mark': self.ccc_mark,
@@ -79,6 +87,9 @@ class CarPartsLibrary(BaseModels):
             'shelf_life': self.shelf_life,
             'is_hazmat': self.is_hazmat,
             'purchase_price': self.purchase_price,
+            'part_nr_info_super_session': self.part_nr_info_super_session,
             'created_at': self.created_at,
             'updated_at': self.updated_at
         }
+
+ 

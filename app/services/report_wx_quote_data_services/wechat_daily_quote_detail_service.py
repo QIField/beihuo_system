@@ -370,7 +370,7 @@ def get_customer_list(oe_code=None, create_date=None):
             # 去掉OE码前面的字母，只保留数字部分
             # 例如: "A12345" → "12345"
                 
-            oe_code_clean = re.sub(r'^[a-zA-Z]+', '', oe_code)
+            oe_code_clean = re.sub(r'^[a-zA-Z]+', '', oe_code)  # pyright: ignore[reportArgumentType, reportCallIssue]
             if oe_code_clean:
                 query = query.filter(
                     CrmappSalesHistoryDetail.number == oe_code_clean
@@ -381,10 +381,10 @@ def get_customer_list(oe_code=None, create_date=None):
                 # 提取日期部分（只取 yyyy-mm-dd）
                 # 支持格式：2026-04-09 18:19:08 或 2026-04-09
                 date_part = None
-                if ' ' in create_date:
-                    date_part = create_date.split(' ')[0]
-                elif 'T' in create_date:
-                    date_part = create_date.split('T')[0]
+                if ' ' in create_date:  # pyright: ignore[reportOperatorIssue]
+                    date_part = create_date.split(' ')[0]  # pyright: ignore[reportOptionalMemberAccess]
+                elif 'T' in create_date:  # pyright: ignore[reportOperatorIssue]
+                    date_part = create_date.split('T')[0]  # pyright: ignore[reportOptionalMemberAccess]
                 else:
                     date_part = create_date
                 
@@ -511,18 +511,18 @@ def process_single_day(day_date):
             for record in records:
                 try:
                     # 如果是缺货，直接标记为未成交
-                    if record.is_out_of_stock:
-                        record.deal_status = 2
+                    if record.is_out_of_stock:  # pyright: ignore[reportGeneralTypeIssues]
+                        record.deal_status = 2  # pyright: ignore[reportAttributeAccessIssue]
                         day_stats['not_found'] += 1
                         continue
                     
                     # 检查 OE 码
-                    if not record.oe_code:
+                    if not record.oe_code:  # pyright: ignore[reportGeneralTypeIssues]
                         day_stats['no_oe_code'] += 1
                         continue
                     
                     # 清理 OE 码（去掉前面的字母）
-                    oe_code_clean = re.sub(r'^[a-zA-Z]+', '', record.oe_code)
+                    oe_code_clean = re.sub(r'^[a-zA-Z]+', '', record.oe_code)  # pyright: ignore[reportCallIssue, reportArgumentType]
                     if not oe_code_clean:
                         day_stats['no_oe_code'] += 1
                         continue
@@ -540,14 +540,14 @@ def process_single_day(day_date):
                     if len(sales_records) == 1:
                         sales_record = sales_records[0]
                         # 找到匹配，标记为成交
-                        record.deal_status = 1
+                        record.deal_status = 1  # pyright: ignore[reportAttributeAccessIssue]
                         record.deal_customer = sales_record.fullname
                         record.deal_brand = sales_record.brand_name
                         record.deal_amount = sales_record.total_price
                         day_stats['updated'] += 1
                     elif len(sales_records) == 0:
                         # 没找到匹配，标记为未成交
-                        record.deal_status = 2
+                        record.deal_status = 2  # pyright: ignore[reportAttributeAccessIssue]
                         day_stats['not_found'] += 1
                     else:
                         # 找到多条匹配，保持状态不变

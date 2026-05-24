@@ -5,6 +5,3 @@
 # @File    : __init__.py
 # @Software: PyCharm
 
-from .car_parts_library_service import CarPartsLibraryService
-
-__all__ = ["CarPartsLibraryService"]

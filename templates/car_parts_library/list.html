@@ -7,26 +7,26 @@
             margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
-        
+
         .search-row {
             display: flex;
             flex-wrap: wrap;
             gap: 12px;
             align-items: center;
         }
-        
+
         .search-item {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        
+
         .search-item label {
             font-size: 14px;
             color: #595959;
             white-space: nowrap;
         }
-        
+
         .search-item input,
         .search-item select {
             width: 160px;
@@ -36,14 +36,14 @@
             font-size: 14px;
             transition: all 0.3s;
         }
-        
+
         .search-item input:focus,
         .search-item select:focus {
             outline: none;
             border-color: #1890ff;
             box-shadow: 0 0 0 2px rgba(24,144,255,0.2);
         }
-        
+
         /* 按钮 */
         .btn {
             padding: 8px 16px;
@@ -56,36 +56,36 @@
             align-items: center;
             gap: 6px;
         }
-        
+
         .btn-primary {
             background: #1890ff;
             color: #fff;
         }
-        
+
         .btn-primary:hover {
             background: #40a9ff;
         }
-        
+
         .btn-success {
             background: #52c41a;
             color: #fff;
         }
-        
+
         .btn-success:hover {
             background: #73d13d;
         }
-        
+
         .btn-default {
             background: #fff;
             color: #595959;
             border: 1px solid #d9d9d9;
         }
-        
+
         .btn-default:hover {
             color: #40a9ff;
             border-color: #40a9ff;
         }
-        
+
         /* 主内容区 */
         .main-content {
             background: #fff;
@@ -93,7 +93,7 @@
             padding: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
-        
+
         /* 工具栏 */
         .toolbar {
             display: flex;
@@ -103,55 +103,55 @@
             padding-bottom: 16px;
             border-bottom: 1px solid #f0f0f0;
         }
-        
+
         .toolbar-left {
             display: flex;
             gap: 12px;
             align-items: center;
         }
-        
+
         .toolbar-right {
             display: flex;
             gap: 8px;
         }
-        
+
         /* 表格样式 */
         .layui-table-view {
             border-radius: 6px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             border: 1px solid #e8e8e8;
         }
-        
+
         .layui-table-header {
             background-color: #fafafa;
             border-bottom: 2px solid #e8e8e8;
         }
-        
+
         .layui-table th {
             font-weight: 600;
             color: #333;
             font-size: 13px;
             padding: 10px 5px;
         }
-        
+
         .layui-table td {
             padding: 6px 5px;
             font-size: 13px;
             height: 36px;
             line-height: 1.5;
         }
-        
+
         .layui-table tbody tr:hover {
             background-color: #f5f7fa;
         }
-        
+
         /* 操作按钮组 */
         .action-btns {
             display: flex;
             justify-content: center;
             gap: 6px;
         }
-        
+
         .action-btns .layui-btn {
             margin: 0;
             padding: 0 10px;
@@ -169,16 +169,19 @@
             <label>配件编号：</label>
             <input type="text" id="partNumber" placeholder="请输入配件编号">
         </div>
-        <div class="search-item">
-            <label>中文描述：</label>
-            <input type="text" id="descriptionCn" placeholder="请输入中文描述">
-        </div>
+
         <div class="search-item">
             <button class="btn btn-primary" id="searchBtn">
                 <i class="layui-icon layui-icon-search"></i> 查询
             </button>
+            <button class="btn btn-success" id="refreshBtn">
+                <i class="layui-icon layui-icon-refresh-3"></i> 更新数据
+            </button>
             <button class="btn btn-default" id="resetBtn">
                 <i class="layui-icon layui-icon-refresh"></i> 重置
+            </button>
+            <button class="btn btn-default" id="settingsBtn">
+                <i class="layui-icon layui-icon-set"></i> 设置
             </button>
         </div>
     </div>
@@ -192,12 +195,19 @@
             <button class="btn btn-success" id="addBtn">
                 <i class="layui-icon layui-icon-add-1"></i> 添加配件
             </button>
+            <div style="display: flex; align-items: center; gap: 12px; margin-left: 24px;">
+                <label style="font-size: 14px; color: #595959;">价格倍率：</label>
+                <input type="number" id="priceMultiplier" value="1.0" min="0" step="0.1" style="width: 100px; padding: 8px 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 14px;">
+                <button class="btn btn-primary" id="applyMultiplier">
+                    <i class="layui-icon layui-icon-refresh"></i> 应用
+                </button>
+            </div>
         </div>
         <div class="toolbar-right">
             <span style="font-size: 14px; color: #595959;">共 <strong id="totalCount">0</strong> 条记录</span>
         </div>
     </div>
-    
+
     <!-- 表格 -->
     <table id="partsTable" lay-filter="partsTable"></table>
 </div>
@@ -210,6 +220,34 @@
   </div>
 </script>
 
+<!-- 设置弹窗模板 -->
+<script type="text/html" id="settingsTemplate">
+  <form class="layui-form" lay-filter="settingsForm" style="padding: 30px;">
+    <div class="layui-form-item">
+      <label class="layui-form-label">Cookie</label>
+      <div class="layui-input-block">
+        <textarea id="cookieInput" name="cookie" placeholder="请输入Cookie" class="layui-textarea" style="height: 100px;"></textarea>
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">客户ID</label>
+      <div class="layui-input-block">
+        <input type="text" id="customerIdInput" name="customer_id" placeholder="请输入客户ID" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">销售组织ID</label>
+      <div class="layui-input-block">
+        <input type="text" id="salesOrganizationIdInput" name="sales_organization_id" placeholder="请输入销售组织ID" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item" style="text-align: center; padding-top: 20px;">
+      <button type="button" class="layui-btn layui-btn-normal" id="saveSettingsBtn">保存</button>
+      <button type="button" class="layui-btn layui-btn-primary" id="cancelSettingsBtn">取消</button>
+    </div>
+  </form>
+</script>
+
 <script>
 layui.use(['table', 'layer', 'form', 'jquery'], function(){
     const table = layui.table;
@@ -217,8 +255,22 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
     const form = layui.form;
     const $ = layui.jquery;
     
-    // 渲染表格
-    table.render({
+    // 表格是否已渲染
+    let tableRendered = false;
+    // 当前倍率
+    let currentMultiplier = 1.0;
+    // 原始数据缓存
+    let rawDataList = [];
+    
+    // 处理价格显示（只给批发价加倍率）
+    function formatPrice(price, multiplier) {
+        if (!price) return '-';
+        const multipliedPrice = price * multiplier;
+        return '¥' + multipliedPrice.toFixed(2);
+    }
+
+    // 表格配置
+    const tableConfig = {
         elem: '#partsTable',
         id: 'partsTable',
         url: '/new/api/car-parts/list',
@@ -232,13 +284,16 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
         },
         parseData: function(res){
             if(res.code === 200){
+                // 缓存原始数据
+                rawDataList = res.data.data || [];
                 return {
                     "code": 0,
                     "msg": res.msg,
-                    "count": res.data.total,
-                    "data": res.data.list
+                    "count": res.data.count,
+                    "data": rawDataList
                 };
             } else {
+                rawDataList = [];
                 return {
                     "code": res.code,
                     "msg": res.msg,
@@ -254,14 +309,22 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
             {field: 'brand', title: '品牌', width: 100},
             {field: 'category', title: '分类', width: 120},
             {field: 'wholesale_price', title: '批发价', width: 120, templet: function(d){
-                return d.wholesale_price ? '¥' + d.wholesale_price.toFixed(2) : '-';
+                return formatPrice(d.wholesale_price, currentMultiplier);
             }},
             {field: 'msrp', title: '市场指导价', width: 120, templet: function(d){
-                return d.msrp ? '¥' + d.msrp.toFixed(2) : '-';
+                return formatPrice(d.msrp, 1.0);
             }},
             {field: 'effective_date', title: '生效日期', width: 120},
-            {field: 'created_at', title: '创建时间', width: 180, templet: function(d){
-                return d.created_at || '-';
+            {field: 'updated_at', title: '更新时间', width: 180, templet: function(d){
+                if (!d.updated_at) return '-';
+                const date = new Date(d.updated_at);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
             }},
             {title: '操作', width: 200, fixed: 'right', align: 'center', templet: '#tableToolBar'}
         ]],
@@ -272,19 +335,64 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
                 layer.msg(res.msg || '数据加载失败', {icon: 2});
             }
         }
-    });
-    
-    // 刷新表格
+    };
+
+    // 刷新/渲染表格
     function reloadTable(){
-        table.reload('partsTable', {
+        const partNumber = $('#partNumber').val().trim();
+
+        // 检查是否有查询条件
+        if (!partNumber) {
+            layer.msg('请输入查询条件', {icon: 0});
+            return;
+        }
+
+        // 合并查询参数
+        const config = {
+            ...tableConfig,
             page: {
                 curr: 1
             },
             where: {
-                part_number: $('#partNumber').val(),
-                description_cn: $('#descriptionCn').val()
+                part_number: partNumber
             }
-        });
+        };
+
+        if (tableRendered) {
+            // 已渲染，执行 reload
+            table.reload('partsTable', {
+                url: config.url,
+                method: config.method,
+                page: config.page,
+                where: config.where
+            });
+        } else {
+            // 未渲染，执行第一次 render
+            table.render(config);
+            tableRendered = true;
+        }
+    }
+    
+    // 应用倍率
+    function applyMultiplier() {
+        const multiplier = parseFloat($('#priceMultiplier').val());
+        if (isNaN(multiplier) || multiplier < 0) {
+            layer.msg('请输入有效的倍率', {icon: 2});
+            return;
+        }
+
+        currentMultiplier = multiplier;
+
+        if (tableRendered && rawDataList.length > 0) {
+            // 使用缓存的原始数据重新渲染表格
+            table.reload('partsTable', {
+                data: rawDataList,
+                url: undefined
+            });
+            layer.msg('倍率已应用', {icon: 1});
+        } else {
+            layer.msg('请先查询数据', {icon: 0});
+        }
     }
     
     // 查询按钮
@@ -292,13 +400,71 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
         reloadTable();
     });
     
+    // 回车键查询
+    $('#partNumber').on('keydown', function(e){
+        if(e.keyCode === 13){
+            reloadTable();
+        }
+    });
+    
     // 重置按钮
     $('#resetBtn').on('click', function(){
         $('#partNumber').val('');
-        $('#descriptionCn').val('');
-        reloadTable();
+        if (tableRendered) {
+            // 如果已渲染，清空表格
+            table.reload('partsTable', {
+                data: []
+            });
+            $('#totalCount').text(0);
+            rawDataList = [];
+        }
+    });
+
+    // 更新数据按钮
+    $('#refreshBtn').on('click', function(){
+        const partNumber = $('#partNumber').val().trim();
+        // 显示加载层
+        const loading = layer.load(1, {shade: [0.1, '#fff']});
+        
+        // 构建请求参数
+        const params = {};
+        if (partNumber) {
+            params.part_number = partNumber;
+        }
+
+        // 调用刷新API
+        $.ajax({
+            url: '/new/api/car-parts/refresh',
+            method: 'GET',
+            data: params,
+            success: function(res) {
+                layer.close(loading);
+                if (res.code === 200) {
+                    layer.msg(res.msg || '数据更新成功', {icon: 1});
+                    // 如果有数据，刷新表格
+                    if (tableRendered) {
+                        reloadTable();
+                    }
+                } else {
+                    layer.msg(res.msg || '数据更新失败', {icon: 2});
+                }
+            },
+            error: function(xhr, status, error) {
+                layer.close(loading);
+                layer.msg('请求失败: ' + error, {icon: 2});
+            }
+        });
     });
     
+    // 应用倍率按钮
+    $('#applyMultiplier').on('click', applyMultiplier);
+    // 倍率输入框回车
+    $('#priceMultiplier').on('keydown', function(e){
+        if(e.keyCode === 13){
+            applyMultiplier();
+        }
+    });
+
     // 添加按钮
     $('#addBtn').on('click', function(){
         layer.msg('添加功能开发中...', {icon: 0});
@@ -307,7 +473,7 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
     // 表格工具事件监听
     table.on('tool(partsTable)', function(obj){
         const data = obj.data;
-        
+
         if(obj.event === 'detail'){
             // 跳转到详情页
             location.hash = '/detail?part_number=' + encodeURIComponent(data.part_number);
@@ -319,6 +485,77 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
                 layer.msg('删除成功', {icon: 1});
             });
         }
+    });
+
+    // 设置按钮点击事件
+    $('#settingsBtn').on('click', function(){
+        const getTpl = settingsTemplate.innerHTML;
+        const layerIndex = layer.open({
+            title: '奔驰大库配置',
+            type: 1,
+            area: ['600px', '450px'],
+            content: getTpl,
+            success: function(layero, index){
+                // 先获取当前配置
+                $.ajax({
+                    url: '/new/api/car-parts/get-config',
+                    method: 'GET',
+                    success: function(res){
+                        if(res.code === 200 && res.data){
+                            $('#cookieInput').val(res.data.cookie || '');
+                            $('#customerIdInput').val(res.data.customer_id || '');
+                            $('#salesOrganizationIdInput').val(res.data.sales_organization_id || '');
+                        }
+                    }
+                });
+
+                // 保存按钮点击事件
+                $('#saveSettingsBtn').off('click').on('click', function(){
+                    const cookie = $('#cookieInput').val();
+                    const customerId = $('#customerIdInput').val();
+                    const salesOrganizationId = $('#salesOrganizationIdInput').val();
+
+                    if(!cookie || !customerId || !salesOrganizationId){
+                        layer.msg('Cookie、客户ID和销售组织ID不能为空', {icon: 0});
+                        return;
+                    }
+
+                    const loading = layer.load(2, {
+                        shade: [0.3, '#000'],
+                        content: '正在保存...'
+                    });
+
+                    $.ajax({
+                        url: '/new/api/car-parts/set-config',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            cookie: cookie,
+                            customer_id: customerId,
+                            sales_organization_id: salesOrganizationId
+                        }),
+                        success: function(res){
+                            layer.close(loading);
+                            if(res.code === 200){
+                                layer.msg('保存成功', {icon: 1, time: 1500});
+                                layer.close(layerIndex);
+                            } else {
+                                layer.msg(res.msg || '保存失败', {icon: 2});
+                            }
+                        },
+                        error: function(){
+                            layer.close(loading);
+                            layer.msg('请求失败，请稍后重试', {icon: 2});
+                        }
+                    });
+                });
+
+                // 取消按钮点击事件
+                $('#cancelSettingsBtn').off('click').on('click', function(){
+                    layer.close(layerIndex);
+                });
+            }
+        });
     });
 });
 </script>

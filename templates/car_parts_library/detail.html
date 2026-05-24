@@ -99,6 +99,13 @@
                 <i class="layui-icon layui-icon-return"></i> 返回列表
             </button>
         </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <label style="font-size: 14px; color: #595959;">价格倍率：</label>
+            <input type="number" id="priceMultiplier" value="1.0" min="0" step="0.1" style="width: 100px; padding: 8px 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 14px;">
+            <button class="btn btn-primary" id="applyMultiplier">
+                <i class="layui-icon layui-icon-refresh"></i> 应用
+            </button>
+        </div>
     </div>
     <!-- 加载提示 -->
     <div id="loading" style="text-align: center; padding: 50px;">
@@ -184,7 +191,7 @@
                         <td style="color: #ff4d4f; font-weight: 600;">{{ d.wholesale_price }}</td>
                         <td style="background: #fafafa; font-weight: 500;">市场指导价</td>
                         <td style="color: #ff4d4f; font-weight: 600;">{{ d.msrp }}</td>
-                        <td style="background: #fafafa; font-weight: 500;">佳配采购价</td>
+                        <td style="background: #fafafa; font-weight: 500;">巴博瑞采购价</td>
                         <td style="color: #ff4d4f; font-weight: 600;">{{ d.purchase_price }}</td>
                     </tr>
                 </tbody>
@@ -209,6 +216,10 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
     var layer = layui.layer;
     var laytpl = layui.laytpl;
     
+    // 全局变量：原始数据和当前倍率
+    var rawData = null;
+    var currentMultiplier = 1.0;
+    
     // 获取URL参数
     function getUrlParam(name) {
         var hash = location.hash;
@@ -231,15 +242,19 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
     }
     
     // 处理数据格式
-    function formatData(data) {
+    function formatData(data, multiplier) {
         // 处理空值
         function emptyVal(val) {
             return val ? val : '-';
         }
         
-        // 处理价格
-        function formatPrice(price) {
-            return price ? price.toFixed(2) + ' CNY' : '-';
+        // 处理价格（只给批发价加倍率）
+        function formatPrice(price, applyMultiplier) {
+            if (!price) return '-';
+            var numPrice = parseFloat(price);
+            if (isNaN(numPrice)) return '-';
+            var finalPrice = applyMultiplier ? (numPrice * multiplier) : numPrice;
+            return finalPrice.toFixed(2) + ' CNY';
         }
         
         // 处理尺寸
@@ -267,12 +282,12 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
             origin_country: emptyVal(data.origin_country),
             created_at: emptyVal(data.created_at),
             updated_at: emptyVal(data.updated_at),
-            wholesale_price: formatPrice(data.wholesale_price),
-            msrp: formatPrice(data.msrp),
-            purchase_price: formatPrice(data.purchase_price),
+            wholesale_price: formatPrice(data.wholesale_price, true),
+            msrp: formatPrice(data.msrp, false),
+            purchase_price: formatPrice(data.purchase_price, false),
             quantity_unit: emptyVal(data.quantity_unit),
-            weight: data.weight ? data.weight + ' KG' : '-',
-            volume: data.volume ? data.volume + ' CDM' : '-',
+            weight: data.weight ? parseFloat(data.weight) + ' KG' : '-',
+            volume: data.volume ? parseFloat(data.volume) + ' CDM' : '-',
             dimensions: formatDimensions(data.length, data.width, data.height),
             ccc_mark: emptyVal(data.ccc_mark),
             marketing_code: emptyVal(data.marketing_code),
@@ -284,15 +299,30 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
     }
     
     // 渲染详情
-    function renderDetail(rawData) {
-        var data = formatData(rawData);
+    function renderDetail(data, multiplier) {
+        var formattedData = formatData(data, multiplier);
         var getTpl = $('#detailTpl').html();
         var view = $('#detailContent');
         
-        laytpl(getTpl).render(data, function(html){
+        laytpl(getTpl).render(formattedData, function(html){
             $('#loading').remove();
             view.html(html);
         });
+    }
+    
+    // 应用倍率
+    function applyMultiplier() {
+        var multiplier = parseFloat($('#priceMultiplier').val());
+        if (isNaN(multiplier) || multiplier < 0) {
+            layer.msg('请输入有效的倍率', {icon: 2});
+            return;
+        }
+        
+        currentMultiplier = multiplier;
+        if (rawData) {
+            renderDetail(rawData, currentMultiplier);
+            layer.msg('倍率已应用', {icon: 1});
+        }
     }
     
     // 加载详情数据
@@ -314,7 +344,8 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
             },
             success: function(res) {
                 if (res.code === 200 && res.data) {
-                    renderDetail(res.data);
+                    rawData = res.data;
+                    renderDetail(rawData, currentMultiplier);
                 } else {
                     layer.msg(res.msg || '获取配件详情失败', {icon: 2});
                     showError(res.msg || '获取配件详情失败');
@@ -326,6 +357,14 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
             }
         });
     }
+    
+    // 绑定事件
+    $('#applyMultiplier').on('click', applyMultiplier);
+    $('#priceMultiplier').on('keydown', function(e) {
+        if (e.keyCode === 13) {
+            applyMultiplier();
+        }
+    });
     
     // 执行加载
     loadDetail();
