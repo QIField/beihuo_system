@@ -174,9 +174,6 @@
             <button class="btn btn-primary" id="searchBtn">
                 <i class="layui-icon layui-icon-search"></i> 查询
             </button>
-            <button class="btn btn-success" id="refreshBtn">
-                <i class="layui-icon layui-icon-refresh-3"></i> 更新数据
-            </button>
             <button class="btn btn-default" id="resetBtn">
                 <i class="layui-icon layui-icon-refresh"></i> 重置
             </button>
@@ -201,6 +198,9 @@
                 <button class="btn btn-primary" id="applyMultiplier">
                     <i class="layui-icon layui-icon-refresh"></i> 应用
                 </button>
+                <button class="btn btn-default" id="viewFavorites">
+                    <i class="layui-icon layui-icon-star"></i> 查看收藏
+                </button>
             </div>
         </div>
         <div class="toolbar-right">
@@ -217,6 +217,16 @@
     <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">查看</a>
     <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
     <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+  </div>
+</script>
+
+<!-- 表格工具栏模板 -->
+<script type="text/html" id="tableHeaderToolBar">
+  <div class="layui-btn-container">
+    <button class="layui-btn layui-btn-sm layui-btn-normal" lay-event="batchAddFavorite">
+      <i class="layui-icon layui-icon-star"></i> 加入收藏
+    </button>
+    <button class="layui-btn layui-btn-sm layui-btn-warm" lay-event="batchRefresh">更新选中数据</button>
   </div>
 </script>
 
@@ -246,6 +256,31 @@
       <button type="button" class="layui-btn layui-btn-primary" id="cancelSettingsBtn">取消</button>
     </div>
   </form>
+</script>
+
+<!-- 收藏列表弹窗模板 -->
+<script type="text/html" id="favoritesTemplate">
+  <div style="padding: 20px;">
+    <table id="favoritesTable" lay-filter="favoritesTable"></table>
+  </div>
+</script>
+
+<!-- 收藏列表工具栏模板 -->
+<script type="text/html" id="favoritesTableToolBar">
+  <div class="layui-btn-container">
+    <button class="layui-btn layui-btn-sm layui-btn-danger" lay-event="batchRemoveFavorite">
+      <i class="layui-icon layui-icon-close"></i> 批量删除
+    </button>
+  </div>
+</script>
+
+<!-- 收藏列表操作列模板 -->
+<script type="text/html" id="favoritesRowToolBar">
+  <div class="action-btns">
+    <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="removeFavorite">
+      <i class="layui-icon layui-icon-close"></i> 删除
+    </a>
+  </div>
 </script>
 
 <script>
@@ -278,6 +313,7 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
         page: true,
         limit: 10,
         limits: [10, 20, 50, 100],
+        toolbar: '#tableHeaderToolBar', // 头部工具栏
         request: {
             pageName: 'page',
             limitName: 'page_size'
@@ -303,11 +339,33 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
             }
         },
         cols: [[
+            {type: 'checkbox', fixed: 'left'}, // 复选框列
             {field: 'part_number', title: '配件编号', width: 180},
             {field: 'description_cn', title: '中文描述', width: 200},
             {field: 'descriptions', title: '英文描述', width: 200},
-            {field: 'brand', title: '品牌', width: 100},
-            {field: 'category', title: '分类', width: 120},
+            {field: 'brand', title: '品牌', width: 100, hide: true},
+            {field: 'category', title: '分类', width: 120, hide: true},
+            {field: 'marketing_code', title: '营销代码', width: 120},
+            {field: 'dealer_discount_group', title: '经销商折扣组', width: 140, hide: true},
+            {field: 'dealer_fixed_nominal_margin', title: '经销商固定利润', width: 140, hide: true},
+            {field: 'marketing_code_description', title: '营销代码描述', width: 160},
+            {field: 'quantity_unit', title: '数量单位', width: 100, hide: true},
+            {field: 'sales_pack_size', title: '销售包装规格', width: 120, hide: true},
+            {field: 'weight', title: '重量', width: 100, hide: true},
+            {field: 'length', title: '长度', width: 100, hide: true},
+            {field: 'width', title: '宽度', width: 100, hide: true},
+            {field: 'height', title: '高度', width: 100, hide: true},
+            {field: 'volume', title: '体积', width: 100, hide: true},
+            {field: 'data_source', title: '数据来源', width: 100, hide: true},
+            {field: 'l_model_zh', title: '车型中文名', width: 200, hide: true},
+            {field: 'ccc_mark', title: 'CCC标识', width: 100, hide: true},
+            {field: 'hazmat_code', title: '危险货物代码', width: 120, hide: true},
+            {field: 'origin_country', title: '原产地', width: 100, hide: true},
+            {field: 'shelf_life', title: '存储期限', width: 100, hide: true},
+            {field: 'is_hazmat', title: '防盗/危险品', width: 120, hide: true},
+            {field: 'purchase_price', title: '巴博瑞采购价', width: 140, hide: true, templet: function(d){
+                return formatPrice(d.purchase_price, 1.0);
+            }},
             {field: 'wholesale_price', title: '批发价', width: 120, templet: function(d){
                 return formatPrice(d.wholesale_price, currentMultiplier);
             }},
@@ -318,12 +376,12 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
             {field: 'updated_at', title: '更新时间', width: 180, templet: function(d){
                 if (!d.updated_at) return '-';
                 const date = new Date(d.updated_at);
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                const hours = String(date.getHours()).padStart(2, '0');
-                const minutes = String(date.getMinutes()).padStart(2, '0');
-                const seconds = String(date.getSeconds()).padStart(2, '0');
+                const year = date.getUTCFullYear();
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                const hours = String(date.getUTCHours()).padStart(2, '0');
+                const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                const seconds = String(date.getUTCSeconds()).padStart(2, '0');
                 return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
             }},
             {title: '操作', width: 200, fixed: 'right', align: 'center', templet: '#tableToolBar'}
@@ -420,42 +478,6 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
         }
     });
 
-    // 更新数据按钮
-    $('#refreshBtn').on('click', function(){
-        const partNumber = $('#partNumber').val().trim();
-        // 显示加载层
-        const loading = layer.load(1, {shade: [0.1, '#fff']});
-        
-        // 构建请求参数
-        const params = {};
-        if (partNumber) {
-            params.part_number = partNumber;
-        }
-
-        // 调用刷新API
-        $.ajax({
-            url: '/new/api/car-parts/refresh',
-            method: 'GET',
-            data: params,
-            success: function(res) {
-                layer.close(loading);
-                if (res.code === 200) {
-                    layer.msg(res.msg || '数据更新成功', {icon: 1});
-                    // 如果有数据，刷新表格
-                    if (tableRendered) {
-                        reloadTable();
-                    }
-                } else {
-                    layer.msg(res.msg || '数据更新失败', {icon: 2});
-                }
-            },
-            error: function(xhr, status, error) {
-                layer.close(loading);
-                layer.msg('请求失败: ' + error, {icon: 2});
-            }
-        });
-    });
-    
     // 应用倍率按钮
     $('#applyMultiplier').on('click', applyMultiplier);
     // 倍率输入框回车
@@ -470,6 +492,86 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
         layer.msg('添加功能开发中...', {icon: 0});
     });
     
+    // 头部工具栏事件监听
+    table.on('toolbar(partsTable)', function(obj){
+        var checkStatus = table.checkStatus(obj.config.id); // 获取选中行数据
+        
+        if(obj.event === 'batchRefresh'){
+            if(!checkStatus.data.length) return layer.msg('请先选择要更新的数据', {icon: 0});
+            
+            // 提取所有选中的 part_number
+            var partNumbers = checkStatus.data.map(function(item){
+                return item.part_number;
+            });
+            
+            // 显示加载层
+            var loading = layer.load(1, {shade: [0.3, '#000'], content: '正在更新数据...'});
+            
+            // 发送 AJAX 请求
+            $.ajax({
+                url: '/new/api/car-parts/batch-refresh',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    part_numbers: partNumbers
+                }),
+                success: function(res){
+                    layer.close(loading);
+                    if(res.code === 200){
+                        layer.msg(res.msg || '数据更新成功', {icon: 1});
+                        // 刷新表格
+                        if (tableRendered) {
+                            table.reload('partsTable');
+                        }
+                    } else {
+                        layer.msg(res.msg || '数据更新失败', {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error){
+                    layer.close(loading);
+                    layer.msg('请求失败: ' + error, {icon: 2});
+                }
+            });
+        } else if(obj.event === 'batchAddFavorite'){
+            if(!checkStatus.data.length) return layer.msg('请先选择要加入收藏的数据', {icon: 0});
+            
+            // 提取所有选中的 part_number
+            var partNumbers = checkStatus.data.map(function(item){
+                return item.part_number;
+            });
+            
+            // 显示加载层
+            var loading = layer.load(1, {shade: [0.3, '#000'], content: '正在添加收藏...'});
+            
+            // 发送 AJAX 请求
+            $.ajax({
+                url: '/new/api/car-parts/add-favorites',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    part_numbers: partNumbers,
+                    category: '主收藏'
+                }),
+                success: function(res){
+                    layer.close(loading);
+                    if(res.code === 200){
+                        layer.msg(res.msg || '添加收藏成功', {icon: 1});
+                    } else {
+                        layer.msg(res.msg || '添加收藏失败', {icon: 2});
+                    }
+                },
+                error: function(xhr, status, error){
+                    layer.close(loading);
+                    if(xhr.status === 401){
+                        layer.msg('请先登录后再收藏', {icon: 2});
+                    } else {
+                        layer.msg('请求失败: ' + error, {icon: 2});
+                    }
+                }
+            });
+        }
+    });
+
     // 表格工具事件监听
     table.on('tool(partsTable)', function(obj){
         const data = obj.data;
@@ -485,6 +587,203 @@ layui.use(['table', 'layer', 'form', 'jquery'], function(){
                 layer.msg('删除成功', {icon: 1});
             });
         }
+    });
+
+    // 查看收藏按钮点击事件
+    $('#viewFavorites').on('click', function(){
+        const getTpl = favoritesTemplate.innerHTML;
+        const layerIndex = layer.open({
+            title: '我的收藏',
+            type: 1,
+            area: ['1200px', '700px'],
+            content: getTpl,
+            success: function(layero, index){
+                // 渲染收藏列表表格
+                const favoritesTable = table.render({
+                    elem: '#favoritesTable',
+                    id: 'favoritesTable',
+                    url: '/new/api/car-parts/get-favorites',
+                    method: 'get',
+                    page: true,
+                    limit: 10,
+                    limits: [10, 20, 50, 100],
+                    toolbar: '#favoritesTableToolBar',
+                    request: {
+                        pageName: 'page',
+                        limitName: 'page_size'
+                    },
+                    where: {
+                        category: '主收藏'
+                    },
+                    parseData: function(res){
+                        if(res.code === 200){
+                            return {
+                                "code": 0,
+                                "msg": res.msg,
+                                "count": res.data ? res.data.count : 0,
+                                "data": res.data ? res.data.data : []
+                            };
+                        } else {
+                            return {
+                                "code": res.code,
+                                "msg": res.msg,
+                                "count": 0,
+                                "data": []
+                            };
+                        }
+                    },
+                    cols: [[
+                        {type: 'checkbox', fixed: 'left'},
+                        {field: 'part_number', title: '配件编号', width: 180},
+                        {field: 'description_cn', title: '中文描述', width: 200},
+                        {field: 'descriptions', title: '英文描述', width: 200},
+                        {field: 'brand', title: '品牌', width: 100, hide: true},
+                        {field: 'category', title: '分类', width: 120, hide: true},
+                        {field: 'marketing_code', title: '营销代码', width: 120},
+                        {field: 'dealer_discount_group', title: '经销商折扣组', width: 140, hide: true},
+                        {field: 'dealer_fixed_nominal_margin', title: '经销商固定利润', width: 140, hide: true},
+                        {field: 'marketing_code_description', title: '营销代码描述', width: 160, hide: true},
+                        {field: 'quantity_unit', title: '数量单位', width: 100, hide: true},
+                        {field: 'sales_pack_size', title: '销售包装规格', width: 120, hide: true},
+                        {field: 'weight', title: '重量', width: 100, hide: true},
+                        {field: 'length', title: '长度', width: 100, hide: true},
+                        {field: 'width', title: '宽度', width: 100, hide: true},
+                        {field: 'height', title: '高度', width: 100, hide: true},
+                        {field: 'volume', title: '体积', width: 100, hide: true},
+                        {field: 'data_source', title: '数据来源', width: 100, hide: true},
+                        {field: 'l_model_zh', title: '车型中文名', width: 200, hide: true},
+                        {field: 'ccc_mark', title: 'CCC标识', width: 100, hide: true},
+                        {field: 'hazmat_code', title: '危险货物代码', width: 120, hide: true},
+                        {field: 'origin_country', title: '原产地', width: 100, hide: true},
+                        {field: 'shelf_life', title: '存储期限', width: 100, hide: true},
+                        {field: 'is_hazmat', title: '防盗/危险品', width: 120, hide: true},
+                        {field: 'purchase_price', title: '巴博瑞采购价', width: 140, hide: true, templet: function(d){
+                            return formatPrice(d.purchase_price, 1.0);
+                        }},
+                        {field: 'wholesale_price', title: '批发价', width: 120, templet: function(d){
+                            return formatPrice(d.wholesale_price, currentMultiplier);
+                        }},
+                        {field: 'msrp', title: '市场指导价', width: 120, templet: function(d){
+                            return formatPrice(d.msrp, 1.0);
+                        }},
+                        {field: 'effective_date', title: '生效日期', width: 120},
+                        {field: 'updated_at', title: '更新时间', width: 180, templet: function(d){
+                            if (!d.updated_at) return '-';
+                            const date = new Date(d.updated_at);
+                            const year = date.getUTCFullYear();
+                            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                            const day = String(date.getUTCDate()).padStart(2, '0');
+                            const hours = String(date.getUTCHours()).padStart(2, '0');
+                            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+                            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                        }},
+                        {field: 'favorite_created_at', title: '收藏时间', width: 180, hide: true, templet: function(d){
+                            if (!d.favorite_created_at) return '-';
+                            const date = new Date(d.favorite_created_at);
+                            const year = date.getUTCFullYear();
+                            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                            const day = String(date.getUTCDate()).padStart(2, '0');
+                            const hours = String(date.getUTCHours()).padStart(2, '0');
+                            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+                            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                        }},
+                        {title: '操作', width: 120, fixed: 'right', align: 'center', templet: '#favoritesRowToolBar'}
+                    ]],
+                    done: function(res, curr, count){
+                        if(res.code !== 0 && res.msg){
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    }
+                });
+
+                // 收藏列表工具栏事件监听
+                table.on('toolbar(favoritesTable)', function(obj){
+                    var checkStatus = table.checkStatus(obj.config.id);
+                    
+                    if(obj.event === 'batchRemoveFavorite'){
+                        if(!checkStatus.data.length) return layer.msg('请先选择要删除的收藏', {icon: 0});
+                        
+                        layer.confirm('确定要删除选中的收藏吗？', function(confirmIndex){
+                            // 提取所有选中的 part_number
+                            var partNumbers = checkStatus.data.map(function(item){
+                                return item.part_number;
+                            });
+                            
+                            const loading = layer.load(1, {shade: [0.3, '#000'], content: '正在删除...'});
+                            
+                            $.ajax({
+                                url: '/new/api/car-parts/remove-favorites',
+                                method: 'POST',
+                                contentType: 'application/json',
+                                data: JSON.stringify({
+                                    part_numbers: partNumbers
+                                }),
+                                success: function(res){
+                                    layer.close(loading);
+                                    layer.close(confirmIndex);
+                                    if(res.code === 200){
+                                        layer.msg(res.msg || '删除成功', {icon: 1});
+                                        table.reload('favoritesTable');
+                                    } else {
+                                        layer.msg(res.msg || '删除失败', {icon: 2});
+                                    }
+                                },
+                                error: function(xhr, status, error){
+                                    layer.close(loading);
+                                    layer.close(confirmIndex);
+                                    if(xhr.status === 401){
+                                        layer.msg('请先登录', {icon: 2});
+                                    } else {
+                                        layer.msg('请求失败: ' + error, {icon: 2});
+                                    }
+                                }
+                            });
+                        });
+                    }
+                });
+
+                // 收藏列表行操作事件监听
+                table.on('tool(favoritesTable)', function(obj){
+                    const data = obj.data;
+
+                    if(obj.event === 'removeFavorite'){
+                        layer.confirm('确定要删除该收藏吗？', function(confirmIndex){
+                            const loading = layer.load(1, {shade: [0.3, '#000'], content: '正在删除...'});
+                            
+                            $.ajax({
+                                url: '/new/api/car-parts/remove-favorites',
+                                method: 'POST',
+                                contentType: 'application/json',
+                                data: JSON.stringify({
+                                    part_numbers: [data.part_number]
+                                }),
+                                success: function(res){
+                                    layer.close(loading);
+                                    layer.close(confirmIndex);
+                                    if(res.code === 200){
+                                        layer.msg(res.msg || '删除成功', {icon: 1});
+                                        table.reload('favoritesTable');
+                                    } else {
+                                        layer.msg(res.msg || '删除失败', {icon: 2});
+                                    }
+                                },
+                                error: function(xhr, status, error){
+                                    layer.close(loading);
+                                    layer.close(confirmIndex);
+                                    if(xhr.status === 401){
+                                        layer.msg('请先登录', {icon: 2});
+                                    } else {
+                                        layer.msg('请求失败: ' + error, {icon: 2});
+                                    }
+                                }
+                            });
+                        });
+                    }
+                });
+            }
+        });
     });
 
     // 设置按钮点击事件

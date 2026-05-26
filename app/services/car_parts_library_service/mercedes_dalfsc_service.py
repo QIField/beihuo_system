@@ -19,7 +19,7 @@ def fetch_mercedes_parts_information(spider, part_number, customer_id, sales_org
     :param part_number: 零件编号
     :param customer_id: 客户ID
     :param sales_organization_id: 销售组织ID
-    :return: 包含成功/失败状态和提示信息的字典，格式: {'status': bool, 'msg': str, 'part_data': dict, 'raw_data': dict}
+    :return: 包含成功/失败状态和提示信息的字典，格式: {'status': bool, 'msg': str, 'part_numbers': list}
     """
     try:
         # 调用接口
@@ -28,7 +28,7 @@ def fetch_mercedes_parts_information(spider, part_number, customer_id, sales_org
         if not response:
             msg = f"请求失败：{part_number}"
             print(msg)
-            return {'status': False, 'msg': msg, 'part_data': None, 'raw_data': None}
+            return {'status': False, 'msg': msg, 'part_numbers': []}
         
         # 获取JSON数据
         data = response.json()
@@ -46,12 +46,15 @@ def fetch_mercedes_parts_information(spider, part_number, customer_id, sales_org
                 msg = f"零件 {part_number} 入库成功，影响 {count} 条"
                 print(msg)
         
-        return {'status': True, 'msg': msg, 'part_data': clean_data, 'raw_data': data}
+        # 提取所有相关的零件编号
+        part_numbers = extract_all_part_numbers_from_part_data(data)
+        
+        return {'status': True, 'msg': msg, 'part_numbers': part_numbers}
         
     except Exception as e:
         msg = f"处理零件 {part_number} 时出错：{str(e)}"
         print(msg)
-        return {'status': False, 'msg': msg, 'part_data': None, 'raw_data': None}
+        return {'status': False, 'msg': msg, 'part_numbers': []}
 
 
 def fetch_mercedes_stock_information(spider, part_numbers):
@@ -130,44 +133,37 @@ def fetch_mercedes_data(part_numbers):
         print(msg)
         return {'status': False, 'msg': msg, 'parts_count': 0, 'stock_count': 0}
     
-    # 创建spider实例并验证Cookie
-    print("正在验证Cookie...")
+    # 创建spider实例
     spider = MercedesDalfscSpider(cookie)
     
     try:
         # 验证Cookie是否有效
         is_valid, error_msg = spider.validate_cookie(
-            test_part_number="A0002521620",
+            test_part_number="A0005420590",
             test_customer_id=customer_id,
             test_sales_organization_id=sales_organization_id
         )
         if not is_valid:
-            msg = f"Cookie验证失败：{error_msg}"
+            msg = f"Cookie验证失败：==={error_msg}"
             print(msg)
             return {'status': False, 'msg': msg, 'parts_count': 0, 'stock_count': 0}
         print("Cookie验证通过，继续执行...")
         
-        # 第一步：逐个爬取零件信息
+        # 逐个爬取零件信息
         print("\n开始爬取零件信息...")
-        raw_parts_data_list = []
+        all_part_numbers = set()
         success_count = 0
         for part_number in part_numbers:
             result = fetch_mercedes_parts_information(spider, part_number, customer_id, sales_organization_id)
-            if result['status'] and result['part_data']:
-                raw_parts_data_list.append(result['raw_data'])
+            if result['status']:
                 success_count += 1
+                if result['part_numbers']:
+                    all_part_numbers.update(result['part_numbers'])
     
         print(f"\n零件信息爬取完成，成功 {success_count}/{len(part_numbers)} 个")
         
-        # 第二步：从零件数据中提取所有相关的零件编号
-        print("\n从零件数据中提取载荷信息...")
-        all_part_numbers = set()
-        for raw_data in raw_parts_data_list:
-            part_nums = extract_all_part_numbers_from_part_data(raw_data)
-            all_part_numbers.update(part_nums)
-        
         all_part_numbers = list(all_part_numbers)
-        print(f"共提取到 {len(all_part_numbers)} 个零件编号用于库存查询")
+        print(f"\n共提取到 {len(all_part_numbers)} 个零件编号用于库存查询")
         
         # 第三步：批量爬取库存信息
         print("\n开始爬取库存信息...")
@@ -187,3 +183,5 @@ def fetch_mercedes_data(part_numbers):
     finally:
         spider.close()
 
+# if __name__ == "__main__":
+#    fetch_mercedes_data(["A0005420711"])  

@@ -11,6 +11,7 @@
 """
 
 from app.models.orm_models.car_parts_library_benz import CarPartsLibraryBenz
+from app.models.orm_models.crmapp_compare_summary import CrmappCompareSummary
 from app.services.car_parts_library_service.mercedes_dalfsc_service import fetch_mercedes_data
 from app.utils.orm.session import orm_session
 from app.dao.car_parts_library_benz_dao import CarPartsLibraryBenzDao
@@ -19,6 +20,7 @@ from config.config_list_manager.config_cache import get_config_value
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy import select, func
 import json
+import re
 
 def get_part_by_number(part_number: str) -> Optional[Dict]:
     """
@@ -56,7 +58,7 @@ def get_parts_list_page(
     """
     try:
         with orm_session() as session:
-            # 检查是否有查询条件，没有则直接返回空
+            # 检查是否有查询条件，没有则直接返回
             has_condition = False
             if part_number and part_number.strip():
                 has_condition = True
@@ -79,7 +81,7 @@ def get_parts_list_page(
             
             # 分页查询
             offset = (page - 1) * page_size
-            items = query.order_by(CarPartsLibraryBenz.updated_at.desc()).offset(offset).limit(page_size).all()
+            items = query.order_by(CarPartsLibraryBenz.part_number.asc(), CarPartsLibraryBenz.updated_at.desc()).offset(offset).limit(page_size).all()
             
             # 转换为字典列表
             data = []
@@ -97,63 +99,122 @@ def get_parts_list_page(
 
 
 
-
-## 进行数据刷新
-def data_list_page_refresh(
-    page: int = 1,
-    page_size: int = 20,
-    part_number: Optional[str] = None
-) -> Dict:  
+def data_refresh(part_numbers: List[str]) -> Dict:
     """
-    获取配件列表（分页）
-
-    :param page: 页码，默认1
-    :param page_size: 每页条数，默认20
-    :param part_number: 配件编号筛选（可选）
-    :return: 包含成功/失败状态和提示信息的字典，格式: {'status': bool, 'msg': str, 'count': int}
+    根据配件编号列表刷新数据
+    
+    :param part_numbers: 配件编号列表
+    :return: 包含状态、消息和统计信息的字典
     """
-
     try:
-        with orm_session() as session:
-            # 检查是否有查询条件，没有则直接返回
-            has_condition = False
-            if part_number and part_number.strip():
-                has_condition = True
-            
-            if not has_condition:
-                msg = "没有查询条件，不返回数据"
-                print(msg)
-                return {'status': False, 'msg': msg, 'parts_count': 0, 'stock_count': 0}
-            
+        if not part_numbers or len(part_numbers) == 0:
+            return {'status': False, 'msg': '配件编号列表不能为空', 'parts_count': 0, 'stock_count': 0}
+        
+        fetch_mercedes_data_result = fetch_mercedes_data(part_numbers)
+        get_crmapp_compare_summary_result = get_crmapp_compare_summary(part_numbers)
 
+        parts_count = fetch_mercedes_data_result.get("parts_count", 0)
+        stock_count = fetch_mercedes_data_result.get("stock_count", 0)
 
-
-            # 构建查询
-            query = session.query(CarPartsLibraryBenz)
-            
-            # 添加筛选条件
-            if part_number:
-                part_number = part_number.strip()
-                query = query.filter(CarPartsLibraryBenz.part_number.like(f'%{part_number}%'))
-         
-            # 分页查询
-            offset = (page - 1) * page_size
-            items = query.order_by(CarPartsLibraryBenz.updated_at.desc()).offset(offset).limit(page_size).all()
-            
-           
-            if len(items) == 0:
-                return fetch_mercedes_data([part_number])
-
-            # 只提取part_number转化为列表
-            part_numbers = []
-            for item in items:
-                part_numbers.append(item.part_number)
-            return fetch_mercedes_data(part_numbers)
-
+        if fetch_mercedes_data_result.get('status') and get_crmapp_compare_summary_result:
+            return {
+                'status': True, 
+                'msg': f'🎉 数据刷新成功！成功更新了 {len(part_numbers)} 个配件，包含 {parts_count} 条零件信息和 {stock_count} 条库存信息', 
+                'parts_count': parts_count, 
+                'stock_count': stock_count
+            }
+        else:
+            return {
+                'status': False, 
+                'msg': f'❌ 数据刷新失败！涉及 {len(part_numbers)} 个配件，零件信息 {parts_count} 条，库存信息 {stock_count} 条，请检查配置或网络连接', 
+                'parts_count': parts_count, 
+                'stock_count': stock_count
+            }
     except Exception as e:
-        msg = f"从数据库查询配件数据刷新失败: {str(e)}"
+        msg = f"💥 批量刷新数据异常: {str(e)}"
         print(msg)
         return {'status': False, 'msg': msg, 'parts_count': 0, 'stock_count': 0}
+
+
+def get_crmapp_compare_summary(oe_list: List[str], vehicle_brand: str = '奔驰', company: str = 'fsbbr') -> bool:
+    """
+    根据OE号列表、品牌和公司/门店代码查询比价数据，并更新CarPartsLibraryBenz表的字段
+
+    :param oe_list: OE号列表
+    :param vehicle_brand: 品牌（可选）
+    :param company: 公司/门店代码（可选）
+    :return: 布尔值，True表示操作成功
+    """
+    try:
+        with orm_session() as session:
+            # 处理OE号，去掉前面的大写字母A
+            processed_oe_list = [re.sub(r'^A', '', oe) for oe in oe_list]
+            
+            # 构建查询 - 使用GROUP BY和MAX()去重
+            query = session.query(
+                CrmappCompareSummary.oe,
+                func.max(CrmappCompareSummary.product_name).label('product_name'),
+                func.max(CrmappCompareSummary.l_model_zh).label('l_model_zh'),
+                func.max(CrmappCompareSummary.vehicle_brand).label('vehicle_brand')
+            )
+            
+            # 添加OE号筛选（使用处理后的OE号）
+            if processed_oe_list:
+                query = query.filter(CrmappCompareSummary.oe.in_(processed_oe_list))
+            
+            # 添加品牌筛选
+            if vehicle_brand:
+                query = query.filter(CrmappCompareSummary.vehicle_brand == vehicle_brand)
+            
+            # 添加公司筛选
+            if company:
+                query = query.filter(CrmappCompareSummary.company == company)
+            
+            # 添加GROUP BY
+            query = query.group_by(CrmappCompareSummary.oe)
+            
+            # 执行查询
+            results = query.all()
+            
+            # 转换为字典，key为处理后的OE号，value为包含所需字段的字典
+            result_dict: Dict[str, Dict[str, Optional[str]]] = {}
+            for row in results:
+                result_dict[row.oe] = {
+                    'product_name': row.product_name,
+                    'l_model_zh': row.l_model_zh,
+                    'vehicle_brand': row.vehicle_brand
+                }
+            
+            # 更新CarPartsLibraryBenz表的字段
+            for original_oe in oe_list:
+                # 处理当前OE号
+                processed_oe = re.sub(r'^A', '', original_oe)
+                
+                # 检查是否有对应的比价数据
+                if processed_oe not in result_dict:
+                    continue
+                
+                compare_result = result_dict[processed_oe]
+                
+                # 根据原始OE号查找CarPartsLibraryBenz记录
+                benz_part = session.query(CarPartsLibraryBenz).filter(
+                    CarPartsLibraryBenz.part_number == original_oe
+                ).first()
+                
+                if benz_part:
+                    # 更新description_cn字段（从product_name）
+                    if compare_result['product_name']:
+                        benz_part.description_cn = compare_result['product_name']  # pyright: ignore[reportAttributeAccessIssue]
+                    
+                    # 更新l_model_zh字段
+                    if compare_result['l_model_zh']:
+                        benz_part.l_model_zh = compare_result['l_model_zh']  # pyright: ignore[reportAttributeAccessIssue]
+
+            return True
+    except Exception as e:
+        print(f"查询比价数据更新配件库失败: {str(e)}")
+        return False
+
 
 
 def set_mercedes_config(cookie: str, customer_id: str, sales_organization_id: str) -> Dict:
@@ -208,4 +269,6 @@ def get_mercedes_config() -> Optional[Dict]:
 
 
 
-
+# if __name__ == '__main__':
+#     a=data_list_page_refresh(part_number='8201245')
+#     print(a)
