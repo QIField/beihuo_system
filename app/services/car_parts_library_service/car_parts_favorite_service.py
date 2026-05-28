@@ -13,6 +13,7 @@
 from app.models.orm_models.car_parts_library_benz import CarPartsLibraryBenz
 from app.models.orm_models.car_parts_favorite import CarPartsFavorite
 from app.utils.orm.session import orm_session
+from config.config_list_manager.config_cache import get_config_value
 from typing import Dict, List, Optional
 
 
@@ -77,6 +78,17 @@ def get_user_favorites(user_id: int, category: Optional[str] = '主收藏', page
     :return: 包含状态、消息、总数和数据列表的字典，如果失败则返回None
     """
     try:
+        # 先获取配置
+        tax_rate = 1.13
+        discount_rate = 0.87
+        try:
+            config = get_config_value('mercedes_benz')
+            if config and isinstance(config, dict):
+                tax_rate = config.get('tax_rate', 1.13)
+                discount_rate = config.get('discount_rate', 0.87)
+        except Exception:
+            pass
+        
         with orm_session() as session:
             # 构建查询
             query = session.query(
@@ -99,12 +111,12 @@ def get_user_favorites(user_id: int, category: Optional[str] = '主收藏', page
             # 分页查询
             offset = (page - 1) * page_size
             favorites = query.order_by(
-                CarPartsFavorite.created_at.desc()
+                CarPartsLibraryBenz.part_number.desc()
             ).offset(offset).limit(page_size).all()
             
             result = []
             for favorite, part in favorites:
-                part_dict = part.to_dict()
+                part_dict = part.to_web_dict(tax_rate, discount_rate)
                 part_dict['favorite_id'] = favorite.id
                 part_dict['favorite_category'] = favorite.category
                 part_dict['favorite_created_at'] = favorite.created_at

@@ -30,6 +30,17 @@ def get_part_by_number(part_number: str) -> Optional[Dict]:
     :return: 配件字典，如果不存在则返回None
     """
     try:
+        # 先获取配置
+        tax_rate = 1.13
+        discount_rate = 0.83
+        try:
+            config = get_config_value('mercedes_benz')
+            if config and isinstance(config, dict):
+                tax_rate = config.get('tax_rate', 1.13)
+                discount_rate = config.get('discount_rate', 0.83)
+        except Exception:
+            pass
+        
         with orm_session() as session:
             # 直接使用 session.query 查询
             part = session.query(CarPartsLibraryBenz).filter(
@@ -37,7 +48,7 @@ def get_part_by_number(part_number: str) -> Optional[Dict]:
             ).first()
             
             if part:
-                return part.to_dict()
+                return part.to_web_dict(tax_rate, discount_rate)
             return None
     except Exception as e:
         print(f"从数据库查询配件详情失败: {str(e)}")
@@ -57,6 +68,17 @@ def get_parts_list_page(
     :return: 包含状态、消息、总数和数据列表的字典
     """
     try:
+        # 先获取配置
+        tax_rate = 1.13
+        discount_rate = 0.87
+        try:
+            config = get_config_value('mercedes_benz')
+            if config and isinstance(config, dict):
+                tax_rate = config.get('tax_rate', 1.13)
+                discount_rate = config.get('discount_rate', 0.87)
+        except Exception:
+            pass
+        
         with orm_session() as session:
             # 检查是否有查询条件，没有则直接返回
             has_condition = False
@@ -86,7 +108,7 @@ def get_parts_list_page(
             # 转换为字典列表
             data = []
             for item in items:
-                data.append(item.to_dict())
+                data.append(item.to_web_dict(tax_rate, discount_rate))
 
             print(f"从数据库查询到 {len(data)} 条配件数据，共 {total} 条")
             return {'status': True, 'msg': '查询成功', 'count': total, 'data': data}
@@ -217,13 +239,15 @@ def get_crmapp_compare_summary(oe_list: List[str], vehicle_brand: str = '奔驰'
 
 
 
-def set_mercedes_config(cookie: str, customer_id: str, sales_organization_id: str) -> Dict:
+def set_mercedes_config(cookie: str, customer_id: str, sales_organization_id: str, tax_rate: float = 1.13, discount_rate: float = 0.87) -> Dict:
     """
     设置奔驰大库配置
 
     :param cookie: Cookie 字符串
     :param customer_id: 客户ID
     :param sales_organization_id: 销售组织ID
+    :param tax_rate: 税率，默认 1.13
+    :param discount_rate: 折扣率，默认 0.83
     :return: 设置结果
     """
     try:
@@ -231,7 +255,9 @@ def set_mercedes_config(cookie: str, customer_id: str, sales_organization_id: st
         config_value = json.dumps({
             'cookie': cookie,
             'customer_id': customer_id,
-            'sales_organization_id': sales_organization_id
+            'sales_organization_id': sales_organization_id,
+            'tax_rate': tax_rate,
+            'discount_rate': discount_rate
         }, ensure_ascii=False)
         
         set_config_by_key(
@@ -267,6 +293,124 @@ def get_mercedes_config() -> Optional[Dict]:
         return None
 
 
+
+
+def add_part(part_data: dict) -> dict:
+    """
+    添加配件
+    :param part_data: 配件数据字典
+    :return: 操作结果
+    """
+    try:
+        with orm_session() as session:
+            # 检查配件编号是否已存在
+            existing_part = session.query(CarPartsLibraryBenz).filter(
+                CarPartsLibraryBenz.part_number == part_data.get('part_number')
+            ).first()
+            
+            if existing_part:
+                return {
+                    'status': False,
+                    'msg': '配件编号已存在'
+                }
+            
+            # 创建新配件对象
+            new_part = CarPartsLibraryBenz()
+            
+            # 填充数据
+            for key, value in part_data.items():
+                if hasattr(new_part, key):
+                    setattr(new_part, key, value)
+            
+            # 设置数据来源
+            new_part.data_source = 'manual'  # pyright: ignore[reportAttributeAccessIssue]
+            
+            session.add(new_part)
+            session.commit()
+            
+            return {
+                'status': True,
+                'msg': '添加成功'
+            }
+    except Exception as e:
+        print(f"添加配件失败: {str(e)}")
+        return {
+            'status': False,
+            'msg': f'添加失败: {str(e)}'
+        }
+
+
+def update_part(part_number: str, part_data: dict) -> dict:
+    """
+    更新配件
+    :param part_number: 配件编号
+    :param part_data: 更新的数据字典
+    :return: 操作结果
+    """
+    try:
+        with orm_session() as session:
+            # 查找配件
+            part = session.query(CarPartsLibraryBenz).filter(
+                CarPartsLibraryBenz.part_number == part_number
+            ).first()
+            
+            if not part:
+                return {
+                    'status': False,
+                    'msg': '配件不存在'
+                }
+            
+            # 更新数据
+            for key, value in part_data.items():
+                if hasattr(part, key) and key != 'part_number':  # 不允许修改配件编号
+                    setattr(part, key, value)
+            
+            session.commit()
+            
+            return {
+                'status': True,
+                'msg': '更新成功'
+            }
+    except Exception as e:
+        print(f"更新配件失败: {str(e)}")
+        return {
+            'status': False,
+            'msg': f'更新失败: {str(e)}'
+        }
+
+
+def delete_part(part_number: str) -> dict:
+    """
+    删除配件
+    :param part_number: 配件编号
+    :return: 操作结果
+    """
+    try:
+        with orm_session() as session:
+            # 查找配件
+            part = session.query(CarPartsLibraryBenz).filter(
+                CarPartsLibraryBenz.part_number == part_number
+            ).first()
+            
+            if not part:
+                return {
+                    'status': False,
+                    'msg': '配件不存在'
+                }
+            
+            session.delete(part)
+            session.commit()
+            
+            return {
+                'status': True,
+                'msg': '删除成功'
+            }
+    except Exception as e:
+        print(f"删除配件失败: {str(e)}")
+        return {
+            'status': False,
+            'msg': f'删除失败: {str(e)}'
+        }
 
 
 # if __name__ == '__main__':

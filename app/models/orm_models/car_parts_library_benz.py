@@ -92,4 +92,57 @@ class CarPartsLibraryBenz(BaseModels):
             'updated_at': self.updated_at
         }
 
+
+    def to_web_dict(self, tax_rate: float = 1.13, discount_rate: float = 0.87):
+        """
+        单个对象转字典（专门给前端使用）
+        :param tax_rate: 税率，默认 1.13
+        :param discount_rate: 折扣率，默认 0.87
+        :return: 字典形式的对象数据
+        """
+        wholesale_price = self.wholesale_price
+        price_4s_tax_in = None
+        price_baborui = None
+        
+        if wholesale_price is not None:
+            # 4s含税进价 = 批发价 * 税率
+            price_4s_tax_in = wholesale_price * tax_rate   # pyright: ignore[reportArgumentType, reportCallIssue]
+            # 巴博瑞采购价 = 批发价 * 税率 * 折扣
+            price_baborui = wholesale_price * tax_rate * discount_rate   # pyright: ignore[reportArgumentType, reportCallIssue]
+
+        return {
+            'part_number': self.part_number,
+            'descriptions': self.descriptions,
+            'description_cn': self.description_cn,
+            'marketing_code': self.marketing_code,
+            'dealer_discount_group': self.dealer_discount_group,
+            'msrp': self.msrp,
+            'dealer_fixed_nominal_margin': self.dealer_fixed_nominal_margin,
+            'wholesale_price': wholesale_price,
+            'marketing_code_description': self.marketing_code_description,
+            'quantity_unit': self.quantity_unit,
+            'sales_pack_size': self.sales_pack_size,
+            'weight': self.weight,
+            'length': self.length,
+            'width': self.width,
+            'height': self.height,
+            'effective_date': self.effective_date,
+            'data_source': self.data_source,
+            'l_model_zh': self.l_model_zh,
+            'brand': self.brand,
+            'category': self.category,
+            'ccc_mark': self.ccc_mark,
+            'volume': self.volume,
+            'hazmat_code': self.hazmat_code,
+            'origin_country': self.origin_country,
+            'shelf_life': self.shelf_life,
+            'is_hazmat': self.is_hazmat,
+            'part_nr_info_super_session': self.part_nr_info_super_session,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            # 新增前端显示的价格字段
+            'price_4s_tax_in': price_4s_tax_in,
+            'price_baborui': price_baborui,
+        }
+
  

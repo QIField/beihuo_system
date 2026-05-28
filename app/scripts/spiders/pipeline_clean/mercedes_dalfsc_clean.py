@@ -28,9 +28,9 @@ def clean_parts_information(data_dict):
         'dealer_discount_group': data_dict.get('discountGroup', ''),
         
         # 价格信息
-        'msrp': data_dict.get('currentMarketGuidancePrice', {}).get('value'),
-        'purchase_price': data_dict.get('currentSellingPrice', {}).get('value'),
-        'wholesale_price': data_dict.get('grossValueCurrent', {}).get('value'),
+        'msrp': data_dict.get('currentMarketGuidancePrice', {}).get('value'), #市场指导价
+        'purchase_price': data_dict.get('currentSellingPrice', {}).get('value'), #巴博瑞采购价
+        'wholesale_price': data_dict.get('currentSellingPrice', {}).get('value'),#批发价
         
         # 基本数据
         'quantity_unit': data_dict.get('baseUnit', ''),

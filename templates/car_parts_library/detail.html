@@ -99,13 +99,6 @@
                 <i class="layui-icon layui-icon-return"></i> 返回列表
             </button>
         </div>
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <label style="font-size: 14px; color: #595959;">价格倍率：</label>
-            <input type="number" id="priceMultiplier" value="1.0" min="0" step="0.1" style="width: 100px; padding: 8px 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 14px;">
-            <button class="btn btn-primary" id="applyMultiplier">
-                <i class="layui-icon layui-icon-refresh"></i> 应用
-            </button>
-        </div>
     </div>
     <!-- 加载提示 -->
     <div id="loading" style="text-align: center; padding: 50px;">
@@ -122,7 +115,6 @@
         <div style="margin-bottom: 24px;">
             <h2 style="margin: 0 0 12px 0; font-size: 24px; color: #262626;">{{ d.title }}</h2>
             <p style="margin: 0 0 8px 0; color: #595959;">代码：<span style="color: #1890ff; font-weight: 500;">{{ d.part_number }}</span></p>
-            <p style="margin: 0 0 8px 0; color: #595959;">品牌：{{ d.brand }} | 分类：{{ d.category }} | 原产地：{{ d.origin_country }}</p>
             <p style="margin: 0 0 12px 0; color: #595959;">创建时间：{{ d.created_at }} | 更新时间：{{ d.updated_at }}</p>
             <div style="display: flex; gap: 16px; align-items: center;">
                 <span style="font-size: 28px; color: #ff4d4f; font-weight: 600;">{{ d.wholesale_price }}</span>
@@ -147,7 +139,7 @@
             <table class="layui-table" lay-skin="line">
                 <tbody>
                     <tr>
-                        <td style="width: 120px; background: #fafafa; font-weight: 500;">零件名称</td>
+                        <td style="width: 120px; background: #fafafa; font-weight: 500;">配件名称</td>
                         <td>{{ d.description_cn }}</td>
                         <td style="width: 120px; background: #fafafa; font-weight: 500;">代码</td>
                         <td>{{ d.part_number }}</td>
@@ -181,7 +173,7 @@
                     <tr>
                         <td style="background: #fafafa; font-weight: 500;">存储期限</td>
                         <td>{{ d.shelf_life }}</td>
-                        <td style="background: #fafafa; font-weight: 500;">防溢标识/危险品</td>
+                        <td style="background: #fafafa; font-weight: 500;">防盗/危险品</td>
                         <td>{{ d.is_hazmat }}</td>
                         <td style="background: #fafafa; font-weight: 500;">价格有效期起始日期</td>
                         <td>{{ d.effective_date }}</td>
@@ -189,10 +181,18 @@
                     <tr>
                         <td style="background: #fafafa; font-weight: 500;">批发价</td>
                         <td style="color: #ff4d4f; font-weight: 600;">{{ d.wholesale_price }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">4S含税进价</td>
+                        <td style="color: #ff4d4f; font-weight: 600;">{{ d.price_4s_tax_in }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">巴博瑞采购价</td>
+                        <td style="color: #ff4d4f; font-weight: 600;">{{ d.price_baborui }}</td>
+                    </tr>
+                    <tr>
                         <td style="background: #fafafa; font-weight: 500;">市场指导价</td>
                         <td style="color: #ff4d4f; font-weight: 600;">{{ d.msrp }}</td>
-                        <td style="background: #fafafa; font-weight: 500;">巴博瑞采购价</td>
-                        <td style="color: #ff4d4f; font-weight: 600;">{{ d.purchase_price }}</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
                     </tr>
                 </tbody>
             </table>
@@ -216,10 +216,6 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
     var layer = layui.layer;
     var laytpl = layui.laytpl;
     
-    // 全局变量：原始数据和当前倍率
-    var rawData = null;
-    var currentMultiplier = 1.0;
-    
     // 获取URL参数
     function getUrlParam(name) {
         var hash = location.hash;
@@ -242,19 +238,19 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
     }
     
     // 处理数据格式
-    function formatData(data, multiplier) {
+    function formatData(data) {
         // 处理空值
         function emptyVal(val) {
             return val ? val : '-';
         }
         
-        // 处理价格（只给批发价加倍率）
-        function formatPrice(price, applyMultiplier) {
+        // 处理价格
+        function formatPrice(price) {
             if (!price) return '-';
             var numPrice = parseFloat(price);
             if (isNaN(numPrice)) return '-';
-            var finalPrice = applyMultiplier ? (numPrice * multiplier) : numPrice;
-            return finalPrice.toFixed(2) + ' CNY';
+            return numPrice.toFixed(2) + ' CNY';
+            // return numPrice + ' CNY';
         }
         
         // 处理尺寸
@@ -282,9 +278,10 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
             origin_country: emptyVal(data.origin_country),
             created_at: emptyVal(data.created_at),
             updated_at: emptyVal(data.updated_at),
-            wholesale_price: formatPrice(data.wholesale_price, true),
-            msrp: formatPrice(data.msrp, false),
-            purchase_price: formatPrice(data.purchase_price, false),
+            wholesale_price: formatPrice(data.wholesale_price),
+            price_4s_tax_in: formatPrice(data.price_4s_tax_in),
+            price_baborui: formatPrice(data.price_baborui),
+            msrp: formatPrice(data.msrp),
             quantity_unit: emptyVal(data.quantity_unit),
             weight: data.weight ? parseFloat(data.weight) + ' KG' : '-',
             volume: data.volume ? parseFloat(data.volume) + ' CDM' : '-',
@@ -299,8 +296,8 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
     }
     
     // 渲染详情
-    function renderDetail(data, multiplier) {
-        var formattedData = formatData(data, multiplier);
+    function renderDetail(data) {
+        var formattedData = formatData(data);
         var getTpl = $('#detailTpl').html();
         var view = $('#detailContent');
         
@@ -308,21 +305,6 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
             $('#loading').remove();
             view.html(html);
         });
-    }
-    
-    // 应用倍率
-    function applyMultiplier() {
-        var multiplier = parseFloat($('#priceMultiplier').val());
-        if (isNaN(multiplier) || multiplier < 0) {
-            layer.msg('请输入有效的倍率', {icon: 2});
-            return;
-        }
-        
-        currentMultiplier = multiplier;
-        if (rawData) {
-            renderDetail(rawData, currentMultiplier);
-            layer.msg('倍率已应用', {icon: 1});
-        }
     }
     
     // 加载详情数据
@@ -344,8 +326,7 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
             },
             success: function(res) {
                 if (res.code === 200 && res.data) {
-                    rawData = res.data;
-                    renderDetail(rawData, currentMultiplier);
+                    renderDetail(res.data);
                 } else {
                     layer.msg(res.msg || '获取配件详情失败', {icon: 2});
                     showError(res.msg || '获取配件详情失败');
@@ -357,14 +338,6 @@ layui.use(['jquery', 'layer', 'laytpl'], function(){
             }
         });
     }
-    
-    // 绑定事件
-    $('#applyMultiplier').on('click', applyMultiplier);
-    $('#priceMultiplier').on('keydown', function(e) {
-        if (e.keyCode === 13) {
-            applyMultiplier();
-        }
-    });
     
     // 执行加载
     loadDetail();
