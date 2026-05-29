@@ -30,6 +30,7 @@
         }
         .search-form {
             margin-bottom: 10px;
+            margin-top: 0;
         }
         .search-row {
             display: flex;
@@ -60,32 +61,7 @@
         .layui-input-inline {
             width: 100%;
         }
-        .statistics-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            font-size: 14px;
-            color: #666;
-        }
 
-        .stat-item {
-            background-color: #f0f8ff;
-            padding: 5px 10px;
-            border-radius: 4px;
-            border: 1px solid #d0e8ff;
-        }
-        .header-and-search {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 15px;
-        }
-        .header-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin: 0;
-            flex-shrink: 0;
-        }
         .layui-form-label {
             width: auto;
             padding-right: 5px;
@@ -128,10 +104,10 @@
             border-color: #66b1ff;
         }
         
-        /* 添加业务日期选择样式 */
-        .business-date-item {
-            min-width: 150px;
-            max-width: 180px;
+        /* 日期范围选择器样式 */
+        .date-range-item {
+            min-width: 220px;
+            max-width: 260px;
             flex: 0 0 auto;
             display: flex;
             flex-direction: column;
@@ -139,13 +115,6 @@
     </style>
 </head>
 <body>
-    <div class="header-and-search">
-        <div class="header-title" id="headerTitle">虚拟库存管理</div>
-        <div class="statistics-info" id="statisticsInfo">
-            <!-- 统计信息将在这里动态加载 -->
-        </div>
-    </div>
-    
     <!-- 搜索表单 -->
     <div class="table-container search-form">
         <form class="layui-form" id="searchForm">
@@ -182,12 +151,9 @@
                         </select>
                     </div>
                 </div>
-                <div class="business-date-item">
+                <div class="date-range-item">
                     <div class="layui-input-inline">
-                        <select name="business_date_type" id="businessDateTypeSelect" class="layui-select">
-                            <option value="today">今天数据</option>
-                            <option value="">全部数据</option>
-                        </select>
+                        <input type="text" name="date_range" id="dateRange" placeholder="请选择日期范围" autocomplete="off" class="layui-input" readonly>
                     </div>
                 </div>
             </div>
@@ -213,6 +179,7 @@
     </script>
 
 <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
 <script>
     // 创建独立的命名空间
     window.VirtualInventoryApp = window.VirtualInventoryApp || {};
@@ -291,13 +258,6 @@
                         console.log(`[⏱️ 计时] 表格数据加载完成，耗时: ${duration}ms`, res);
                         console.log('当前搜索参数:', apiParams);
 
-                        // 如果是业务日期数据，显示业务日期范围
-                        if (res.business_time_range) {
-                            $('#headerTitle').html(`虚拟库存管理 - ${res.business_time_range}`);
-                        } else {
-                            $('#headerTitle').html('虚拟库存管理');
-                        }
-
                         // 重新设置表格高度
                         setTimeout(function() {
                             var tableBox = $('.layui-table-box');
@@ -307,17 +267,24 @@
                             }
                         }, 100);
 
-                        // 异步加载统计数据（表格先显示，统计后加载）
-                        app.loadStatisticsAsync(apiParams);
+
                     },
                     error: function(res, msg) {
                         console.error('表格加载失败: ' + msg);
                         layer.msg('表格加载失败: ' + msg, {icon: 2});
                     }
                 });
+
+                // 初始化表格单元格选择功能（双击复制）
+                if (typeof TableCellSelector !== 'undefined') {
+                    TableCellSelector.init('virtualInventoryTable', {
+                        enableCopy: true  // 启用Ctrl+C复制
+                    });
+                    console.log('[表格选择器] 已初始化双击复制功能');
+                }
             });
         },
-        
+
         // 加载更新信息选项（固定8种中文状态）
         loadUpdateMsgOptions: function() {
             layui.use(['jquery'], function() {
@@ -355,61 +322,27 @@
             });
         },
         
-        getStatistics: function() {
-            // 统一使用今日统计，显示当天数据的5大汇总
-            this.getTodayStatistics();
+        // 解析日期范围字符串
+        parseDateRange: function(dateRangeStr) {
+            if (!dateRangeStr) return { start: '', end: '' };
+            var dates = dateRangeStr.split(' - ');
+            if (dates.length === 2) {
+                return {
+                    start: dates[0].trim(),
+                    end: dates[1].trim()
+                };
+            }
+            return { start: '', end: '' };
         },
 
-        // 获取今日业务日期统计数据
-        getTodayStatistics: function() {
-            layui.use(['jquery'], function() {
-                var $ = layui.jquery;
-                var startTime = performance.now();
-                console.log('[⏱️ 计时] 开始请求今日统计数据...');
-
-                $.ajax({
-                    url: '/api/virtual_inventory_statistics_today',
-                    type: 'GET',
-                    success: function(res) {
-                        var endTime = performance.now();
-                        var duration = (endTime - startTime).toFixed(2);
-                        console.log(`[⏱️ 计时] 今日统计数据加载完成，耗时: ${duration}ms`, res);
-
-                        if(res.code === 0) {
-                            var data = res.data;
-                            console.log('今日统计数据详情:', data);
-                            // 新四大分类汇总
-                            var statsHtml = `
-                                <span class="stat-item">业务日期：${data.business_date}</span>
-                                <span class="stat-item">业务时间：${data.business_time_range}</span>
-                                <span class="stat-item">总记录：${data.total_count}条</span>
-                                <span class="stat-item">上传成功：${data.upload_success_count || 0}条</span>
-                                <span class="stat-item">新建成功：${data.new_create_success_count || 0}条</span>
-                                <span class="stat-item">新建失败：${data.new_create_fail_count || 0}条</span>
-                                <span class="stat-item">上传失败：${data.upload_fail_count || 0}条</span>
-                                <span class="stat-item">没有档案：${data.no_record_count || 0}条</span>
-                            `;
-                            $('#statisticsInfo').html(statsHtml);
-                            console.log('今日统计数据已更新到页面');
-                        } else {
-                            console.error('获取今日统计数据失败:', res.msg);
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        var endTime = performance.now();
-                        var duration = (endTime - startTime).toFixed(2);
-                        console.error(`[⏱️ 计时] 今日统计数据加载失败，耗时: ${duration}ms, 错误:`, error);
-                        console.error('错误详情:', xhr, status, error);
-                    }
-                });
-            });
-        },
-
-        // 异步加载统计数据（表格先显示，统计后加载）
-        // 统一显示当天数据的5大汇总
-        loadStatisticsAsync: function(searchParams) {
-            // 统一使用今日统计，显示当天数据的5大汇总
-            this.getTodayStatistics();
+        // 获取今天的日期范围字符串（yyyy-MM-dd - yyyy-MM-dd）
+        getTodayDateRange: function() {
+            var today = new Date();
+            var year = today.getFullYear();
+            var month = String(today.getMonth() + 1).padStart(2, '0');
+            var day = String(today.getDate()).padStart(2, '0');
+            var dateStr = year + '-' + month + '-' + day;
+            return dateStr + ' - ' + dateStr;
         },
 
         // 在app对象中添加获取供应商汇总的方法
@@ -420,13 +353,14 @@
             var startTime = performance.now();
             console.log('[⏱️ 计时] 开始请求供应商汇总数据...');
 
-            // 获取当前业务日期类型
-            var currentBusinessDateType = $('#businessDateTypeSelect').val();
+            // 获取日期范围
+            var dateRangeValue = $('#dateRange').val();
+            var dateRange = app.parseDateRange(dateRangeValue);
 
-            // 根据当前业务日期类型选择相应的API
+            // 构建API URL，添加日期参数
             var apiUrl = '/api/supplier_summary';
-            if (currentBusinessDateType === 'today') {
-                apiUrl = '/api/supplier_summary?business_date_type=today';
+            if (dateRange.start && dateRange.end) {
+                apiUrl += '?start_date=' + encodeURIComponent(dateRange.start) + '&end_date=' + encodeURIComponent(dateRange.end);
             }
 
             $.ajax({
@@ -439,6 +373,8 @@
 
                     if(res.code === 0) {
                         var summaryData = res.data;
+                        var dateRangeText = dateRange.start && dateRange.end ? 
+                            '（' + dateRange.start + ' 至 ' + dateRange.end + '）' : '（全部数据）';
                         
                         // 构建弹窗内容
                         var content = '<table class="layui-table" style="width: 100%;">';
@@ -459,7 +395,7 @@
                         // 显示弹窗
                         layer.open({
                             type: 1,
-                            title: '各供应商汇总' + (currentBusinessDateType === 'today' ? '（今日数据）' : '（全部数据）'),
+                            title: '各供应商汇总' + dateRangeText,
                             area: ['700px', '500px'],
                             content: content,
                             cancel: function(){
@@ -483,18 +419,17 @@
                                 layui.form.render('select');
                             }
                             
-                            // 设置业务日期类型为"今日数据"
-                            $('#businessDateTypeSelect').val('today');
-                            if(layui.form) {
-                                layui.form.render('select');
-                            }
-                            
-                            // 触发搜索 - 保持当前业务日期类型
+                            // 触发搜索
                             var searchParams = {
                                 supplier_name: supplierName,
-                                pattern: '上传失败',
-                                business_date_type: 'today'  // 设置为今日数据
+                                pattern: '上传失败'
                             };
+                            
+                            // 如果有日期范围，也传递
+                            if (dateRange.start && dateRange.end) {
+                                searchParams.start_date = dateRange.start;
+                                searchParams.end_date = dateRange.end;
+                            }
                             
                             app.initTable(searchParams);
                         });
@@ -526,15 +461,43 @@
                 $('input[name="warehouse"]').val('');
                 $('input[name="remark"]').val('');
 
-                // 重置下拉选择框为默认值（业务日期类型保持为"今天数据"）
+                // 重置日期范围选择器
+                $('#dateRange').val('');
+
+                // 重置下拉选择框为默认值
                 $('#updateMsgSelect')[0].selectedIndex = 0; // 重置为第一个选项
-                $('#businessDateTypeSelect').val('today'); // 重置业务日期类型为"今天数据"
                 form.render('select'); // 重新渲染下拉框
             });
 
-            // 刷新表格，默认查询今天数据
-            app.getTodayStatistics();
-            app.initTable({business_date_type: 'today'});
+            // 清空表格数据，不加载任何数据
+            layui.use(['table'], function() {
+                var table = layui.table;
+                // 使用 render 重新渲染表格，设置空数据和 url 为空
+                table.render({
+                    elem: '#virtualInventoryTable',
+                    data: [],
+                    page: true,
+                    limit: 200,
+                    cols: [[
+                        {field: 'supplier_name', title: '供应商名称', width: 120, sort: true},
+                        {field: 'oe_code', title: 'OE码', width: 130, sort: true},
+                        {field: 'brand', title: '品牌', width: 90, sort: true},
+                        {field: 'price', title: '价格', width: 100, sort: true},
+                        {field: 'expiry_date', title: '过期日期', width: 150, sort: true, templet: function(d) {
+                            return formatDateTime(d.expiry_date);
+                        }},
+                        {field: 'warehouse', title: '仓库', width: 120},
+                        {field: 'stock', title: '库存', width: 100, sort: true, sort: true},
+                        {field: 'remark', title: '备注', width: 180, sort: true},
+                        {field: 'fetch_time', title: '获取时间', width: 180, sort: true, templet: function(d) {
+                            return formatDateTime(d.fetch_time);
+                        }},
+                        {field: 'update_msg', title: '更新信息', width: 600, sort: true}
+                    ]]
+                });
+            });
+
+            layer.msg('已重置搜索条件', {icon: 1});
         },
 
         // 页面初始化开始时间
@@ -546,31 +509,66 @@
             app._pageInitStartTime = performance.now();
             console.log('[⏱️ 计时] ========== 页面初始化开始 ==========');
 
-            // 先加载更新信息选项
-            app.loadUpdateMsgOptions();
-
-            // 默认加载今日统计数据
-            app.getTodayStatistics();
-
-            // 初始化表格，默认查询今天数据
-            app.initTable({business_date_type: 'today'});
-
-            // 页面初始化完成后输出总耗时
-            setTimeout(function() {
-                var endTime = performance.now();
-                var totalDuration = (endTime - app._pageInitStartTime).toFixed(2);
-                console.log(`[⏱️ 计时] ========== 页面初始化完成，总耗时: ${totalDuration}ms ==========`);
-            }, 100);
-            
-            // 使用layui的form模块绑定事件
-            layui.use(['form', 'jquery'], function() {
+            // 使用layui的form和jquery模块
+            layui.use(['form', 'jquery', 'laydate'], function() {
                 var form = layui.form;
                 var $ = layui.jquery;
+                var laydate = layui.laydate;
+
+                // 先加载更新信息选项
+                app.loadUpdateMsgOptions();
+
+                // 初始化日期选择器
+                laydate.render({
+                    elem: '#dateRange',
+                    trigger: 'click',
+                    format: 'yyyy-MM-dd',
+                    range: true,
+                    max: 0,
+                    value: '',
+                    done: function(value, date, endDate) {
+                        if (value) {
+                            var searchParams = {};
+                            searchParams.supplier_name = $('input[name="supplier_name"]').val();
+                            searchParams.oe_code = $('input[name="oe_code"]').val();
+                            searchParams.brand = $('input[name="brand"]').val();
+                            searchParams.warehouse = $('input[name="warehouse"]').val();
+                            searchParams.remark = $('input[name="remark"]').val();
+                            searchParams.pattern = $('#updateMsgSelect').val();
+
+                            var dateRange = app.parseDateRange(value);
+                            if (dateRange.start && dateRange.end) {
+                                searchParams.start_date = dateRange.start;
+                                searchParams.end_date = dateRange.end;
+                            }
+
+                            app.initTable(searchParams);
+                        }
+                    }
+                });
+
+                // 设置默认日期为今天
+                var todayRange = app.getTodayDateRange();
+                $('#dateRange').val(todayRange);
+
+                // 初始化表格，默认查询今天数据
+                var todayDateRange = app.parseDateRange(todayRange);
+                app.initTable({
+                    start_date: todayDateRange.start,
+                    end_date: todayDateRange.end
+                });
+
+                // 页面初始化完成后输出总耗时
+                setTimeout(function() {
+                    var endTime = performance.now();
+                    var totalDuration = (endTime - app._pageInitStartTime).toFixed(2);
+                    console.log(`[⏱️ 计时] ========== 页面初始化完成，总耗时: ${totalDuration}ms ==========`);
+                }, 100);
                 
                 // 表单提交事件
                 form.on('submit(search)', function(data) {
                     var searchParams = {};
-                    
+
                     // 获取所有搜索字段的值
                     searchParams.supplier_name = $('input[name="supplier_name"]').val();
                     searchParams.oe_code = $('input[name="oe_code"]').val();
@@ -578,17 +576,17 @@
                     searchParams.warehouse = $('input[name="warehouse"]').val();
                     searchParams.remark = $('input[name="remark"]').val();
                     searchParams.pattern = $('#updateMsgSelect').val(); // 获取更新信息筛选值
-                    searchParams.business_date_type = $('#businessDateTypeSelect').val(); // 获取业务日期类型
-                    
-                    console.log('搜索参数:', searchParams);
-                    
-                    // 根据业务日期类型选择不同的统计数据API
-                    if (searchParams.business_date_type === 'today') {
-                        app.getTodayStatistics();
-                    } else {
-                        app.getStatistics();
+
+                    // 获取日期范围
+                    var dateRangeValue = $('#dateRange').val();
+                    var dateRange = app.parseDateRange(dateRangeValue);
+                    if (dateRange.start && dateRange.end) {
+                        searchParams.start_date = dateRange.start;
+                        searchParams.end_date = dateRange.end;
                     }
-                    
+
+                    console.log('搜索参数:', searchParams);
+
                     // 重新加载表格
                     app.initTable(searchParams);
                     return false; // 阻止表单默认提交
@@ -616,30 +614,6 @@
                 $('#statsLogBtn').on('click', function() {
                     app.openStatsLogModal();
                     return false;
-                });
-
-                // 监听业务日期类型变化
-                form.on('select(businessDateTypeSelect)', function(data) {
-                    var selectedValue = data.value;
-
-                    // 根据选择的业务日期类型更新统计数据
-                    if (selectedValue === 'today') {
-                        app.getTodayStatistics();
-                    } else {
-                        app.getStatistics();
-                    }
-
-                    // 重新加载表格
-                    var searchParams = {};
-                    searchParams.supplier_name = $('input[name="supplier_name"]').val();
-                    searchParams.oe_code = $('input[name="oe_code"]').val();
-                    searchParams.brand = $('input[name="brand"]').val();
-                    searchParams.warehouse = $('input[name="warehouse"]').val();
-                    searchParams.remark = $('input[name="remark"]').val();
-                    searchParams.pattern = $('#updateMsgSelect').val();
-                    searchParams.business_date_type = selectedValue;
-
-                    app.initTable(searchParams);
                 });
 
                 // 检查是否是管理员，显示刷新状态按钮

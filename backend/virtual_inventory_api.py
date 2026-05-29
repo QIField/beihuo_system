@@ -110,41 +110,6 @@ def refresh_update_status():
         if 'conn' in locals():
             conn.close()
 
-def get_business_date(target_time):
-    """
-    获取业务日期
-    业务日期定义：使用自然日，即当天00:00:00到23:59:59
-    """
-    if isinstance(target_time, str):
-        target_time = datetime.strptime(target_time, '%Y-%m-%d %H:%M:%S')
-    
-    # 直接使用当天的日期作为业务日期
-    business_date = target_time.date()
-        
-    return business_date
-
-def get_business_date_range(target_time=None):
-    """
-    获取业务日期的时间范围
-    返回该业务日的开始时间和结束时间
-    如果target_time为None，则使用当前时间
-    """
-    if target_time is None:
-        target_time = datetime.now()
-    
-    if isinstance(target_time, str):
-        target_time = datetime.strptime(target_time, '%Y-%m-%d %H:%M:%S')
-    
-    # 获取业务日期
-    business_date = get_business_date(target_time)
-    
-    # 业务日开始时间：当天00:00:00
-    start_time = datetime.combine(business_date, datetime.min.time())
-    # 业务日结束时间：当天23:59:59
-    end_time = datetime.combine(business_date, datetime.max.time().replace(microsecond=0))
-    
-    return start_time, end_time
-
 @virtual_inventory_bp.route('/virtual_inventory')
 @login_required
 def virtual_inventory_page():
@@ -607,7 +572,7 @@ def get_virtual_inventory_statistics():
 @virtual_inventory_bp.route('/api/virtual_inventory_by_msg_pattern')
 @login_required
 def get_virtual_inventory_by_msg_pattern():
-    """根据更新信息模式获取虚拟库存数据 - 遵循用户选择的业务日期范围"""
+    """根据更新信息模式获取虚拟库存数据 - 遵循用户选择的日期范围"""
     api_start_time = time.time()
     print(f"\n[⏱️ 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 开始 ==========")
     try:
@@ -627,8 +592,9 @@ def get_virtual_inventory_by_msg_pattern():
         warehouse = request.args.get('warehouse', '').strip()
         remark = request.args.get('remark', '').strip()
 
-        # 获取业务日期范围参数
-        business_date_type = request.args.get('business_date_type', '').strip()
+        # 获取日期范围参数
+        start_date_str = request.args.get('start_date', '').strip()
+        end_date_str = request.args.get('end_date', '').strip()
 
         db_connect_start = time.time()
         conn = get_db_connection()
@@ -639,12 +605,17 @@ def get_virtual_inventory_by_msg_pattern():
         where_conditions = ["1=1"]
         params = []
 
-        # 根据业务日期范围参数添加时间条件
-        if business_date_type == 'today':
-            # 使用当前业务日期范围
-            start_time, end_time = get_business_date_range()
-            where_conditions.append("fetch_time >= %s AND fetch_time < %s")
-            params.extend([start_time, end_time])
+        # 根据日期范围参数添加时间条件
+        if start_date_str and end_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                start_time = datetime.combine(start_date, datetime.min.time())
+                end_time = datetime.combine(end_date, datetime.max.time().replace(microsecond=0))
+                where_conditions.append("fetch_time >= %s AND fetch_time <= %s")
+                params.extend([start_time, end_time])
+            except ValueError:
+                return jsonify({'code': 1, 'msg': '日期格式错误，请使用 YYYY-MM-DD 格式'}), 400
 
         # 根据模式筛选数据 - 使用 update_status 字段（支持8种中文状态）
         if pattern:
@@ -886,33 +857,51 @@ def get_virtual_inventory_statistics_by_pattern():
 @virtual_inventory_bp.route('/api/supplier_summary')
 @login_required
 def get_supplier_summary():
-    """获取各供应商上传成功和失败统计 - 始终基于当前业务日期范围"""
+    """获取各供应商上传成功和失败统计 - 基于用户选择的日期范围"""
     api_start_time = time.time()
     print(f"\n[⏱️ 后端计时] ========== API /api/supplier_summary 开始 ==========")
     try:
+        # 获取日期范围参数
+        start_date_str = request.args.get('start_date', '').strip()
+        end_date_str = request.args.get('end_date', '').strip()
+
         db_connect_start = time.time()
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         log_time_cost("数据库连接", db_connect_start)
 
-        # 获取当前业务日期范围
-        start_time, end_time = get_business_date_range()
+        # 构建查询条件和参数
+        where_conditions = ["supplier_name IS NOT NULL AND supplier_name != ''"]
+        params = []
 
-        # 查询每个供应商的上传成功和失败统计 - 限制为当前业务日期范围
+        # 根据日期范围参数添加时间条件
+        if start_date_str and end_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                start_time = datetime.combine(start_date, datetime.min.time())
+                end_time = datetime.combine(end_date, datetime.max.time().replace(microsecond=0))
+                where_conditions.append("fetch_time >= %s AND fetch_time <= %s")
+                params.extend([start_time, end_time])
+            except ValueError:
+                return jsonify({'code': 1, 'msg': '日期格式错误，请使用 YYYY-MM-DD 格式'}), 400
+
+        where_clause = " AND ".join(where_conditions)
+
+        # 查询每个供应商的上传成功和失败统计
         query_start = time.time()
-        sql = """
+        sql = f"""
             SELECT
                 supplier_name,
                 COUNT(*) as total_count,
                 SUM(CASE WHEN LOWER(update_msg) LIKE %s THEN 1 ELSE 0 END) as success_count,
                 SUM(CASE WHEN LOWER(update_msg) NOT LIKE %s OR update_msg IS NULL OR update_msg = '' THEN 1 ELSE 0 END) as failed_count
             FROM virtual_inventory
-            WHERE supplier_name IS NOT NULL AND supplier_name != ''
-            AND fetch_time >= %s AND fetch_time < %s
+            WHERE {where_clause}
             GROUP BY supplier_name
             ORDER BY supplier_name
         """
-        cursor.execute(sql, ("%update%", "%update%", start_time, end_time))
+        cursor.execute(sql, ["%update%", "%update%"] + params)
         rows = cursor.fetchall()
         log_time_cost("供应商汇总查询", query_start)
 
@@ -931,380 +920,6 @@ def get_supplier_summary():
         total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
         print(f"[⏱️ 后端计时] ========== API /api/supplier_summary 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取供应商汇总失败: {str(e)}'}), 500
-
-# 新增API路由：根据当前业务日期获取虚拟库存数据
-@virtual_inventory_bp.route('/api/virtual_inventory_today', methods=['GET'])
-@login_required
-def get_virtual_inventory_today():
-    """获取当前业务日的虚拟库存数据"""
-    try:
-        page = int(request.args.get('page', 1))
-        limit = int(request.args.get('limit', 10))
-        offset = (page - 1) * limit
-
-        # 获取排序参数
-        field = request.args.get('field', '').strip() or None
-        order = request.args.get('order', '').strip() or None
-
-        # 获取搜索条件
-        supplier_name = request.args.get('supplier_name', '').strip()
-        oe_code = request.args.get('oe_code', '').strip()
-        brand = request.args.get('brand', '').strip()
-        warehouse = request.args.get('warehouse', '').strip()
-        remark = request.args.get('remark', '').strip()
-
-        # 获取业务日期范围
-        start_time, end_time = get_business_date_range()
-
-        conn = get_db_connection()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-        # 构建查询条件
-        where_conditions = ["fetch_time >= %s AND fetch_time < %s"]
-        params = [start_time, end_time]
-
-        if supplier_name:
-            where_conditions.append("`supplier_name` LIKE %s")
-            params.append(f"%{supplier_name}%")
-        
-        if oe_code:
-            where_conditions.append("`oe_code` LIKE %s")
-            params.append(f"%{oe_code}%")
-            
-        if brand:
-            where_conditions.append("`brand` LIKE %s")
-            params.append(f"%{brand}%")
-        
-        if warehouse:
-            where_conditions.append("`warehouse` LIKE %s")
-            params.append(f"%{warehouse}%")
-        
-        if remark:
-            where_conditions.append("`remark` LIKE %s")
-            params.append(f"%{remark}%")
-
-        where_clause = " AND ".join(where_conditions)
-
-        # 获取总记录数
-        count_sql = f"SELECT COUNT(*) AS total FROM virtual_inventory WHERE {where_clause}"
-        cursor.execute(count_sql, params)
-        total = cursor.fetchone()['total']
-
-        # 构建排序子句
-        order_clause = ""
-        if field and order:
-            # 字段映射，确保安全
-            field_mapping = {
-                'supplier_name': '`supplier_name`',
-                'oe_code': '`oe_code`',
-                'brand': '`brand`',
-                'price': '`price`',
-                'expiry_date': '`expiry_date`',
-                'warehouse': '`warehouse`',
-                'stock': '`stock`',
-                'remark': '`remark`',
-                'fetch_time': '`fetch_time`',
-                'update_msg': '`update_msg`'
-            }
-            
-            if field in field_mapping:
-                order_direction = "ASC" if order.lower() == "asc" else "DESC"
-                # 对于价格和库存，使用数值型排序
-                if field in ['price', 'stock']:
-                    order_clause = f"ORDER BY {field_mapping[field]}+0 {order_direction}"
-                else:
-                    order_clause = f"ORDER BY {field_mapping[field]} {order_direction}"
-            else:
-                order_clause = "ORDER BY `fetch_time` DESC"
-        else:
-            order_clause = "ORDER BY `fetch_time` DESC"
-
-        # 查询数据
-        sql = f"""
-            SELECT `supplier_name`, `oe_code`, `brand`, `price`, `expiry_date`, `warehouse`, `stock`, `remark`, 
-                   `fetch_time`, `update_msg`
-            FROM virtual_inventory 
-            WHERE {where_clause}
-            {order_clause}
-            LIMIT %s OFFSET %s
-        """
-        params.extend([limit, offset])
-        cursor.execute(sql, params)
-        rows = cursor.fetchall()
-
-        # 格式化时间字段
-        for row in rows:
-            if row['fetch_time']:
-                # 将fetch_time转换为字符串格式
-                if hasattr(row['fetch_time'], 'strftime'):
-                    row['fetch_time'] = row['fetch_time'].strftime('%Y-%m-%d %H:%M:%S')
-            if row['expiry_date']:
-                # 将expiry_date转换为字符串格式
-                if hasattr(row['expiry_date'], 'strftime'):
-                    row['expiry_date'] = row['expiry_date'].strftime('%Y-%m-%d %H:%M:%S')
-
-        conn.close()
-
-        return jsonify({
-            'code': 0,
-            'msg': '',
-            'count': total,
-            'data': rows,
-            'business_date': start_time.strftime('%Y-%m-%d'),  # 返回业务日期
-            'business_time_range': f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"  # 返回业务时间范围
-        })
-
-    except Exception as e:
-        return jsonify({'code': 1, 'msg': f'获取今日数据失败: {str(e)}'}), 500
-
-# 新增API路由：获取指定业务日期的虚拟库存数据
-@virtual_inventory_bp.route('/api/virtual_inventory_by_date', methods=['GET'])
-@login_required
-def get_virtual_inventory_by_date():
-    """获取指定业务日期的虚拟库存数据"""
-    try:
-        # 获取请求参数
-        business_date_str = request.args.get('business_date', '').strip()  # 业务日期，格式：YYYY-MM-DD
-        page = int(request.args.get('page', 1))
-        limit = int(request.args.get('limit', 10))
-        offset = (page - 1) * limit
-
-        # 获取排序参数
-        field = request.args.get('field', '').strip() or None
-        order = request.args.get('order', '').strip() or None
-
-        # 获取搜索条件
-        supplier_name = request.args.get('supplier_name', '').strip()
-        oe_code = request.args.get('oe_code', '').strip()
-        brand = request.args.get('brand', '').strip()
-        warehouse = request.args.get('warehouse', '').strip()
-        remark = request.args.get('remark', '').strip()
-
-        # 如果没有提供业务日期，使用当前业务日期
-        if not business_date_str:
-            start_time, end_time = get_business_date_range()
-        else:
-            try:
-                business_date = datetime.strptime(business_date_str, '%Y-%m-%d').date()
-                start_time = datetime.combine(business_date, datetime.min.time())
-                end_time = datetime.combine(business_date, datetime.max.time().replace(microsecond=0))
-            except ValueError:
-                return jsonify({'code': 1, 'msg': '日期格式错误，请使用 YYYY-MM-DD 格式'}), 400
-
-        conn = get_db_connection()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-        # 构建查询条件
-        where_conditions = ["fetch_time >= %s AND fetch_time < %s"]
-        params = [start_time, end_time]
-
-        if supplier_name:
-            where_conditions.append("`supplier_name` LIKE %s")
-            params.append(f"%{supplier_name}%")
-        
-        if oe_code:
-            where_conditions.append("`oe_code` LIKE %s")
-            params.append(f"%{oe_code}%")
-            
-        if brand:
-            where_conditions.append("`brand` LIKE %s")
-            params.append(f"%{brand}%")
-        
-        if warehouse:
-            where_conditions.append("`warehouse` LIKE %s")
-            params.append(f"%{warehouse}%")
-        
-        if remark:
-            where_conditions.append("`remark` LIKE %s")
-            params.append(f"%{remark}%")
-
-        where_clause = " AND ".join(where_conditions)
-
-        # 获取总记录数
-        count_sql = f"SELECT COUNT(*) AS total FROM virtual_inventory WHERE {where_clause}"
-        cursor.execute(count_sql, params)
-        total = cursor.fetchone()['total']
-
-        # 构建排序子句
-        order_clause = ""
-        if field and order:
-            # 字段映射，确保安全
-            field_mapping = {
-                'supplier_name': '`supplier_name`',
-                'oe_code': '`oe_code`',
-                'brand': '`brand`',
-                'price': '`price`',
-                'expiry_date': '`expiry_date`',
-                'warehouse': '`warehouse`',
-                'stock': '`stock`',
-                'remark': '`remark`',
-                'fetch_time': '`fetch_time`',
-                'update_msg': '`update_msg`'
-            }
-            
-            if field in field_mapping:
-                order_direction = "ASC" if order.lower() == "asc" else "DESC"
-                # 对于价格和库存，使用数值型排序
-                if field in ['price', 'stock']:
-                    order_clause = f"ORDER BY {field_mapping[field]}+0 {order_direction}"
-                else:
-                    order_clause = f"ORDER BY {field_mapping[field]} {order_direction}"
-            else:
-                order_clause = "ORDER BY `fetch_time` DESC"
-        else:
-            order_clause = "ORDER BY `fetch_time` DESC"
-
-        # 查询数据
-        sql = f"""
-            SELECT `supplier_name`, `oe_code`, `brand`, `price`, `expiry_date`, `warehouse`, `stock`, `remark`, 
-                   `fetch_time`, `update_msg`
-            FROM virtual_inventory 
-            WHERE {where_clause}
-            {order_clause}
-            LIMIT %s OFFSET %s
-        """
-        params.extend([limit, offset])
-        cursor.execute(sql, params)
-        rows = cursor.fetchall()
-
-        # 格式化时间字段
-        for row in rows:
-            if row['fetch_time']:
-                # 将fetch_time转换为字符串格式
-                if hasattr(row['fetch_time'], 'strftime'):
-                    row['fetch_time'] = row['fetch_time'].strftime('%Y-%m-%d %H:%M:%S')
-            if row['expiry_date']:
-                # 将expiry_date转换为字符串格式
-                if hasattr(row['expiry_date'], 'strftime'):
-                    row['expiry_date'] = row['expiry_date'].strftime('%Y-%m-%d %H:%M:%S')
-
-        conn.close()
-
-        return jsonify({
-            'code': 0,
-            'msg': '',
-            'count': total,
-            'data': rows,
-            'business_date': business_date_str if business_date_str else start_time.strftime('%Y-%m-%d'),
-            'business_time_range': f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
-        })
-
-    except Exception as e:
-        return jsonify({'code': 1, 'msg': f'获取指定日期数据失败: {str(e)}'}), 500
-
-# 新增API路由：获取当前业务日期的统计数据
-@virtual_inventory_bp.route('/api/virtual_inventory_statistics_today', methods=['GET'])
-@login_required
-def get_virtual_inventory_statistics_today():
-    """获取当前业务日的虚拟库存统计信息"""
-    api_start_time = time.time()
-    print(f"\n[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_today 开始 ==========")
-    try:
-        # 获取业务日期范围
-        start_time, end_time = get_business_date_range()
-
-        db_connect_start = time.time()
-        conn = get_db_connection()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
-        log_time_cost("数据库连接", db_connect_start)
-
-        # 使用 update_status 字段优化统计查询
-        query_start = time.time()
-
-        # 总记录数
-        total_sql = "SELECT COUNT(*) as count FROM virtual_inventory WHERE fetch_time >= %s AND fetch_time < %s"
-        cursor.execute(total_sql, (start_time, end_time))
-        total_count = cursor.fetchone()['count']
-        print(f"当前业务日总记录数: {total_count}")
-
-        # 新分类统计（基于中文 update_status）
-        
-        # 1. 上传成功
-        upload_success_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
-            WHERE update_status = '上传成功' AND fetch_time >= %s AND fetch_time < %s
-        """
-        cursor.execute(upload_success_sql, (start_time, end_time))
-        upload_success_count = cursor.fetchone()['count']
-        print(f"当前业务日上传成功数: {upload_success_count}")
-        
-        # 2. 新建成功（新建成功-已存在 + 新建成功-新创建）
-        new_create_success_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
-            WHERE update_status IN ('新建成功-已存在', '新建成功-新创建') 
-            AND fetch_time >= %s AND fetch_time < %s
-        """
-        cursor.execute(new_create_success_sql, (start_time, end_time))
-        new_create_success_count = cursor.fetchone()['count']
-        print(f"当前业务日新建成功数: {new_create_success_count}")
-        
-        # 3. 新建失败（新建失败-未找到产品名称 + 新建失败-车型不能为空 + 上传失败-产品不存在）
-        new_create_fail_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
-            WHERE update_status IN ('新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在') 
-            AND fetch_time >= %s AND fetch_time < %s
-        """
-        cursor.execute(new_create_fail_sql, (start_time, end_time))
-        new_create_fail_count = cursor.fetchone()['count']
-        print(f"当前业务日新建失败数: {new_create_fail_count}")
-        
-        # 4. 上传失败（除上传成功以外的所有）
-        upload_fail_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
-            WHERE update_status != '上传成功' AND fetch_time >= %s AND fetch_time < %s
-        """
-        cursor.execute(upload_fail_sql, (start_time, end_time))
-        upload_fail_count = cursor.fetchone()['count']
-        print(f"当前业务日上传失败数: {upload_fail_count}")
-        
-        # 5. 没有档案（新建成功-已存在 + 新建成功-新创建 + 新建失败-未找到产品名称 + 新建失败-车型不能为空 + 上传失败-产品不存在）
-        no_record_sql = """
-            SELECT COUNT(*) as count FROM virtual_inventory 
-            WHERE update_status IN ('新建成功-已存在', '新建成功-新创建', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在') 
-            AND fetch_time >= %s AND fetch_time < %s
-        """
-        cursor.execute(no_record_sql, (start_time, end_time))
-        no_record_count = cursor.fetchone()['count']
-        print(f"当前业务日没有档案数: {no_record_count}")
-        
-        log_time_cost("统计查询(使用update_status索引)", query_start)
-        
-        # 兼容旧字段名
-        success_count = upload_success_count
-        failed_count = upload_fail_count
-
-        conn.close()
-
-        result = {
-            'code': 0,
-            'msg': '',
-            'data': {
-                'business_date': start_time.strftime('%Y-%m-%d'),
-                'business_time_range': f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} ~ {end_time.strftime('%Y-%m-%d %H:%M:%S')}",
-                'total_count': total_count,
-                # 新分类统计
-                'upload_success_count': upload_success_count,
-                'new_create_success_count': new_create_success_count,
-                'new_create_fail_count': new_create_fail_count,
-                'upload_fail_count': upload_fail_count,
-                'no_record_count': no_record_count,
-                # 兼容旧字段名
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-        }
-        print(f"当前业务日统计返回结果: {result}")
-
-        total_cost = log_time_cost("API 总耗时", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_today 完成，总耗时: {total_cost:.2f}ms ==========\n")
-
-        return jsonify(result)
-
-    except Exception as e:
-        total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_today 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
-        print(f"获取当前业务日统计数据失败: {str(e)}")
-        return jsonify({'code': 1, 'msg': f'获取当前业务日统计数据失败: {str(e)}'}), 500
 
 @virtual_inventory_bp.route('/api/admin/refresh_update_status', methods=['POST'])
 @login_required
