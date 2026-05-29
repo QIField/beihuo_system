@@ -1,0 +1,207 @@
+/**
+ * 一键置顶按钮样式
+ * Scroll To Top Component Styles
+ */
+
+/* 置顶按钮基础样式 */
+.scroll-to-top-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 9999;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+    border: none;
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.8);
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 按钮显示状态 */
+.scroll-to-top-btn.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+
+/* 按钮悬停效果 */
+.scroll-to-top-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(24, 144, 255, 0.5);
+    background: linear-gradient(135deg, #40a9ff 0%, #69c0ff 100%);
+}
+
+/* 按钮点击效果 */
+.scroll-to-top-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.4);
+}
+
+/* 按钮内的 SVG 图标 */
+.scroll-to-top-btn svg {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.3s ease;
+}
+
+/* 悬停时图标上移效果 */
+.scroll-to-top-btn:hover svg {
+    transform: translateY(-2px);
+}
+
+/* 按钮动画 - 脉冲效果 */
+@keyframes scroll-to-top-pulse {
+    0% {
+        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(24, 144, 255, 0.6);
+    }
+    100% {
+        box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+    }
+}
+
+.scroll-to-top-btn.pulse {
+    animation: scroll-to-top-pulse 2s infinite;
+}
+
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+    .scroll-to-top-btn {
+        background: linear-gradient(135deg, #177ddc 0%, #3c9ae8 100%);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .scroll-to-top-btn:hover {
+        background: linear-gradient(135deg, #3c9ae8 0%, #65b7f3 100%);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+    .scroll-to-top-btn {
+        width: 44px;
+        height: 44px;
+        bottom: 20px;
+        right: 20px;
+    }
+
+    .scroll-to-top-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* 小屏幕移动端适配 */
+@media screen and (max-width: 480px) {
+    .scroll-to-top-btn {
+        width: 40px;
+        height: 40px;
+        bottom: 15px;
+        right: 15px;
+    }
+
+    .scroll-to-top-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+/* 打印时隐藏按钮 */
+@media print {
+    .scroll-to-top-btn {
+        display: none !important;
+    }
+}
+
+/* 无障碍 - 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+    .scroll-to-top-btn {
+        transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .scroll-to-top-btn:hover {
+        transform: scale(1);
+    }
+
+    .scroll-to-top-btn svg {
+        transition: none;
+    }
+
+    .scroll-to-top-btn.pulse {
+        animation: none;
+    }
+}
+
+/* 焦点样式 - 键盘导航 */
+.scroll-to-top-btn:focus-visible {
+    outline: 2px solid #1890ff;
+    outline-offset: 2px;
+}
+
+/* 按钮提示文字 */
+.scroll-to-top-btn::after {
+    content: attr(title);
+    position: absolute;
+    right: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%) scale(0.9);
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+/* 悬停时显示提示 */
+.scroll-to-top-btn:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) scale(1);
+}
+
+/* 提示箭头 */
+.scroll-to-top-btn::before {
+    content: '';
+    position: absolute;
+    right: calc(100% + 5px);
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-left-color: rgba(0, 0, 0, 0.75);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.scroll-to-top-btn:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 移动端隐藏提示 */
+@media screen and (max-width: 768px) {
+    .scroll-to-top-btn::after,
+    .scroll-to-top-btn::before {
+        display: none;
+    }
+}

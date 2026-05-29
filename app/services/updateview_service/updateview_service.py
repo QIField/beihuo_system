@@ -27,6 +27,10 @@ os.environ['DB_NAME'] = 'bbr_test'
 from app.utils.database_connection import get_db_connection
 from config.cookie_config import create_crm_session
 
+SPECIAL_BRAND_GROUPS = [
+    ['FAG', '舍弗勒FAG'],
+]
+
 
 def get_oe_by_brand_code(brand_code, cursor):
     """从数据库根据brand_code获取oe"""
@@ -86,54 +90,46 @@ def get_product_list_by_numberlist(session, numberlist):
 
 
 def find_product_id_by_brand_code(api_response, brand_code):
-    """
-    方式一：在API-1响应中根据brand_code查找product_id
-    """
+    """方式一：根据brand_code查找所有匹配的product_id"""
     if not api_response or 'data' not in api_response:
-        return None
+        return []
     
-    products_data = api_response.get('data', [])
-    
-    for item in products_data:
-        child_list = item.get('child', [])
-        for child in child_list:
-            # 匹配brand_code
+    matched_ids = []
+    for item in api_response.get('data', []):
+        for child in item.get('child', []):
             if child.get('brand_code') == brand_code:
-                return child.get('product_id')
-            # 也尝试匹配number
+                matched_ids.append(child.get('product_id'))
             if child.get('number') == brand_code:
-                return child.get('product_id')
-            # 尝试匹配original_number
+                matched_ids.append(child.get('product_id'))
             if child.get('original_number') == brand_code:
-                return child.get('product_id')
+                matched_ids.append(child.get('product_id'))
     
-    return None
+    return matched_ids
 
 
 def find_product_id_by_number_and_brand(api_response, number, brand_name):
-    """
-    方式二：在API-1响应中根据number和brand_name查找product_id
-    """
+    """方式二：根据number和brand_name查找所有匹配的product_id"""
     if not api_response or 'data' not in api_response:
-        return None
+        return []
     
-    products_data = api_response.get('data', [])
+    matched_ids = []
     
-    for item in products_data:
-        child_list = item.get('child', [])
-        for child in child_list:
-            # 同时匹配number和brand_name
+    target_brands = [brand_name]
+    for group in SPECIAL_BRAND_GROUPS:
+        if brand_name in group:
+            target_brands = group
+            break
+    
+    for item in api_response.get('data', []):
+        for child in item.get('child', []):
             child_number = child.get('number', '')
             child_brand = child.get('brand_name', '')
+            child_original_number = child.get('original_number', '')
             
-            if child_number == number and child_brand == brand_name:
-                return child.get('product_id')
-            
-            # 也尝试匹配original_number
-            if child.get('original_number') == number and child_brand == brand_name:
-                return child.get('product_id')
+            if (child_number == number or child_original_number == number) and child_brand in target_brands:
+                matched_ids.append(child.get('product_id'))
     
-    return None
+    return matched_ids
 
 
 def update_product_view(session, product_id, cass_desc, store_cass_price, store_peer_price, qpl_price):
@@ -306,11 +302,10 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
                 if has_brand:
                     brand = str(brand).strip()
                 
-                product_id = None
+                product_ids = []
                 
                 # 方式一：优先使用品牌号获取product_id
                 if not pd.isna(brand_code) and str(brand_code).strip():
-                    brand_code = str(brand_code).strip()
                     print(f"  方式一：使用品牌号 {brand_code} 获取product_id")
                     
                     # 从数据库获取oe
@@ -324,73 +319,46 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
                         api1_response = get_product_list_by_numberlist(session, oe)
                         
                         if api1_response:
-                            # 用品牌号匹配product_id
-                            product_id = find_product_id_by_brand_code(api1_response, brand_code)
-                            if product_id:
-                                print(f"    API匹配成功: product_id={product_id}")
-                            else:
-                                print(f"    API响应中未找到品牌号 {brand_code}")
+                            product_ids = find_product_id_by_brand_code(api1_response, brand_code)
+                            if product_ids:
+                                print(f"  方式一匹配到 {len(product_ids)} 个: {product_ids}")
                         else:
                             print(f"    API-1调用失败")
                     else:
                         print(f"    数据库未找到品牌号 {brand_code} 的OE")
                 
-                # 方式二：使用配件编码+品牌获取product_id（只有在有配件编码时才执行）
-                if not product_id and has_peijian_code:
-                    print(f"  方式二：使用配件编码 {peijian_code} + 品牌 {brand} 获取product_id")
+                # 方式二：使用配件编码+品牌获取product_id
+                if not product_ids and has_peijian_code:
+                    print(f"  方式二：配件编码 {peijian_code} + 品牌 {brand}")
                     
                     # 调用API-1
                     time.sleep(0.5)
                     api1_response = get_product_list_by_numberlist(session, peijian_code)
                     
                     if api1_response:
-                        # 用配件编码+品牌匹配product_id
-                        product_id = find_product_id_by_number_and_brand(api1_response, peijian_code, brand)
-                        if product_id:
-                            print(f"    API匹配成功: product_id={product_id}")
-                        else:
-                            print(f"    API响应中未找到配件编码 {peijian_code} 和品牌 {brand} 的组合")
+                        product_ids = find_product_id_by_number_and_brand(api1_response, peijian_code, brand)
+                        if product_ids:
+                            print(f"  方式二匹配到 {len(product_ids)} 个: {product_ids}")
                     else:
                         print(f"    API-1调用失败")
                 
-                # 如果没有找到product_id，跳过
-                if not product_id:
+                if not product_ids:
                     df.at[idx, '更新状态'] = '未找到product_id'
-                    print(f"  跳过：无法获取product_id")
                     continue
                 
-                # 获取要更新的字段值
                 cass_desc = row.get('开思描述', '')
                 store_cass_price = row.get('开思价', '')
                 store_peer_price = row.get('同行价', '')
                 qpl_price = row.get('汽配龙价格', '')
-                
-                # 处理空值
                 cass_desc = str(cass_desc) if not pd.isna(cass_desc) else ''
                 
-                print(f"  准备更新:")
-                print(f"    开思描述: {cass_desc[:30] if cass_desc else '(空)'}...")
-                print(f"    开思价: {store_cass_price if not pd.isna(store_cass_price) else 'null'}")
-                print(f"    同行价: {store_peer_price if not pd.isna(store_peer_price) else 'null'}")
-                print(f"    汽配龙价格: {qpl_price if not pd.isna(qpl_price) else 'null'}")
-                
-                # 调用更新API
-                time.sleep(0.5)
-                success, msg = update_product_view(
-                    session, 
-                    product_id, 
-                    cass_desc, 
-                    store_cass_price, 
-                    store_peer_price, 
-                    qpl_price
-                )
-                
-                if success:
-                    df.at[idx, '更新状态'] = f'更新成功: {msg}'
-                    print(f"  ✓ 更新成功: {msg}")
-                else:
-                    df.at[idx, '更新状态'] = f'更新失败: {msg}'
-                    print(f"  ✗ 更新失败: {msg}")
+                success_count = 0
+                for pid in product_ids:
+                    time.sleep(0.5)
+                    success, msg = update_product_view(session, pid, cass_desc, store_cass_price, store_peer_price, qpl_price)
+                    success_count += 1 if success else 0
+                    print(f"  {'✓' if success else '✗'} {pid}")
+                df.at[idx, '更新状态'] = f'成功{success_count}/{len(product_ids)}'
                 
     finally:
         conn.close()
