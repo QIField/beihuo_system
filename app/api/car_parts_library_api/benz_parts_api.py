@@ -10,8 +10,10 @@
 负责处理配件库的HTTP请求
 """
 
-from flask import Blueprint, request, jsonify
-from app.services.car_parts_library_service.car_parts_library_benz_service import get_part_by_number, get_parts_list_page, data_refresh, add_part, update_part, delete_part
+from flask import Blueprint, request, jsonify, send_file, session
+from app.services.car_parts_library_service.car_parts_library_benz_service import get_part_by_number, get_parts_list_page, data_refresh, add_part, update_part, delete_part, import_parts, download_template
+from app.services.car_parts_library_service.car_parts_favorite_service import batch_add_to_favorites
+import time
 
 benz_parts_bp = Blueprint('benz_parts', __name__)
 
@@ -307,5 +309,84 @@ def delete_part_api():
         return jsonify({
             'code': 500,
             'msg': f'删除失败: {str(e)}',
+            'data': None
+        })
+
+
+@benz_parts_bp.route('/import', methods=['POST'])
+def import_parts_api():
+    """
+    批量导入配件（插入更新模式）
+    请求参数: file（Excel/CSV文件）
+    返回: 操作结果
+    """
+    try:
+        # 检查文件是否存在
+        if 'file' not in request.files:
+            return jsonify({
+                'code': 400,
+                'msg': '请选择要上传的文件',
+                'data': None
+            })
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'code': 400,
+                'msg': '请选择要上传的文件',
+                'data': None
+            })
+
+        # 调用服务层处理
+        result = import_parts(file, file.filename)
+
+        # 如果导入成功且用户已登录，将成功的配件添加到收藏
+        if result.get('status') and 'logged_in' in session:
+            user_id = session.get('user_id')
+            if user_id:
+                success_part_numbers = result.get('data', {}).get('success_part_numbers', [])
+                if success_part_numbers:
+                    # 生成分类名：excel + 秒级时间戳
+                    category = f'excel{int(time.time())}'
+                    batch_add_to_favorites(user_id, success_part_numbers, category)
+
+        if result.get('status'):
+            return jsonify({
+                'code': 200,
+                'msg': result.get('msg', '导入成功'),
+                'data': result.get('data')
+            })
+        else:
+            return jsonify({
+                'code': 400,
+                'msg': result.get('msg', '导入失败'),
+                'data': result.get('data')
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'导入失败: {str(e)}',
+            'data': None
+        })
+
+
+@benz_parts_bp.route('/template', methods=['GET'])
+def download_template_api():
+    """
+    下载Excel导入模板
+    返回: Excel文件
+    """
+    try:
+        template_file = download_template()
+        return send_file(
+            template_file,
+            as_attachment=True,
+            download_name='配件导入模板.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'下载模板失败: {str(e)}',
             'data': None
         })
