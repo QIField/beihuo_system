@@ -29,3 +29,7 @@ def expansion_app(app):
     # 注册仓库管理蓝图
     from app.routes.warehouse_manager_web import warehouse_manager_web_bp
     app.register_blueprint(warehouse_manager_web_bp)
+    
+    # 注册新的主蓝图
+    from app.routes import common_web_bp
+    app.register_blueprint(common_web_bp)

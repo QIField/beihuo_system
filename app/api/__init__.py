@@ -22,6 +22,7 @@ from .customer_quota_manager_api import customer_quota_manager_bp
 from .data_board_info_api import report_wx_quote_data_bp
 from .cookie import cookie_bp
 from .wms_upload_site_api import wms_upload_site_bp
+from .car_parts_library_api import car_parts_library_bp
 
 # 注册比价数据对比蓝图（设置正确的 url_prefix）
 api_bp.register_blueprint(compare_bp, url_prefix='/compare')
@@ -32,5 +33,6 @@ api_bp.register_blueprint(customer_quota_manager_bp)
 api_bp.register_blueprint(report_wx_quote_data_bp)
 api_bp.register_blueprint(cookie_bp)
 api_bp.register_blueprint(wms_upload_site_bp)
+api_bp.register_blueprint(car_parts_library_bp)
 
 __all__ = ["api_bp"]

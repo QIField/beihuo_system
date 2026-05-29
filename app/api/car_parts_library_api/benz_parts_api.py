@@ -1,0 +1,311 @@
+# -*- coding:utf-8 -*-
+# @Time    : 2026/5/20
+# @Author  : xingkongtub
+# @Project : beihuo_system
+# @File    : benz_parts_api.py
+# @Software: PyCharm
+
+"""
+奔驰汽车配件库API接口
+负责处理配件库的HTTP请求
+"""
+
+from flask import Blueprint, request, jsonify
+from app.services.car_parts_library_service.car_parts_library_benz_service import get_part_by_number, get_parts_list_page, data_refresh, add_part, update_part, delete_part
+
+benz_parts_bp = Blueprint('benz_parts', __name__)
+
+
+@benz_parts_bp.route('/list', methods=['GET'])
+def get_parts_list():
+    """
+    获取配件列表（分页）
+
+    参数:
+        page: 页码，默认1
+        page_size: 每页条数，默认20
+        part_number: 配件编号筛选（可选）
+
+    返回:
+        {
+            "code": 200,
+            "msg": "success",
+            "data": {
+                "status": 操作状态,
+                "msg": 提示信息,
+                "parts_count": 零件信息条数,
+                "stock_count": 库存信息条数
+            }
+        }
+    """
+    try:
+        # 获取参数
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 20))
+        part_number = request.args.get('part_number')
+
+        # 查询数据
+        result = get_parts_list_page(
+            page=page,
+            page_size=page_size,
+            part_number=part_number
+        )
+
+        return jsonify({
+            'code': 200,
+            'msg': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'查询失败: {str(e)}',
+            'data': None
+        })
+
+
+@benz_parts_bp.route('/detail', methods=['GET'])
+def get_part_detail():
+    """
+    获取配件详情
+
+    参数:
+        part_number: 配件编号（查询参数）
+
+    返回:
+        {
+            "code": 200,
+            "msg": "success",
+            "data": {...}
+        }
+    """
+    try:
+        part_number = request.args.get('part_number')
+        if not part_number:
+            return jsonify({
+                'code': 400,
+                'msg': '配件编号不能为空',
+                'data': None
+            })
+        
+        part = get_part_by_number(part_number)
+        if part:
+            return jsonify({
+                'code': 200,
+                'msg': 'success',
+                'data': part
+            })
+        else:
+            return jsonify({
+                'code': 404,
+                'msg': '配件不存在',
+                'data': None
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'查询失败: {str(e)}',
+            'data': None
+        })
+
+
+@benz_parts_bp.route('/batch-refresh', methods=['POST'])
+def batch_refresh_parts_data():
+    """
+    批量刷新配件数据 API
+
+    请求参数:
+    {
+        "part_numbers": ["配件编号1", "配件编号2", ...]
+    }
+
+    返回:
+    {
+        "code": 200,
+        "msg": "刷新成功",
+        "data": {
+            "status": true,
+            "msg": "数据刷新成功",
+            "parts_count": 零件信息条数,
+            "stock_count": 库存信息条数
+        }
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'code': 400,
+                'msg': '请求参数不能为空',
+                'data': None
+            })
+        
+        part_numbers = data.get('part_numbers', [])
+        
+        if not part_numbers or len(part_numbers) == 0:
+            return jsonify({
+                'code': 400,
+                'msg': '配件编号列表不能为空',
+                'data': None
+            })
+        
+        result = data_refresh(part_numbers)
+        
+        if result and result.get('status'):
+            return jsonify({
+                'code': 200,
+                'msg': result.get('msg', '刷新成功'),
+                'data': result
+            })
+        else:
+            return jsonify({
+                'code': 400,
+                'msg': result.get('msg', '刷新失败'),
+                'data': result
+            })
+        
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'批量刷新失败: {str(e)}',
+            'data': None
+        })
+
+
+@benz_parts_bp.route('/add', methods=['POST'])
+def add_part_api():
+    """
+    添加配件
+    请求参数: 配件数据字典
+    返回: 操作结果
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'code': 400,
+                'msg': '请求参数不能为空',
+                'data': None
+            })
+        
+        # 验证配件编号是否存在
+        if not data.get('part_number'):
+            return jsonify({
+                'code': 400,
+                'msg': '配件编号不能为空',
+                'data': None
+            })
+        
+        result = add_part(data)
+        
+        if result.get('status'):
+            return jsonify({
+                'code': 200,
+                'msg': result.get('msg', '添加成功'),
+                'data': None
+            })
+        else:
+            return jsonify({
+                'code': 400,
+                'msg': result.get('msg', '添加失败'),
+                'data': None
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'添加失败: {str(e)}',
+            'data': None
+        })
+
+
+@benz_parts_bp.route('/update', methods=['POST'])
+def update_part_api():
+    """
+    更新配件
+    请求参数: part_number和更新的数据
+    返回: 操作结果
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'code': 400,
+                'msg': '请求参数不能为空',
+                'data': None
+            })
+        
+        part_number = data.get('part_number')
+        if not part_number:
+            return jsonify({
+                'code': 400,
+                'msg': '配件编号不能为空',
+                'data': None
+            })
+        
+        result = update_part(part_number, data)
+        
+        if result.get('status'):
+            return jsonify({
+                'code': 200,
+                'msg': result.get('msg', '更新成功'),
+                'data': None
+            })
+        else:
+            return jsonify({
+                'code': 400,
+                'msg': result.get('msg', '更新失败'),
+                'data': None
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'更新失败: {str(e)}',
+            'data': None
+        })
+
+
+@benz_parts_bp.route('/delete', methods=['POST'])
+def delete_part_api():
+    """
+    删除配件
+    请求参数: part_number
+    返回: 操作结果
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'code': 400,
+                'msg': '请求参数不能为空',
+                'data': None
+            })
+        
+        part_number = data.get('part_number')
+        if not part_number:
+            return jsonify({
+                'code': 400,
+                'msg': '配件编号不能为空',
+                'data': None
+            })
+        
+        result = delete_part(part_number)
+        
+        if result.get('status'):
+            return jsonify({
+                'code': 200,
+                'msg': result.get('msg', '删除成功'),
+                'data': None
+            })
+        else:
+            return jsonify({
+                'code': 400,
+                'msg': result.get('msg', '删除失败'),
+                'data': None
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'删除失败: {str(e)}',
+            'data': None
+        })

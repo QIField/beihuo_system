@@ -1,0 +1,345 @@
+<style>
+        /* 主内容区 */
+        .main-content {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        /* 工具栏 */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        /* 按钮 */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-primary {
+            background: #1890ff;
+            color: #fff;
+        }
+        
+        .btn-primary:hover {
+            background: #40a9ff;
+        }
+        
+        .btn-default {
+            background: #fff;
+            color: #595959;
+            border: 1px solid #d9d9d9;
+        }
+        
+        .btn-default:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+        }
+        
+        /* 详情卡片 */
+        .detail-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .detail-card-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #262626;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        /* 表格样式 */
+        .layui-table-view {
+            border-radius: 6px;
+            border: 1px solid #e8e8e8;
+        }
+        
+        .layui-table-header {
+            background-color: #fafafa;
+            border-bottom: 2px solid #e8e8e8;
+        }
+        
+        .layui-table th {
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+        }
+        
+        .layui-table td {
+            font-size: 13px;
+        }
+</style>
+
+<!-- 主内容区 -->
+<div class="main-content" id="detailContainer">
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <div>
+            <button class="btn btn-default" onclick="location.hash='#/list'">
+                <i class="layui-icon layui-icon-return"></i> 返回列表
+            </button>
+        </div>
+    </div>
+    <!-- 加载提示 -->
+    <div id="loading" style="text-align: center; padding: 50px;">
+        <i class="layui-icon layui-icon-loading" style="font-size: 30px; color: #1890ff; animation: layui-anim-rotate 1s linear infinite;"></i>
+        <p style="margin-top: 10px; color: #595959;">加载中...</p>
+    </div>
+    <!-- 详情内容 -->
+    <div id="detailContent"></div>
+</div>
+
+<script type="text/html" id="detailTpl">
+{% raw %}
+    <div class="detail-card">
+        <div style="margin-bottom: 24px;">
+            <h2 style="margin: 0 0 12px 0; font-size: 24px; color: #262626;">{{ d.title }}</h2>
+            <p style="margin: 0 0 8px 0; color: #595959;">代码：<span style="color: #1890ff; font-weight: 500;">{{ d.part_number }}</span></p>
+            <p style="margin: 0 0 12px 0; color: #595959;">创建时间：{{ d.created_at }} | 更新时间：{{ d.updated_at }}</p>
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <span style="font-size: 28px; color: #ff4d4f; font-weight: 600;">{{ d.wholesale_price }}</span>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 24px;">
+            <button class="btn btn-default" onclick="location.hash='#/list'">
+                <i class="layui-icon layui-icon-return"></i> 返回列表
+            </button>
+            <button class="btn btn-primary">
+                <i class="layui-icon layui-icon-edit"></i> 编辑
+            </button>
+        </div>
+    </div>
+    
+    <div class="detail-card">
+        <div class="detail-card-title">
+            <i class="layui-icon layui-icon-form" style="margin-right: 8px;"></i>基本信息
+        </div>
+        <div>
+            <table class="layui-table" lay-skin="line">
+                <tbody>
+                    <tr>
+                        <td style="width: 120px; background: #fafafa; font-weight: 500;">配件名称</td>
+                        <td>{{ d.description_cn }}</td>
+                        <td style="width: 120px; background: #fafafa; font-weight: 500;">代码</td>
+                        <td>{{ d.part_number }}</td>
+                        <td style="width: 120px; background: #fafafa; font-weight: 500;">分类</td>
+                        <td>{{ d.category }}</td>
+                    </tr>
+                    <tr>
+                        <td style="background: #fafafa; font-weight: 500;">品牌</td>
+                        <td>{{ d.brand }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">CCC标识</td>
+                        <td>{{ d.ccc_mark }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">市场代码</td>
+                        <td>{{ d.marketing_code }}</td>
+                    </tr>
+                    <tr>
+                        <td style="background: #fafafa; font-weight: 500;">单位</td>
+                        <td>{{ d.quantity_unit }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">重量</td>
+                        <td>{{ d.weight }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">体积</td>
+                        <td>{{ d.volume }}</td>
+                    </tr>
+                    <tr>
+                        <td style="background: #fafafa; font-weight: 500;">长*宽*高</td>
+                        <td>{{ d.dimensions }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">危险货物代码</td>
+                        <td>{{ d.hazmat_code }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">原产地</td>
+                        <td>{{ d.origin_country }}</td>
+                    </tr>
+                    <tr>
+                        <td style="background: #fafafa; font-weight: 500;">存储期限</td>
+                        <td>{{ d.shelf_life }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">防盗/危险品</td>
+                        <td>{{ d.is_hazmat }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">价格有效期起始日期</td>
+                        <td>{{ d.effective_date }}</td>
+                    </tr>
+                    <tr>
+                        <td style="background: #fafafa; font-weight: 500;">批发价</td>
+                        <td style="color: #ff4d4f; font-weight: 600;">{{ d.wholesale_price }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">4S含税进价</td>
+                        <td style="color: #ff4d4f; font-weight: 600;">{{ d.price_4s_tax_in }}</td>
+                        <td style="background: #fafafa; font-weight: 500;">巴博瑞采购价</td>
+                        <td style="color: #ff4d4f; font-weight: 600;">{{ d.price_baborui }}</td>
+                    </tr>
+                    <tr>
+                        <td style="background: #fafafa; font-weight: 500;">市场指导价</td>
+                        <td style="color: #ff4d4f; font-weight: 600;">{{ d.msrp }}</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="detail-card">
+        <div class="detail-card-title">
+            <i class="layui-icon layui-icon-form" style="margin-right: 8px;"></i>配件描述
+        </div>
+        <div>
+            <p style="margin: 0; color: #595959; line-height: 1.8;">{{ d.descriptions }}</p>
+        </div>
+    </div>
+{% endraw %}
+</script>
+
+<script>
+layui.use(['jquery', 'layer', 'laytpl'], function(){
+    var $ = layui.jquery;
+    var layer = layui.layer;
+    var laytpl = layui.laytpl;
+    
+    // 获取URL参数
+    function getUrlParam(name) {
+        var hash = location.hash;
+        var query = hash.split('?')[1];
+        if (!query) return null;
+        
+        var searchParams = new URLSearchParams(query);
+        return searchParams.get(name);
+    }
+    
+    // 显示错误
+    function showError(msg) {
+        $('#loading').remove();
+        $('#detailContent').html(
+            '<div style="text-align: center; padding: 50px;">' +
+                '<i class="layui-icon layui-icon-face-cry" style="font-size: 50px; color: #999;"></i>' +
+                '<p style="margin-top: 10px; color: #999;">' + msg + '</p>' +
+            '</div>'
+        );
+    }
+    
+    // 处理数据格式
+    function formatData(data) {
+        // 处理空值
+        function emptyVal(val) {
+            return val ? val : '-';
+        }
+        
+        // 处理价格
+        function formatPrice(price) {
+            if (!price) return '-';
+            var numPrice = parseFloat(price);
+            if (isNaN(numPrice)) return '-';
+            return numPrice.toFixed(2) + ' CNY';
+            // return numPrice + ' CNY';
+        }
+        
+        // 处理尺寸
+        function formatDimensions(length, width, height) {
+            return (length && width && height) ? (length + ' M * ' + width + ' M * ' + height + ' M') : '-';
+        }
+        
+        // 处理标题
+        function formatTitle(descCn, descEn) {
+            return descCn ? descCn : (descEn ? descEn : '-');
+        }
+        
+        // 处理描述
+        function formatDesc(descCn, descEn) {
+            return descEn ? descEn : (descCn ? descCn : '暂无描述');
+        }
+        
+        return {
+            part_number: emptyVal(data.part_number),
+            description_cn: emptyVal(data.description_cn),
+            descriptions: formatDesc(data.description_cn, data.descriptions),
+            title: formatTitle(data.description_cn, data.descriptions),
+            brand: emptyVal(data.brand),
+            category: emptyVal(data.category),
+            origin_country: emptyVal(data.origin_country),
+            created_at: emptyVal(data.created_at),
+            updated_at: emptyVal(data.updated_at),
+            wholesale_price: formatPrice(data.wholesale_price),
+            price_4s_tax_in: formatPrice(data.price_4s_tax_in),
+            price_baborui: formatPrice(data.price_baborui),
+            msrp: formatPrice(data.msrp),
+            quantity_unit: emptyVal(data.quantity_unit),
+            weight: data.weight ? parseFloat(data.weight) + ' KG' : '-',
+            volume: data.volume ? parseFloat(data.volume) + ' CDM' : '-',
+            dimensions: formatDimensions(data.length, data.width, data.height),
+            ccc_mark: emptyVal(data.ccc_mark),
+            marketing_code: emptyVal(data.marketing_code),
+            hazmat_code: emptyVal(data.hazmat_code),
+            shelf_life: emptyVal(data.shelf_life),
+            is_hazmat: emptyVal(data.is_hazmat),
+            effective_date: emptyVal(data.effective_date)
+        };
+    }
+    
+    // 渲染详情
+    function renderDetail(data) {
+        var formattedData = formatData(data);
+        var getTpl = $('#detailTpl').html();
+        var view = $('#detailContent');
+        
+        laytpl(getTpl).render(formattedData, function(html){
+            $('#loading').remove();
+            view.html(html);
+        });
+    }
+    
+    // 加载详情数据
+    function loadDetail() {
+        var partNumber = getUrlParam('part_number');
+        
+        if (!partNumber) {
+            layer.msg('配件编号不能为空', {icon: 2});
+            showError('配件编号不能为空');
+            return;
+        }
+        
+        // 调用API
+        $.ajax({
+            url: '/new/api/car-parts/detail',
+            type: 'GET',
+            data: {
+                part_number: partNumber
+            },
+            success: function(res) {
+                if (res.code === 200 && res.data) {
+                    renderDetail(res.data);
+                } else {
+                    layer.msg(res.msg || '获取配件详情失败', {icon: 2});
+                    showError(res.msg || '获取配件详情失败');
+                }
+            },
+            error: function() {
+                layer.msg('网络请求失败', {icon: 2});
+                showError('网络请求失败');
+            }
+        });
+    }
+    
+    // 执行加载
+    loadDetail();
+});
+</script>
