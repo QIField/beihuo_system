@@ -13,6 +13,7 @@
 from app.models.orm_models.car_parts_library_benz import CarPartsLibraryBenz
 from app.models.orm_models.crmapp_compare_summary import CrmappCompareSummary
 from app.services.car_parts_library_service.mercedes_dalfsc_service import fetch_mercedes_data
+from app.services.car_parts_library_service.excel_import_service import process_file_stream, generate_template
 from app.utils.orm.session import orm_session
 from app.dao.car_parts_library_benz_dao import CarPartsLibraryBenzDao
 from app.services.system_setting_service.beihuo_system_config_service import set_config_by_key
@@ -40,7 +41,7 @@ def get_part_by_number(part_number: str) -> Optional[Dict]:
                 discount_rate = config.get('discount_rate', 0.83)
         except Exception:
             pass
-        
+
         with orm_session() as session:
             # 直接使用 session.query 查询
             part = session.query(CarPartsLibraryBenz).filter(
@@ -78,7 +79,7 @@ def get_parts_list_page(
                 discount_rate = config.get('discount_rate', 0.87)
         except Exception:
             pass
-        
+
         with orm_session() as session:
             # 检查是否有查询条件，没有则直接返回
             has_condition = False
@@ -307,27 +308,27 @@ def add_part(part_data: dict) -> dict:
             existing_part = session.query(CarPartsLibraryBenz).filter(
                 CarPartsLibraryBenz.part_number == part_data.get('part_number')
             ).first()
-            
+
             if existing_part:
                 return {
                     'status': False,
                     'msg': '配件编号已存在'
                 }
-            
+
             # 创建新配件对象
             new_part = CarPartsLibraryBenz()
-            
+
             # 填充数据
             for key, value in part_data.items():
                 if hasattr(new_part, key):
                     setattr(new_part, key, value)
-            
+
             # 设置数据来源
             new_part.data_source = 'manual'  # pyright: ignore[reportAttributeAccessIssue]
-            
+
             session.add(new_part)
             session.commit()
-            
+
             return {
                 'status': True,
                 'msg': '添加成功'
@@ -353,20 +354,20 @@ def update_part(part_number: str, part_data: dict) -> dict:
             part = session.query(CarPartsLibraryBenz).filter(
                 CarPartsLibraryBenz.part_number == part_number
             ).first()
-            
+
             if not part:
                 return {
                     'status': False,
                     'msg': '配件不存在'
                 }
-            
+
             # 更新数据
             for key, value in part_data.items():
                 if hasattr(part, key) and key != 'part_number':  # 不允许修改配件编号
                     setattr(part, key, value)
-            
+
             session.commit()
-            
+
             return {
                 'status': True,
                 'msg': '更新成功'
@@ -391,16 +392,16 @@ def delete_part(part_number: str) -> dict:
             part = session.query(CarPartsLibraryBenz).filter(
                 CarPartsLibraryBenz.part_number == part_number
             ).first()
-            
+
             if not part:
                 return {
                     'status': False,
                     'msg': '配件不存在'
                 }
-            
+
             session.delete(part)
             session.commit()
-            
+
             return {
                 'status': True,
                 'msg': '删除成功'
@@ -411,6 +412,54 @@ def delete_part(part_number: str) -> dict:
             'status': False,
             'msg': f'删除失败: {str(e)}'
         }
+
+
+def import_parts(file_obj, filename) -> Dict:
+    """
+    批量导入配件数据（插入更新模式）
+
+    :param file_obj: 文件对象
+    :param filename: 文件名
+    :return: 包含统计信息的字典
+    """
+    try:
+        dao = CarPartsLibraryBenzDao()
+        stats = process_file_stream(file_obj, filename, dao)
+
+        msg = f'导入完成！共处理 {stats["total"]} 条数据，成功 {stats["success"]} 条，失败 {stats["failed"]} 条'
+
+        return {
+            'status': True,
+            'msg': msg,
+            'data': stats
+        }
+    except Exception as e:
+        msg = f'导入失败: {str(e)}'
+        print(msg)
+        return {
+            'status': False,
+            'msg': msg,
+            'data': {
+                'total': 0,
+                'success': 0,
+                'failed': 0,
+                'errors': [{'error': str(e)}],
+                'success_part_numbers': []
+            }
+        }
+
+
+def download_template():
+    """
+    下载Excel导入模板
+
+    :return: BytesIO对象，包含Excel模板
+    """
+    try:
+        return generate_template()
+    except Exception as e:
+        print(f'生成模板失败: {str(e)}')
+        raise
 
 
 # if __name__ == '__main__':

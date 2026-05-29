@@ -20,8 +20,8 @@ def clean_parts_information(data_dict):
     """
     # 要保留的字段映射
     clean_data = {
-        # 基本信息
-        'part_number': data_dict.get('partNo', {}).get('number', ''),
+        # 基本信息 - part_number 需要去除所有空格
+        'part_number': data_dict.get('partNo', {}).get('number', '').replace(' ', ''),
         # 'descriptions': data_dict.get('partNo', {}).get('description', ''),
         'description_cn': data_dict.get('partNo', {}).get('description', ''),
         'marketing_code': data_dict.get('marketingCode', ''),
@@ -73,7 +73,7 @@ def clean_stock_information(data_list):
     
     for item in data_list:
         clean_data = {
-            'part_number': item.get('partNo', {}).get('number', ''),
+            'part_number': item.get('partNo', {}).get('number', '').replace(' ', ''),
             'warehouse': item.get('warehouse', ''),
             'description': item.get('partNo', {}).get('description', ''),
             'quantity_available': item.get('quantityAvailable', {}).get('amount'),
@@ -95,8 +95,8 @@ def extract_all_part_numbers_from_part_data(part_data):
     """
     part_numbers = set()
     
-    # 添加主零件编号
-    main_part_number = part_data.get('partNo', {}).get('number', '')
+    # 添加主零件编号 - 去除空格
+    main_part_number = part_data.get('partNo', {}).get('number', '').replace(' ', '')
     if main_part_number:
         part_numbers.add(main_part_number)
     
@@ -105,8 +105,8 @@ def extract_all_part_numbers_from_part_data(part_data):
         if not session_node:
             return
         
-        # 添加当前节点的零件编号
-        part_no = session_node.get('partNo', {}).get('number', '')
+        # 添加当前节点的零件编号 - 去除空格
+        part_no = session_node.get('partNo', {}).get('number', '').replace(' ', '')
         if part_no:
             part_numbers.add(part_no)
         
