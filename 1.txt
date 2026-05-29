@@ -1,332 +1,44 @@
-{
-    "status": 200,
-    "msg": "返回成功",
-    "data": {
-        "total": 777,
-        "per_page": 20,
-        "current_page": 1,
-        "last_page": 39,
-        "data": [
-            {
-                "supplier_link_id": "42677",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "苏伟良",
-                "buyer": "苏伟良",
-                "payment_description": "月结",
-                "partner_id": "206740",
-                "sap_no": "CNCD0087",
-                "fullname": "成都缤世贸易有限公司（友隆顺）",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42673",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "林建烊",
-                "buyer": "林建烊",
-                "payment_description": "现金",
-                "partner_id": "206716",
-                "sap_no": "CNHE0012",
-                "fullname": "唐山宝锋商贸有限公司",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "朱凯",
-                "contacts_phone": "0315-2232450",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42628",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "黄锐洪",
-                "buyer": "黄锐洪",
-                "payment_description": "现金",
-                "partner_id": "206261",
-                "sap_no": "CNGD3138",
-                "fullname": "佛山伟业隆",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42552",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "邓宇圣",
-                "buyer": "邓宇圣",
-                "payment_description": "现金",
-                "partner_id": "205581",
-                "sap_no": "CNZJ0287",
-                "fullname": "杭州聚骋汽配",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42551",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "佛山采购专用",
-                "buyer": "佛山采购专用",
-                "payment_description": "月结",
-                "partner_id": "205579",
-                "sap_no": "CNSD0302",
-                "fullname": "奔裕海拉",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "欧总",
-                "contacts_phone": "15699181808",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42548",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "林建烊",
-                "buyer": "林建烊",
-                "payment_description": "现金",
-                "partner_id": "205555",
-                "sap_no": "CNBJ0408",
-                "fullname": "（北京）京北汇名车配件",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "无",
-                "contacts_phone": ":010\/87332988",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42516",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "黄锐洪",
-                "buyer": "黄锐洪",
-                "payment_description": "现金",
-                "partner_id": "205338",
-                "sap_no": "CNGD3102",
-                "fullname": "广州亿佳",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42512",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "林建烊",
-                "buyer": "林建烊",
-                "payment_description": "现金",
-                "partner_id": "205325",
-                "sap_no": "CNGD3099",
-                "fullname": "汕头麒林汽配",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42503",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "林建烊",
-                "buyer": "林建烊",
-                "payment_description": "现金",
-                "partner_id": "205265",
-                "sap_no": "CNGD3096",
-                "fullname": "广州新和丰",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "13922165590",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42498",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "佛山采购专用",
-                "buyer": "佛山采购专用",
-                "payment_description": "月结",
-                "partner_id": "205219",
-                "sap_no": "CNMO0166",
-                "fullname": "康配(浙江)汽车零部件有限公司   ",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "商宝国",
-                "contacts_phone": "18618411715",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42497",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "周振辉",
-                "buyer": "周振辉",
-                "payment_description": "现金",
-                "partner_id": "205217",
-                "sap_no": "CNMO0165",
-                "fullname": "广州桀绮",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "无",
-                "contacts_phone": "无",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42493",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "佛山采购专用",
-                "buyer": "佛山采购专用",
-                "payment_description": "月结",
-                "partner_id": "205178",
-                "sap_no": "CNSD0298",
-                "fullname": "OSSA",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "时",
-                "contacts_phone": "020-86296686",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42491",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "邓宇圣",
-                "buyer": "邓宇圣",
-                "payment_description": "现金",
-                "partner_id": "205167",
-                "sap_no": "CNHA0071",
-                "fullname": "郑州富业汽配",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "15517190303",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42485",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "周振辉",
-                "buyer": "周振辉",
-                "payment_description": "现金",
-                "partner_id": "205142",
-                "sap_no": "CNMO0164",
-                "fullname": "上海嘉喜源",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "无",
-                "contacts_phone": "无",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42464",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "佛山采购专用",
-                "buyer": "佛山采购专用",
-                "payment_description": "现金",
-                "partner_id": "205023",
-                "sap_no": "CNMO0163",
-                "fullname": "光束未来（北京） ",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "淮朝阳",
-                "contacts_phone": "13311203738",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42462",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "邓宇圣",
-                "buyer": "邓宇圣",
-                "payment_description": "现金",
-                "partner_id": "205005",
-                "sap_no": "CNGD3081",
-                "fullname": "广州展耀贸易有限公司",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42456",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "林建烊",
-                "buyer": "林建烊",
-                "payment_description": "现金",
-                "partner_id": "204918",
-                "sap_no": "CNJX0006",
-                "fullname": " 南昌宝驰通",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "无",
-                "contacts_phone": " 13767438479",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42455",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "林建烊",
-                "buyer": "林建烊",
-                "payment_description": "现金",
-                "partner_id": "204903",
-                "sap_no": "CNGD3078",
-                "fullname": "东莞宝星汽配",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "无",
-                "contacts_phone": "0769-81190378 ",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42441",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "邓宇圣",
-                "buyer": "邓宇圣",
-                "payment_description": "现金",
-                "partner_id": "204810",
-                "sap_no": "CNGD3073",
-                "fullname": "广州曜德汽配",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "",
-                "is_bbr": "0"
-            },
-            {
-                "supplier_link_id": "42426",
-                "company_name": "佛山市巴博瑞汽车零配件有限公司",
-                "creator": "黄锐洪",
-                "buyer": "黄锐洪",
-                "payment_description": "现金",
-                "partner_id": "204624",
-                "sap_no": "CNCQ0009",
-                "fullname": "重庆大昌行",
-                "upload_kingdee": "1",
-                "status": "1",
-                "is_disabled": "0",
-                "contacts": "",
-                "contacts_phone": "",
-                "is_bbr": "0"
-            }
-        ]
-    }
-}
+(索引):5482 [Cart] initCartFilterButtons called
+filter-panel.js:230 [FilterPanel] renderSearchButtons called, container: #cartFilterButtons
+filter-panel.js:236 [FilterPanel] Search container found: <div id=​"cartFilterButtons" style=​"margin-bottom:​ 15px;​ flex-shrink:​ 0;​ display:​ flex;​ flex-wrap:​ wrap;​ gap:​ 10px;​ align-items:​ center;​">​…​</div>​flex
+filter-panel.js:248 [FilterPanel] Creating search buttons, fields count: 7
+filter-panel.js:250 [FilterPanel] Creating button for field: OE号 btnId: searchBtn_0_cartSearchOe
+filter-panel.js:250 [FilterPanel] Creating button for field: 物料条码 btnId: searchBtn_1_cartSearchBarcode
+filter-panel.js:250 [FilterPanel] Creating button for field: 物料名称 btnId: searchBtn_2_cartSearchMaterialName
+filter-panel.js:250 [FilterPanel] Creating button for field: 品牌 btnId: searchBtn_3_cartSearchBrand
+filter-panel.js:250 [FilterPanel] Creating button for field: 车型品牌 btnId: searchBtn_4_cartSearchCarBrand
+filter-panel.js:250 [FilterPanel] Creating button for field: 标签 btnId: searchBtn_5_cartSearchTag
+filter-panel.js:250 [FilterPanel] Creating button for field: 车型 btnId: searchBtn_6_cartSearchCarModel
+filter-panel.js:266 [FilterPanel] Search buttons appended to container
+filter-panel.js:557 [FilterPanel] Data updated, count: 50
+table-cell-selector.js:629 TableCellSelector: 表格 cartTable 初始化完成
+(索引):4731 调用绑定供应商悬浮面板事件
+(索引):4740 调用绑定供应商悬浮面板事件
+(索引):4781 调用绑定库存悬浮面板事件
+table-cell-selector.js:629 TableCellSelector: 表格 beihuoTable 初始化完成
+(索引):2957 调用绑定供应商悬浮面板事件
+(索引):3001 调用绑定库存悬浮面板事件
+filter-panel.js:120 [FilterPanel] Creating filter panel for field: 标签 data count: 50
+filter-panel.js:186 [FilterPanel] getUniqueValues for field: 标签 data length: 50
+filter-panel.js:188 [FilterPanel] Sample row keys: (35) ['added_by', 'added_time', 'avg_sales_12m', 'avg_sales_6m', 'barcode', 'brand', 'brand_code', 'car_brand', 'car_model', 'cost_price', 'id', 'inquiry_1m', 'inquiry_3m', 'internal_remarks', 'material_name', 'national_inquiry_1m', 'national_inquiry_3m', 'oe', 'on_way', 'quantity', 'replace_number', 'sales_7d', 'sales_month', 'sales_yesterday', 'sellable_days', 'stock', 'stock_amount', 'store', 'supplier', 'tag', 'today_sales', 'warning_status', 'LAY_NUM', 'LAY_INDEX', 'LAY_INDEX_INIT']
+filter-panel.js:197 [FilterPanel] Value count result: 0
+filter-panel.js:122 [FilterPanel] Unique values count: 0
+filter-panel.js:158 [FilterPanel] === 筛选面板层级调试 ===
+filter-panel.js:159 [FilterPanel] Filter Panel zIndex: 999999999
+filter-panel.js:160 [FilterPanel] Filter Panel computed zIndex: 999999999
+filter-panel.js:165 [FilterPanel] Cart layer zIndex: 19891015
+filter-panel.js:166 [FilterPanel] Cart layer computed zIndex: 19891015
+filter-panel.js:172 [FilterPanel] Cart shade zIndex: 19891014
+filter-panel.js:173 [FilterPanel] Cart shade computed zIndex: 19891014
+filter-panel.js:120 [FilterPanel] Creating filter panel for field: 车型品牌 data count: 50
+filter-panel.js:186 [FilterPanel] getUniqueValues for field: 车型品牌 data length: 50
+filter-panel.js:188 [FilterPanel] Sample row keys: (35) ['added_by', 'added_time', 'avg_sales_12m', 'avg_sales_6m', 'barcode', 'brand', 'brand_code', 'car_brand', 'car_model', 'cost_price', 'id', 'inquiry_1m', 'inquiry_3m', 'internal_remarks', 'material_name', 'national_inquiry_1m', 'national_inquiry_3m', 'oe', 'on_way', 'quantity', 'replace_number', 'sales_7d', 'sales_month', 'sales_yesterday', 'sellable_days', 'stock', 'stock_amount', 'store', 'supplier', 'tag', 'today_sales', 'warning_status', 'LAY_NUM', 'LAY_INDEX', 'LAY_INDEX_INIT']0: "added_by"1: "added_time"2: "avg_sales_12m"3: "avg_sales_6m"4: "barcode"5: "brand"6: "brand_code"7: "car_brand"8: "car_model"9: "cost_price"10: "id"11: "inquiry_1m"12: "inquiry_3m"13: "internal_remarks"14: "material_name"15: "national_inquiry_1m"16: "national_inquiry_3m"17: "oe"18: "on_way"19: "quantity"20: "replace_number"21: "sales_7d"22: "sales_month"23: "sales_yesterday"24: "sellable_days"25: "stock"26: "stock_amount"27: "store"28: "supplier"29: "tag"30: "today_sales"31: "warning_status"32: "LAY_NUM"33: "LAY_INDEX"34: "LAY_INDEX_INIT"length: 35[[Prototype]]: Array(0)
+filter-panel.js:197 [FilterPanel] Value count result: 0
+filter-panel.js:122 [FilterPanel] Unique values count: 0
+filter-panel.js:158 [FilterPanel] === 筛选面板层级调试 ===
+filter-panel.js:159 [FilterPanel] Filter Panel zIndex: 999999999
+filter-panel.js:160 [FilterPanel] Filter Panel computed zIndex: 999999999
+filter-panel.js:165 [FilterPanel] Cart layer zIndex: 19891015
+filter-panel.js:166 [FilterPanel] Cart layer computed zIndex: 19891015
+filter-panel.js:172 [FilterPanel] Cart shade zIndex: 19891014
+filter-panel.js:173 [FilterPanel] Cart shade computed zIndex: 19891014

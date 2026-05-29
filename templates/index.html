@@ -838,6 +838,12 @@
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:;">CRM</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="javascript:void(0);" onclick="openDiffReplaceNumberInNewTab()">替换号比对更新</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item layui-nav-itemed">
                         <a href="javascript:;">仓库</a>
                         <dl class="layui-nav-child">
                             <dd><a href="javascript:void(0);" onclick="openWarehouseDashboardInNewTab()">仓库看板</a></dd>
@@ -894,6 +900,11 @@
 
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
+
+    <!-- Filter Panel Component -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/filter_panel/filter-panel.css') }}">
+    <script src="{{ url_for('static', filename='js/components/filter_panel/filter-panel.js') }}"></script>
+
     <!-- 购物车模块 -->
     <script src="{{ url_for('static', filename='js/cart/cart-api.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cart/cart-table.js') }}"></script>
@@ -1527,6 +1538,11 @@ function openSearchInCrmInNewTab() {
 function openSuyuanQuery() {
     // 在新标签页中打开溯源查询页面
     window.open('/region_by_number_query_page', '_blank');
+}
+
+// 添加打开替换号比对更新新标签页的函数
+function openDiffReplaceNumberInNewTab() {
+    window.open('/diff_replace_number', '_blank');
 }
 
 // 添加打开仓库看板新标签页的函数
@@ -4401,31 +4417,15 @@ function showCartPanel(table) {
                     </button>
                 </div>
             </div>
-            <div class="layui-input-group search-cart-panel" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; flex-shrink: 0;">
-                <div class="layui-input-inline" style="flex: 1; min-width: 120px; max-width: 180px;">
-                    <input type="text" name="cart_oe" placeholder="OE搜索" autocomplete="off" class="layui-input" style="width: 100%;">
-                </div>
-                <div class="layui-input-inline" style="flex: 1; min-width: 120px; max-width: 180px;">
-                    <input type="text" name="cart_barcode" placeholder="物料条码或品牌号码搜索" autocomplete="off" class="layui-input" style="width: 100%;">
-                </div>
-                <div class="layui-input-inline" style="flex: 1; min-width: 120px; max-width: 180px;">
-                    <input type="text" name="cart_material_name" placeholder="物料名称搜索" autocomplete="off" class="layui-input" style="width: 100%;">
-                </div>
-                <div class="layui-input-inline" style="flex: 1; min-width: 100px; max-width: 180px;">
-                    <input type="text" name="cart_brand" placeholder="品牌搜索" autocomplete="off" class="layui-input" style="width: 100%;">
-                </div>
-                <div class="layui-input-inline" style="flex: 1; min-width: 100px; max-width: 180px;">
-                    <input type="text" name="cart_tag" placeholder="标签搜索" autocomplete="off" class="layui-input" style="width: 100%;">
-                </div>
-                <div class="layui-input-inline" style="flex: 1; min-width: 100px; max-width: 180px;">
-                    <input type="text" name="cart_car_model" placeholder="车型搜索" autocomplete="off" class="layui-input" style="width: 100%;">
-                </div>
-                <div class="layui-input-inline" style="flex: 1; min-width: 100px; max-width: 180px;">
-                    <input type="text" name="cart_car_brand" placeholder="车型品牌搜索" autocomplete="off" class="layui-input" style="width: 100%;">
-                </div>
-                <button class="layui-btn layui-btn-sm layui-btn-normal" id="cartSearchBtn">搜索</button>
-                <button class="layui-btn layui-btn-sm layui-btn-primary" id="cartResetBtn">重置</button>
-            </div>
+            <div id="cartFilterButtons" style="margin-bottom: 15px; flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;"></div>
+            <!-- 隐藏的输入框用于存储搜索值 -->
+            <input type="hidden" id="cartSearchOe">
+            <input type="hidden" id="cartSearchBarcode">
+            <input type="hidden" id="cartSearchMaterialName">
+            <input type="hidden" id="cartSearchBrand">
+            <input type="hidden" id="cartSearchCarBrand">
+            <input type="hidden" id="cartSearchTag">
+            <input type="hidden" id="cartSearchCarModel">
             <div id="cartTableContainer" style="flex: 1; min-height: 0; overflow: hidden; height: auto;">
                 <table class="layui-hide" id="cartTable" lay-filter="cartTable"></table>
             </div>
@@ -4455,7 +4455,10 @@ function showCartPanel(table) {
             success: function(layero, index) {
                 // 保存layero引用到全局变量，供导出函数使用
                 window.currentCartLayero = layero;
-                
+
+                // 初始化搜索和筛选按钮
+                initCartFilterButtons(layero, cartTable);
+
                 // 初始化搜索事件
                 layero.find('#cartSearchBtn').on('click', function() {
                     var searchParams = {};
@@ -4466,20 +4469,20 @@ function showCartPanel(table) {
                     searchParams.cart_tag = layero.find('input[name="cart_tag"]').val();
                     searchParams.cart_car_model = layero.find('input[name="cart_car_model"]').val();
                     searchParams.cart_car_brand = layero.find('input[name="cart_car_brand"]').val();
-                    
+
                     // 过滤空值
                     for (var key in searchParams) {
                         if (searchParams[key] === '') {
                             delete searchParams[key];
                         }
                     }
-                    
+
                     // 重新加载购物车表格
                     cartTable.reload({
                         where: searchParams,
                         page: { curr: 1 }
                     });
-                    
+
                     // 重新绑定供应商悬浮面板事件（仅在产品维度）
                     setTimeout(function() {
                         if (typeof bindSupplierTooltipEvents !== 'undefined' && currentDimension === 'product') {
@@ -4718,6 +4721,12 @@ function showCartPanel(table) {
                 done: function(res, curr, count) {
                     // 存储表格实例到全局变量
                     window.cartTableInstance = this; // 保存表格实例到全局变量
+                    
+                    // 更新筛选面板数据
+                    if (typeof FilterPanel !== 'undefined' && res.data) {
+                        FilterPanel.updateData(res.data);
+                    }
+                    
                     // 绑定供应商列的鼠标悬停事件
                         setTimeout(function() {
                             console.log('调用绑定供应商悬浮面板事件'); // 调试信息
@@ -5467,6 +5476,123 @@ function importCartData(cartTable) {
     };
     
     fileInput.click();
+}
+
+// 初始化购物车搜索和筛选按钮
+function initCartFilterButtons(layero, cartTable) {
+    // 搜索按钮
+    FilterPanel.initSearch({
+        container: '#cartFilterButtons',
+        fields: [
+            { label: 'OE号', inputId: 'cartSearchOe' },
+            { label: '物料条码', inputId: 'cartSearchBarcode' },
+            { label: '物料名称', inputId: 'cartSearchMaterialName' },
+            { label: '品牌', inputId: 'cartSearchBrand' },
+            { label: '车型品牌', inputId: 'cartSearchCarBrand' },
+            { label: '标签', inputId: 'cartSearchTag' },
+            { label: '车型', inputId: 'cartSearchCarModel' }
+        ],
+        onApply: function(field, value) {
+            applyCartFilters(layero);
+        }
+    });
+
+    // 添加分隔符
+    var container = document.getElementById('cartFilterButtons');
+    if (container) {
+        var separator = document.createElement('span');
+        separator.textContent = '|';
+        separator.style.margin = '0 5px';
+        separator.style.color = '#999';
+        container.appendChild(separator);
+    }
+
+    // 筛选按钮
+    FilterPanel.init({
+        container: '#cartFilterButtons',
+        fields: [
+            { field: 'brand', label: '品牌' },
+            { field: 'car_brand', label: '车型品牌' },
+            { field: 'tag', label: '标签' }
+        ],
+        data: [],
+        onApply: function(filters) {
+            applyCartFilters(layero);
+        }
+    });
+
+    // 添加分隔符和重置按钮
+    if (container) {
+        var separator2 = document.createElement('span');
+        separator2.textContent = '|';
+        separator2.style.margin = '0 5px';
+        separator2.style.color = '#999';
+        container.appendChild(separator2);
+
+        var resetBtn = document.createElement('button');
+        resetBtn.className = 'filter-btn';
+        resetBtn.textContent = '重置';
+        resetBtn.onclick = function() {
+            // 清空所有搜索条件
+            document.getElementById('cartSearchOe').value = '';
+            document.getElementById('cartSearchBarcode').value = '';
+            document.getElementById('cartSearchMaterialName').value = '';
+            document.getElementById('cartSearchBrand').value = '';
+            document.getElementById('cartSearchCarBrand').value = '';
+            document.getElementById('cartSearchTag').value = '';
+            document.getElementById('cartSearchCarModel').value = '';
+
+            // 清空筛选面板
+            FilterPanel.clearAll();
+
+            // 刷新表格
+            layui.table.reload('cartTable', {
+                where: {},
+                page: { curr: 1 }
+            });
+        };
+        container.appendChild(resetBtn);
+    }
+}
+
+// 应用购物车筛选条件
+function applyCartFilters(layero) {
+    var searchParams = {};
+
+    // 搜索条件
+    var oe = document.getElementById('cartSearchOe').value.trim();
+    var barcode = document.getElementById('cartSearchBarcode').value.trim();
+    var materialName = document.getElementById('cartSearchMaterialName').value.trim();
+    var brand = document.getElementById('cartSearchBrand').value.trim();
+    var carBrand = document.getElementById('cartSearchCarBrand').value.trim();
+    var tag = document.getElementById('cartSearchTag').value.trim();
+    var carModel = document.getElementById('cartSearchCarModel').value.trim();
+
+    if (oe) searchParams.cart_oe = oe;
+    if (barcode) searchParams.cart_barcode = barcode;
+    if (materialName) searchParams.cart_material_name = materialName;
+    if (brand) searchParams.cart_brand = brand;
+    if (carBrand) searchParams.cart_car_brand = carBrand;
+    if (tag) searchParams.cart_tag = tag;
+    if (carModel) searchParams.cart_car_model = carModel;
+
+    // 筛选条件
+    var activeFilters = FilterPanel.getActiveFilters();
+    if (activeFilters.brand && activeFilters.brand.length > 0) {
+        searchParams.filter_brand = activeFilters.brand.join(',');
+    }
+    if (activeFilters.car_brand && activeFilters.car_brand.length > 0) {
+        searchParams.filter_car_brand = activeFilters.car_brand.join(',');
+    }
+    if (activeFilters.tag && activeFilters.tag.length > 0) {
+        searchParams.filter_tag = activeFilters.tag.join(',');
+    }
+
+    // 刷新表格 - 使用 LayUI 的 table.reload
+    layui.table.reload('cartTable', {
+        where: searchParams,
+        page: { curr: 1 }
+    });
 }
 
 // 添加导出购物车数据函数

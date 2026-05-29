@@ -861,24 +861,37 @@ class CompareDataService:
         from app.utils.Crm_Updatenumber import update_product_numbers
         
         results = []
-        for product_id in product_ids:
+        # 支持中文逗号和英文逗号
+        number_list = replace_number.replace('，', ',').split(',')
+        print(f"=== 开始执行一键使用 ===")
+        print(f"原始替换号: {replace_number}")
+        print(f"分割后: {number_list}")
+        print(f"要更新的产品ID: {product_ids}")
+        print(f"门店代码: {store_code}")
+        for idx, product_id in enumerate(product_ids, 1):
             try:
+                print(f"\n--- 第 {idx}/{len(product_ids)} 个产品 ---")
+                print(f"产品ID: {product_id}")
+                print(f"请求参数: product_id={product_id}, numbers={number_list}, store_code={store_code}")
                 result = update_product_numbers(
                     product_id=product_id,
-                    numbers=[replace_number],
+                    numbers=number_list,
                     store_code=store_code
                 )
+                print(f"CRM返回: {result}")
                 results.append({
                     'product_id': product_id,
                     'success': result.get('status') == 200,
                     'message': result.get('msg', '')
                 })
             except Exception as e:
+                print(f"错误: {e}")
                 results.append({
                     'product_id': product_id,
                     'success': False,
                     'message': str(e)
                 })
+        print(f"\n=== 一键使用执行完成 ===")
         
         return results
     

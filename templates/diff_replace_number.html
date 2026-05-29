@@ -20,8 +20,29 @@
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1600px;
             margin: 0 auto;
+        }
+        
+        .status-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin-bottom: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .status-container .stats-bar,
+        .status-container .progress-bar {
+            box-shadow: none;
+            border-radius: 0;
+            margin-bottom: 0;
+        }
+        
+        .status-container .stats-bar {
+            border-bottom: 1px solid #f0f0f0;
         }
         
         /* 头部 */
@@ -120,7 +141,6 @@
             background: #fff;
             padding: 16px 24px;
             border-radius: 8px;
-            margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             display: flex;
             gap: 32px;
@@ -157,7 +177,6 @@
             background: #fff;
             padding: 16px 24px;
             border-radius: 8px;
-            margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             display: flex;
             justify-content: space-between;
@@ -255,26 +274,41 @@
             background: #f6ffed;
         }
         
-        .col-oe {
-            width: 25%;
+        .col-index {
+            width: 6%;
+            text-align: center;
         }
         
-        .col-brand {
+        .col-oe {
             width: 15%;
         }
         
-        .col-stock {
+        .col-brand {
             width: 12%;
+        }
+        
+        .col-stock {
+            width: 10%;
             text-align: center;
         }
         
         .col-purchase {
-            width: 12%;
+            width: 10%;
             text-align: center;
         }
         
         .col-replace {
-            width: 36%;
+            width: 30%;
+        }
+        
+        .col-action {
+            width: 17%;
+            text-align: center;
+        }
+        
+        .col-action .btn {
+            white-space: nowrap;
+            width: auto;
         }
         
         .stock-yes {
@@ -316,12 +350,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- 头部 -->
-        <div class="header">
-            <div class="header-title">替换号差异对比</div>
-            <div class="header-subtitle">逐个查看同一OE下不同品牌的替换号差异</div>
-        </div>
-        
         <!-- 搜索表单 -->
         <div class="search-form">
             <div class="form-row">
@@ -340,34 +368,37 @@
             </div>
         </div>
         
-        <!-- 统计信息 -->
-        <div class="stats-bar" id="statsBar" style="display: none;">
-            <div class="stat-item">
-                <span class="stat-label">数据库总OE数：</span>
-                <span class="stat-value" id="totalOeCount">0</span>
+        <!-- 统计和进度区域 -->
+        <div class="status-container" id="statusContainer" style="display: none;">
+            <!-- 统计信息 -->
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-label">数据库总OE数：</span>
+                    <span class="stat-value" id="totalOeCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">有差异的OE数：</span>
+                    <span class="stat-value warning" id="diffOeCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">差异率：</span>
+                    <span class="stat-value highlight" id="diffRate">0%</span>
+                </div>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">有差异的OE数：</span>
-                <span class="stat-value warning" id="diffOeCount">0</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">差异率：</span>
-                <span class="stat-value highlight" id="diffRate">0%</span>
-            </div>
-        </div>
-        
-        <!-- 进度和操作 -->
-        <div class="progress-bar" id="progressBar" style="display: none;">
-            <div class="progress-info">
-                当前第 <span id="currentIndex">0</span> / <span id="totalCount">0</span> 个OE
-            </div>
-            <div class="nav-buttons">
-                <button class="btn-nav btn-prev" id="btnPrev" onclick="showPrev()" disabled>
-                    ← 上一个
-                </button>
-                <button class="btn-nav btn-next" id="btnNext" onclick="showNext()" disabled>
-                    下一个 →
-                </button>
+            
+            <!-- 进度和操作 -->
+            <div class="progress-bar">
+                <div class="progress-info">
+                    当前第 <span id="currentIndex">0</span> / <span id="totalCount">0</span> 个OE
+                </div>
+                <div class="nav-buttons">
+                    <button class="btn-nav btn-prev" id="btnPrev" onclick="showPrev()" disabled>
+                        ← 上一个
+                    </button>
+                    <button class="btn-nav btn-next" id="btnNext" onclick="showNext()" disabled>
+                        下一个 →
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -377,6 +408,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th class="col-index">序号</th>
                         <th class="col-oe">OE</th>
                         <th class="col-brand">品牌</th>
                         <th class="col-purchase">采购历史</th>
@@ -419,8 +451,7 @@
             document.getElementById('loading').textContent = '加载中...';
             document.getElementById('emptyState').style.display = 'none';
             document.getElementById('dataContainer').style.display = 'none';
-            document.getElementById('progressBar').style.display = 'none';
-            document.getElementById('statsBar').style.display = 'none';
+            document.getElementById('statusContainer').style.display = 'none';
             
             allData = [];
             let page = 1;
@@ -482,8 +513,7 @@
                 showCurrentOe();
                 
                 // 显示进度条和统计
-                document.getElementById('progressBar').style.display = 'flex';
-                document.getElementById('statsBar').style.display = 'flex';
+                document.getElementById('statusContainer').style.display = 'flex';
                 document.getElementById('dataContainer').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
                 
@@ -575,13 +605,15 @@
                     ? `<span class="stock-yes">${stockQty}</span>` 
                     : '<span class="stock-no">0</span>';
                 
-                // 获取同OE下其他行的product_id
+                // 获取同OE下其他行的product_id（排除替换号相同的行）
+                const currentReplaceNumber = item.replace_number;
                 const otherProductIds = items
-                    .filter((_, i) => i !== index)
+                    .filter((x, i) => i !== index && x.replace_number !== currentReplaceNumber)
                     .map(x => x.product_id)
                     .filter(Boolean);
                 
                 row.innerHTML = `
+                    <td>${index + 1}</td>
                     <td>${item.oe || '-'}</td>
                     <td>${item.brand || '-'}</td>
                     <td class="col-purchase">${purchaseHtml}</td>
@@ -634,7 +666,7 @@
             document.getElementById('searchOe').value = '';
             document.getElementById('searchBrand').value = '';
             document.getElementById('dataContainer').style.display = 'none';
-            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('statusContainer').style.display = 'none';
             document.getElementById('emptyState').style.display = 'block';
             document.getElementById('emptyState').textContent = '请点击"开始查询"按钮查询数据';
             allData = [];
@@ -645,10 +677,16 @@
         
         // 一键使用替换号
         async function useReplaceNumber(replaceNumber, productIds) {
-            if (!confirm(`确定要将此替换号应用到其他 ${productIds.length} 个产品吗？`)) {
-                return;
-            }
-            
+            layer.confirm(`确定要将此替换号应用到其他 ${productIds.length} 个产品吗？`, {
+                icon: 3,
+                title: '提示'
+            }, function (index) {
+                layer.close(index);
+                doReplace(replaceNumber, productIds);
+            });
+        }
+
+        async function doReplace(replaceNumber, productIds) {
             try {
                 const response = await fetch('/new/api/compare/diff-replace-numbers/use', {
                     method: 'POST',
@@ -665,13 +703,19 @@
                 
                 if (result.code === 0) {
                     const successCount = result.data.results.filter(r => r.success).length;
-                    alert(`更新完成：成功 ${successCount} 条，失败 ${result.data.results.length - successCount} 条`);
-                    searchData();  // 刷新数据
+                    layer.msg(`更新完成：成功 ${successCount} 条，失败 ${result.data.results.length - successCount} 条`, {
+                        icon: 1,
+                        time: 2000
+                    });
                 } else {
-                    alert('操作失败：' + result.message);
+                    layer.msg('操作失败：' + result.message, {
+                        icon: 2
+                    });
                 }
             } catch (e) {
-                alert('请求失败：' + e.message);
+                layer.msg('请求失败：' + e.message, {
+                    icon: 2
+                });
             }
         }
     </script>

@@ -10,6 +10,7 @@ import math
 from ..database_connection import get_db_connection as get_pooled_db_connection  # 导入统一的连接池实现并重命名
 from ..supplier_data_fetchers.changsheng_inventory import start as fetch_changsheng_data
 from ..supplier_data_fetchers.wantuo_inventory import start as fetch_wantuo_data
+from ..supplier_data_fetchers.shengwen_inventory import start as fetch_shengwen_data
 
 
 # 全局品牌缓存
@@ -64,15 +65,14 @@ def clear_brand_cache():
 def process_price_by_brand(price, brand, is_wantuo=False, is_changsheng_special=False, company='fsbbr'):
     """
     根据品牌精准匹配处理价格：
-    - 佛山/中山/东莞：原厂+5%，品牌+6%，其他+8%
-    - 珠海：原厂+8%，国际+12%，其他+20%
-    - 万拓额外+15%，昌盛特殊产品额外+10%
+    - 所有公司统一规则：原厂+5%，品牌+6%，其他+8%
+    - 万拓额外+15%，昌盛特殊产品额外+6%
 
     :param price: 原始价格
     :param brand: 品牌名称
     :param is_wantuo: 是否为万拓数据，如果是则额外加15%
     :param is_changsheng_special: 是否为昌盛特殊产品（尾号80结尾+原厂再制造），如果是则额外加10%
-    :param company: 公司标识，'zhbbr'为珠海，其他为默认规则
+    :param company: 公司标识（保留参数，不再区分规则）
     """
     if not price or price == '':
         return 0.0
@@ -83,36 +83,35 @@ def process_price_by_brand(price, brand, is_wantuo=False, is_changsheng_special=
         # 获取品牌缓存
         brand_dict = load_crm_brand_list()
 
-        # 判断是否为珠海
-        is_zhuhai = (company == 'zhbbr')
-
-        # 基础加点
-        base_multiplier = 1.0
+        # 基础加点率（百分比）- 所有公司统一规则
+        base_rate = 0.0
 
         # 检查品牌是否在 crm_brand_list 中
         if brand in brand_dict:
             type_cn = brand_dict[brand]
             # 原厂品牌
             if type_cn == '原厂':
-                base_multiplier = 1.08 if is_zhuhai else 1.05
+                base_rate = 0.05
             # type_cn='品牌'
             elif type_cn == '品牌':
-                base_multiplier = 1.12 if is_zhuhai else 1.06
+                base_rate = 0.06
             # type_cn='其他品牌'
             else:
-                base_multiplier = 1.20 if is_zhuhai else 1.08
+                base_rate = 0.08
         else:
             # 品牌不在 crm_brand_list 中
-            base_multiplier = 1.20 if is_zhuhai else 1.08
+            base_rate = 0.08
 
-        # 额外加点（万拓+15%，昌盛特殊+10%）
-        extra_multiplier = 1.0
+        # 额外加点率（万拓+15%，昌盛特殊+6%）
+        extra_rate = 0.0
         if is_wantuo:
-            extra_multiplier += 0.15
+            extra_rate += 0.15
         elif is_changsheng_special:
-            extra_multiplier += 0.10
+            extra_rate += 0.06
 
-        final_price = price_float * base_multiplier * extra_multiplier
+        # 总加点率 = 基础加点 + 额外加点
+        total_rate = base_rate + extra_rate
+        final_price = price_float * (1 + total_rate)
         return round(final_price, 2)
 
     except (ValueError, TypeError):
@@ -1391,45 +1390,39 @@ def ggg2():
     fd_df['原厂OE码'] = fd_df['原厂oe码']
     fd_df = fd_df[['供应商名称','原厂OE码','品牌','价格','失效时间','仓库名称','库存','备注']]
 
-    # 保存原价格
+    # 保存原价格（用于后续各公司价格计算）
     fd_df['原价格'] = fd_df['价格']
-
-    # 根据品牌处理价格
-    fd_df['价格'] = fd_df.apply(
-        lambda row: process_price_by_brand(row['价格'], row['品牌']) if row['价格'] != '' and pd.notna(row['价格']) and row['价格'] is not None else row['价格'],
-        axis=1
-    )
 
     # 替换nan值
     fd_df = fd_df.fillna('')
-    
+
     # 添加拉取时间
     fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     fd_df['fetch_time'] = fetch_time
-    
-    # 批量保存到数据库
+
+    # 批量保存到数据库（保存原始价格，不提前处理）
     db_manager = get_db_connection()
     try:
         # 批量插入数据
         batch_size = 1000  # 批量处理大小
         for i in range(0, len(fd_df), batch_size):
             batch = fd_df.iloc[i:i + batch_size]
-            
-            # 准备批量插入数据
+
+            # 准备批量插入数据（保存原始价格）
             batch_data = []
             for index, row in batch.iterrows():
                 batch_data.append((
                     row['供应商名称'],
                     row['原厂OE码'],
                     row['品牌'],
-                    row['价格'],
+                    row['价格'],  # 原始价格
                     row['失效时间'],
                     row['仓库名称'],
                     row['库存'],
                     row['备注'],
                     row['fetch_time']
                 ))
-            
+
             # 批量插入到外部数据表
             sql = """
                 INSERT INTO external_data (supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
@@ -1437,95 +1430,14 @@ def ggg2():
             """
             db_manager.execute_many(sql, batch_data)
             print(f"已批量保存 {min(i + batch_size, len(fd_df))} / {len(fd_df)} 条外部数据到外部数据表")
-        
-    finally:
-        db_manager.close()
-
-    # 将数据保存到各公司整合表（外部数据不是万拓也不是昌盛）
-    # 注意：ggg2函数已经对价格进行了处理，这里需要重新按各公司规则处理
-    # 所以不使用save_to_company_tables，而是直接保存到各表（价格已在上面处理过）
-    companies = ['fsbbr', 'zhbbr', 'zsbbr', 'dgby', 'dghf']
-    table_map = {
-        'fsbbr': 'virtual_inventory',
-        'zhbbr': 'virtual_inventory_zhbbr',
-        'zsbbr': 'virtual_inventory_zsbbr',
-        'dgby': 'virtual_inventory_dgby',
-        'dghf': 'virtual_inventory_dghf'
-    }
-
-    # 供应商名称映射（用于非佛山表）
-    supplier_mapping = {
-        '东莞佳配': '佛山1',
-        '佛山万拓': '佛山2',
-        '佛山巴博瑞': '佛山3',
-        '佛山德孚': '佛山4',
-        '佛山新奔裕汽配': '佛山5',
-        '佳配': '佛山6',
-        '宝翼隆': '佛山7',
-        '广州佳配': '佛山8',
-        '广州德之宝': '佛山9',
-        '广州日昇': '佛山10',
-        '广州昌盛': '佛山11',
-        '广州犇宝': '佛山12',
-        '广星': '佛山13',
-        '沐博': '佛山14',
-        '爱车贝母': '佛山15',
-        '腾隆': '佛山16',
-        '鑫峰': '佛山17'
-    }
-
-    # 佛山表上传用供应商名称映射
-    fsbbr_upload_mapping = {
-        '广州昌盛': '昌盛',
-        '佛山万拓': '万拓'
-    }
-
-    db_manager = get_db_connection()
-    try:
-        for company in companies:
-            table_name = table_map[company]
-
-            # 准备数据
-            batch_data = []
-            for _, row in fd_df.iterrows():
-                # 处理供应商名称和上传用供应商名称
-                original_supplier = row['供应商名称']
-                if company == 'fsbbr':
-                    # 佛山表：supplier_name保持原名称，upload_supplier_name使用映射
-                    supplier_name = original_supplier
-                    upload_supplier_name = fsbbr_upload_mapping.get(original_supplier, original_supplier)
-                else:
-                    # 其他表：supplier_name保持原名称，upload_supplier_name使用佛山X映射
-                    supplier_name = original_supplier
-                    upload_supplier_name = supplier_mapping.get(original_supplier, original_supplier)
-
-                batch_data.append((
-                    supplier_name,
-                    row['原厂OE码'],
-                    row['品牌'],
-                    row['价格'],  # 已经处理过的价格
-                    row['原价格'],
-                    row['失效时间'],
-                    row['仓库名称'],
-                    row['库存'],
-                    row['备注'],
-                    row['fetch_time'],
-                    upload_supplier_name
-                ))
-
-            # 批量插入
-            batch_size = 1000
-            for i in range(0, len(batch_data), batch_size):
-                batch = batch_data[i:i + batch_size]
-                sql = f"""
-                    INSERT INTO {table_name} (supplier_name, oe_code, brand, price, original_price, expiry_date, warehouse, stock, remark, fetch_time, upload_supplier_name)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """
-                db_manager.execute_many(sql, batch)
-                print(f"[{company}] 已批量保存 {min(i + batch_size, len(batch_data))} / {len(batch_data)} 条外部数据")
 
     finally:
         db_manager.close()
+
+    # 将数据保存到各公司整合表，使用 save_to_company_tables 统一处理价格
+    # 根据供应商名称判断是否为万拓数据
+    is_wantuo = '佛山万拓' in fd_df['供应商名称'].values if not fd_df.empty else False
+    save_to_company_tables(fd_df, is_wantuo=is_wantuo, is_changsheng=False)
 
     return fd_df
 
@@ -1593,7 +1505,8 @@ def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changshe
         '沐博': '佛山14',
         '爱车贝母': '佛山15',
         '腾隆': '佛山16',
-        '鑫峰': '佛山17'
+        '鑫峰': '佛山17',
+        '盛旻': '佛山18'
     }
 
     # 佛山表上传用供应商名称映射
@@ -1642,7 +1555,8 @@ def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changshe
                     is_changsheng_special = is_changsheng_special_fn(row)
 
                 # 按公司规则处理价格
-                original_price = row['价格']
+                # 使用原价格进行计算，避免重复加点
+                original_price = row.get('原价格', row['价格'])
                 processed_price = process_price_by_brand(
                     original_price,
                     row['品牌'],
@@ -1749,6 +1663,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
     def login(company):
         """从数据库获取 B2B token"""
         from config.config_list_manager.config_cache import get_config_value
+        import time
         
         # 公司代码转 config_key
         company_map = {
@@ -1763,11 +1678,22 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         if not config_key:
             raise KeyError(f"未知的公司代码: {company}")
         
-        token = get_config_value(config_key)
-        if not token:
-            raise Exception(f"[{company}] 数据库中未找到 token")
-        
-        return token
+        # 添加重试机制，处理连接超时问题
+        for attempt in range(3):
+            try:
+                token = get_config_value(config_key)
+                if token:
+                    return token
+                else:
+                    raise Exception(f"[{company}] 数据库中未找到 token")
+            except Exception as e:
+                if "Lost connection" in str(e) or "10060" in str(e):
+                    if attempt == 2:
+                        raise Exception(f"[{company}] 获取token失败，数据库连接超时: {e}")
+                    print(f"[{company}] 数据库连接超时，第{attempt + 1}次重试...")
+                    time.sleep(2)
+                else:
+                    raise
 
     def getAllCassWarehouse(token):
         url = "https://openapi.gzbbr.com/Product.Quote/getAllCassWarehouse"
@@ -1811,7 +1737,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
             start += 500
         return split_groups
 
-    def batchSave(records, original_rows, brand_mapping_info, reverse_brand_mapping, original_df, company='fsbbr'):
+    def batchSave(records, original_rows, brand_mapping_info, reverse_brand_mapping, original_df, company='fsbbr', token=None):
         # 转换所有记录中的不可序列化类型为可序列化类型
         serializable_records = [convert_decimal_to_serializable(record) for record in records]
 
@@ -1819,25 +1745,9 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         original_row_groups = split_array_by_500_loop(original_rows)
 
         for i, group in enumerate(record_groups):
-            # 获取token，增加重试机制
-            token = None
-            for attempt in range(3):
-                try:
-                    token = login(company)
-                    break
-                except requests.exceptions.ConnectTimeout:
-                    if attempt == 2:
-                        print(f'[{company}] 获取token失败，跳过批次 {i+1}')
-                        continue
-                    time.sleep(5)
-                except Exception as e:
-                    if attempt == 2:
-                        print(f'[{company}] 获取token失败，跳过批次 {i+1}')
-                        continue
-                    time.sleep(5)
-
+            # 使用传入的token，不再重复获取
             if token is None:
-                print(f"[{company}] 无法获取token，跳过批次 {i+1}")
+                print(f"[{company}] 未提供token，跳过批次 {i+1}")
                 continue
 
             url = "https://openapi.gzbbr.com/Product.Quote/batchSave"
@@ -2004,8 +1914,31 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         'dghf': 'virtual_inventory_dghf'
     }
 
+    # 一次性获取所有公司的 token
+    print("\n" + "="*60)
+    print("开始预获取所有公司 token...")
+    print("="*60)
+    company_tokens = {}
+    for company in companies:
+        try:
+            token = login(company)
+            if token:
+                company_tokens[company] = token
+                print(f"[{company}] 成功获取 token")
+            else:
+                print(f"[{company}] 获取 token 失败: 返回空值")
+                company_tokens[company] = None
+        except Exception as e:
+            print(f"[{company}] 获取 token 失败: {e}")
+            company_tokens[company] = None
+    print("="*60)
+
     # 循环推送到各公司
     for company in companies:
+        # 检查是否有可用 token
+        if not company_tokens.get(company):
+            print(f"\n[{company}] 没有可用 token，跳过")
+            continue
         company_start_time = time.time()
         table_name = table_map[company]
 
@@ -2014,12 +1947,9 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         print(f"从表 [{table_name}] 读取数据")
         print(f"{'='*60}")
 
-        # 获取该公司对应的token和仓库/供应商数据
-        print(f"[{company}] 正在获取token和仓库/供应商数据...")
-        token = login(company)
-        if not token:
-            print(f"[{company}] 获取token失败，跳过")
-            continue
+        # 使用预获取的token
+        token = company_tokens[company]
+        print(f"[{company}] 使用预获取的token...")
 
         ck_data = getAllCassWarehouse(token)
         if ck_data is None or ck_data.empty:
@@ -2151,7 +2081,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
 
         # 上传数据
         try:
-            result = batchSave(records, filtered_rows, brand_mapping_info, reverse_brand_mapping, df_with_original, company)
+            result = batchSave(records, filtered_rows, brand_mapping_info, reverse_brand_mapping, df_with_original, company, token=token)
             print(f"[{company}] 推送完成，耗时: {time.time() - company_start_time:.2f}s")
         except Exception as e:
             print(f"[{company}] 推送失败: {e}")
@@ -2224,6 +2154,23 @@ def main_process():
         print("="*60)
     except Exception as e:
         print(f"获取佛山万拓库存数据失败: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # 获取盛旻库存数据
+    try:
+        print("\n" + "="*60)
+        print("开始获取盛旻库存数据")
+        print("="*60)
+        shengwen_df = fetch_shengwen_data()
+        if shengwen_df is not None and not shengwen_df.empty:
+            save_supplier_to_virtual_inventory(shengwen_df, "盛旻")
+            print(f"盛旻库存数据获取完成，共 {len(shengwen_df)} 条")
+        else:
+            print("盛旻库存数据为空")
+        print("="*60)
+    except Exception as e:
+        print(f"获取盛旻库存数据失败: {e}")
         import traceback
         traceback.print_exc()
 

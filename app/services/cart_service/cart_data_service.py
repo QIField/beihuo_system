@@ -157,6 +157,36 @@ class CartDataService:
                         sql += " AND (" + " OR ".join(or_conditions) + ")"
                         count_sql += " AND (" + " OR ".join(or_conditions) + ")"
 
+                # 筛选参数 - 品牌筛选 (filter_brand) - 精确匹配多个值
+                if search_params.get('filter_brand'):
+                    brand_list = search_params['filter_brand'].split(',')
+                    if brand_list:
+                        placeholders = ','.join(['%s'] * len(brand_list))
+                        sql += f" AND brand IN ({placeholders})"
+                        count_sql += f" AND brand IN ({placeholders})"
+                        params.extend(brand_list)
+                        count_params.extend(brand_list)
+
+                # 筛选参数 - 车型品牌筛选 (filter_car_brand) - 精确匹配多个值
+                if search_params.get('filter_car_brand'):
+                    car_brand_list = search_params['filter_car_brand'].split(',')
+                    if car_brand_list:
+                        placeholders = ','.join(['%s'] * len(car_brand_list))
+                        sql += f" AND car_brand IN ({placeholders})"
+                        count_sql += f" AND car_brand IN ({placeholders})"
+                        params.extend(car_brand_list)
+                        count_params.extend(car_brand_list)
+
+                # 筛选参数 - 标签筛选 (filter_tag) - 精确匹配多个值
+                if search_params.get('filter_tag'):
+                    tag_list = search_params['filter_tag'].split(',')
+                    if tag_list:
+                        placeholders = ','.join(['%s'] * len(tag_list))
+                        sql += f" AND tag IN ({placeholders})"
+                        count_sql += f" AND tag IN ({placeholders})"
+                        params.extend(tag_list)
+                        count_params.extend(tag_list)
+
             # 处理排序
             order_clause = self._build_order_clause(sort_field, sort_order)
             sql += order_clause

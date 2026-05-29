@@ -60,6 +60,12 @@ class CartRequestHandler:
             for key in search_keys:
                 if args.get(key):
                     search_params[key] = args.get(key)
+            
+            # 提取筛选参数
+            filter_keys = ['filter_brand', 'filter_car_brand', 'filter_tag']
+            for key in filter_keys:
+                if args.get(key):
+                    search_params[key] = args.get(key)
 
         # 获取购物车数据
         try:

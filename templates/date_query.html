@@ -13,6 +13,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='js/components/datagrid.css') }}?v=6">
     <script src="{{ url_for('static', filename='js/components/index.js') }}?v=6"></script>
     
+    <!-- 一键置顶按钮组件 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/scroll-to-top/scroll-to-top.css') }}?v=1">
+    <script src="{{ url_for('static', filename='js/components/scroll-to-top/scroll-to-top.js') }}?v=1"></script>
+    
     <!-- LayUI -->
     <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
@@ -1901,6 +1905,20 @@
             // 初始化购物车缓存
             await initCartCache();
             setTimeout(() => loadData(), 100);
+            
+            // 初始化一键置顶按钮（延迟初始化以确保表格已渲染）
+            setTimeout(() => {
+                if (typeof ScrollToTop !== 'undefined') {
+                    ScrollToTop.init({
+                        container: '#table-container',
+                        threshold: 300,
+                        offsetBottom: 30,
+                        offsetRight: 30,
+                        duration: 600
+                    });
+                    console.log('[ScrollToTop] 置顶按钮已初始化');
+                }
+            }, 500);
         });
     </script>
 </body>
