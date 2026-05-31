@@ -114,14 +114,15 @@ def get_crm_session():
     return SessionManager.get_session()
 
 
-def search_crm_by_oe(oe_number):
-    """根据OE号码搜索CRM系统 - 使用 SessionManager 复用 session"""
+def search_crm_by_oe(oe_number, store_code='fsbbr'):
+    """根据OE号码搜索CRM系统 - 根据门店代码使用对应的CRM cookie"""
     try:
-        # 获取线程本地的 session（自动复用，避免重复创建）
-        crm_session = get_crm_session()
+        # 根据门店代码创建对应的 CRM session
+        from config import create_crm_session
+        crm_session = create_crm_session(store_code)
         
         get_params = {
-           "number": oe_number 
+           "number": oe_number
         }
         
         # 使用 session 发送请求，自动携带认证信息
@@ -282,17 +283,17 @@ def search_and_save_crm_data(search_terms, username, company):
     # 使用统一任务管理器并发执行搜索请求
     search_results = []
     failed_oes = []
-    
-    # 定义单个搜索任务函数
-    def single_search(term):
-        result = search_crm_by_oe(term)
+
+    # 定义单个搜索任务函数，传入 store_code 参数
+    def single_search(term, store_code):
+        result = search_crm_by_oe(term, store_code)
         return term, result
-    
+
     # 使用 task_manager 并发执行搜索
     from app.core.task_manager import task_manager
     futures = []
     for term in search_terms:
-        future = task_manager.submit(single_search, term)
+        future = task_manager.submit(single_search, term, company)
         futures.append((term, future))
     
     # 收集结果
