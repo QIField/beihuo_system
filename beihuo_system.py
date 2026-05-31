@@ -256,81 +256,63 @@ def run_crm_create_products_task():
         print(f"[{datetime.now()}] 执行CRM新建产品任务时出错: {e}")
 
 def run_virtual_inventory_task():
-    """运行虚拟库存任务的函数 - 优化版本，保持串行执行逻辑"""
+    """运行虚拟库存任务的函数 - 使用后台线程避免uWSGI超时"""
+    import threading
+    
     current_time = datetime.now()
     print(f"[{current_time}] DEBUG: run_virtual_inventory_task 被调用, 进程ID: {os.getpid()}")
     
     # 检查是否有任务正在运行
     if task_execution_tracker['task_running']:
         print(f"[{current_time}] DEBUG: 任务已在运行中，跳过本次执行")
-        task_execution_tracker['execution_log'].append({
-            'time': current_time,
-            'status': 'skipped_already_running',
-            'reason': 'previous_task_still_running',
-            'process_id': os.getpid()
-        })
         return
     
-    # 记录任务开始
-    task_execution_tracker['task_running'] = True
-    task_execution_tracker['virtual_inventory_last_run'] = current_time
-    task_execution_tracker['execution_log'].append({
-        'time': current_time,
-        'status': 'started',
-        'function': 'run_virtual_inventory_task',
-        'process_id': os.getpid()
-    })
-    
-    reset_daily_status()
-    
-    with combined_task_lock:
-        # 检查今天是否已经执行过组合任务
-        if daily_execution_status['combined_task_executed_today']:
-            print(f"[{datetime.now()}] 组合任务（虚拟库存+CRM）今日已执行，跳过本次执行")
-            task_execution_tracker['task_running'] = False
-            task_execution_tracker['execution_log'].append({
-                'time': current_time,
-                'status': 'skipped_already_executed_today',
-                'reason': 'combined_task_executed_today',
-                'process_id': os.getpid()
-            })
-            return
+    # 定义后台任务执行函数
+    def execute_task_in_background():
+        """在后台线程中执行任务"""
+        # 记录任务开始
+        task_execution_tracker['task_running'] = True
+        task_execution_tracker['virtual_inventory_last_run'] = datetime.now()
         
-        print(f"[{datetime.now()}] 进程{os.getpid()} 开始执行虚拟库存数据同步任务...")
+        reset_daily_status()
         
-        try:
+        with combined_task_lock:
+            # 检查今天是否已经执行过组合任务
+            if daily_execution_status['combined_task_executed_today']:
+                print(f"[{datetime.now()}] 组合任务（虚拟库存+CRM）今日已执行，跳过本次执行")
+                task_execution_tracker['task_running'] = False
+                return
+            
+            print(f"[{datetime.now()}] 进程{os.getpid()} 开始执行虚拟库存数据同步任务...")
+            
             # 动态导入virtual_inventory模块
-            # 确保项目根目录在sys.path中
             project_root = os.path.dirname(os.path.abspath(__file__))
             if project_root not in sys.path:
                 sys.path.insert(0, project_root)
             
-            # 使用绝对导入方式加载模块
             from app.utils import virtual_inventory
             
             # 调用主处理函数
             virtual_inventory.main_process()
             print(f"[{datetime.now()}] 虚拟库存数据同步任务执行完成！")
             
-            # 在虚拟库存任务完成后，立即执行CRM新建产品任务（保持原有串行逻辑）
+            # 在虚拟库存任务完成后，立即执行CRM新建产品任务
             run_crm_create_products_task()
             
             # 标记今日已执行组合任务
             daily_execution_status['combined_task_executed_today'] = True
             
-            # 记录成功完成
-            task_execution_tracker['execution_log'].append({
-                'time': datetime.now(),
-                'status': 'completed_successfully',
-                'function': 'run_virtual_inventory_task'
-            })
-            
-        except Exception as e:
-            print(f"[{datetime.now()}] 执行虚拟库存数据同步任务时出错: {e}")
-        finally:
-            # 确保任务标记被重置
+            # 重置任务标记
             task_execution_tracker['task_running'] = False
             print(f"[{datetime.now()}] DEBUG: 任务执行结束，重置task_running标志")
+    
+    # 创建后台线程执行任务
+    thread = threading.Thread(target=execute_task_in_background, daemon=True)
+    thread.start()
+    print(f"[{current_time}] 虚拟库存任务已在后台线程启动，线程ID: {thread.ident}")
+    
+    # 立即返回，不等待任务完成
+    return
 
 # 注册每小时购物车高库存清理任务
 def run_cart_cleanup_task():
