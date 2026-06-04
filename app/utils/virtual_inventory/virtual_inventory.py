@@ -1388,7 +1388,6 @@ def ggg2():
         
     fd_df = pd.concat(xs_df_list)
     fd_df['原厂OE码'] = fd_df['原厂oe码']
-    fd_df = fd_df[['供应商名称','原厂OE码','品牌','价格','失效时间','仓库名称','库存','备注']]
 
     # 保存原价格（用于后续各公司价格计算）
     fd_df['原价格'] = fd_df['价格']
@@ -1397,8 +1396,13 @@ def ggg2():
     fd_df = fd_df.fillna('')
 
     # 添加拉取时间
-    fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now()
+    fetch_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
     fd_df['fetch_time'] = fetch_time
+
+    # 计算失效时间（当前时间+1天）
+    expiry_date = (current_time + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    fd_df['失效时间'] = expiry_date
 
     # 批量保存到数据库（保存原始价格，不提前处理）
     db_manager = get_db_connection()
