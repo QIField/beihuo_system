@@ -21,9 +21,9 @@ class CarPartsFavorite(BaseModels):
     category = Column(String(100), nullable=False, default='主收藏', comment='分类')
     created_at = Column(DateTime, nullable=False, default=datetime.now, comment='创建时间')
 
-    # 唯一约束：同一个用户对同一个配件只能收藏一次
+    # 唯一约束：同一个用户对同一个配件在同一分类下只能收藏一次
     __table_args__ = (
-        UniqueConstraint('user_id', 'part_number', name='uq_user_part'),
+        UniqueConstraint('user_id', 'part_number', 'category', name='uq_user_part_category'),
     )
 
     def to_dict(self):

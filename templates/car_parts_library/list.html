@@ -341,12 +341,14 @@
     <div class="layui-upload-drag" id="uploadArea">
       <i class="layui-icon">&#xe67c;</i>
       <p>点击上传，或将文件拖拽到此处</p>
-      <div class="layui-hide" id="demoUploadText">
-        <hr>
-        <p>文件类型：.xlsx / .xls / .csv</p>
-        <p>文件大小：不超过 10MB</p>
-        <p>导入模式：存在则更新，不存在则插入</p>
-      </div>
+    </div>
+    <div style="margin-top: 15px; padding: 10px 15px; background-color: #fff7e6; border-radius: 4px; border: 1px solid #ffd591;">
+      <p style="color: #ff5722; margin: 0; font-size: 14px;">⚠️ 注意：.xls 格式文件暂不支持，请另存为 .xlsx 或 .csv 格式后上传</p>
+    </div>
+    <div style="margin-top: 15px; color: #666; font-size: 13px;">
+      <p style="margin: 5px 0;">📄 支持文件类型：.xlsx / .csv</p>
+      <p style="margin: 5px 0;">📏 文件大小：不超过 10MB</p>
+      <p style="margin: 5px 0;">🔄 导入模式：存在则更新，不存在则插入</p>
     </div>
     <div style="margin-top: 20px; text-align: center;">
       <a href="#" onclick="downloadTemplate(); return false;" style="color: #1890ff;">
@@ -877,13 +879,12 @@ layui.use(['table', 'layer', 'form', 'jquery', 'upload', 'dropdown'], function()
                     elem: '#uploadArea',
                     url: '/new/api/car-parts/import',
                     accept: 'file',
-                    exts: 'xlsx|xls|csv',
+                    exts: 'xlsx|csv',
                     size: 10240, // 10MB
+                    text: {
+                        'check-error': '选择的文件中包含不支持的格式，请使用 .xlsx 或 .csv 格式上传'
+                    },
                     before: function(obj) {
-                        // 展示文件信息
-                        obj.preview(function(index, file, result) {
-                            $('#demoUploadText').removeClass('layui-hide');
-                        });
                         layer.load(2, {shade: [0.3, '#000']});
                     },
                     done: function(res) {
@@ -1020,14 +1021,22 @@ layui.use(['table', 'layer', 'form', 'jquery', 'upload', 'dropdown'], function()
 
     // 表格工具事件监听
     table.on('tool(partsTable)', function(obj){
-        const data = obj.data;
+      const data = obj.data;
 
-        if(obj.event === 'detail'){
-            location.hash = '/detail?part_number=' + encodeURIComponent(data.part_number);
-        } else if(obj.event === 'edit'){
-            openPartForm(data, true);
-        } else if(obj.event === 'del'){
-            layer.confirm('确定要删除该配件吗？', function(index){
+      if(obj.event === 'detail'){
+        // 直接调用 window.openDetailTab 函数打开标签页
+        if (window.openDetailTab) {
+          console.log('调用 openDetailTab，配件编号:', data.part_number);
+          window.openDetailTab(data.part_number);
+        } else {
+          // 如果没有这个函数，降级使用原来的方式
+          console.log('openDetailTab 函数不存在，使用 hash 方式');
+          location.hash = '/detail?part_number=' + encodeURIComponent(data.part_number);
+        }
+      } else if(obj.event === 'edit'){
+        openPartForm(data, true);
+      } else if(obj.event === 'del'){
+        layer.confirm('确定要删除该配件吗？', function(index){
                 const loading = layer.load(1, {shade: [0.3, '#000'], content: '正在删除...'});
                 
                 $.ajax({

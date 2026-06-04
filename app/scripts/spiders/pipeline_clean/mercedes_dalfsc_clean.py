@@ -63,24 +63,39 @@ def clean_parts_information(data_dict):
 def clean_stock_information(data_list):
     """
     清洗奔驰库存信息数据
-    
-    根据 demo2.json 中的字段进行清洗和提取
-    
+
+    根据 demo.json 中的字段进行清洗和提取
+
     :param data_list: 原始库存信息列表
     :return: 清洗后的库存信息列表
     """
     clean_data_list = []
-    
+
     for item in data_list:
+        # 零件编号 - 只去除空格
+        part_number = item.get('partNo', {}).get('number', '').replace(' ', '')
+        
+        # 仓库信息
+        warehouse = item.get('warehouse', '')
+        
+        # 描述信息
+        description = item.get('partNo', {}).get('description', '')
+        
+        # 可用数量 - 直接获取原始值
+        quantity_available = item.get('quantityAvailable', {}).get('amount')
+        
+        # 单位信息
+        unit = item.get('quantityAvailable', {}).get('unitId', '')
+        
         clean_data = {
-            'part_number': item.get('partNo', {}).get('number', '').replace(' ', ''),
-            'warehouse': item.get('warehouse', ''),
-            'description': item.get('partNo', {}).get('description', ''),
-            'quantity_available': item.get('quantityAvailable', {}).get('amount'),
-            'unit': item.get('quantityAvailable', {}).get('unitId', '')
+            'part_number': part_number,
+            'warehouse': warehouse,
+            'description': description,
+            'quantity_available': quantity_available,
+            'unit': unit
         }
         clean_data_list.append(clean_data)
-    
+
     return clean_data_list
 
 
@@ -95,8 +110,8 @@ def extract_all_part_numbers_from_part_data(part_data):
     """
     part_numbers = set()
     
-    # 添加主零件编号 - 去除空格
-    main_part_number = part_data.get('partNo', {}).get('number', '').replace(' ', '')
+    # 添加主零件编号 - 不去空格，保持原始格式用于API请求
+    main_part_number = part_data.get('partNo', {}).get('number', '')
     if main_part_number:
         part_numbers.add(main_part_number)
     
@@ -105,8 +120,8 @@ def extract_all_part_numbers_from_part_data(part_data):
         if not session_node:
             return
         
-        # 添加当前节点的零件编号 - 去除空格
-        part_no = session_node.get('partNo', {}).get('number', '').replace(' ', '')
+        # 添加当前节点的零件编号 - 不去空格，保持原始格式用于API请求
+        part_no = session_node.get('partNo', {}).get('number', '')
         if part_no:
             part_numbers.add(part_no)
         

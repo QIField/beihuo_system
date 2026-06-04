@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-# @Time    : 2026/05/27
+# @Time    : 2026-05-27
 # @Author  : xingkongtub
 # @Project : beihuo_system
 # @File    : excel_import_service.py
@@ -252,13 +252,17 @@ def process_file_stream(file_obj, filename, dao) -> Dict[str, Any]:
     # 根据文件扩展名选择处理方式
     ext = os.path.splitext(filename)[1].lower()
     
+    # 检查是否支持 .xls 格式
+    if ext == '.xls':
+        raise ValueError('不支持 .xls 格式的文件，请使用 .xlsx 格式或转换为 .csv 格式')
+    
     # 1. 读取表头
-    if ext in ['.xlsx', '.xls']:
+    if ext == '.xlsx':
         header = read_excel_header(file_obj)
     elif ext == '.csv':
         header = read_csv_header(file_obj)
     else:
-        raise ValueError(f'不支持的文件格式：{ext}')
+        raise ValueError(f'不支持的文件格式：{ext}。仅支持 .xlsx 和 .csv 格式')
     
     # 2. 验证列名
     valid, msg = validate_columns(header)
@@ -269,7 +273,7 @@ def process_file_stream(file_obj, filename, dao) -> Dict[str, Any]:
     col_index_map = build_column_index_map(header)
     
     # 4. 选择行迭代器
-    if ext in ['.xlsx', '.xls']:
+    if ext == '.xlsx':
         row_iterator = iter_excel_rows(file_obj)
     else:  # .csv
         row_iterator = iter_csv_rows(file_obj)
@@ -354,4 +358,3 @@ def generate_template() -> BytesIO:
     output.seek(0)
     
     return output
-

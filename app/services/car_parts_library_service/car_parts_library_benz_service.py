@@ -193,6 +193,9 @@ def get_crmapp_compare_summary(oe_list: List[str], vehicle_brand: str = '奔驰'
             if company:
                 query = query.filter(CrmappCompareSummary.company == company)
             
+            # 添加brand条件筛选：只查询原厂或原厂国内4s件
+            query = query.filter(CrmappCompareSummary.brand.in_(['原厂', '原厂国内4s件']))
+            
             # 添加GROUP BY
             query = query.group_by(CrmappCompareSummary.oe)
             
@@ -240,7 +243,14 @@ def get_crmapp_compare_summary(oe_list: List[str], vehicle_brand: str = '奔驰'
 
 
 
-def set_mercedes_config(cookie: str, customer_id: str, sales_organization_id: str, tax_rate: float = 1.13, discount_rate: float = 0.87) -> Dict:
+def set_mercedes_config(
+    cookie: str, customer_id: str, sales_organization_id: str, 
+    tax_rate: float = 1.13, discount_rate: float = 0.87, 
+    column_config: Optional[Dict] = None, 
+    favorite_column_config: Optional[Dict] = None,
+    column_order: Optional[List[str]] = None,
+    favorite_column_order: Optional[List[str]] = None
+) -> Dict:
     """
     设置奔驰大库配置
 
@@ -249,17 +259,51 @@ def set_mercedes_config(cookie: str, customer_id: str, sales_organization_id: st
     :param sales_organization_id: 销售组织ID
     :param tax_rate: 税率，默认 1.13
     :param discount_rate: 折扣率，默认 0.83
+    :param column_config: 配件列表列配置（可选）
+    :param favorite_column_config: 收藏列表列配置（可选）
+    :param column_order: 配件列表列顺序（可选）
+    :param favorite_column_order: 收藏列表列顺序（可选）
     :return: 设置结果
     """
     try:
-        # 将配置保存为 JSON 格式
-        config_value = json.dumps({
+        # 获取现有配置
+        existing_config = get_mercedes_config() or {}
+        
+        # 构建新配置
+        config_dict = {
             'cookie': cookie,
             'customer_id': customer_id,
             'sales_organization_id': sales_organization_id,
             'tax_rate': tax_rate,
             'discount_rate': discount_rate
-        }, ensure_ascii=False)
+        }
+        
+        # 如果有列配置，添加到配置中；否则保留现有的列配置
+        if column_config is not None:
+            config_dict['column_config'] = column_config
+        else:
+            config_dict['column_config'] = existing_config.get('column_config')
+        
+        # 如果有收藏列表列配置，添加到配置中；否则保留现有的收藏列配置
+        if favorite_column_config is not None:
+            config_dict['favorite_column_config'] = favorite_column_config
+        else:
+            config_dict['favorite_column_config'] = existing_config.get('favorite_column_config')
+        
+        # 如果有列顺序配置，添加到配置中；否则保留现有的列顺序
+        if column_order is not None:
+            config_dict['column_order'] = column_order
+        else:
+            config_dict['column_order'] = existing_config.get('column_order')
+        
+        # 如果有收藏列表列顺序配置，添加到配置中；否则保留现有的
+        if favorite_column_order is not None:
+            config_dict['favorite_column_order'] = favorite_column_order
+        else:
+            config_dict['favorite_column_order'] = existing_config.get('favorite_column_order')
+        
+        # 将配置保存为 JSON 格式
+        config_value = json.dumps(config_dict, ensure_ascii=False)
         
         set_config_by_key(
             'mercedes_benz',

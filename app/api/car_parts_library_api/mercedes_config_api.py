@@ -27,7 +27,19 @@ def set_mercedes_config_api():
             "customer_id": "客户ID",
             "sales_organization_id": "销售组织ID",
             "tax_rate": 税率（可选，默认 1.13）,
-            "discount_rate": 折扣率（可选，默认 0.87）
+            "discount_rate": 折扣率（可选，默认 0.87）,
+            "column_config": {  // 配件列表列配置（可选）
+                "part_number": {"hide": false, "width": 180},
+                "brand": {"hide": true, "width": 100},
+                ...
+            },
+            "favorite_column_config": {  // 收藏列表列配置（可选）
+                "part_number": {"hide": false, "width": 180},
+                "brand": {"hide": true, "width": 100},
+                ...
+            },
+            "column_order": ["part_number", "description_cn", ...],  // 配件列表列顺序（可选）
+            "favorite_column_order": ["part_number", "description_cn", ...]  // 收藏列表列顺序（可选）
         }
 
     返回:
@@ -55,6 +67,12 @@ def set_mercedes_config_api():
         tax_rate = data.get('tax_rate', 1.13)
         discount_rate = data.get('discount_rate', 0.83)
         
+        # 列配置是可选的
+        column_config = data.get('column_config')
+        favorite_column_config = data.get('favorite_column_config')
+        column_order = data.get('column_order')
+        favorite_column_order = data.get('favorite_column_order')
+        
         if not cookie or not customer_id or not sales_organization_id:
             return jsonify({
                 'code': 400,
@@ -62,7 +80,7 @@ def set_mercedes_config_api():
                 'data': None
             })
         
-        result = set_mercedes_config(cookie, customer_id, sales_organization_id, tax_rate, discount_rate)
+        result = set_mercedes_config(cookie, customer_id, sales_organization_id, tax_rate, discount_rate, column_config, favorite_column_config, column_order, favorite_column_order)
         
         if result.get('code') == 200:
             return jsonify({
