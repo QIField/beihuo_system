@@ -46,6 +46,35 @@
             color: #8c8c8c;
             margin-top: 4px;
         }
+        
+        /* 标签页样式 */
+        .layui-tabs {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            min-height: 700px;
+        }
+        
+        .layui-tabs-header {
+            padding: 0 20px;
+            border-radius: 8px 8px 0 0;
+            background: #f8f8f8;
+            border-bottom: 1px solid #e8e8e8;
+        }
+        
+        .layui-tabs-body {
+            padding: 20px;
+            min-height: 600px;
+        }
+        
+        .layui-tabs-item {
+            min-height: 600px;
+        }
+        
+        .tab-content {
+            min-height: 600px;
+            width: 100%;
+        }
   </style>
 </head>
 <body>
@@ -58,44 +87,417 @@
         </div>
     </div>
     
-    <!-- 主内容区（路由视图出口） -->
-    <div id="main-view">
-      <!-- 页面内容动态加载 -->
+    <!-- 标签页容器 -->
+    <div class="layui-tabs" lay-filter="parts-tabs" lay-allowclose="true">
+      <ul class="layui-tabs-header" lay-allowclose="true">
+        <li lay-id="list" class="layui-this">
+          <i class="layui-icon layui-icon-list"></i> 配件列表
+        </li>
+      </ul>
+      <div class="layui-tabs-body">
+        <div class="layui-tabs-item layui-show" lay-id="list">
+          <div id="tab-list-content" class="tab-content"></div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script src="/static/layui/layui.js"></script>
   <script>
-  layui.use(['jquery', 'layer', 'table', 'form'], function(){
+  layui.use(['jquery', 'layer', 'table', 'form', 'element'], function(){
     const $ = layui.jquery;
+    const element = layui.element;
+    const layer = layui.layer;
 
-    // 1. 路由表
+    console.log('主页面初始化完成');
+
+    // 路由表
     const routes = {
       '/list': '/web/car_parts_library/list',
       '/detail': '/web/car_parts_library/detail'
     };
 
-    // 2. 渲染视图函数
-    function renderView() {
-      const hash = location.hash.replace('#', '') || '/list';
-      // 处理带参数的路由，如 /detail?id=1
-      const basePath = hash.split('?')[0];
-      const url = routes[basePath];
-      if (!url) {
-        $('#main-view').html('<div>404 页面不存在</div>');
-        return;
-      }
-      // 加载HTML片段
-      $('#main-view').load(url, function(response, status, xhr) {
+    // 存储已打开的标签页
+    let openedTabs = new Set(['list']);
+    
+    // 加载列表页
+    function loadListPage() {
+      console.log('开始加载列表页');
+      $('#tab-list-content').load('/web/car_parts_library/list', function(response, status, xhr) {
         if (status === 'error') {
-          $('#main-view').html('<div>页面加载失败: ' + xhr.status + ' ' + xhr.statusText + '</div>');
+          $('#tab-list-content').html('<div>页面加载失败: ' + xhr.status + ' ' + xhr.statusText + '</div>');
+          console.error('列表页加载失败:', xhr.status, xhr.statusText);
+        } else {
+          console.log('列表页加载成功');
         }
       });
     }
 
-    // 3. 监听hash变化
-    window.addEventListener('hashchange', renderView);
-    renderView(); // 首次加载
+    // 打开详情标签页
+    window.openDetailTab = function(partNumber) {
+      console.log('openDetailTab 被调用，配件编号:', partNumber);
+      const tabId = 'detail-' + partNumber;
+      
+      // 检查标签页是否已存在
+      if (openedTabs.has(tabId)) {
+        console.log('标签页已存在，切换到:', tabId);
+        switchToTab(tabId);
+        return;
+      }
+      
+      console.log('添加新标签页，ID:', tabId);
+      
+      // 手动添加标签头
+      const tabTitleHtml = '<li lay-id="' + tabId + '" class="layui-this">' + 
+        '<i class="layui-icon layui-icon-form"></i> 配件详情: ' + partNumber + 
+        '<i class="layui-icon layui-close layui-unselect">ဆ</i></li>';
+      $('.layui-tabs-header').append(tabTitleHtml);
+      
+      // 手动添加标签内容
+      const tabContentHtml = '<div class="layui-tabs-item layui-show" lay-id="' + tabId + '">' +
+        '<div id="tab-' + tabId + '-content" class="tab-content">' +
+        '<div style="text-align: center; padding: 50px;"><i class="layui-icon layui-icon-loading" style="font-size: 30px; color: #1890ff; animation: layui-anim-rotate 1s linear infinite;"></i><p style="margin-top: 10px; color: #595959;">加载中...</p></div>' +
+        '</div></div>';
+      $('.layui-tabs-body').append(tabContentHtml);
+      
+      // 移除其他标签的layui-show类
+      $('.layui-tabs-header li').not('[lay-id="' + tabId + '"]').removeClass('layui-this');
+      $('.layui-tabs-item').not('[lay-id="' + tabId + '"]').removeClass('layui-show');
+      
+      openedTabs.add(tabId);
+      console.log('当前打开的标签页:', Array.from(openedTabs));
+      
+      // 加载详情内容
+      loadDetailContent(tabId, partNumber);
+      
+      // 绑定关闭按钮事件
+      bindTabCloseEvents();
+      
+      console.log('标签页已手动添加完成');
+    };
+    
+    // 切换到指定标签页
+    function switchToTab(tabId) {
+      // 更新标签头
+      $('.layui-tabs-header li').removeClass('layui-this');
+      $('.layui-tabs-header li[lay-id="' + tabId + '"]').addClass('layui-this');
+      
+      // 更新标签内容
+      $('.layui-tabs-item').removeClass('layui-show');
+      $('.layui-tabs-item[lay-id="' + tabId + '"]').addClass('layui-show');
+    }
+    
+    // 绑定标签关闭事件
+    function bindTabCloseEvents() {
+      $('.layui-tabs-header li .layui-close').off('click').on('click', function() {
+        const $li = $(this).parent('li');
+        const tabId = $li.attr('lay-id');
+        
+        // 不允许关闭列表标签
+        if (tabId === 'list') {
+          return;
+        }
+        
+        console.log('关闭标签页:', tabId);
+        
+        // 如果关闭的是当前标签，切换到上一个标签
+        if ($li.hasClass('layui-this')) {
+          const $prevLi = $li.prev();
+          if ($prevLi.length) {
+            switchToTab($prevLi.attr('lay-id'));
+          } else {
+            switchToTab('list');
+          }
+        }
+        
+        // 移除标签头和内容
+        $li.remove();
+        $('.layui-tabs-item[lay-id="' + tabId + '"]').remove();
+        openedTabs.delete(tabId);
+      });
+      
+      // 绑定标签点击切换事件
+      $('.layui-tabs-header li').off('click').on('click', function() {
+        const tabId = $(this).attr('lay-id');
+        if (tabId) {
+          switchToTab(tabId);
+        }
+      });
+    }
+
+    // 加载详情内容
+    function loadDetailContent(tabId, partNumber) {
+      console.log('开始加载详情内容，tabId:', tabId, 'partNumber:', partNumber);
+      // 直接通过AJAX获取数据并渲染，而不是加载detail.html页面
+      $.ajax({
+        url: '/new/api/car-parts/detail',
+        method: 'GET',
+        data: { part_number: partNumber },
+        success: function(res) {
+          console.log('API返回结果:', res);
+          if (res.code === 200 && res.data) {
+            renderDetail('#tab-' + tabId + '-content', res.data);
+          } else {
+            $('#tab-' + tabId + '-content').html(
+              '<div style="text-align: center; padding: 50px;">' +
+                '<i class="layui-icon layui-icon-face-cry" style="font-size: 50px; color: #999;"></i>' +
+                '<p style="margin-top: 10px; color: #999;">' + (res.msg || '获取配件详情失败') + '</p>' +
+              '</div>'
+            );
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error('请求失败:', status, error);
+          $('#tab-' + tabId + '-content').html(
+            '<div style="text-align: center; padding: 50px;">' +
+              '<i class="layui-icon layui-icon-face-cry" style="font-size: 50px; color: #999;"></i>' +
+              '<p style="margin-top: 10px; color: #999;">网络请求失败: ' + error + '</p>' +
+            '</div>'
+          );
+        }
+      });
+    }
+
+    // 渲染详情内容（从detail.html复制的逻辑）
+    function renderDetail(container, data) {
+      console.log('开始渲染详情，容器:', container, '数据:', data);
+      
+      // 处理空值
+      function emptyVal(val) {
+        return val ? val : '-';
+      }
+      
+      // 处理价格
+      function formatPrice(price) {
+        if (!price) return '-';
+        var numPrice = parseFloat(price);
+        if (isNaN(numPrice)) return '-';
+        return numPrice.toFixed(2) + ' CNY';
+      }
+      
+      // 处理尺寸
+      function formatDimensions(length, width, height) {
+        return (length && width && height) ? (length + ' M * ' + width + ' M * ' + height + ' M') : '-';
+      }
+      
+      // 处理标题
+      function formatTitle(descCn, descEn) {
+        return descCn ? descCn : (descEn ? descEn : '-');
+      }
+      
+      // 处理描述
+      function formatDesc(descCn, descEn) {
+        return descEn ? descEn : (descCn ? descCn : '暂无描述');
+      }
+      
+      var formattedData = {
+        part_number: emptyVal(data.part_number),
+        description_cn: emptyVal(data.description_cn),
+        descriptions: formatDesc(data.description_cn, data.descriptions),
+        title: formatTitle(data.description_cn, data.descriptions),
+        brand: emptyVal(data.brand),
+        category: emptyVal(data.category),
+        origin_country: emptyVal(data.origin_country),
+        created_at: emptyVal(data.created_at),
+        updated_at: emptyVal(data.updated_at),
+        wholesale_price: formatPrice(data.wholesale_price),
+        price_4s_tax_in: formatPrice(data.price_4s_tax_in),
+        price_baborui: formatPrice(data.price_baborui),
+        msrp: formatPrice(data.msrp),
+        quantity_unit: emptyVal(data.quantity_unit),
+        weight: data.weight ? parseFloat(data.weight) + ' KG' : '-',
+        volume: data.volume ? parseFloat(data.volume) + ' CDM' : '-',
+        dimensions: formatDimensions(data.length, data.width, data.height),
+        ccc_mark: emptyVal(data.ccc_mark),
+        marketing_code: emptyVal(data.marketing_code),
+        hazmat_code: emptyVal(data.hazmat_code),
+        shelf_life: emptyVal(data.shelf_life),
+        is_hazmat: emptyVal(data.is_hazmat),
+        effective_date: emptyVal(data.effective_date)
+      };
+      
+      console.log('格式化后的数据:', formattedData);
+      
+      // 构建HTML
+      var html = `
+        <style>
+          /* 详情卡片样式 */
+          .detail-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+          }
+          
+          .detail-card-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #262626;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+          }
+          
+          /* 表格样式 */
+          .layui-table-view {
+            border-radius: 6px;
+            border: 1px solid #e8e8e8;
+          }
+          
+          .layui-table-header {
+            background-color: #fafafa;
+            border-bottom: 2px solid #e8e8e8;
+          }
+          
+          .layui-table th {
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+          }
+          
+          .layui-table td {
+            font-size: 13px;
+          }
+          
+          /* 按钮样式 */
+          .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+          }
+          
+          .btn-primary {
+            background: #1890ff;
+            color: #fff;
+          }
+          
+          .btn-primary:hover {
+            background: #40a9ff;
+          }
+          
+          .btn-default {
+            background: #fff;
+            color: #595959;
+            border: 1px solid #d9d9d9;
+          }
+          
+          .btn-default:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+          }
+        </style>
+        
+        <div class="detail-card">
+          <div style="margin-bottom: 24px;">
+            <h2 style="margin: 0 0 12px 0; font-size: 24px; color: #262626;">${formattedData.title}</h2>
+            <p style="margin: 0 0 8px 0; color: #595959;">代码：<span style="color: #1890ff; font-weight: 500;">${formattedData.part_number}</span></p>
+            <p style="margin: 0 0 12px 0; color: #595959;">创建时间：${formattedData.created_at} | 更新时间：${formattedData.updated_at}</p>
+            <div style="display: flex; gap: 16px; align-items: center;">
+              <span style="font-size: 28px; color: #ff4d4f; font-weight: 600;">${formattedData.wholesale_price}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="detail-card">
+          <div class="detail-card-title">
+            <i class="layui-icon layui-icon-form" style="margin-right: 8px;"></i>基本信息
+          </div>
+          <div>
+            <table class="layui-table" lay-skin="line">
+              <tbody>
+                <tr>
+                  <td style="width: 120px; background: #fafafa; font-weight: 500;">配件名称</td>
+                  <td>${formattedData.description_cn}</td>
+                  <td style="width: 120px; background: #fafafa; font-weight: 500;">代码</td>
+                  <td>${formattedData.part_number}</td>
+                  <td style="width: 120px; background: #fafafa; font-weight: 500;">分类</td>
+                  <td>${formattedData.category}</td>
+                </tr>
+                <tr>
+                  <td style="background: #fafafa; font-weight: 500;">品牌</td>
+                  <td>${formattedData.brand}</td>
+                  <td style="background: #fafafa; font-weight: 500;">CCC标识</td>
+                  <td>${formattedData.ccc_mark}</td>
+                  <td style="background: #fafafa; font-weight: 500;">市场代码</td>
+                  <td>${formattedData.marketing_code}</td>
+                </tr>
+                <tr>
+                  <td style="background: #fafafa; font-weight: 500;">单位</td>
+                  <td>${formattedData.quantity_unit}</td>
+                  <td style="background: #fafafa; font-weight: 500;">重量</td>
+                  <td>${formattedData.weight}</td>
+                  <td style="background: #fafafa; font-weight: 500;">体积</td>
+                  <td>${formattedData.volume}</td>
+                </tr>
+                <tr>
+                  <td style="background: #fafafa; font-weight: 500;">长*宽*高</td>
+                  <td>${formattedData.dimensions}</td>
+                  <td style="background: #fafafa; font-weight: 500;">危险货物代码</td>
+                  <td>${formattedData.hazmat_code}</td>
+                  <td style="background: #fafafa; font-weight: 500;">原产地</td>
+                  <td>${formattedData.origin_country}</td>
+                </tr>
+                <tr>
+                  <td style="background: #fafafa; font-weight: 500;">存储期限</td>
+                  <td>${formattedData.shelf_life}</td>
+                  <td style="background: #fafafa; font-weight: 500;">防盗/危险品</td>
+                  <td>${formattedData.is_hazmat}</td>
+                  <td style="background: #fafafa; font-weight: 500;">价格有效期起始日期</td>
+                  <td>${formattedData.effective_date}</td>
+                </tr>
+                <tr>
+                  <td style="background: #fafafa; font-weight: 500;">批发价</td>
+                  <td style="color: #ff4d4f; font-weight: 600;">${formattedData.wholesale_price}</td>
+                  <td style="background: #fafafa; font-weight: 500;">4S含税进价</td>
+                  <td style="color: #ff4d4f; font-weight: 600;">${formattedData.price_4s_tax_in}</td>
+                  <td style="background: #fafafa; font-weight: 500;">巴博瑞采购价</td>
+                  <td style="color: #ff4d4f; font-weight: 600;">${formattedData.price_baborui}</td>
+                </tr>
+                <tr>
+                  <td style="background: #fafafa; font-weight: 500;">市场指导价</td>
+                  <td style="color: #ff4d4f; font-weight: 600;">${formattedData.msrp}</td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="detail-card">
+          <div class="detail-card-title">
+            <i class="layui-icon layui-icon-form" style="margin-right: 8px;"></i>配件描述
+          </div>
+          <div>
+            <p style="margin: 0; color: #595959; line-height: 1.8;">${formattedData.descriptions}</p>
+          </div>
+        </div>
+      `;
+      
+      console.log('设置HTML内容到容器:', container);
+      $(container).html(html);
+      console.log('HTML内容已设置');
+      layui.form.render();
+      console.log('表单已渲染');
+    }
+
+    console.log('openDetailTab 函数已挂载到 window:', !!window.openDetailTab);
+
+    // 初始化绑定标签页事件
+    bindTabCloseEvents();
+    console.log('标签页事件已绑定');
+
+    // 初始化加载列表页
+    loadListPage();
   });
   </script>
 </body>

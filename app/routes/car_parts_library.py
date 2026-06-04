@@ -22,5 +22,11 @@ def list_html():
 def detail_html():
     """详情页片段"""
     return render_template("car_parts_library/detail.html")
+    
+
+@car_parts_library_bp.route("/cart")
+def cart_html():
+    """购物车页片段"""
+    return render_template("car_parts_library/car_parts_library_combined.html")
 
 
