@@ -242,60 +242,80 @@ def batch_add_to_favorites(user_id: int, part_numbers: List[str], category: str 
         return {'status': False, 'msg': msg, 'added_count': 0, 'exists_count': 0}
 
 
-def move_to_main_category(user_id: int, part_numbers: List[str]) -> Dict:
+def move_to_main_category(user_id: int, part_numbers: List[str], source_category: Optional[str] = None) -> Dict:
     """
-    批量将收藏从其他分类移动到主收藏
+    批量将收藏从指定分类移动到主收藏
 
     :param user_id: 用户ID
     :param part_numbers: 配件编号列表
+    :param source_category: 来源分类，如果为None则从所有非主收藏分类移动
     :return: 包含操作结果的字典
     """
     try:
         if not part_numbers or len(part_numbers) == 0:
             return {'status': False, 'msg': '配件编号列表不能为空', 'moved_count': 0, 'deleted_count': 0}
-        
+
         moved_count = 0
         deleted_count = 0
-        
+
         with orm_session() as session:
-            # 第一步：找出在主收藏中已存在的配件
-            existing_in_main = session.query(CarPartsFavorite.part_number).filter(
-                CarPartsFavorite.user_id == user_id,
-                CarPartsFavorite.part_number.in_(part_numbers),
-                CarPartsFavorite.category == '主收藏'
-            ).all()
-            existing_part_numbers = [item[0] for item in existing_in_main]
-            
-            # 第二步：对于主收藏已存在的配件，直接删除其他分类的记录
-            if existing_part_numbers:
-                deleted_result = session.query(CarPartsFavorite).filter(
+            try:
+                # 先对用户加锁，确保同一用户的请求串行执行
+                # 尝试获取该用户的任意一条收藏记录加锁，如果没有则不影响
+                # lock_query = session.query(CarPartsFavorite.id).filter(
+                #     CarPartsFavorite.user_id == user_id
+                # ).order_by(CarPartsFavorite.id.asc()).limit(1).with_for_update().first()
+
+                # 第一步：找出在主收藏中已存在的配件
+                existing_in_main = session.query(CarPartsFavorite.part_number).filter(
                     CarPartsFavorite.user_id == user_id,
-                    CarPartsFavorite.part_number.in_(existing_part_numbers),
-                    CarPartsFavorite.category != '主收藏'
-                ).delete(synchronize_session=False)
-                deleted_count = deleted_result
-            
-            # 第三步：对于主收藏不存在的配件，执行移动操作
-            parts_to_move = [pn for pn in part_numbers if pn not in existing_part_numbers]
-            if parts_to_move:
-                move_result = session.query(CarPartsFavorite).filter(
-                    CarPartsFavorite.user_id == user_id,
-                    CarPartsFavorite.part_number.in_(parts_to_move),
-                    CarPartsFavorite.category != '主收藏'
-                ).update(
-                    {'category': '主收藏'},
-                    synchronize_session=False
-                )
-                moved_count = move_result
-            
-            session.commit()
-        
+                    CarPartsFavorite.part_number.in_(part_numbers),
+                    CarPartsFavorite.category == '主收藏'
+                ).all()
+                existing_part_numbers = [item[0] for item in existing_in_main]
+
+                # 第二步：对于主收藏已存在的配件，直接删除来源分类的记录
+                if existing_part_numbers:
+                    query = session.query(CarPartsFavorite).filter(
+                        CarPartsFavorite.user_id == user_id,
+                        CarPartsFavorite.part_number.in_(existing_part_numbers)
+                    )
+                    if source_category:
+                        query = query.filter(CarPartsFavorite.category == source_category)
+                    else:
+                        query = query.filter(CarPartsFavorite.category != '主收藏')
+                    deleted_result = query.delete(synchronize_session=False)
+                    deleted_count = deleted_result
+
+                # 第三步：对于主收藏不存在的配件，执行移动操作
+                parts_to_move = [pn for pn in part_numbers if pn not in existing_part_numbers]
+                if parts_to_move:
+                    query = session.query(CarPartsFavorite).filter(
+                        CarPartsFavorite.user_id == user_id,
+                        CarPartsFavorite.part_number.in_(parts_to_move)
+                    )
+                    if source_category:
+                        query = query.filter(CarPartsFavorite.category == source_category)
+                    else:
+                        query = query.filter(CarPartsFavorite.category != '主收藏')
+                    move_result = query.update(
+                        {'category': '主收藏'},
+                        synchronize_session=False
+                    )
+                    moved_count = move_result
+
+                session.commit()
+            except Exception:
+                # 发生异常时回滚事务，确保锁被释放
+                session.rollback()
+                raise
+
         msg_parts = []
         if moved_count > 0:
             msg_parts.append(f'移动 {moved_count} 个')
         if deleted_count > 0:
             msg_parts.append(f'删除重复 {deleted_count} 个')
-        
+
         return {
             'status': True,
             'msg': f'移动成功！{", ".join(msg_parts)}收藏到主收藏',
@@ -324,7 +344,6 @@ def copy_to_main_category(user_id: int, part_numbers: List[str]) -> Dict:
         exists_count = 0
         
         with orm_session() as session:
-            from datetime import datetime
             for part_number in part_numbers:
                 # 检查主收藏中是否已存在
                 existing = session.query(CarPartsFavorite).filter(
@@ -341,7 +360,6 @@ def copy_to_main_category(user_id: int, part_numbers: List[str]) -> Dict:
                         user_id=user_id,
                         part_number=part_number,
                         category='主收藏',
-                        created_at=datetime.now()
                     )
                     session.add(new_favorite)
                     copied_count += 1

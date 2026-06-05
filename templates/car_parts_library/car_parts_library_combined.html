@@ -1736,11 +1736,15 @@
                   return item.part_number;
                 });
                 var loading = layer.load(1, { shade: [0.3, '#000'], content: '正在移动...' });
+                var requestData = { part_numbers: partNumbers };
+                if (currentCategory) {
+                  requestData.source_category = currentCategory;
+                }
                 $.ajax({
                   url: '/new/api/car-parts/move-to-main',
                   method: 'POST',
                   contentType: 'application/json',
-                  data: JSON.stringify({ part_numbers: partNumbers }),
+                  data: JSON.stringify(requestData),
                   success: function(res) {
                     layer.close(loading);
                     layer.close(confirmIndex);
