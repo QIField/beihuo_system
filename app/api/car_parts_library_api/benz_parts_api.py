@@ -13,6 +13,7 @@
 from flask import Blueprint, request, jsonify, send_file, session
 from app.services.car_parts_library_service.car_parts_library_benz_service import get_part_by_number, get_parts_list_page, data_refresh, add_part, update_part, delete_part, import_parts, download_template
 from app.services.car_parts_library_service.car_parts_favorite_service import batch_add_to_favorites
+from app.services.car_parts_library_service.mercedes_dalfsc_service import by_part_number_get_data
 import time
 
 benz_parts_bp = Blueprint('benz_parts', __name__)
@@ -388,5 +389,73 @@ def download_template_api():
         return jsonify({
             'code': 500,
             'msg': f'下载模板失败: {str(e)}',
+            'data': None
+        })
+
+
+@benz_parts_bp.route('/fetch-realtime', methods=['POST'])
+def fetch_realtime_data():
+    """
+    实时获取零件信息和库存信息（不入库）
+    
+    请求参数:
+        {
+            "key": "密钥",
+            "part_number": "零件编号"
+        }
+    
+    返回:
+        {
+            "code": 200,
+            "msg": "success",
+            "data": {
+                "part_number": "零件编号",
+                "part_info": {...零件信息...},
+                "stock_info": [...库存信息列表...]
+            }
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'code': 400,
+                'msg': '请求参数不能为空',
+                'data': None
+            })
+
+        key = data.get('key')
+        if not key:
+            return jsonify({
+                'code': 400,
+                'msg': '密钥不能为空',
+                'data': None
+            })
+        if key != '7Y4Y6RNdkDCwTJDJEBWz':
+            return jsonify({
+                'code': 403,
+                'msg': '密钥验证失败',
+                'data': None
+            })
+
+        part_number = data.get('part_number')
+        if not part_number:
+            return jsonify({
+                'code': 400,
+                'msg': '零件编号不能为空',
+                'data': None
+            })
+        
+        result = by_part_number_get_data(part_number)
+        
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'获取数据失败: {str(e)}',
             'data': None
         })
