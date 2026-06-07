@@ -300,7 +300,8 @@ def move_to_main_api():
 
     请求参数:
     {
-        "part_numbers": ["配件编号1", "配件编号2", ...]
+        "part_numbers": ["配件编号1", "配件编号2", ...],
+        "source_category": "收藏a"  // 可选，指定来源分类
     }
 
     返回:
@@ -347,7 +348,8 @@ def move_to_main_api():
                 'data': None
             })
 
-        result = move_to_main_category(user_id, part_numbers)
+        source_category = data.get('source_category')
+        result = move_to_main_category(user_id, part_numbers, source_category)
 
         if result.get('status'):
             return jsonify({

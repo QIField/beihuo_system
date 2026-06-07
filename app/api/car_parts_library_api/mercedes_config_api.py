@@ -23,19 +23,20 @@ def set_mercedes_config_api():
 
     请求参数:
         {
-            "cookie": "Cookie 字符串",
+            "username": "登录用户名",
+            "password": "登录密码",
             "customer_id": "客户ID",
             "sales_organization_id": "销售组织ID",
             "tax_rate": 税率（可选，默认 1.13）,
             "discount_rate": 折扣率（可选，默认 0.87）,
             "column_config": {  // 配件列表列配置（可选）
-                "part_number": {"hide": false, "width": 180},
-                "brand": {"hide": true, "width": 100},
+                "part_number": {"hide": false, "width": 180 },
+                "brand": {"hide": true, "width": 100 },
                 ...
             },
             "favorite_column_config": {  // 收藏列表列配置（可选）
-                "part_number": {"hide": false, "width": 180},
-                "brand": {"hide": true, "width": 100},
+                "part_number": {"hide": false, "width": 180 },
+                "brand": {"hide": true, "width": 100 },
                 ...
             },
             "column_order": ["part_number", "description_cn", ...],  // 配件列表列顺序（可选）
@@ -46,7 +47,7 @@ def set_mercedes_config_api():
         {
             "code": 200,
             "msg": "设置成功",
-            "data": None
+            "data": null
         }
     """
     try:
@@ -59,7 +60,8 @@ def set_mercedes_config_api():
                 'data': None
             })
         
-        cookie = data.get('cookie')
+        username = data.get('username')
+        password = data.get('password')
         customer_id = data.get('customer_id')
         sales_organization_id = data.get('sales_organization_id')
         
@@ -73,14 +75,14 @@ def set_mercedes_config_api():
         column_order = data.get('column_order')
         favorite_column_order = data.get('favorite_column_order')
         
-        if not cookie or not customer_id or not sales_organization_id:
+        if not username or not password or not customer_id or not sales_organization_id:
             return jsonify({
                 'code': 400,
-                'msg': 'Cookie、customer_id 和 sales_organization_id 不能为空',
+                'msg': 'username、password、customer_id 和 sales_organization_id 不能为空',
                 'data': None
             })
         
-        result = set_mercedes_config(cookie, customer_id, sales_organization_id, tax_rate, discount_rate, column_config, favorite_column_config, column_order, favorite_column_order)
+        result = set_mercedes_config(username, password, customer_id, sales_organization_id, tax_rate, discount_rate, column_config, favorite_column_config, column_order, favorite_column_order)
         
         if result.get('code') == 200:
             return jsonify({

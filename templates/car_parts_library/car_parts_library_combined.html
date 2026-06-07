@@ -360,9 +360,15 @@
   <script type="text/html" id="settingsTemplate">
     <form class="layui-form" lay-filter="settingsForm" style="padding: 30px;">
       <div class="layui-form-item">
-        <label class="layui-form-label">Cookie</label>
+        <label class="layui-form-label">用户名</label>
         <div class="layui-input-block">
-          <textarea id="cookieInput" name="cookie" placeholder="请输入Cookie" class="layui-textarea" style="height: 100px;"></textarea>
+          <input type="text" id="usernameInput" name="username" placeholder="请输入用户名" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">密码</label>
+        <div class="layui-input-block">
+          <input type="password" id="passwordInput" name="password" placeholder="请输入密码" class="layui-input">
         </div>
       </div>
       <div class="layui-form-item">
@@ -762,6 +768,49 @@
         <p style="margin: 0; color: #595959; line-height: 1.8;">{{ d.descriptions }}</p>
       </div>
     </div>
+
+    <div class="detail-card">
+      <div class="detail-card-title">
+        <i class="layui-icon layui-icon-list" style="margin-right: 8px;"></i>库存信息
+      </div>
+      <div>
+        {{# if (d.stock_info && d.stock_info.length > 0) { }}
+        <table class="layui-table" lay-skin="line">
+          <thead>
+            <tr>
+              <th>仓库</th>
+              <th>零件描述</th>
+              <th>可用数量</th>
+              <th>单位</th>
+              <th>创建时间</th>
+              <th>更新时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{# layui.each(d.stock_info, function(index, item) { }}
+            <tr>
+              <td>
+                {{# if (item.warehouse_name !== item.warehouse) { }}
+                <span style="color: #1890ff;">{{ item.warehouse_name }}</span>
+                <span style="color: #999; font-size: 12px;">({{ item.warehouse }})</span>
+                {{# } else { }}
+                {{ item.warehouse }}
+                {{# } }}
+              </td>
+              <td>{{ item.description || '-' }}</td>
+              <td style="font-weight: 600; color: #52c41a;">{{ item.quantity_available || 0 }}</td>
+              <td>{{ item.unit || '-' }}</td>
+              <td>{{ item.created_at || '-' }}</td>
+              <td>{{ item.updated_at || '-' }}</td>
+            </tr>
+            {{# }); }}
+          </tbody>
+        </table>
+        {{# } else { }}
+        <p style="text-align: center; color: #999; padding: 20px;">暂无库存信息</p>
+        {{# } }}
+      </div>
+    </div>
   </script>
   {% endraw %}
 
@@ -804,6 +853,35 @@
     function formatPrice(price) {
       if (!price) return '-';
       return '¥' + parseFloat(price).toFixed(2);
+    }
+
+    // 格式化日期时间
+    function formatDateTime(dateStr) {
+      if (!dateStr) return '-';
+      var date = new Date(dateStr);
+      var year = date.getUTCFullYear();
+      var month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      var day = String(date.getUTCDate()).padStart(2, '0');
+      var hours = String(date.getUTCHours()).padStart(2, '0');
+      var minutes = String(date.getUTCMinutes()).padStart(2, '0');
+      var seconds = String(date.getUTCSeconds()).padStart(2, '0');
+      return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+    }
+
+    // 仓库代码映射
+    var warehouseMapping = {
+      '8918': 'PDC BJ 北京',
+      '8968': 'PDC KS 昆山',
+      '8928': 'PDC SH (HZ) 宝湾',
+      '8958': '成都PDC CD',
+      '8938': '广州PDC',
+      '8978': 'PDC JN 济南'
+    };
+
+    // 获取仓库名称
+    function getWarehouseName(code) {
+      if (!code) return '-';
+      return warehouseMapping[code] || code;
     }
 
     // 处理空值
@@ -981,7 +1059,15 @@
         hazmat_code: emptyVal(data.hazmat_code),
         shelf_life: emptyVal(data.shelf_life),
         is_hazmat: emptyVal(data.is_hazmat),
-        effective_date: emptyVal(data.effective_date)
+        effective_date: emptyVal(data.effective_date),
+        stock_info: (data.stock_info || []).map(function(item) {
+          return {
+            ...item,
+            warehouse_name: getWarehouseName(item.warehouse),
+            created_at: formatDateTime(item.created_at),
+            updated_at: formatDateTime(item.updated_at)
+          };
+        })
       };
 
       console.log('格式化后的数据:', formattedData);
@@ -1736,11 +1822,15 @@
                   return item.part_number;
                 });
                 var loading = layer.load(1, { shade: [0.3, '#000'], content: '正在移动...' });
+                var requestData = { part_numbers: partNumbers };
+                if (currentCategory) {
+                  requestData.source_category = currentCategory;
+                }
                 $.ajax({
                   url: '/new/api/car-parts/move-to-main',
                   method: 'POST',
                   contentType: 'application/json',
-                  data: JSON.stringify({ part_numbers: partNumbers }),
+                  data: JSON.stringify(requestData),
                   success: function(res) {
                     layer.close(loading);
                     layer.close(confirmIndex);
@@ -1940,7 +2030,8 @@
             method: 'GET',
             success: function(res) {
               if (res.code === 200 && res.data) {
-                $('#cookieInput').val(res.data.cookie || '');
+                $('#usernameInput').val(res.data.username || '');
+                $('#passwordInput').val(res.data.password || '');
                 $('#customerIdInput').val(res.data.customer_id || '');
                 $('#salesOrganizationIdInput').val(res.data.sales_organization_id || '');
                 $('#taxRateInput').val(res.data.tax_rate || 1.13);
@@ -1951,14 +2042,15 @@
 
           // 保存设置按钮
           $('#saveSettingsBtn').off('click').on('click', function() {
-            var cookie = $('#cookieInput').val();
+            var username = $('#usernameInput').val();
+            var password = $('#passwordInput').val();
             var customerId = $('#customerIdInput').val();
             var salesOrganizationId = $('#salesOrganizationIdInput').val();
             var taxRate = parseFloat($('#taxRateInput').val()) || 1.13;
             var discountRate = parseFloat($('#discountRateInput').val()) || 0.83;
 
-            if (!cookie || !customerId || !salesOrganizationId) {
-              layer.msg('Cookie、客户ID和销售组织ID不能为空', { icon: 0 });
+            if (!username || !password || !customerId || !salesOrganizationId) {
+              layer.msg('用户名、密码、客户ID和销售组织ID不能为空', { icon: 0 });
               return;
             }
 
@@ -1969,7 +2061,8 @@
 
             // 构建请求数据
             var requestData = {
-              cookie: cookie,
+              username: username,
+              password: password,
               customer_id: customerId,
               sales_organization_id: salesOrganizationId,
               tax_rate: taxRate,

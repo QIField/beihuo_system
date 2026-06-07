@@ -106,3 +106,51 @@ def set_config_by_key(config_key, config_value, env='prod', **kwargs):
         refresh_sys_config(config_key)
         return config.to_dict()
 
+
+def update_json_config(config_key: str, update_dict: dict, env: str = 'prod', **kwargs) -> dict:
+    """
+    更新JSON类型的配置，支持增量更新
+    传入什么属性就更新什么属性，如果数据库没有的属性就新加上去
+
+    :param config_key: 配置键
+    :param update_dict: 要更新的字典，包含要修改的属性
+    :param env: 环境，默认 prod
+    :param kwargs: 其他配置参数（config_type, config_group, label, remark, sort, status）
+                   仅在创建新配置时使用
+    :return: 更新结果字典，包含 code 和 message
+    """
+    try:
+        import json
+        from config.config_list_manager.config_cache import get_config_value
+        
+        # 获取现有配置
+        existing_config = get_config_value(config_key)
+        
+        # 如果现有配置不是字典，初始化为空字典
+        config_dict = existing_config if isinstance(existing_config, dict) else {}
+        
+        # 增量更新：只更新传入的属性，保留原有属性
+        config_dict.update(update_dict)
+        
+        # 将配置保存为 JSON 格式
+        config_value = json.dumps(config_dict, ensure_ascii=False)
+        
+        # 调用 set_config_by_key 保存
+        set_config_by_key(
+            config_key,
+            config_value,
+            env=env,
+            config_type='json',
+            **kwargs
+        )
+        
+        return {
+            'code': 200,
+            'message': f'配置 {config_key} 更新成功'
+        }
+    except Exception as e:
+        return {
+            'code': 500,
+            'message': f'配置 {config_key} 更新失败: {str(e)}'
+        }
+

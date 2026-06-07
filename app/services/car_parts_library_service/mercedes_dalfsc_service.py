@@ -8,9 +8,10 @@ from app.scripts.spiders.spider_entities.mercedes_dalfsc import MercedesDalfscSp
 from app.scripts.spiders.pipeline_clean.mercedes_dalfsc_clean import clean_parts_information, clean_stock_information, extract_all_part_numbers_from_part_data
 from app.dao.car_parts_library_benz_dao import CarPartsLibraryBenzDao
 from app.dao.car_parts_library_benz_stock_dao import CarPartsLibraryBenzStockDao
+from app.scripts.spiders.spider_entities.mercedes_login import MercedesLoginService
 from app.utils.orm.session import orm_session
 from config.config_list_manager.config_cache import get_config_value
-
+import json
 
 def fetch_mercedes_parts_information(spider, part_number, customer_id, sales_organization_id):
     """
@@ -116,45 +117,20 @@ def fetch_mercedes_data(part_numbers):
     print("=" * 100)
     print("奔驰大库数据爬取开始")
     
-    # 获取配置
-    config = get_config_value("mercedes_benz")
-
-    # config = {
-    #     "cookie": "_abck=9CF00446D3E0B33C259A7C11C21E2056~0~YAAQ7G+bG9FZBXaeAQAABwKvjBD33UEqKVchKGzHISA5Pcz/YkPaGBVkFxj7FNlHHnOwjAR1UEkCCkuIsPPtOuCdkVu6SEFRf0QF0Qwf9p3uo7rtBJBZ4vy7kGy8g/OzcKxJ1TAEw2hah4K1TPCyOdawgTAP+2y9FYB/Snz17aGKHgZggPpq+4PM8mwLuB7f8PbT11EtHEEmbasYFsoU+P6JyfAQwYMwT6wLgxn2bHza81urHugkK6kGJJXhKBCu0n1aWF2dadSGnnQX5iqGPZDtGKjI0Bf/hM8hCe42FeanNaUm8UoB9TD4QXBB+TTNL4BePDjfp9wFdCVi8R5crKwsG5u+42n2d6rCosyX3ThlCwrpC5PMEoApZ9+yD3V2FYIjsUe3rx3/AmFaQUUTXMkXDn5gjcanskwGzPP8JH7A+EsQE6CuSxUqJjAVe/I92OZXEir+6eOAaFG8kOFoumOt/XVWsBVmHMBbjeQObGR/k5HkM/qT1ivLPl6+zhkS0tAhQOYTKX524hbnvQGzAHeJl+T0YKDZASuzhXwJy7/h4Q+NaLgv9IWco/o0dcEnPuO2QwtSvO7lgp2hF3+eJOVQ5OIrTXzYbk/60vumbJts12vBFybS2FiWtdtBzhuEs2Yqii4XzioOGTQVqEeAgECvKFzTTlBa8Q1ykKKuOIlitb7ikPo8bcq7hLSNMnRk401PqzN0MqHB1+xiygpO0VT3wGkDBpneV2FI6FgSdNXGNwXp7WuHRPcQCnHOU+/ZIAnYkNM3u9SWD1NVOatpIbDG7J407OU3zch/IXgpYd3WwG+ElPtLM8kTMr4Hus2dn0Juzbl2OyZCzQU999P4ll02Iw6o6kGaElx6JlkeLJNU82mkCqwEnfLf+WVblBOZ/v/oRjFvzzPchoW/jAluhiJFPg==~-1~-1~1779949745~AAQAAAAF%2f%2f%2f%2f%2f38xH6h1TTBZPHrrsQGltUM8OiNQTOgPSYBJuJd458uUZ8s7FuQpDSkDqF6+f8kON1PUjLIHiAjFfSYlOfPT8VPG7wTbfSoi+9ZQ~-1; bm_sz=BD0A0F88CA54E3C159B888EAF9F10B49~YAAQ7G+bG9JZBXaeAQAABwKvjADY3vO/G3ZqhSa1c9/vjwoUN5zU5G9O4Kx7N+j80kwFeGYt/Df5op32Tj0D3j/eyxA2KcXzVRsFNCNt7B30R28U8I79kiz5nFuNw6N5uOINmjnuvWbGz6xtahr0ASyMB8q6H1OnAYtJbDNnD0K+1/Ch8v72vEFa/D+twyYi4XKF6EMmGvQn3sv89r6MTKJ/jEW68AC5pJ80uMiB9qxtTvXlWj3iFQxlqsHsMaNVPjDFbQPlpBQdXSzC1q/hIXelAYz2bB4S1jioYin+6qgrgbEZI5EMAu/OhSN+2FWJ4ku8H+yXqFx+eFuZ3lcMzbm6T39ziVaU6orXeR+Rm3tnerWU2alajgz4XggMJCIgmpD6zzSgaj8G3xkGt91kudn2Jk0=~3552820~4272690; SESSION=6667d620-aad0-45bf-8d9b-dddea069a3f6",
-
-    #     "customer_id": "193211390",
-    #     "sales_organization_id": "O 50000741"
-    # }
+    # 读取配置获取其他需要的参数
+    from config.config_list_manager.config_cache import get_config_value
+    config = get_config_value('mercedes_benz')
     
-    if not config:
-        msg = "未找到奔驰大库配置"
-        print(msg)
-        return {'status': False, 'msg': msg, 'parts_count': 0, 'stock_count': 0}
     
-    cookie = config.get("cookie", "")  # pyright: ignore[reportAttributeAccessIssue]
-    customer_id = config.get("customer_id", "193211390")  # pyright: ignore[reportAttributeAccessIssue]
-    sales_organization_id = config.get("sales_organization_id", "O 50000741")  # pyright: ignore[reportAttributeAccessIssue]
     
-    if not cookie:
-        msg = "Cookie 未配置"
-        print(msg)
-        return {'status': False, 'msg': msg, 'parts_count': 0, 'stock_count': 0}
+    customer_id = config.get("customer_id", "193211390")   # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
+    sales_organization_id = config.get("sales_organization_id", "O 50000741")   # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
     
-    # 创建spider实例
-    spider = MercedesDalfscSpider(cookie)
+    # 创建spider实例（会自动获取并验证 cookie）
+    spider = MercedesDalfscSpider()
     
     try:
-        # 验证Cookie是否有效
-        is_valid, error_msg = spider.validate_cookie(
-            test_part_number="A0005420590",
-            test_customer_id=customer_id,
-            test_sales_organization_id=sales_organization_id
-        )
-        if not is_valid:
-            msg = f"Cookie验证失败：==={error_msg}"
-            print(msg)
-            return {'status': False, 'msg': msg, 'parts_count': 0, 'stock_count': 0}
-        print("Cookie验证通过，继续执行...")
+        print("✓ Spider 初始化完成，cookie 已验证")
         
         # 逐个爬取零件信息
         print("\n开始爬取零件信息...")
@@ -190,5 +166,60 @@ def fetch_mercedes_data(part_numbers):
     finally:
         spider.close()
 
-if __name__ == "__main__":
-   fetch_mercedes_data(["A2642000301"])  
+
+
+def by_part_number_get_data(part_number):
+    """
+    根据零件编号获取零件信息和库存信息（不入库，返回JSON）
+    
+    :param part_number: 零件编号
+    :return: 包含零件信息和库存信息的JSON字典
+    :raises Exception: 当请求失败或处理出错时抛出异常
+    """
+    result = {
+        'part_number': part_number,
+        'part_info': None,
+        'stock_info': []
+    }
+    
+    config = get_config_value('mercedes_benz')
+    customer_id = config.get("customer_id", "193211390")  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
+    sales_organization_id = config.get("sales_organization_id", "O 50000741")  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
+    
+    spider = MercedesDalfscSpider()
+    
+    try:
+        parts_response = spider.get_parts_informations(part_number, customer_id, sales_organization_id)
+        if not parts_response:
+            raise Exception('零件信息请求失败')
+        
+        parts_data = parts_response.json()
+        clean_part_data = clean_parts_information(parts_data)
+        
+        # 将 JSON 字符串转换为字典（使用 json.loads 而不是 .json()）
+       
+        clean_part_data['part_nr_info_super_session'] = json.loads(clean_part_data['part_nr_info_super_session'])
+        
+        result['part_info'] = clean_part_data
+        
+        all_part_numbers = extract_all_part_numbers_from_part_data(parts_data)
+        
+        stock_response = spider.get_stock_information(all_part_numbers)
+        if not stock_response:
+            raise Exception('库存信息请求失败')
+        
+        stock_data = stock_response.json()
+        clean_stock_data = clean_stock_information(stock_data)
+        result['stock_info'] = clean_stock_data
+        
+        return result
+        
+    finally:
+        spider.close()
+
+
+
+# if __name__ == "__main__":
+# #    fetch_mercedes_data(["A2642000301"])  
+#     result = by_part_number_get_data("A2642000301")
+#     print(result)

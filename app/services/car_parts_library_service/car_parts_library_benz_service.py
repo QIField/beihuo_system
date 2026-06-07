@@ -11,12 +11,13 @@
 """
 
 from app.models.orm_models.car_parts_library_benz import CarPartsLibraryBenz
+from app.models.orm_models.car_parts_library_benz_stock import CarPartsLibraryBenzStock
 from app.models.orm_models.crmapp_compare_summary import CrmappCompareSummary
 from app.services.car_parts_library_service.mercedes_dalfsc_service import fetch_mercedes_data
 from app.services.car_parts_library_service.excel_import_service import process_file_stream, generate_template
 from app.utils.orm.session import orm_session
 from app.dao.car_parts_library_benz_dao import CarPartsLibraryBenzDao
-from app.services.system_setting_service.beihuo_system_config_service import set_config_by_key
+from app.services.system_setting_service.beihuo_system_config_service import set_config_by_key, update_json_config
 from config.config_list_manager.config_cache import get_config_value
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy import select, func
@@ -25,10 +26,10 @@ import re
 
 def get_part_by_number(part_number: str) -> Optional[Dict]:
     """
-    根据配件编号获取配件详情
+    根据配件编号获取配件详情（包含库存信息）
 
     :param part_number: 配件编号
-    :return: 配件字典，如果不存在则返回None
+    :return: 配件字典，如果不存在则返回None，包含stock_info字段
     """
     try:
         # 先获取配置
@@ -49,7 +50,24 @@ def get_part_by_number(part_number: str) -> Optional[Dict]:
             ).first()
             
             if part:
-                return part.to_web_dict(tax_rate, discount_rate)
+                # 查询库存信息
+                stock_items = session.query(CarPartsLibraryBenzStock).filter(
+                    CarPartsLibraryBenzStock.part_number == part_number
+                ).all()
+                
+                # 将库存信息转换为字典列表
+                stock_info_list = [item.to_dict() for item in stock_items]
+                
+                # 获取配件基本信息
+                part_dict = part.to_web_dict(tax_rate, discount_rate)
+                
+                # 合并数据
+                result = {
+                    **part_dict,
+                    'stock_info': stock_info_list
+                }
+                
+                return result
             return None
     except Exception as e:
         print(f"从数据库查询配件详情失败: {str(e)}")
@@ -244,84 +262,67 @@ def get_crmapp_compare_summary(oe_list: List[str], vehicle_brand: str = '奔驰'
 
 
 def set_mercedes_config(
-    cookie: str, customer_id: str, sales_organization_id: str, 
-    tax_rate: float = 1.13, discount_rate: float = 0.87, 
-    column_config: Optional[Dict] = None, 
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    customer_id: Optional[str] = None,
+    sales_organization_id: Optional[str] = None,
+    tax_rate: Optional[float] = None,
+    discount_rate: Optional[float] = None,
+    column_config: Optional[Dict] = None,
     favorite_column_config: Optional[Dict] = None,
     column_order: Optional[List[str]] = None,
     favorite_column_order: Optional[List[str]] = None
 ) -> Dict:
     """
     设置奔驰大库配置
+    所有参数都是可选的，如果参数为 None，则保留原有配置不变
 
-    :param cookie: Cookie 字符串
-    :param customer_id: 客户ID
-    :param sales_organization_id: 销售组织ID
-    :param tax_rate: 税率，默认 1.13
-    :param discount_rate: 折扣率，默认 0.83
-    :param column_config: 配件列表列配置（可选）
-    :param favorite_column_config: 收藏列表列配置（可选）
-    :param column_order: 配件列表列顺序（可选）
-    :param favorite_column_order: 收藏列表列顺序（可选）
+    :param username: 登录用户名（可选），默认保留原值
+    :param password: 登录密码（可选），默认保留原值
+    :param customer_id: 客户ID（可选）
+    :param sales_organization_id: 销售组织ID（可选）
+    :param tax_rate: 税率（可选），默认保留原值
+    :param discount_rate: 折扣率（可选），默认保留原值
+    :param column_config: 配件列表列配置（可选），默认保留原值
+    :param favorite_column_config: 收藏列表列配置（可选），默认保留原值
+    :param column_order: 配件列表列顺序（可选），默认保留原值
+    :param favorite_column_order: 收藏列表列顺序（可选），默认保留原值
     :return: 设置结果
     """
-    try:
-        # 获取现有配置
-        existing_config = get_mercedes_config() or {}
-        
-        # 构建新配置
-        config_dict = {
-            'cookie': cookie,
-            'customer_id': customer_id,
-            'sales_organization_id': sales_organization_id,
-            'tax_rate': tax_rate,
-            'discount_rate': discount_rate
-        }
-        
-        # 如果有列配置，添加到配置中；否则保留现有的列配置
-        if column_config is not None:
-            config_dict['column_config'] = column_config
-        else:
-            config_dict['column_config'] = existing_config.get('column_config')
-        
-        # 如果有收藏列表列配置，添加到配置中；否则保留现有的收藏列配置
-        if favorite_column_config is not None:
-            config_dict['favorite_column_config'] = favorite_column_config
-        else:
-            config_dict['favorite_column_config'] = existing_config.get('favorite_column_config')
-        
-        # 如果有列顺序配置，添加到配置中；否则保留现有的列顺序
-        if column_order is not None:
-            config_dict['column_order'] = column_order
-        else:
-            config_dict['column_order'] = existing_config.get('column_order')
-        
-        # 如果有收藏列表列顺序配置，添加到配置中；否则保留现有的
-        if favorite_column_order is not None:
-            config_dict['favorite_column_order'] = favorite_column_order
-        else:
-            config_dict['favorite_column_order'] = existing_config.get('favorite_column_order')
-        
-        # 将配置保存为 JSON 格式
-        config_value = json.dumps(config_dict, ensure_ascii=False)
-        
-        set_config_by_key(
-            'mercedes_benz',
-            config_value,
-            config_type='json',
-            config_group='car_parts',
-            label='奔驰大库配置',
-            remark='用于访问奔驰大库的配置信息'
-        )
-        return {
-            'code': 200,
-            'message': '奔驰配置设置成功'
-        }
-    except Exception as e:
-        return {
-            'code': 500,
-            'message': f'奔驰配置设置失败: {str(e)}'
-        }
+    # 构建要更新的字典
+    update_dict = {}
+    
+    # 只添加传入的参数（不是 None 的）
+    if username is not None:
+        update_dict['username'] = username
+    if password is not None:
+        update_dict['password'] = password
+    if customer_id is not None:
+        update_dict['customer_id'] = customer_id
+    if sales_organization_id is not None:
+        update_dict['sales_organization_id'] = sales_organization_id
+    if tax_rate is not None:
+        update_dict['tax_rate'] = tax_rate
+    if discount_rate is not None:
+        update_dict['discount_rate'] = discount_rate
+    if column_config is not None:
+        update_dict['column_config'] = column_config
+    if favorite_column_config is not None:
+        update_dict['favorite_column_config'] = favorite_column_config
+    if column_order is not None:
+        update_dict['column_order'] = column_order
+    if favorite_column_order is not None:
+        update_dict['favorite_column_order'] = favorite_column_order
+    
+    
+    # 使用通用函数更新配置
+    return update_json_config(
+        'mercedes_benz',
+        update_dict,
+        config_group='car_parts',
+        label='奔驰大库配置',
+        remark='用于访问奔驰大库的配置信息'
+    )
 
 
 def get_mercedes_config() -> Optional[Dict]:

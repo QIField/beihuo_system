@@ -56,7 +56,7 @@ def get_config_value(config_key):
         return _config_cache[config_key]
     
     # 缓存未命中，从数据库查询
-    with orm_session() as session:
+    with orm_session() as session:  # pyright: ignore[reportGeneralTypeIssues]
         config = session.query(BeihuoSystemConfig).filter(
             BeihuoSystemConfig.config_key == config_key,
             BeihuoSystemConfig.env == FLASK_SYS_ENV,
