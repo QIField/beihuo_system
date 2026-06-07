@@ -20,6 +20,7 @@ from .tables import (
     init_price_inquiry_direct_table,
     init_safety_stock_calculation_table,
     init_all_virtual_inventory_tables,
+    init_qpl_quote_record_table,
 )
 
 
@@ -895,6 +896,7 @@ def init_all_tables():
         ('询价直接入库', init_price_inquiry_direct_table),
         ('安全库存计算', init_safety_stock_calculation_table),
         ('虚拟库存', init_all_virtual_inventory_tables),
+        ('汽配龙报价记录', init_qpl_quote_record_table),
     ]
 
     completed = []

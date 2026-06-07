@@ -46,6 +46,10 @@ from .safety_stock_tables import (
     init_safety_stock_calculation_table,
 )
 
+from .qpl_quote_tables import (
+    init_qpl_quote_record_table,
+)
+
 __all__ = [
     'init_sales_history_detail_table',
     'init_quote_count_ks_table',
@@ -63,4 +67,5 @@ __all__ = [
     'init_price_inquiry_direct_table',
     'init_safety_stock_calculation_table',
     'init_all_virtual_inventory_tables',
+    'init_qpl_quote_record_table',
 ]

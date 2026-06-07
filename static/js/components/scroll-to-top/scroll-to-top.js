@@ -365,6 +365,95 @@
         return new ScrollToTop(options);
     };
 
+    // 静态方法：在分页栏中创建置顶按钮（全程显示）
+    ScrollToTop.createPagingPanelButton = function(options = {}) {
+        const config = {
+            pagingPanelSelector: options.pagingPanelSelector || '.ag-paging-panel',
+            onClick: options.onClick || null,
+            ...options
+        };
+
+        // 查找分页栏
+        const pagingPanel = document.querySelector(config.pagingPanelSelector);
+        if (!pagingPanel) {
+            console.log('[ScrollToTop] 未找到分页栏，尝试重新查找...');
+            setTimeout(() => ScrollToTop.createPagingPanelButton(config), 500);
+            return;
+        }
+
+        // 检查是否已存在
+        if (pagingPanel.querySelector('.scroll-to-top-paging-btn')) {
+            return;
+        }
+
+        // 创建按钮容器
+        const btnContainer = document.createElement('div');
+        btnContainer.className = 'scroll-to-top-paging-btn';
+        btnContainer.style.cssText = `
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+        `;
+
+        // 创建按钮（小型样式）
+        const btn = document.createElement('button');
+        btn.setAttribute('type', 'button');
+        btn.setAttribute('title', '回到顶部');
+        btn.style.cssText = `
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+            border: none;
+            box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            transition: all 0.3s ease;
+        `;
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 19V5M5 12l7-7 7 7"/>
+            </svg>
+        `;
+
+        // 鼠标悬停效果
+        btn.addEventListener('mouseenter', () => {
+            btn.style.transform = 'scale(1.1)';
+            btn.style.boxShadow = '0 4px 10px rgba(24, 144, 255, 0.5)';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.transform = 'scale(1)';
+            btn.style.boxShadow = '0 2px 6px rgba(24, 144, 255, 0.3)';
+        });
+
+        // 点击事件
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (config.onClick) {
+                config.onClick();
+            } else {
+                // 默认行为：滚动到顶部
+                const agGridViewport = document.querySelector('.ag-body-viewport');
+                if (agGridViewport) {
+                    agGridViewport.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+        });
+
+        btnContainer.appendChild(btn);
+        pagingPanel.appendChild(btnContainer);
+
+        console.log('[ScrollToTop] 分页栏置顶按钮已创建');
+    };
+
     // 导出到全局
     global.ScrollToTop = ScrollToTop;
 
