@@ -8,20 +8,20 @@ car_parts_library_bp = Blueprint(
     url_prefix='/car_parts_library'
 )
 
-@car_parts_library_bp.route("/main")
-def car_parts_library_list():
-    """汽车配件库主页面"""
-    return render_template("car_parts_library/car_parts_library_main.html")
+# @car_parts_library_bp.route("/main")
+# def car_parts_library_list():
+#     """汽车配件库主页面"""
+#     return render_template("car_parts_library/car_parts_library_main.html")
 
-@car_parts_library_bp.route("/list")
-def list_html():
-    """列表页片段"""
-    return render_template("car_parts_library/list.html")
+# @car_parts_library_bp.route("/list")
+# def list_html():
+#     """列表页片段"""
+#     return render_template("car_parts_library/list.html")
 
-@car_parts_library_bp.route("/detail")
-def detail_html():
-    """详情页片段"""
-    return render_template("car_parts_library/detail.html")
+# @car_parts_library_bp.route("/detail")
+# def detail_html():
+#     """详情页片段"""
+#     return render_template("car_parts_library/detail.html")
     
 
 @car_parts_library_bp.route("/cart")

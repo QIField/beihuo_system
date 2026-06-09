@@ -7,6 +7,35 @@
 import numpy as np
 import pandas as pd
 import json
+from datetime import datetime
+
+
+def format_date(date_str):
+    """
+    将ISO格式日期字符串转换为标准格式
+    
+    将 "2026-01-01T00:00:00Z" 格式转换为 "2026-01-01 00:00:00"
+    
+    :param date_str: 原始日期字符串
+    :return: 格式化后的日期字符串，如果转换失败则返回原始字符串
+    """
+    if not date_str:
+        return date_str
+    
+    try:
+        # 尝试解析ISO格式日期
+        dt = datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%SZ')
+        # 格式化为目标格式
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        # 如果解析失败，尝试其他常见格式
+        try:
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            return dt.strftime('%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            # 如果所有解析都失败，返回原始字符串
+            return date_str
+
 
 
 def clean_parts_information(data_dict):
@@ -42,7 +71,7 @@ def clean_parts_information(data_dict):
         'volume': data_dict.get('volume', {}).get('volumeValue'),
         
         # 其他信息
-        'effective_date': data_dict.get('currentValidFromDate', ''),
+        'effective_date': format_date(data_dict.get('currentValidFromDate', '')),
         'origin_country': data_dict.get('countryManufacture', ''),
         'brand': '奔驰',
         'category': data_dict.get('assortmentClasses', ''),

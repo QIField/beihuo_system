@@ -2,7 +2,7 @@ import requests
 import json
 
 # 接口地址
-url = "http://localhost:5000/new/api/car-parts/fetch-realtime"
+url = "http://x.fsbbr.net/new/api/car-parts/fetch-realtime"
 
 # 请求头
 headers = {

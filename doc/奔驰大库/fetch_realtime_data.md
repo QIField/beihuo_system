@@ -153,7 +153,7 @@ import requests
 import json
 
 # 接口地址
-url = "http://localhost:5000/new/api/car-parts/fetch-realtime"
+url = "http://x.fsbbr.net/new/api/car-parts/fetch-realtime"
 
 # 请求头
 headers = {
@@ -196,13 +196,13 @@ except Exception as e:
 import requests
 import json
 
-def fetch_realtime_part_info(part_number, base_url="http://localhost:5000"):
+def fetch_realtime_part_info(part_number, base_url="http://x.fsbbr.net"):
     """
     实时获取零件信息
     
     Args:
         part_number (str): 零件编号
-        base_url (str): 基础URL，默认为 http://localhost:5000
+        base_url (str): 基础URL，默认为 http://x.fsbbr.net
     
     Returns:
         dict: 响应结果
@@ -245,4 +245,4 @@ if __name__ == "__main__":
         print(f"获取失败: {result.get('msg')}")
 ```
 
-**注意**: 请将 `http://localhost:5000` 替换为实际的服务器地址和端口。
+
