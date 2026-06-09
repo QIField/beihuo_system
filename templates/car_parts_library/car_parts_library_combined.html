@@ -1519,38 +1519,39 @@
         var seconds = String(date.getUTCSeconds()).padStart(2, '0');
         return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
       } },
-      { field: 'beihuo_data', title: '备货库存', width: 200, templet: function(d) {
-        // 显示各地区的库存信息（精简版，点击展开详情）
-        if (!d.beihuo_data || d.beihuo_data.length === 0) {
-          return '<span style="color:#999;cursor:default;" title="无备货数据">无数据</span>';
-        }
-        // 计算总库存和有货地区数
-        var totalStock = 0;
-        var hasStockCount = 0;
-        for (var i = 0; i < d.beihuo_data.length; i++) {
-          var sq = d.beihuo_data[i].stock_quantity || 0;
-          totalStock += sq;
-          if (sq > 0) hasStockCount++;
-        }
+      // 【临时注释】备货库存列 - 与 soulTable 拖拽功能冲突，待排查后恢复
+      // { field: 'beihuo_data', title: '备货库存', width: 200, templet: function(d) {
+      //   // 显示各地区的库存信息（精简版，点击展开详情）
+      //   if (!d.beihuo_data || d.beihuo_data.length === 0) {
+      //     return '<span style="color:#999;cursor:default;" title="无备货数据">无数据</span>';
+      //   }
+      //   // 计算总库存和有货地区数
+      //   var totalStock = 0;
+      //   var hasStockCount = 0;
+      //   for (var i = 0; i < d.beihuo_data.length; i++) {
+      //     var sq = d.beihuo_data[i].stock_quantity || 0;
+      //     totalStock += sq;
+      //     if (sq > 0) hasStockCount++;
+      //   }
 
-        // 构建纯文本tooltip（4个字段，换行分隔）
-        var tipLines = [];
-        for (var j = 0; j < d.beihuo_data.length; j++) {
-          var row = d.beihuo_data[j];
-          tipLines.push(row.company + ' | 品牌:' + (row.brand || '-') +
-                         ' | 库存:' + (row.stock_quantity || 0) + '件' +
-                         ' | 车型品牌:' + (row.model_brand || '-'));
-        }
-        var titleText = tipLines.join('\n');
+      //   // 构建纯文本tooltip（4个字段，换行分隔）
+      //   var tipLines = [];
+      //   for (var j = 0; j < d.beihuo_data.length; j++) {
+      //     var row = d.beihuo_data[j];
+      //     tipLines.push(row.company + ' | 品牌:' + (row.brand || '-') +
+      //                    ' | 库存:' + (row.stock_quantity || 0) + '件' +
+      //                    ' | 车型品牌:' + (row.model_brand || '-'));
+      //   }
+      //   var titleText = tipLines.join('\n');
 
-        // 摘要显示（原生title tooltip）
-        var color = totalStock > 0 ? '#67c23a' : '#f56c6c';
-        var summaryHtml = '<span style="color:#409eff;background:#ecf5ff;padding:2px 8px;border-radius:4px;" title="' + titleText.replace(/"/g, '&quot;') + '">' +
-                          '<b>' + hasStockCount + '/' + d.beihuo_data.length + '</b>地区 ' +
-                          '<span style="color:' + color + ';">' + totalStock + '件</span></span>';
+      //   // 摘要显示（原生title tooltip）
+      //   var color = totalStock > 0 ? '#67c23a' : '#f56c6c';
+      //   var summaryHtml = '<span style="color:#409eff;background:#ecf5ff;padding:2px 8px;border-radius:4px;" title="' + titleText.replace(/"/g, '&quot;') + '">' +
+      //                     '<b>' + hasStockCount + '/' + d.beihuo_data.length + '</b>地区 ' +
+      //                     '<span style="color:' + color + ';">' + totalStock + '件</span></span>';
 
-        return summaryHtml;
-      } },
+      //   return summaryHtml;
+      // } },
       { title: '操作', width: 200, fixed: 'right', align: 'center', templet: '#tableToolBar' }
     ];
 
@@ -1616,38 +1617,38 @@
         var seconds = String(date.getUTCSeconds()).padStart(2, '0');
         return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
       } },
-      { field: 'beihuo_data', title: '备货库存', width: 200, templet: function(d) {
-        // 显示各地区的库存信息（精简版，鼠标悬停查看详情）
-        if (!d.beihuo_data || d.beihuo_data.length === 0) {
-          return '<span style="color:#999;cursor:default;" title="无备货数据">无数据</span>';
-        }
-        // 计算总库存和有货地区数
-        var totalStock = 0;
-        var hasStockCount = 0;
-        for (var i = 0; i < d.beihuo_data.length; i++) {
-          var sq = d.beihuo_data[i].stock_quantity || 0;
-          totalStock += sq;
-          if (sq > 0) hasStockCount++;
-        }
+      // { field: 'beihuo_data', title: '备货库存', width: 200, templet: function(d) {
+      //   // 显示各地区的库存信息（精简版，鼠标悬停查看详情）
+      //   if (!d.beihuo_data || d.beihuo_data.length === 0) {
+      //     return '<span style="color:#999;cursor:default;" title="无备货数据">无数据</span>';
+      //   }
+      //   // 计算总库存和有货地区数
+      //   var totalStock = 0;
+      //   var hasStockCount = 0;
+      //   for (var i = 0; i < d.beihuo_data.length; i++) {
+      //     var sq = d.beihuo_data[i].stock_quantity || 0;
+      //     totalStock += sq;
+      //     if (sq > 0) hasStockCount++;
+      //   }
 
-        // 构建纯文本tooltip（4个字段，换行分隔）
-        var tipLines = [];
-        for (var j = 0; j < d.beihuo_data.length; j++) {
-          var row = d.beihuo_data[j];
-          tipLines.push(row.company + ' | 品牌:' + (row.brand || '-') +
-                         ' | 库存:' + (row.stock_quantity || 0) + '件' +
-                         ' | 车型品牌:' + (row.model_brand || '-'));
-        }
-        var titleText = tipLines.join('\n');
+      //   // 构建纯文本tooltip（4个字段，换行分隔）
+      //   var tipLines = [];
+      //   for (var j = 0; j < d.beihuo_data.length; j++) {
+      //     var row = d.beihuo_data[j];
+      //     tipLines.push(row.company + ' | 品牌:' + (row.brand || '-') +
+      //                    ' | 库存:' + (row.stock_quantity || 0) + '件' +
+      //                    ' | 车型品牌:' + (row.model_brand || '-'));
+      //   }
+      //   var titleText = tipLines.join('\n');
 
-        // 摘要显示（原生title tooltip）
-        var color = totalStock > 0 ? '#67c23a' : '#f56c6c';
-        var summaryHtml = '<span style="color:#409eff;background:#ecf5ff;padding:2px 8px;border-radius:4px;" title="' + titleText.replace(/"/g, '&quot;') + '">' +
-                          '<b>' + hasStockCount + '/' + d.beihuo_data.length + '</b>地区 ' +
-                          '<span style="color:' + color + ';">' + totalStock + '件</span></span>';
+      //   // 摘要显示（原生title tooltip）
+      //   var color = totalStock > 0 ? '#67c23a' : '#f56c6c';
+      //   var summaryHtml = '<span style="color:#409eff;background:#ecf5ff;padding:2px 8px;border-radius:4px;" title="' + titleText.replace(/"/g, '&quot;') + '">' +
+      //                     '<b>' + hasStockCount + '/' + d.beihuo_data.length + '</b>地区 ' +
+      //                     '<span style="color:' + color + ';">' + totalStock + '件</span></span>';
 
-        return summaryHtml;
-      } },
+      //   return summaryHtml;
+      // } },
       { title: '操作', width: 150, fixed: 'right', align: 'center', templet: '#favoritesRowToolBar' }
     ];
 
