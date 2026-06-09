@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日库存</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <link rel="stylesheet" href="/static/soulTable/soulTable.css">
+    <style>
+        /* 固定列和非固定列的视觉区分 */
+        .layui-table-header th[fixed] {
+            background-color: #f0f7ff !important;
+        }
+        .layui-table-body td[fixed] {
+            background-color: #f0f7ff !important;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* 头部 */
+        .header {
+            background: #fff;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .header-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #262626;
+            height: 15px;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            color: #8c8c8c;
+            margin-top: 4px;
+        }
+
+        /* 搜索区域 */
+        .search-panel {
+            background: #fff;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .search-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .search-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-item label {
+            font-size: 14px;
+            color: #595959;
+            white-space: nowrap;
+        }
+
+        .search-item input,
+        .search-item select {
+            width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .search-item input:focus,
+        .search-item select:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24,144,255,0.2);
+        }
+
+        /* 按钮 */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: #1890ff;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #40a9ff;
+        }
+
+        .btn-default {
+            background: #fff;
+            color: #595959;
+            border: 1px solid #d9d9d9;
+        }
+
+        .btn-default:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+        }
+
+        /* 主内容区 */
+        .main-content {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        /* 表格样式 */
+        .layui-table-view {
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #e8e8e8;
+        }
+
+        .layui-table-header {
+            background-color: #fafafa;
+            border-bottom: 2px solid #e8e8e8;
+        }
+
+        .layui-table th {
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+            padding: 10px 5px;
+        }
+
+        .layui-table td {
+            padding: 6px 5px;
+            font-size: 13px;
+            height: 36px;
+            line-height: 1.5;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .layui-table tbody tr:hover {
+            background-color: #f5f7fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <div>
+                <div class="header-title">每日库存</div>
+                <!-- <div class="header-subtitle">每日库存数据查询与管理</div> -->
+            </div>
+        </div>
+
+        <!-- 搜索区域 -->
+        <div class="search-panel">
+            <div class="search-row">
+                <div class="search-item">
+                    <label>日期：</label>
+                    <input type="text" id="datePicker" placeholder="请选择日期" autocomplete="off">
+                </div>
+                <div class="search-item">
+                    <label>采购单号：</label>
+                    <input type="text" id="searchInput" placeholder="请输入采购单号" autocomplete="off">
+                </div>
+                <div class="search-item">
+                    <label>订单类型：</label>
+                    <select id="orderTypeSelect">
+                        <option value="">全部</option>
+                        <option value="1">采购入库单</option>
+                        <option value="2">采购退货单</option>
+                    </select>
+                </div>
+                <div class="search-item">
+                    <label>业务类型：</label>
+                    <select id="businessTypeSelect">
+                        <option value="">全部</option>
+                        <option value="1">外购</option>
+                        <option value="2">普通</option>
+                        <option value="3">调货</option>
+                    </select>
+                </div>
+                <div class="search-item">
+                    <button class="btn btn-primary" id="searchBtn">
+                      <i class="layui-icon layui-icon-search"></i> 搜索
+                    </button>
+                    <button class="btn btn-default" id="resetBtn">
+                      <i class="layui-icon layui-icon-refresh"></i> 重置
+                    </button>
+                    <button class="btn btn-primary" id="updateBtn" style="background: #52c41a;">
+                      <i class="layui-icon layui-icon-refresh-3"></i> 更新数据
+                    </button>
+                  </div>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <table id="dailyInventoryTable" lay-filter="dailyInventoryTable"></table>
+        </div>
+    </div>
+    
+    <!-- 空的工具栏模板 -->
+    <script type="text/html" id="emptyToolbar">
+    </script>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+        // 配置 soulTable 扩展
+        layui.config({
+            version: 'v1.9.0'
+        }).extend({
+            soulTable: '/static/soulTable/soulTable.slim',
+            tableMerge: '/static/soulTable/tableMerge'
+        });
+
+        layui.use(['table', 'soulTable', 'tableMerge', 'laydate', 'jquery', 'layer'], function() {
+            var table = layui.table;
+            var soulTable = layui.soulTable;
+            var tableMerge = layui.tableMerge;
+            var laydate = layui.laydate;
+            var $ = layui.jquery;
+            var layer = layui.layer;
+            
+            // 初始化日期选择器，默认今天
+            var today = new Date();
+            var todayStr = today.getFullYear() + '-' + 
+                          String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                          String(today.getDate()).padStart(2, '0');
+            laydate.render({
+                elem: '#datePicker',
+                type: 'date',
+                value: todayStr,
+                format: 'yyyy-MM-dd'
+            });
+            
+            // 渲染表格
+            var tableIns = table.render({
+                elem: '#dailyInventoryTable',
+                id: 'dailyInventoryTable',
+                url: '/new/api/daily_inventory/purchase-orders',
+                method: 'GET',
+                page: true,
+                limit: 10,
+                limits: [10, 20, 50, 100],
+                height: 'full-260',
+                toolbar: '#emptyToolbar',
+                defaultToolbar: ['filter', 'exports'],
+                where: {
+                  date: todayStr,
+                  keyword: ''
+                },
+                parseData: function(res) { // 将返回的数据解析成 table 组件所要求的格式
+                  // 将200转换为0，因为layui table期望code:0表示成功
+                  var tableCode = res.code === 200 ? 0 : res.code;
+                  return {
+                    "code": tableCode, // 接口状态
+                    "msg": res.msg, // 提示信息
+                    "count": res.data ? res.data.total : 0, // 数据总数
+                    "data": res.data ? res.data.list : [] // 数据列表
+                  };
+                },
+                cols: [[
+                    {field: 'list_purchase_order_id', title: '订单ID', width: 100, merge: 'list_purchase_order_id', hide: true},
+                    {field: 'list_create_date', title: '订单日期', width: 180, merge: 'list_purchase_order_id',hide: true},
+                    {field: 'list_pono', title: '采购单号', width: 180, merge: 'list_purchase_order_id'},
+                    {field: 'list_fullname', title: '供应商名称', width: 300, merge: 'list_purchase_order_id'},
+                    {field: 'list_order_type_id', title: '订单类型',hide: true, width: 120, merge: 'list_purchase_order_id', templet: function(d) {
+                        var statusMap = {1: '采购入库单', 2: '采购退货单'};
+                        return statusMap[d.list_order_type_id] || d.list_order_type_id;
+                      }
+                    },
+                    {field: 'list_order_source_type', title: '业务类型',hide: true, width: 120, merge: 'list_purchase_order_id', templet: function(d) {
+                        var statusMap = {1: '外购', 2: '普通', 3: '调货'};
+                        return statusMap[d.list_order_source_type] || d.list_order_source_type;
+                      }
+                    },
+                    
+                    {field: 'list_end_date', title: '入库日期', width: 180, merge: 'list_purchase_order_id',hide: true},
+                    {field: 'list_total', title: '订单总数', width: 100, merge: 'list_purchase_order_id'},
+                    {field: 'list_received_quantity', title: '实发总数', width: 100, merge: 'list_purchase_order_id',hide: true},
+                    {field: 'list_amount_money', title: '订单总价', width: 120, merge: 'list_purchase_order_id', templet: function(d) {
+                        return '¥' + (d.list_amount_money || 0);
+                      }},
+                    {field: 'list_received', title: '实发总价', width: 110, merge: 'list_purchase_order_id', templet: function(d) {
+                        return '¥' + (d.list_received || 0);
+                      }},
+                    {field: 'list_payment_description', title: '付款方式', width: 100, merge: 'list_purchase_order_id',hide: true},
+                    {field: 'list_shipping_fee', title: '运费', width: 100, merge: 'list_purchase_order_id', templet: function(d) {
+                        return '¥' + (d.list_shipping_fee || 0);
+                      },hide: true},
+                    {field: 'list_packing_fee', title: '包装费', width: 100, merge: 'list_purchase_order_id', templet: function(d) {
+                        return '¥' + (d.list_packing_fee || 0);
+                      },hide: true},
+                    {field: 'list_name', title: '采购员', width: 120, merge: 'list_purchase_order_id'},
+                    {field: 'list_remarks', title: '备注', width: 200, merge: 'list_purchase_order_id',hide: true},
+                    {field: 'list_status', title: '订单状态', width: 100, merge: 'list_purchase_order_id', templet: function(d) {
+                        var statusMap = {1: '已调单', 4: '已收货',7:'已拣货'};
+                        return statusMap[d.list_status] || d.list_status;
+                      },hide: true},
+                    {field: 'detail_no', title: '序号', width: 80},
+                    {field: 'detail_purchase_order_line_id', title: '订单明细ID', width: 80, hide: true},
+                    {field: 'detail_frey_no', title: '条码', width: 180, hide: true},
+                    {field: 'detail_number', title: 'oe号', width: 140},
+                    {field: 'detail_l_name_zh', title: '商品名称', width: 200},
+                    {field: 'detail_brand', title: '品牌', width: 100},
+                    {field: 'detail_brand_code', title: '品牌编码', width: 100},
+                    {field: 'detail_company_remark', title: '内部备注', width: 100, hide: true},
+                    {field: 'detail_l_model_zh', title: '车型', width: 250, hide: true},
+                    {field: 'detail_purchase_quantity', title: '采购数量', width: 100},
+                    {field: 'detail_received_quantity', title: '收货数量', width: 100, hide: true},
+                    {field: 'detail_unit', title: '单位', width: 80, hide: true},
+                    {field: 'detail_price', title: '采购价', width: 100, templet: function(d) {
+                        return '¥' + (d.detail_price || 0);
+                      }},
+                    {field: 'detail_unit_cost', title: '单件成本', hide: true, width: 100, templet: function(d) {
+                        return '¥' + (d.unit_cost || 0);
+                      }},
+                    {field: 'detail_amount_money', title: '商品金额', width: 110, templet: function(d) {
+                        return '¥' + (d.detail_amount_money || 0);
+                      }, hide: true},
+                    {field: 'detail_ks_price', title: '开思价', width: 110, templet: function(d) {
+                        return d.detail_ks_price ? '¥' + d.detail_ks_price : '-';
+                      }}
+                ]],
+                done: function() {
+          // 表格渲染完成后，调用 tableMerge.render() 实现单元格合并
+          tableMerge.render(this);
+          // 调用 soulTable.render() 实现列拖拽功能，soulTable会自动禁止固定列与非固定列之间交换
+          // 暂时禁用拖拽功能
+          // soulTable.render(this);
+        }
+            });
+            
+            // 搜索按钮点击事件
+            $('#searchBtn').on('click', function() {
+                var date = $('#datePicker').val();
+                var keyword = $('#searchInput').val();
+                var orderType = $('#orderTypeSelect').val();
+                var businessType = $('#businessTypeSelect').val();
+                tableIns.reload({
+                    where: {
+                        date: date,
+                        keyword: keyword,
+                        order_type: orderType,
+                        business_type: businessType
+                    },
+                    page: {
+                        curr: 1
+                    }
+                });
+            });
+            
+            // 重置按钮点击事件
+            $('#resetBtn').on('click', function() {
+              $('#datePicker').val(todayStr);
+              $('#searchInput').val('');
+              $('#orderTypeSelect').val('');
+              $('#businessTypeSelect').val('');
+              tableIns.reload({
+                where: {
+                  date: todayStr,
+                  keyword: '',
+                  order_type: '',
+                  business_type: ''
+                },
+                page: {
+                  curr: 1
+                }
+              });
+            });
+            
+            // 更新数据按钮点击事件
+            $('#updateBtn').on('click', function() {
+              var date = $('#datePicker').val();
+              var updateBtn = $(this);
+              
+              // 禁用按钮防止重复点击
+              updateBtn.prop('disabled', true).html('<i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> 更新中...');
+              
+              // 调用更新数据API
+              $.ajax({
+                url: '/new/api/daily_inventory/update-data',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                  date: date
+                }),
+                success: function(res) {
+                  if (res.code === 200) {
+                    layer.msg(res.msg || '数据更新完成', { icon: 1 });
+                    // 更新完成后自动刷新表格
+                    tableIns.reload();
+                  } else {
+                    layer.msg(res.msg || '数据更新失败', { icon: 2 });
+                  }
+                },
+                error: function() {
+                  layer.msg('网络错误，请稍后重试', { icon: 2 });
+                },
+                complete: function() {
+                  // 恢复按钮状态
+                  updateBtn.prop('disabled', false).html('<i class="layui-icon layui-icon-refresh-3"></i> 更新数据');
+                }
+              });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -16,7 +16,7 @@ from config.config_list_manager.config_cache import get_config_value
 
 
 def partnerList(token, page_num=None):
-    spider = CrmGzbbrSpider(token)
+    spider = CrmGzbbrSpider(token=token)
     limit = 200
     data_total_count = 0  # 存储所有客户数据总计
     current_page = 1

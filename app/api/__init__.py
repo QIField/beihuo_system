@@ -35,4 +35,11 @@ api_bp.register_blueprint(cookie_bp)
 api_bp.register_blueprint(wms_upload_site_bp)
 api_bp.register_blueprint(car_parts_library_bp)
 
+
+# 注册 system_inventory_api 子蓝图
+from .daily_inventory_api import daily_inventory_bp
+api_bp.register_blueprint(daily_inventory_bp)
+
+
+
 __all__ = ["api_bp"]
