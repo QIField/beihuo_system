@@ -38,7 +38,7 @@ class CrmappBeihuo(BaseModels):
     internal_remark = Column('内部备注', Text, nullable=True, comment='内部备注')
     company = Column(String(100), nullable=True, comment='公司')  # 英文列名
     warning_status = Column('预警状态', String(255), nullable=True, comment='预警状态')
-    today_sales_str = Column('今日销售', String(255), nullable=True, comment='今日销售')
+    # today_sales_str = Column('今日销售', String(255), nullable=True, comment='今日销售')
 
     # 库存相关字段（数据库列为中文名）
     stock_quantity = Column('库存数量', Integer, default=0, comment='库存数量')
@@ -98,7 +98,7 @@ class CrmappBeihuo(BaseModels):
             'internal_remark': self.internal_remark,
             'company': self.company,
             'warning_status': self.warning_status,
-            'today_sales_str': self.today_sales_str,
+            # 'today_sales_str': self.today_sales_str,
             'stock_quantity': self.stock_quantity,
             'stock_amount': str(self.stock_amount) if self.stock_amount else '0.00',  # pyright: ignore[reportGeneralTypeIssues]
             'cost_price': str(self.cost_price) if self.cost_price else '0.00',  # pyright: ignore[reportGeneralTypeIssues]
