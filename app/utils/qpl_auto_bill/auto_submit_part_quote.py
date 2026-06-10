@@ -163,7 +163,7 @@ def process_mercedes_order(detail_data, company='fsbbr'):
 
                     if not factory_brand or not factory_product_list:
                         reason = "适配列表为空，无原厂奔驰产品"
-                        print(f"[跳过] {enquiry_no} - {item_oe}: {reason}")
+                        print(f"[汽配龙自动报价][跳过] {enquiry_no} - {item_oe}: {reason}")
                         failed_items[enquiry_item_id] = reason
                         continue
 
@@ -175,7 +175,7 @@ def process_mercedes_order(detail_data, company='fsbbr'):
                     oe_price_map = query_mercedes_service_all(product_oe_list)
                     if not oe_price_map:
                         reason = "零件信息请求失败"
-                        print(f"[跳过] {enquiry_no} - {item_oe}: {reason}")
+                        print(f"[汽配龙自动报价][跳过] {enquiry_no} - {item_oe}: {reason}")
                         failed_items[enquiry_item_id] = reason
                         continue
 
@@ -213,7 +213,7 @@ def process_mercedes_order(detail_data, company='fsbbr'):
 
                     if not product_price_map:
                         reason = "库存为0"
-                        print(f"[跳过] {enquiry_no} - {item_oe}: {reason}")
+                        print(f"[汽配龙自动报价][跳过] {enquiry_no} - {item_oe}: {reason}")
                         failed_items[enquiry_item_id] = reason
                         continue
 
@@ -309,7 +309,7 @@ def process_mercedes_order(detail_data, company='fsbbr'):
 
                     if not quote_items_for_item:
                         reason = "价格监测失败: " + "；".join(price_check_errors) if price_check_errors else "价格监测失败"
-                        print(f"[跳过] {enquiry_no} - {item_oe}: {reason}")
+                        print(f"[汽配龙自动报价][跳过] {enquiry_no} - {item_oe}: {reason}")
                         failed_items[enquiry_item_id] = reason
                         continue
 
@@ -339,6 +339,9 @@ def classify_order(order_data):
     """
     car_type5 = order_data.get('carType5', '')
     items = []
+    # 列表接口：项目可能在顶层 supplierEnquiryItemList
+    items.extend(order_data.get('supplierEnquiryItemList', []))
+    # 详情接口：项目在 supplierEnquiryDemandList 下
     for demand in order_data.get('supplierEnquiryDemandList', []):
         items.extend(demand.get('supplierEnquiryItemList', []))
 
@@ -409,7 +412,7 @@ def print_summary_table(detail_data, mercedes_quote_items, summary_list, company
     car_type5 = detail_data.get('carType5', '')
 
     print("\n" + "=" * 80)
-    print(f"[{company}] 订单: {enquiry_no} | {car_type5}")
+    print(f"[汽配龙自动报价][{company}] 订单: {enquiry_no} | {car_type5}")
     print("=" * 80)
     print(f"{'项目OE':<20} {'项目名称':<25} {'报价':<8} {'备货天数':<8} {'报价数'}")
     print("-" * 80)
@@ -421,8 +424,8 @@ def print_summary_table(detail_data, mercedes_quote_items, summary_list, company
                 existing_quotes = item.get('supplierQuoteItemList', [])
                 if existing_quotes:
                     first_quote = existing_quotes[0]
-                    price = first_quote.get('itemSellPrice', 0)
-                    days = first_quote.get('prepareGoodTimespan', 0)
+                    price = first_quote.get('itemSellPrice') or 0
+                    days = first_quote.get('prepareGoodTimespan') or 0
                     print(f"{item.get('itemOe', '')[:18]:<20} {item.get('itemName', '')[:23]:<25} ¥{price:<7} {days:<8} {len(existing_quotes)}")
 
     # WAITING_QUOTE + 奔驰报价项目
@@ -461,13 +464,13 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
     if end_date is None:
         end_date = datetime.now().strftime('%Y-%m-%d')
 
-    print(f"[{company}] 查询日期: {begin_date} 至 {end_date}")
+    print(f"[汽配龙自动报价][{company}] 查询日期: {begin_date} 至 {end_date}")
 
     result = query_enquiry_list(begin_date, end_date, company=company)
     orders = result.get('data', [])
 
     unique_orders = {order.get('supplierEnquiryNo'): order for order in orders if order.get('supplierEnquiryNo')}
-    print(f"[{company}] 找到 {len(unique_orders)} 个订单")
+    print(f"[汽配龙自动报价][{company}] 找到 {len(unique_orders)} 个订单")
 
     # 分类并筛选：A/B类保留，SKIP类过滤
     categorized = []
@@ -483,7 +486,7 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
     # 按类别排序：A 在前，B 在后
     categorized.sort(key=lambda x: 0 if x[0] == 'A' else 1)
 
-    print(f"[{company}] 处理 {len(categorized)} 个订单 (跳过 {skipped_count} 个普通车未报价订单)")
+    print(f"[汽配龙自动报价][{company}] 处理 {len(categorized)} 个订单 (跳过 {skipped_count} 个普通车未报价订单)")
 
     results = []
 
@@ -499,8 +502,9 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
             pickup_info = extract_pickup_info(pickup_result)
             detail_data.update(pickup_info)
 
-        # 按类别处理订单（字典分发）
-        process_result = process_order_by_category(detail_data, company)
+        # 按类别处理订单（字典分发，直接使用已知 category）
+        handler = ORDER_HANDLERS[category]
+        process_result = handler(detail_data, company)
 
         mercedes_quote_items = process_result['mercedes_quote_items']
         summary_list = process_result['summary_list']
@@ -538,7 +542,7 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
 def main(company='fsbbr'):
     """独立脚本入口"""
     results = submit_all_quotes(company=company)
-    print(f"\n[{company}] 任务完成，共处理 {len(results)} 个订单")
+    print(f"\n[汽配龙自动报价][{company}] 任务完成，共处理 {len(results)} 个订单")
 
 
 if __name__ == '__main__':

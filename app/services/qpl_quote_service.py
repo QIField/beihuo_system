@@ -197,7 +197,7 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
             ))
 
         conn.commit()
-        print(f"[报价保存][{company}] 成功保存 {len(details)} 条记录，询价单: {enquiry_no}")
+        print(f"[汽配龙自动报价][报价保存][{company}] 成功保存 {len(details)} 条记录，询价单: {enquiry_no}")
 
     conn.close()
 
@@ -220,7 +220,7 @@ def process_and_save_quotes_for_company(company, begin_date=None, end_date=None)
     Returns:
         dict: 处理结果统计
     """
-    print(f"\n[报价服务][{company}] 开始处理报价任务 - {datetime.now()}")
+    print(f"\n[汽配龙自动报价][{company}] 开始处理报价任务 - {datetime.now()}")
 
     # 调用工具层提交报价
     results = submit_all_quotes(begin_date, end_date, company=company)
@@ -251,8 +251,8 @@ def process_and_save_quotes_for_company(company, begin_date=None, end_date=None)
         else:
             fail_count += 1
 
-    print(f"[报价服务][{company}] 任务完成 - 成功: {success_count}, 失败: {fail_count}")
-    print(f"[报价服务][{company}] 类别 A (全PART_QUOTE): {category_counts['A']}, 类别 B (奔驰): {category_counts['B']}")
+    print(f"[汽配龙自动报价][{company}] 任务完成 - 成功: {success_count}, 失败: {fail_count}")
+    print(f"[汽配龙自动报价][{company}] 类别 A (全PART_QUOTE): {category_counts['A']}, 类别 B (奔驰): {category_counts['B']}")
 
     return {
         'company': company,
@@ -275,7 +275,7 @@ def process_and_save_quotes_for_all_companies(begin_date=None, end_date=None):
     Returns:
         list: 各组织处理结果统计列表
     """
-    print(f"\n[报价服务] ====== 开始处理所有组织的报价任务 ====== {datetime.now()}")
+    print(f"\n[汽配龙自动报价] ====== 开始处理所有组织的报价任务 ====== {datetime.now()}")
 
     companies = get_supported_companies()
     all_results = []
@@ -288,7 +288,7 @@ def process_and_save_quotes_for_all_companies(begin_date=None, end_date=None):
     total_success = sum(r.get('success_count', 0) for r in all_results)
     total_fail = sum(r.get('fail_count', 0) for r in all_results)
 
-    print(f"\n[报价服务] ====== 所有组织报价任务完成 ======")
-    print(f"[报价服务] 汇总结果: 成功 {total_success}, 失败 {total_fail}")
+    print(f"\n[汽配龙自动报价] ====== 所有组织报价任务完成 ======")
+    print(f"[汽配龙自动报价] 汇总结果: 成功 {total_success}, 失败 {total_fail}")
 
     return all_results
