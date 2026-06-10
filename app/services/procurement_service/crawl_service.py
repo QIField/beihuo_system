@@ -171,11 +171,16 @@ class CRMDataCrawlService:
             'replace_number_with_keys': self._extract_replace_numbers_with_keys(product.get('display_number')),
             'brand_code': product.get('brand_code', ''),
             'is_cass': product.get('is_cass', ''),
-            'product_remark': product.get('company_remark', ''),
+            'product_remark': product.get('product_remark', ''),
             'product_level': product_level,
             'l_model_zh': product.get('l_model_zh', ''),
             'stock_zaitu_list': stock_zaitu_list,
             'frey_no': product.get('frey_no', ''),
+            'company_remark': product.get('company_remark', ''),
+            'waiting_time': product.get('waiting_time', ''),
+            'qpl_price': float(product.get('qpl_price', 0)),
+            'cost_price': float(product.get('cost_price', 0)),
+            'store_cass_price': float(product.get('store_cass_price', 0)),
             'supplier_price': 0.0,
             'max_price': 0.0,
             'min_price': 0.0
@@ -218,6 +223,7 @@ class CRMDataCrawlService:
             'product_id', 'oe', 'brand', 'company', 'product_name', 'vehicle_brand',
             'replace_number', 'replace_number_with_keys', 'brand_code', 'is_cass', 'product_remark',
             'product_level', 'l_model_zh', 'stock_zaitu_list', 'frey_no',
+            'company_remark', 'waiting_time', 'qpl_price', 'cost_price', 'store_cass_price',
             'supplier_price', 'max_price', 'min_price'
         ]
         sql = f"INSERT INTO crmapp_compare_summary ({', '.join(columns)}) VALUES ({', '.join(['%s'] * len(columns))})"
@@ -239,6 +245,11 @@ class CRMDataCrawlService:
                 p.get('l_model_zh', ''),
                 p.get('stock_zaitu_list') or None,
                 p.get('frey_no', ''),
+                p.get('company_remark', ''),
+                p.get('waiting_time', ''),
+                p.get('qpl_price', 0.0),
+                p.get('cost_price', 0.0),
+                p.get('store_cass_price', 0.0),
                 p.get('supplier_price', 0.0),
                 p.get('max_price', 0.0),
                 p.get('min_price', 0.0)

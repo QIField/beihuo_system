@@ -129,8 +129,6 @@ def get_records():
                         record['submit_time'] = record['submit_time'].strftime('%Y-%m-%d %H:%M:%S')
                     if record.get('created_at') and hasattr(record['created_at'], 'strftime'):
                         record['created_at'] = record['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-                    if record.get('created_time') and hasattr(record['created_time'], 'strftime'):
-                        record['created_time'] = record['created_time'].strftime('%Y-%m-%d %H:%M:%S')
                     result.append(record)
             
             print(f'[QPL Quote API] 返回数据: code=0, total={total}, list_length={len(result)}')

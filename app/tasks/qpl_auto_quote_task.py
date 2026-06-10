@@ -3,7 +3,7 @@
 
 """
 汽配龙自动报价定时任务
-每5分钟运行一次，后台线程串行处理
+每2分钟运行一次，后台线程串行处理
 支持多组织循环运行
 """
 
@@ -27,8 +27,8 @@ def register_qpl_auto_quote_tasks(task_manager):
         qpl_auto_quote_task,
         'interval',
         'qpl_auto_quote',
-        minutes=5,
+        minutes=2,
         next_run_time=datetime.now(),
         replace_existing=True
     )
-    print("[汽配龙自动报价] 定时任务已注册（每5分钟执行，支持多组织循环）")
+    print("[汽配龙自动报价] 定时任务已注册（每2分钟执行，支持多组织循环）")
