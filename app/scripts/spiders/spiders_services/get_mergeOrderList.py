@@ -26,7 +26,7 @@ def get_mergeOrderList_complete_by_level_id(token, page_num=None,
     :param page_num: 要爬取的页数，None=自动爬取全部，数字=指定爬取N页
     :return: 所有爬取到的订单列表
     """
-    spider = CrmGzbbrSpider(token)
+    spider = CrmGzbbrSpider(token=token)
     limit = 200
     data_total_count = 0  # 存储所有订单数据总计
     current_page = 1

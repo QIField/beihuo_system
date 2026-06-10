@@ -43,7 +43,7 @@ def get_part_by_number(part_number: str) -> Optional[Dict]:
         except Exception:
             pass
 
-        with orm_session() as session:
+        with orm_session() as session:  # pyright: ignore[reportGeneralTypeIssues]
             # 直接使用 session.query 查询
             part = session.query(CarPartsLibraryBenz).filter(
                 CarPartsLibraryBenz.part_number == part_number
@@ -126,8 +126,25 @@ def get_parts_list_page(
             
             # 转换为字典列表
             data = []
+            oe_list=[]
             for item in items:
-                data.append(item.to_web_dict(tax_rate, discount_rate))
+                oe=re.sub(r'^A', '', item.part_number)  # pyright: ignore[reportCallIssue, reportArgumentType]
+                oe_list.append(oe)
+
+                # 转换为字典，并附带oe字段用于后续匹配
+                item_dict = item.to_web_dict(tax_rate, discount_rate)
+                item_dict['oe'] = oe  # 添加oe字段，用于匹配备货数据
+                data.append(item_dict)
+
+            ## 使用oe_list在crmapp_beihuo搜索数据，并合并到data中
+            beihuo_data_dict = get_crmapp_beihuo_data(oe_list)
+            for item in data:
+                oe_key = item.get('oe', '')
+                item['beihuo_data'] = beihuo_data_dict.get(oe_key, [])  # pyright: ignore[reportOptionalMemberAccess]
+            
+
+
+
 
             print(f"从数据库查询到 {len(data)} 条配件数据，共 {total} 条")
             return {'status': True, 'msg': '查询成功', 'count': total, 'data': data}
@@ -140,6 +157,67 @@ def get_parts_list_page(
 
 
 
+def get_crmapp_beihuo_data(oe_list):
+    """
+    根据OE号列表查询备货数据（crmapp_beihuo表）
+    返回按OE分组的字典结构，一个OE对应多个地区(company)的数据列表
+
+    :param oe_list: OE号列表
+    :return: 字典，key为OE号，value为该OE下所有地区的备货数据列表；查询失败返回空字典
+
+    返回格式示例:
+    {
+        "1665000075": [
+            {"brand": "原厂", "model_brand": "奔驰", "company": "fsbbr", "stock_quantity": 3, ...},
+            {"brand": "原厂", "model_brand": "奔驰", "company": "dghf", "stock_quantity": 1, ...}
+        ],
+        "2642004201": [...]
+    }
+    """
+    from collections import defaultdict
+
+    try:
+        # 参数校验：OE列表为空时直接返回空字典
+        if not oe_list:
+            return None
+
+        with orm_session() as session:  # pyright: ignore[reportGeneralTypeIssues]
+            # 导入CrmappBeihuo模型（局部导入避免循环依赖）
+            from app.models.orm_models.crmapp_beihuo import CrmappBeihuo
+
+            # 根据OE号列表批量查询备货数据（奔驰 + 原厂品牌筛选）
+            results = session.query(CrmappBeihuo).filter(
+                CrmappBeihuo.oe.in_(oe_list),
+                CrmappBeihuo.car_model_brand == '奔驰',  # 筛选奔驰车型品牌
+                CrmappBeihuo.brand.in_(['原厂国内4s件', '原厂']),  # 筛选原厂品牌
+            ).all()
+
+            # 按OE号分组，使用defaultdict自动创建列表
+            oe_grouped: Dict[str, List[Dict]] = defaultdict(list)
+            for item in results:
+                item_dict = {
+                    'company': item.company,
+                    'stock_quantity': item.stock_quantity,
+                    'brand': item.brand,
+                    'model_brand': item.car_model_brand,
+                }  # pyright: ignore[reportArgumentType]
+
+
+
+                oe_grouped[item.oe].append(item_dict)  # pyright: ignore[reportArgumentType]
+
+            print(f"根据OE列表查询到 {len(oe_grouped)} 个OE，共 {len(results)} 条数据")
+            return dict(oe_grouped)
+
+    except Exception as e:
+        print(f"查询备货数据失败: {str(e)}")
+        return None
+
+# if __name__ == '__main__':
+#     oe_list=['2642004201','1665000875','1665000075','2742003100']
+#     result=get_crmapp_beihuo_data(oe_list)
+#     print(result)
+    
 def data_refresh(part_numbers: List[str]) -> Dict:
     """
     根据配件编号列表刷新数据
@@ -258,87 +336,6 @@ def get_crmapp_compare_summary(oe_list: List[str], vehicle_brand: str = '奔驰'
     except Exception as e:
         print(f"查询比价数据更新配件库失败: {str(e)}")
         return False
-
-
-
-def set_mercedes_config(
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    customer_id: Optional[str] = None,
-    sales_organization_id: Optional[str] = None,
-    tax_rate: Optional[float] = None,
-    discount_rate: Optional[float] = None,
-    column_config: Optional[Dict] = None,
-    favorite_column_config: Optional[Dict] = None,
-    column_order: Optional[List[str]] = None,
-    favorite_column_order: Optional[List[str]] = None
-) -> Dict:
-    """
-    设置奔驰大库配置
-    所有参数都是可选的，如果参数为 None，则保留原有配置不变
-
-    :param username: 登录用户名（可选），默认保留原值
-    :param password: 登录密码（可选），默认保留原值
-    :param customer_id: 客户ID（可选）
-    :param sales_organization_id: 销售组织ID（可选）
-    :param tax_rate: 税率（可选），默认保留原值
-    :param discount_rate: 折扣率（可选），默认保留原值
-    :param column_config: 配件列表列配置（可选），默认保留原值
-    :param favorite_column_config: 收藏列表列配置（可选），默认保留原值
-    :param column_order: 配件列表列顺序（可选），默认保留原值
-    :param favorite_column_order: 收藏列表列顺序（可选），默认保留原值
-    :return: 设置结果
-    """
-    # 构建要更新的字典
-    update_dict = {}
-    
-    # 只添加传入的参数（不是 None 的）
-    if username is not None:
-        update_dict['username'] = username
-    if password is not None:
-        update_dict['password'] = password
-    if customer_id is not None:
-        update_dict['customer_id'] = customer_id
-    if sales_organization_id is not None:
-        update_dict['sales_organization_id'] = sales_organization_id
-    if tax_rate is not None:
-        update_dict['tax_rate'] = tax_rate
-    if discount_rate is not None:
-        update_dict['discount_rate'] = discount_rate
-    if column_config is not None:
-        update_dict['column_config'] = column_config
-    if favorite_column_config is not None:
-        update_dict['favorite_column_config'] = favorite_column_config
-    if column_order is not None:
-        update_dict['column_order'] = column_order
-    if favorite_column_order is not None:
-        update_dict['favorite_column_order'] = favorite_column_order
-    
-    
-    # 使用通用函数更新配置
-    return update_json_config(
-        'mercedes_benz',
-        update_dict,
-        config_group='car_parts',
-        label='奔驰大库配置',
-        remark='用于访问奔驰大库的配置信息'
-    )
-
-
-def get_mercedes_config() -> Optional[Dict]:
-    """
-    获取奔驰大库配置
-
-    :return: 配置字典，如果不存在则返回None
-    """
-    try:
-        config = get_config_value('mercedes_benz')
-        return config  # pyright: ignore[reportReturnType]
-    except Exception as e:
-        print(f"获取奔驰配置失败: {str(e)}")
-        return None
-
-
 
 
 def add_part(part_data: dict) -> dict:

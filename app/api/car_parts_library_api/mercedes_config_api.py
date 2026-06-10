@@ -11,7 +11,7 @@
 """
 
 from flask import Blueprint, request, jsonify
-from app.services.car_parts_library_service.car_parts_library_benz_service import set_mercedes_config, get_mercedes_config
+from app.services.car_parts_library_service.mercedes_config_service import set_mercedes_config, get_mercedes_config
 
 mercedes_config_bp = Blueprint('mercedes_config', __name__)
 

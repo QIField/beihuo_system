@@ -25,6 +25,8 @@ from .car_parts_library import car_parts_library_bp
 common_web_bp.register_blueprint(car_parts_library_bp)
 common_web_bp.register_blueprint(qpl_quote_web_bp)
 
+from .daily_inventory_web import daily_inventory_web_bp
+common_web_bp.register_blueprint(daily_inventory_web_bp)
 
 __all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp','warehouse_manager_web_bp','common_web_bp']
 

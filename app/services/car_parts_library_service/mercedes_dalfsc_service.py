@@ -93,7 +93,7 @@ def fetch_mercedes_stock_information(spider, part_numbers):
         # 入库
         count = 0
         if clean_data_list:
-            with orm_session() as session:
+            with orm_session() as session:  # pyright: ignore[reportGeneralTypeIssues]
                 count = CarPartsLibraryBenzStockDao.batch_upsert(session, clean_data_list)
                 session.commit()
                 msg = f"库存信息入库成功，影响 {count} 条"

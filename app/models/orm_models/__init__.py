@@ -9,5 +9,7 @@ from .wechat_daily_quote_detail import WechatDailyQuoteDetail
 from .crmapp_sales_history_detail import CrmappSalesHistoryDetail
 from .car_parts_library_benz import CarPartsLibraryBenz
 from .car_parts_library_benz_stock import CarPartsLibraryBenzStock
+from .crm_purchase_order_list import CrmPurchaseOrderList
+from .crm_purchase_order_details import CrmPurchaseOrderDetails
 
-__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock"]
+__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails"]

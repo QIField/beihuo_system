@@ -68,6 +68,23 @@ def get_day_timestamp(day_str: str) -> Tuple[int, int]:
     return start_timestamp, end_timestamp
 
 
+def get_timestamp_from_str(time_str: str) -> int:
+    """
+    传入时间字符串（格式：YYYY-MM-DD），返回该时间的毫米秒级时间戳（北京时间）
+
+    Args:
+        time_str: 时间字符串，例如 "2026-01-23"
+
+    Returns:
+        毫秒秒级时间戳（如 1769097600000）
+    """
+    # 解析日期字符串
+    dt = datetime.strptime(time_str, "%Y-%m-%d")
+    # 转换为秒级时间戳，再乘以1000得到毫秒级时间戳
+    timestamp_seconds = int(time.mktime(dt.timetuple()))
+    return timestamp_seconds * 1000
+
+
 def timestamp_to_str(ts: int, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """
     秒级时间戳 转 北京时间字符串
