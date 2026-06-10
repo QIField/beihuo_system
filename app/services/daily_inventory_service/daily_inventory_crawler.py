@@ -57,7 +57,13 @@ def crawl_purchase_orders(page_num: Optional[int] = None,
         # 获取当前页订单
         order_list = json_data.get("data", {}).get("list", {}).get("data", [])
         if not order_list:
+            
             order_list = json_data.get("data", {}).get("list", [])
+
+        # 进入清洗通道前检查：数据必须是非空列表
+        if not order_list or not isinstance(order_list, list) or len(order_list) == 0:
+            
+            raise ValueError("暂无更新数据")
 
         # 进行数据清洗和字段过滤
         # print(f"第{current_page}页原始订单数量: {len(order_list)}")
@@ -129,7 +135,7 @@ def crawl_purchase_order_details(purchase_order_ids: List[int], cookies_key: str
 
             # 获取订单明细
             item_list = json_data.get("data", {}).get("Quotelineitem", {}).get("data", [])
-            
+
             if not item_list:
                 print(f"采购订单 {purchase_order_id} 明细列表为空")
                 continue

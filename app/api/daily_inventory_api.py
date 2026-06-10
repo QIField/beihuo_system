@@ -144,13 +144,27 @@ def api_update_daily_inventory():
             'data': None
         })
         
+    # except ValueError as e:
+    #     if str(e) == "暂无更新数据":
+    #         return jsonify({
+    #             'code': 204,
+    #             'msg': '暂无更新数据',
+    #             'data': None
+    #         })
+    #     else:
+    #         print(f'[daily_inventory_api] 触发更新异常: {str(e)}')
+    #         return jsonify({
+    #             'code': 500,
+    #             'msg': f'触发更新失败: {str(e)}',
+    #             'data': None
+    #         }), 500
     except Exception as e:
         print(f'[daily_inventory_api] 触发更新异常: {str(e)}')
         return jsonify({
             'code': 500,
             'msg': f'触发更新失败: {str(e)}',
             'data': None
-        }), 500
+        })
 
 
 
