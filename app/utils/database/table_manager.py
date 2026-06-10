@@ -20,6 +20,7 @@ from .tables import (
     init_price_inquiry_direct_table,
     init_safety_stock_calculation_table,
     init_all_virtual_inventory_tables,
+    init_qpl_quote_record_table,
 )
 
 
@@ -172,6 +173,7 @@ def init_user_table():
                 store VARCHAR(50) DEFAULT 'fsbbr' COMMENT '所属门店代码',
                 can_delete_cart TINYINT(1) DEFAULT 0 COMMENT '是否有权限删除购物车 0-否 1-是',
                 can_process_orders TINYINT(1) DEFAULT 0 COMMENT '是否有权限处理单据 0-否 1-是',
+                can_update_crm TINYINT(1) DEFAULT 0 COMMENT '是否有权限更新CRM产品信息 0-否 1-是',
                 department VARCHAR(20) DEFAULT NULL COMMENT '板块:业务/市场/后勤',
                 job_level VARCHAR(20) DEFAULT NULL COMMENT '职级:经理/主管/业务员',
                 ip_records JSON COMMENT '登录IP记录，最多保留5个最近的IP地址',
@@ -197,6 +199,10 @@ def init_user_table():
         {
             'name': 'can_process_orders',
             'definition': "TINYINT(1) DEFAULT 0 COMMENT '是否有权限处理单据 0-否 1-是'"
+        },
+        {
+            'name': 'can_update_crm',
+            'definition': "TINYINT(1) DEFAULT 0 COMMENT '是否有权限更新CRM产品信息 0-否 1-是'"
         },
         {
             'name': 'ip_records',
@@ -895,6 +901,7 @@ def init_all_tables():
         ('询价直接入库', init_price_inquiry_direct_table),
         ('安全库存计算', init_safety_stock_calculation_table),
         ('虚拟库存', init_all_virtual_inventory_tables),
+        ('汽配龙报价记录', init_qpl_quote_record_table),
     ]
 
     completed = []

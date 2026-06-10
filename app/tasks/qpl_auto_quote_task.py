@@ -3,17 +3,18 @@
 
 """
 汽配龙自动报价定时任务
-每5分钟运行一次，后台线程串行处理
+每2分钟运行一次，后台线程串行处理
+支持多组织循环运行
 """
 
 from threading import Thread
 from datetime import datetime
-from app.utils.qpl_auto_bill.auto_submit_part_quote import main as auto_quote_main
+from app.services.qpl_quote_service import process_and_save_quotes_for_all_companies
 
 
 def qpl_auto_quote_task():
-    """启动后台线程执行任务"""
-    thread = Thread(target=auto_quote_main, daemon=True)
+    """启动后台线程执行任务（支持多组织循环）"""
+    thread = Thread(target=process_and_save_quotes_for_all_companies, daemon=True)
     thread.start()
 
 
@@ -26,8 +27,8 @@ def register_qpl_auto_quote_tasks(task_manager):
         qpl_auto_quote_task,
         'interval',
         'qpl_auto_quote',
-        minutes=5,
+        minutes=2,
         next_run_time=datetime.now(),
         replace_existing=True
     )
-    print("[汽配龙自动报价] 定时任务已注册（每5分钟执行）")
+    print("[汽配龙自动报价] 定时任务已注册（每2分钟执行，支持多组织循环）")

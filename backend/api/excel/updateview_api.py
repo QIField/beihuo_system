@@ -10,8 +10,19 @@ from datetime import datetime
 
 def register_updateview_routes(app):
     """注册UpdateView相关的路由"""
+    from functools import wraps
+    from flask import session, jsonify
+    
+    def login_required(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'logged_in' not in session:
+                return jsonify({'code': 1, 'msg': '未登录，请先登录'}), 401
+            return f(*args, **kwargs)
+        return decorated_function
     
     @app.route('/api/excel/async/update_crm_product', methods=['POST'])
+    @login_required
     def async_update_crm_product():
         """
         异步提交更新CRM产品信息任务
@@ -26,6 +37,10 @@ def register_updateview_routes(app):
         - data.task_id: 任务ID，用于查询状态和下载结果
         """
         try:
+            # 检查权限
+            if not session.get('can_update_crm', False):
+                return jsonify({'code': 1, 'msg': '权限不足，无法更新CRM信息'}), 403
+            
             # 检查文件
             if 'file' not in request.files:
                 return jsonify({'code': 1, 'msg': '没有上传文件'}), 400

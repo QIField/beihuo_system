@@ -60,3 +60,9 @@ def customer_quota():
 def display_unpaid_customer_limit():
     """未付款客户额度展示"""
     return render_template("customer_quota_manager_web/display_unpaid_customer_limit_web.html")
+
+
+@general_web_bp.route("/ks_inquiry_records")
+def ks_inquiry_records():
+    """开思询价明细页面"""
+    return render_template("ks_inquiry_records.html")

@@ -980,10 +980,12 @@ def login():
             session['can_process_orders'] = 1
             session['can_inquiry_module'] = 1  # admin默认拥有询价模块权限
             session['can_compare_module'] = 1  # admin默认拥有比价模块权限
+            session['can_update_crm'] = 1  # admin默认拥有更新CRM权限
         else:
             session['can_process_orders'] = user['can_process_orders']  # 添加处理单据权限到session
             session['can_inquiry_module'] = user.get('can_inquiry_module', False)  # 询价模块权限
             session['can_compare_module'] = user.get('can_compare_module', False)  # 比价模块权限
+            session['can_update_crm'] = user.get('can_update_crm', False)  # 更新CRM权限
             
         session['user_id'] = user['id']  # 添加用户ID到session，用于后续权限检查
         # 检查用户store是否有效，如果无效则设置为默认值
@@ -1115,6 +1117,7 @@ def update_user(user_id):
     can_process_orders = data.get('can_process_orders')
     can_inquiry_module = data.get('can_inquiry_module')  # 新增：询价模块权限
     can_compare_module = data.get('can_compare_module')  # 新增：比价模块权限
+    can_update_crm = data.get('can_update_crm')  # 新增：更新CRM权限
     store = data.get('store')
     allowed_orgs = data.get('allowed_orgs')  # 新增：允许切换的组织列表
     department = data.get('department')  # 板块:业务/市场/后勤
@@ -1158,6 +1161,9 @@ def update_user(user_id):
         if can_compare_module is not None:
             update_fields.append("can_compare_module = %s")
             params.append(can_compare_module)
+        if can_update_crm is not None:
+            update_fields.append("can_update_crm = %s")
+            params.append(can_update_crm)
         if store is not None:
             update_fields.append("store = %s")
             params.append(store)
@@ -2124,6 +2130,7 @@ def get_current_user():
     can_modify_prices = session.get('can_modify_prices', False)
     can_inquiry_module = session.get('can_inquiry_module', False)  # 询价模块权限
     can_compare_module = session.get('can_compare_module', False)  # 比价模块权限
+    can_update_crm = session.get('can_update_crm', False)  # 更新CRM权限
     allowed_orgs = session.get('allowed_orgs', [])
     
     # 板块和职级信息（新增字段）
@@ -2166,6 +2173,7 @@ def get_current_user():
         'can_modify_prices': can_modify_prices,
         'can_inquiry_module': can_inquiry_module,  # 询价模块权限
         'can_compare_module': can_compare_module,  # 比价模块权限
+        'can_update_crm': can_update_crm,  # 更新CRM权限
         'allowed_orgs': allowed_orgs,  # 允许切换的组织列表
         'department': department,  # 板块:业务/市场/后勤
         'job_level': job_level,    # 职级:经理/主管/业务员
@@ -2532,6 +2540,7 @@ def create_user():
     can_process_orders = data.get('can_process_orders', 0)  # 新增：处理单据权限
     can_inquiry_module = data.get('can_inquiry_module', 0)  # 新增：询价模块权限
     can_compare_module = data.get('can_compare_module', 0)  # 新增：比价模块权限
+    can_update_crm = data.get('can_update_crm', 0)  # 新增：更新CRM权限
     store = data.get('store', 'fsbbr')
     department = data.get('department')  # 板块:业务/市场/后勤
     job_level = data.get('job_level')    # 职级:经理/主管/业务员
@@ -2569,6 +2578,9 @@ def create_user():
 
     if not isinstance(can_compare_module, bool) and can_compare_module not in [0, 1]:  # 新增验证
         return jsonify({'code': 1, 'msg': '比价模块权限值必须为0或1'}), 400
+
+    if not isinstance(can_update_crm, bool) and can_update_crm not in [0, 1]:  # 新增验证
+        return jsonify({'code': 1, 'msg': '更新CRM权限值必须为0或1'}), 400
     
     if not isinstance(store, str):
         return jsonify({'code': 1, 'msg': '门店代码必须为字符串'}), 400
@@ -2584,8 +2596,8 @@ def create_user():
         
         # 插入新用户
         cursor.execute(
-            "INSERT INTO crmapp_users (username, password, is_admin, store, can_delete_cart, can_process_orders, can_inquiry_module, can_compare_module, department, job_level) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (username, password, is_admin, store, can_delete_cart, can_process_orders, can_inquiry_module, can_compare_module, department, job_level)  # 添加新字段
+            "INSERT INTO crmapp_users (username, password, is_admin, store, can_delete_cart, can_process_orders, can_inquiry_module, can_compare_module, can_update_crm, department, job_level) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (username, password, is_admin, store, can_delete_cart, can_process_orders, can_inquiry_module, can_compare_module, can_update_crm, department, job_level)  # 添加新字段
         )
         
         conn.commit()

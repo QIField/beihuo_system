@@ -346,7 +346,10 @@ class QuoteCountSyncService:
                             'brandId': item.get('brandId', ''),
                             'partType': item.get('partType', ''),
                             'partsBrandQuality': parts_brand_quality,
-                            'remark': item.get('remark', '')
+                            'remark': item.get('remark', ''),
+                            'sellerBtPrice': item.get('sellerBtPrice', ''),
+                            'sellerPrice': item.get('sellerPrice', ''),
+                            'sellerStatus': item.get('sellerStatus', '')
                         })
 
             # 如果第一个接口有数据，直接返回（不切换到第二个接口）
@@ -368,8 +371,8 @@ class QuoteCountSyncService:
             insert_sql = """
                 INSERT INTO crmapp_ks_inquiry_detail 
                 (inquiryId, partsNum, partsName, brandName, brandNormalized, brandId, partType, 
-                 partsBrandQuality, remark, company, quote_date, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                 partsBrandQuality, remark, sellerBtPrice, sellerPrice, sellerStatus, company, quote_date, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     partsName = VALUES(partsName),
                     brandNormalized = VALUES(brandNormalized),
@@ -377,6 +380,9 @@ class QuoteCountSyncService:
                     partType = VALUES(partType),
                     partsBrandQuality = VALUES(partsBrandQuality),
                     remark = VALUES(remark),
+                    sellerBtPrice = VALUES(sellerBtPrice),
+                    sellerPrice = VALUES(sellerPrice),
+                    sellerStatus = VALUES(sellerStatus),
                     quote_date = VALUES(quote_date),
                     updated_at = NOW()
             """
@@ -393,6 +399,9 @@ class QuoteCountSyncService:
                     item.get('partType', ''),
                     item.get('partsBrandQuality', ''),
                     item.get('remark', ''),
+                    item.get('sellerBtPrice', ''),
+                    item.get('sellerPrice', ''),
+                    item.get('sellerStatus', ''),
                     item.get('company', self.COMPANY),
                     item.get('quote_date', '')
                 )

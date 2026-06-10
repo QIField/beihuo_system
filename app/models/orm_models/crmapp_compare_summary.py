@@ -105,6 +105,27 @@ class CrmappCompareSummary(BaseModels):
     # 车型中文名
     l_model_zh = Column(Text, nullable=True, comment="车型中文名")
     
+    # Frey 编号
+    frey_no = Column(String(255), nullable=True, comment="Frey编号")
+    
+    # 在途库存列表
+    stock_zaitu_list = Column(Text, nullable=True, comment="在途库存列表(JSON格式)")
+    
+    # 公司备注
+    company_remark = Column(Text, nullable=True, comment="公司备注")
+    
+    # 等待时间
+    waiting_time = Column(String(50), nullable=True, comment="等待时间")
+    
+    # QPL价格
+    qpl_price = Column(DECIMAL(10, 2), nullable=True, default=0.00, comment="QPL价格")
+    
+    # 成本价
+    cost_price = Column(DECIMAL(10, 2), nullable=True, default=0.00, comment="成本价")
+    
+    # 存储CASS价格
+    store_cass_price = Column(DECIMAL(10, 2), nullable=True, default=0.00, comment="存储CASS价格")
+    
     # 创建时间
     created_time = Column(DateTime, nullable=True, comment="创建时间")
     
@@ -157,6 +178,14 @@ class CrmappCompareSummary(BaseModels):
             "sales_12m": self.sales_12m,
             "product_remark": self.product_remark,
             "is_cass": self.is_cass,
+            "l_model_zh": self.l_model_zh,
+            "frey_no": self.frey_no,
+            "stock_zaitu_list": self.stock_zaitu_list,
+            "company_remark": self.company_remark,
+            "waiting_time": self.waiting_time,
+            "qpl_price": float(self.qpl_price) if self.qpl_price else 0.00,
+            "cost_price": float(self.cost_price) if self.cost_price else 0.00,
+            "store_cass_price": float(self.store_cass_price) if self.store_cass_price else 0.00,
             "created_time": self.created_time.strftime("%Y-%m-%d %H:%M:%S") if self.created_time else None,
             "updated_time": self.updated_time.strftime("%Y-%m-%d %H:%M:%S") if self.updated_time else None,
         }

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>汽配龙自动报价记录</title>
+    
+    <!-- AG Grid CSS - 使用本地文件 -->
+    <link rel="stylesheet" href="/static/ag-grid/ag-grid.css">
+    <link rel="stylesheet" href="/static/ag-grid/ag-theme-alpine.css">
+    <link rel="stylesheet" href="/static/ag-grid/ag-custom-checkbox.css">
+    
+    <!-- LayUI -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <script src="/static/layui/layui.js"></script>
+
+    <!-- Filter Panel Component -->
+    <link rel="stylesheet" href="/static/js/components/filter_panel/filter-panel.css">
+    <script src="/static/js/components/filter_panel/filter-panel.js"></script>
+    
+    <!-- 一键置顶按钮组件 -->
+    <link rel="stylesheet" href="/static/js/components/scroll-to-top/scroll-to-top.css?v=1">
+    <script src="/static/js/components/scroll-to-top/scroll-to-top.js?v=1"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container { max-width: 100%; margin: 0 auto; }
+        
+        /* 搜索筛选区域 - 保持原样 */
+        .search-panel {
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        /* 日期输入框样式 */
+        .search-panel .layui-input {
+            height: 36px;
+            line-height: 34px;
+            padding: 0 12px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        
+        /* 筛选按钮样式 - 关键：去掉默认上下margin */
+        .search-panel .filter-btn {
+            height: 36px !important;
+            line-height: 34px !important;
+            padding: 0 12px !important;
+            box-sizing: border-box !important;
+            margin: 0 4px !important;
+        }
+        
+        /* FilterPanel容器样式 */
+        .search-panel #qplQuoteFilterButtons {
+            display: inline-flex;
+            align-items: center;
+            height: 36px;
+        }
+        
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #qplQuoteGrid {
+            height: calc(100vh - 200px);
+            min-height: 500px;
+            width: 100%;
+        }
+        
+        /* 分页条数选择器 */
+        .ag-paging-panel {
+            position: relative;
+        }
+
+        /* 分页条数选择器 */
+        .page-size-selector {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .page-size-selector select {
+            padding: 4px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            background: #fff;
+        }
+
+        .page-size-selector select:hover {
+            border-color: #1890ff;
+        }
+
+        .page-size-selector select:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        /* 页码跳转器 */
+        .page-jumper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .page-jumper input {
+            width: 50px;
+            padding: 4px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .page-jumper input:hover {
+            border-color: #1890ff;
+        }
+
+        .page-jumper input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .page-jumper button {
+            padding: 4px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .page-jumper button:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+        }
+        
+        /* AG Grid 自定义样式 - 紧凑版 */
+        .ag-theme-alpine {
+            --ag-font-size: 12px;
+            --ag-font-family: 'Microsoft YaHei', Arial, sans-serif;
+            --ag-header-height: 36px;
+            --ag-row-height: 36px;
+            --ag-header-background-color: #fafafa;
+            --ag-odd-row-background-color: #fff;
+            --ag-even-row-background-color: #fafafa;
+            --ag-cell-horizontal-padding: 6px;
+        }
+        
+        .ag-theme-alpine .ag-header-cell-text {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .ag-theme-alpine .ag-cell {
+            font-size: 12px;
+            line-height: 36px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 搜索筛选区域 - 保持原样 -->
+        <div class="search-panel">
+            <!-- 日期选择器 -->
+            <span style="font-size: 14px; color: #666;">日期范围：</span>
+            <input type="text" id="dateRange" placeholder="请选择日期范围" class="layui-input" style="width: 220px;" readonly>
+            
+            <!-- 分隔符 -->
+            <span style="color: #999;">|</span>
+            
+            <!-- 筛选按钮 -->
+            <div id="qplQuoteFilterButtons"></div>
+            
+            <!-- 分隔符 -->
+            <span style="color: #999;">|</span>
+            
+            <!-- 重置按钮 -->
+            <button class="filter-btn" onclick="resetAll()">重置</button>
+            
+            <input type="hidden" id="searchSupplierEnquiryNo">
+            <input type="hidden" id="searchItemOe">
+            <input type="hidden" id="searchItemName">
+            <input type="hidden" id="searchBrandName">
+        </div>
+        
+        <!-- 表格容器 -->
+        <div class="table-container">
+            <div id="qplQuoteGrid" class="ag-theme-alpine"></div>
+        </div>
+    </div>
+
+    <!-- AG Grid JS - 使用本地文件 -->
+    <script src="/static/ag-grid/ag-grid-community.min.js"></script>
+    
+    <!-- 通用复制工具 -->
+    <script src="/static/js/copy-utils.js"></script>
+    
+    <script>
+        // 全局变量
+        let gridApi = null;
+        let gridColumnApi = null;
+        let currentData = [];
+        
+        // AG Grid 列定义
+        const columnDefs = [
+            {
+                headerName: '行号',
+                field: 'rowNumber',
+                width: 80,
+                pinned: 'left',
+                sortable: false,
+                filter: false,
+                valueGetter: params => {
+                    const rowIndex = params.node?.rowIndex;
+                    return rowIndex !== undefined ? rowIndex + 1 : '';
+                }
+            },
+            { field: 'supplier_enquiry_no', headerName: '询价单号', width: 150, pinned: 'left', sortable: true, filter: true },
+            { field: 'submit_time', headerName: '提交时间', width: 160, sortable: true, filter: true },
+            { field: 'item_oe', headerName: 'OE号', width: 130, sortable: true, filter: true },
+            { field: 'item_name', headerName: '产品名称', width: 200, sortable: true, filter: true },
+            { field: 'brand_name', headerName: '品牌', width: 120, sortable: true, filter: true },
+            { field: 'item_sell_price', headerName: '销售价格', width: 100, sortable: true, filter: true },
+            { field: 'delivery_aging', headerName: '交货周期(天)', width: 120, sortable: true, filter: true },
+            { field: 'item_quality', headerName: '产品品质', width: 100, sortable: true, filter: true },
+            { field: 'parts_no', headerName: '零件号', width: 130, sortable: true, filter: true },
+            { field: 'quote_status', headerName: '报价状态', width: 100, sortable: true, filter: true },
+            { field: 'submit_result', headerName: '提交结果', width: 150, sortable: true, filter: true }
+        ];
+        
+        // Grid 配置
+        const gridOptions = {
+            columnDefs: columnDefs,
+            rowData: [],
+            defaultColDef: {
+                sortable: true,
+                filter: true,
+                resizable: true,
+                suppressMenu: true
+            },
+            rowHeight: 36,
+            headerHeight: 36,
+            pagination: true,
+            paginationPageSize: 200,
+            paginationPageSizeSelector: [50, 100, 200],
+            animateRows: true,
+            onGridReady: function(event) {
+                gridApi = event.api;
+                gridColumnApi = event.columnApi;
+                
+                gridApi.sizeColumnsToFit();
+                
+                // 初始化分页条数选择器
+                setTimeout(initPageSizeSelector, 500);
+                
+                // 初始化双击复制功能
+                initDoubleClickCopy();
+                
+                // 初始化一键置顶按钮
+                setTimeout(() => {
+                    if (typeof ScrollToTop !== 'undefined') {
+                        ScrollToTop.init({
+                            container: '#qplQuoteGrid',
+                            threshold: 300,
+                            offsetBottom: 30,
+                            offsetRight: 30,
+                            duration: 600
+                        });
+                    }
+                }, 800);
+                
+                // 加载初始数据
+                refreshGrid();
+            }
+        };
+        
+        // 初始化双击复制功能
+        function initDoubleClickCopy() {
+            const gridDiv = document.querySelector('#qplQuoteGrid');
+            
+            gridDiv.addEventListener('dblclick', function(e) {
+                const cellElement = e.target.closest('.ag-cell');
+                if (!cellElement) return;
+                
+                const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
+                const colId = cellElement.getAttribute('col-id');
+                
+                if (rowId && colId) {
+                    const rowNode = gridApi.getRowNode(rowId);
+                    if (rowNode && rowNode.data) {
+                        const value = rowNode.data[colId];
+                        if (value !== undefined && value !== null) {
+                            const textToCopy = String(value);
+                            navigator.clipboard.writeText(textToCopy).then(() => {
+                                layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+                            }).catch(err => {
+                                console.error('复制失败:', err);
+                                layui.layer.msg('复制失败', {icon: 2});
+                            });
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 初始化分页条数选择器
+        function initPageSizeSelector() {
+            const pagingPanel = document.querySelector('.ag-paging-panel');
+            if (!pagingPanel) {
+                setTimeout(initPageSizeSelector, 500);
+                return;
+            }
+
+            if (pagingPanel.querySelector('.page-size-selector')) {
+                return;
+            }
+
+            const selectorContainer = document.createElement('div');
+            selectorContainer.className = 'page-size-selector';
+            selectorContainer.innerHTML = `
+                <span>每页显示:</span>
+                <select id="pageSizeSelect">
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="200" selected>200</option>
+                </select>
+                <span>条</span>
+            `;
+
+            pagingPanel.appendChild(selectorContainer);
+
+            const select = selectorContainer.querySelector('#pageSizeSelect');
+            select.addEventListener('change', function() {
+                const newPageSize = parseInt(this.value);
+                if (gridApi) {
+                    gridApi.paginationSetPageSize(newPageSize);
+                }
+            });
+
+            addPageJumper();
+        }
+
+        // 添加页码跳转器
+        function addPageJumper() {
+            const pagingPanel = document.querySelector('.ag-paging-panel');
+            const rowSummaryPanel = pagingPanel.querySelector('.ag-paging-row-summary-panel');
+
+            if (!rowSummaryPanel) return;
+
+            rowSummaryPanel.innerHTML = '';
+
+            const jumperDiv = document.createElement('div');
+            jumperDiv.className = 'page-jumper';
+            jumperDiv.innerHTML = `
+                <span>跳至</span>
+                <input type="number" id="pageJumperInput" min="1" placeholder="页码">
+                <span>页</span>
+                <button id="pageJumperBtn">跳转</button>
+            `;
+
+            rowSummaryPanel.appendChild(jumperDiv);
+
+            const input = jumperDiv.querySelector('#pageJumperInput');
+            const btn = jumperDiv.querySelector('#pageJumperBtn');
+
+            const doJump = function() {
+                const pageNum = parseInt(input.value);
+                if (!pageNum || pageNum < 1) {
+                    layui.layer.msg('请输入有效的页码', {icon: 0});
+                    return;
+                }
+
+                const totalPages = gridApi.paginationGetTotalPages();
+                if (pageNum > totalPages) {
+                    layui.layer.msg('页码超出范围，最大页码: ' + totalPages, {icon: 0});
+                    return;
+                }
+
+                gridApi.paginationGoToPage(pageNum - 1);
+                input.value = '';
+            };
+
+            btn.addEventListener('click', doJump);
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    doJump();
+                }
+            });
+        }
+        
+        // 初始化 Grid
+        document.addEventListener('DOMContentLoaded', function() {
+            const gridDiv = document.querySelector('#qplQuoteGrid');
+            new agGrid.Grid(gridDiv, gridOptions);
+            
+            // 初始化筛选面板
+            FilterPanel.initSearch({
+                container: '#qplQuoteFilterButtons',
+                fields: [
+                    { label: '询价单号', inputId: 'searchSupplierEnquiryNo' },
+                    { label: 'OE号', inputId: 'searchItemOe' },
+                    { label: '产品名称', inputId: 'searchItemName' },
+                    { label: '品牌', inputId: 'searchBrandName' }
+                ],
+                onApply: function(field, value) {
+                    refreshGrid();
+                }
+            });
+            
+            // 初始化layui日期组件
+            layui.use(['laydate'], function() {
+                const laydate = layui.laydate;
+                laydate.render({
+                    elem: '#dateRange',
+                    trigger: 'click',
+                    format: 'yyyy-MM-dd',
+                    range: true,
+                    max: 0,
+                    value: ''
+                });
+            });
+        });
+        
+        // 重置所有筛选条件
+        function resetAll() {
+            document.getElementById('dateRange').value = '';
+            document.getElementById('searchSupplierEnquiryNo').value = '';
+            document.getElementById('searchItemOe').value = '';
+            document.getElementById('searchItemName').value = '';
+            document.getElementById('searchBrandName').value = '';
+            
+            if (typeof FilterPanel !== 'undefined' && FilterPanel.clearAll) {
+                FilterPanel.clearAll();
+            }
+            
+            refreshGrid();
+        }
+        
+        // 获取查询参数
+        function getSearchParams() {
+            let beginDate = '', endDate = '';
+            const dateRangeValue = document.getElementById('dateRange').value;
+            if (dateRangeValue) {
+                const dates = dateRangeValue.split(' - ');
+                beginDate = dates[0] || '';
+                endDate = dates[1] || '';
+            }
+            
+            return {
+                supplier_enquiry_no: document.getElementById('searchSupplierEnquiryNo').value || '',
+                item_oe: document.getElementById('searchItemOe').value || '',
+                item_name: document.getElementById('searchItemName').value || '',
+                brand_name: document.getElementById('searchBrandName').value || '',
+                begin_date: beginDate,
+                end_date: endDate
+            };
+        }
+        
+        // 刷新表格数据
+        function refreshGrid() {
+            const params = getSearchParams();
+            
+            fetch('/new/api/qpl_quote/records?' + new URLSearchParams(params))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 0 || data.code === '0') {
+                        currentData = data.data.list;
+                        gridApi.setRowData(currentData);
+                    }
+                })
+                .catch(error => {
+                    console.error('请求失败:', error);
+                });
+        }
+    </script>
+</body>
+</html>
