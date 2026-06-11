@@ -426,18 +426,18 @@ def print_summary_table(detail_data, mercedes_quote_items, summary_list, company
                     first_quote = existing_quotes[0]
                     price = first_quote.get('itemSellPrice') or 0
                     days = first_quote.get('prepareGoodTimespan') or 0
-                    print(f"{item.get('itemOe', '')[:18]:<20} {item.get('itemName', '')[:23]:<25} ¥{price:<7} {days:<8} {len(existing_quotes)}")
+                    print(f"{(item.get('itemOe') or '')[:18]:<20} {(item.get('itemName') or '')[:23]:<25} ¥{price:<7} {days:<8} {len(existing_quotes)}")
 
     # WAITING_QUOTE + 奔驰报价项目
     for summary in summary_list:
-        print(f"{summary['item_oe'][:18]:<20} {summary['item_name'][:23]:<25} ¥{summary['price']:<7} {summary['days']:<8} {summary['product_count']}")
+        print(f"{(summary.get('item_oe') or '')[:18]:<20} {(summary.get('item_name') or '')[:23]:<25} ¥{summary['price']:<7} {summary['days']:<8} {summary['product_count']}")
 
     # WAITING_QUOTE + 未报价项目
     for demand in detail_data.get('supplierEnquiryDemandList', []):
         for item in demand.get('supplierEnquiryItemList', []):
             enquiry_item_id = item.get('enquiryItemId')
             if item.get('quoteStatus') == 'WAITING_QUOTE' and enquiry_item_id not in mercedes_quote_items:
-                print(f"{item.get('itemOe', '')[:18]:<20} {item.get('itemName', '')[:23]:<25} {'--':<8} {'--':<8} {'未报价'}")
+                print(f"{(item.get('itemOe') or '')[:18]:<20} {(item.get('itemName') or '')[:23]:<25} {'--':<8} {'--':<8} {'未报价'}")
 
     print("=" * 80)
 

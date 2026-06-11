@@ -147,6 +147,15 @@ class CRMDataCrawlService:
 
         return ';'.join(pairs)
 
+    def _safe_float(self, value, default=0.0):
+        """安全地将值转为 float，空字符串/None/无效值返回默认值"""
+        if value is None or value == '':
+            return default
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+
     def parse_product(self, product: Dict) -> Dict[str, Any]:
         """解析单个产品数据"""
         # 转换产品等级
@@ -178,9 +187,9 @@ class CRMDataCrawlService:
             'frey_no': product.get('frey_no', ''),
             'company_remark': product.get('company_remark', ''),
             'waiting_time': product.get('waiting_time', ''),
-            'qpl_price': float(product.get('qpl_price', 0)),
-            'cost_price': float(product.get('cost_price', 0)),
-            'store_cass_price': float(product.get('store_cass_price', 0)),
+            'qpl_price': self._safe_float(product.get('qpl_price')),
+            'cost_price': self._safe_float(product.get('cost_price')),
+            'store_cass_price': self._safe_float(product.get('store_cass_price')),
             'supplier_price': 0.0,
             'max_price': 0.0,
             'min_price': 0.0

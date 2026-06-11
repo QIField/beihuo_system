@@ -11,8 +11,7 @@ qpl_quote_web_bp = Blueprint(
     "qpl_quote_web",
     __name__,
     template_folder="../templates",
-    static_folder="../static",
-    url_prefix='/views'
+    static_folder="../static"
 )
 
 
