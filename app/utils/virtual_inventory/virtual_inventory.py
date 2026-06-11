@@ -1144,8 +1144,21 @@ def get_zhuozhixing_multi():
                                     'hhcode': '互换码', 'Isgx': '是否共享',
                                     'kcid': '商家库存表自增ID', 'kcdepot': '库号（仓库）'})
 
-            df['oe_number1'] = df['零件编码'].str.replace(' ', '').str.replace('正厂', '').str.replace('-', '')
-            df['ys_oe1'] = df['零件编码'].str.replace(' ', '').str.replace('正厂', '').str.replace('-', '')
+            # 特殊后缀列表（识别到末尾有这些字符串时直接去除，以后新增直接追加到列表）
+            SPECIAL_SUFFIXES = ['INATZ4', 'INATZ3', 'INA4', 'TZ3']
+            suffix_pattern = r'(' + '|'.join(SPECIAL_SUFFIXES) + r')$'
+
+            # 完整 OE 码清洗：去空格 → 去正厂 → 去横杠 → 去开头 A → 去特殊后缀 → 去末尾字母/中文/符号
+            oe_clean = (df['零件编码']
+                .str.replace(' ', '', regex=False)
+                .str.replace('正厂', '', regex=False)
+                .str.replace('-', '', regex=False)
+                .str.lstrip('A')
+                .str.replace(suffix_pattern, '', regex=True)
+                .str.replace(r'[A-Za-z\u4e00-\u9fff\W_]+$', '', regex=True)
+            )
+            df['oe_number1'] = oe_clean
+            df['ys_oe1'] = oe_clean
             # 更新时间
             df['updateTime'] = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             df['update1'] = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -1168,7 +1181,7 @@ def get_zhuozhixing_multi():
             df = df[['spider_date1', 'oe_number1','ys_oe1','update1','product_name1','brand_name1','seller_name1','quantity1',
                      'price1','make_name1','make_vehicle1','city_name']]
 
-            df = df[['seller_name1', 'oe_number1', 'brand_name1', 'price1', 'city_name', 'quantity1']]
+            df = df[['seller_name1', 'oe_number1', 'ys_oe1', 'brand_name1', 'price1', 'city_name', 'quantity1']]
             all_dataframes.append(df)
     
     if all_dataframes:
@@ -1212,7 +1225,7 @@ def fetch_and_process_latest_data():
 
         # 查询最新日期的所有数据
         data_query = f"""
-        SELECT seller_name1, oe_number1, brand_name1, price1, city_name, quantity1
+        SELECT seller_name1, oe_number1, ys_oe1, brand_name1, price1, city_name, quantity1
         FROM jqr_data 
         WHERE DATE(spider_date1) = '{latest_date}'
         """
