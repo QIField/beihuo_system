@@ -271,20 +271,17 @@
             { field: 'sellerBtPrice', headerName: '卖家BT价格', width: 120, sortable: true, filter: true },
             { field: 'sellerPrice', headerName: '卖家价格', width: 120, sortable: true, filter: true },
             {
-                field: 'sellerStatus',
+                field: 'displaySellerStatus',
                 headerName: '卖家状态',
                 width: 120,
                 sortable: true,
-                filter: true,
-                valueFormatter: params => {
-                    const statusMap = {
-                        'SALABLE': '未下单',
-                        'ORDERED': '已下单'
-                    };
-                    return statusMap[params.value] || params.value;
-                }
+                filter: true
             },
-            { field: 'remark', headerName: '备注', width: 200, sortable: true, filter: true }
+            { field: 'remark', headerName: '备注', width: 200, sortable: true, filter: true },
+            { field: 'vin', headerName: '车架号', width: 150, sortable: true, filter: true },
+            { field: 'engine', headerName: '发动机', width: 120, sortable: true, filter: true },
+            { field: 'productionDate', headerName: '车辆生产日期', width: 140, sortable: true, filter: true },
+            { field: 'chassis', headerName: '底盘', width: 120, sortable: true, filter: true }
         ];
         
         // Grid 配置
@@ -518,8 +515,9 @@
             } else {
                 title = '卖家状态';
                 options = [
-                    { value: 'SALABLE', text: '未下单' },
-                    { value: 'ORDERED', text: '已下单' }
+                    { value: '未下单', text: '未下单' },
+                    { value: '本店下单', text: '本店下单' },
+                    { value: '非本店下单', text: '非本店下单' }
                 ];
             }
 

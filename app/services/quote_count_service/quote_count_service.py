@@ -67,6 +67,24 @@ class QuoteCountSyncService:
     RETRY_DELAY = 2
     COMPANY = 'fsbbr'
 
+    # company -> storeId 映射
+    COMPANY_TO_STORE_ID = {
+        'fsbbr': 'FSBBR001',
+        'zhbbr': '4400004937',
+        'dgby': '4400002594',
+        'dghf': '4400002204',
+        'zsbbr': '4400000670',
+    }
+
+    # company -> inquiry basic token 映射
+    COMPANY_TO_INQUIRY_TOKEN = {
+        'fsbbr': 'ecO2szp3JSljt2Nlwbv',
+        'zhbbr': 'maBLBxO4UB4wyfz3KGE',
+        'dgby': 'dFKGLCEYkGRkZd5Kp5Z',
+        'dghf': 'sLpvQE7IqOcQBYjQbla',
+        'zsbbr': 'W5eWV8OPpIMnYpU4iOm',
+    }
+
     # 需要特殊处理的品牌（宝马/奔驰）
     SPECIAL_BRANDS = {'宝马', '奔驰'}
     # 品质映射表
@@ -254,12 +272,60 @@ class QuoteCountSyncService:
         print(f"[订单列表] 共获取 {len(order_ids)} 个订单ID")
         return order_ids
 
+    def _fetch_inquiry_basic(self, order_id: str) -> Optional[str]:
+        """
+        调用 inquiry/read/inquirybasic 接口获取车架号 vin
+        """
+        token = self.COMPANY_TO_INQUIRY_TOKEN.get(self.COMPANY)
+        if not token:
+            return None
+
+        url = f"https://www.cassmall.com/inquiry/seller/inquiry/read/inquirybasic/{order_id}/{token}"
+        result = self._make_request_with_retry('get', url)
+
+        if not result or result.get('code') != 200:
+            return None
+
+        data = result.get('data', {})
+        inquiry_car_infos = data.get('inquiryCarInfos', {})
+        vin = inquiry_car_infos.get('vin', '')
+        return vin if vin else None
+
+    def _fetch_car_config(self, vin: str) -> Dict[str, str]:
+        """
+        调用 getCarConfigInformation 接口获取车辆配置信息
+        返回: {"engine": "", "production_date": "", "chassis": ""}
+        """
+        url = f"https://www.cassmall.com/agentBuy/seller/admin/inquirys/getCarConfigInformation/{vin}"
+        result = self._make_request_with_retry('get', url)
+
+        config = {"engine": "", "production_date": "", "chassis": ""}
+        if not result or result.get('code') != 200:
+            return config
+
+        data = result.get('data', [])
+        if not isinstance(data, list):
+            return config
+
+        for item in data:
+            name = item.get('name', '')
+            value = item.get('value', '')
+            if name == "发动机":
+                config["engine"] = value
+            elif name == "车辆生产日期":
+                config["production_date"] = value
+            elif name == "底盘":
+                config["chassis"] = value
+
+        return config
+
     def _fetch_quotation_detail(self, order_id: str) -> List[Dict]:
         """
         获取指定订单的询价明细，返回完整字段
         联合唯一键：inquiryId + brandName + partsNum + company
         """
         items = []
+
         url_configs = [
             {
                 'url': f"https://www.cassmall.com/inquiryWeb/quotation/{order_id}/quoting/items",
@@ -316,12 +382,75 @@ class QuoteCountSyncService:
             data = result.get('data', {})
             content_list = data.get('content', [])
 
+            # 提取真正的 inquiryId（B 开头），用于获取车辆信息
+            real_inquiry_id = ''
+            for content in content_list:
+                sqir = content.get('storeQuoteItemResults', [])
+                if sqir:
+                    real_inquiry_id = sqir[0].get('inquiryId', '')
+                    if real_inquiry_id:
+                        break
+
+            # 获取车辆信息
+            vin = ''
+            car_config = {"engine": "", "production_date": "", "chassis": ""}
+            if real_inquiry_id:
+                vin = self._fetch_inquiry_basic(real_inquiry_id)
+                if vin:
+                    car_config = self._fetch_car_config(vin)
+
+            # === 新增：调用 resolveitems/detail 获取 content 级别下单状态 ===
+            resolve_result_ids = []
+            for content in content_list:
+                store_resolve_item = content.get('storeResolveItem', {})
+                resolve_result_id = store_resolve_item.get('resolveResultId', '')
+                if resolve_result_id:
+                    resolve_result_ids.append(resolve_result_id)
+
+            ordered_resolve_ids = set()
+            if resolve_result_ids:
+                store_id = self.COMPANY_TO_STORE_ID.get(self.COMPANY, 'FSBBR001')
+                resolve_payload = {
+                    "inquiryId": order_id,
+                    "storeId": store_id,
+                    "resolveResultIds": resolve_result_ids
+                }
+                resolve_result = self._make_request_with_retry(
+                    'post',
+                    'https://www.cassmall.com/inquiryWeb/quotation/resolveitems/detail',
+                    json=resolve_payload,
+                    headers={'Content-Type': 'application/json'}
+                )
+                if resolve_result and resolve_result.get('code') == 200:
+                    for item_data in resolve_result.get('data', []):
+                        if item_data.get('orderStatusId') == 'ORDERED':
+                            ordered_resolve_ids.add(item_data.get('resolveResultId'))
+            # === 新增结束 ===
+
             # 遍历所有content，收集所有storeQuoteItemResults
             for content in content_list:
                 store_quote_item_results = content.get('storeQuoteItemResults', [])
 
                 if not store_quote_item_results:
                     continue
+
+                # === 新增：计算该 content 的显示状态 ===
+                store_resolve_item = content.get('storeResolveItem', {})
+                resolve_result_id = store_resolve_item.get('resolveResultId', '')
+                content_order_status = '已下单' if resolve_result_id in ordered_resolve_ids else '未下单'
+
+                has_ordered_in_content = any(
+                    sqir.get('sellerStatus') == 'ORDERED'
+                    for sqir in store_quote_item_results
+                )
+
+                if content_order_status == '未下单':
+                    content_display_status = '未下单'
+                elif has_ordered_in_content:
+                    content_display_status = '本店下单'
+                else:
+                    content_display_status = '非本店下单'
+                # === 新增结束 ===
 
                 for item in store_quote_item_results:
                     # 去除OE号中的空格并转为大写
@@ -349,7 +478,13 @@ class QuoteCountSyncService:
                             'remark': item.get('remark', ''),
                             'sellerBtPrice': item.get('sellerBtPrice', ''),
                             'sellerPrice': item.get('sellerPrice', ''),
-                            'sellerStatus': item.get('sellerStatus', '')
+                            'sellerStatus': item.get('sellerStatus', ''),
+                            'orderStatus': content_order_status,
+                            'displaySellerStatus': content_display_status,
+                            'vin': vin or '',
+                            'engine': car_config.get('engine', ''),
+                            'productionDate': car_config.get('production_date', ''),
+                            'chassis': car_config.get('chassis', ''),
                         })
 
             # 如果第一个接口有数据，直接返回（不切换到第二个接口）
@@ -369,10 +504,11 @@ class QuoteCountSyncService:
 
         with db_cursor() as cursor:
             insert_sql = """
-                INSERT INTO crmapp_ks_inquiry_detail 
-                (inquiryId, partsNum, partsName, brandName, brandNormalized, brandId, partType, 
-                 partsBrandQuality, remark, sellerBtPrice, sellerPrice, sellerStatus, company, quote_date, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                INSERT INTO crmapp_ks_inquiry_detail
+                (inquiryId, partsNum, partsName, brandName, brandNormalized, brandId, partType,
+                 partsBrandQuality, remark, sellerBtPrice, sellerPrice, sellerStatus, order_status, display_seller_status,
+                 vin, engine, production_date, chassis, company, quote_date, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     partsName = VALUES(partsName),
                     brandNormalized = VALUES(brandNormalized),
@@ -383,6 +519,12 @@ class QuoteCountSyncService:
                     sellerBtPrice = VALUES(sellerBtPrice),
                     sellerPrice = VALUES(sellerPrice),
                     sellerStatus = VALUES(sellerStatus),
+                    order_status = VALUES(order_status),
+                    display_seller_status = VALUES(display_seller_status),
+                    vin = VALUES(vin),
+                    engine = VALUES(engine),
+                    production_date = VALUES(production_date),
+                    chassis = VALUES(chassis),
                     quote_date = VALUES(quote_date),
                     updated_at = NOW()
             """
@@ -402,6 +544,12 @@ class QuoteCountSyncService:
                     item.get('sellerBtPrice', ''),
                     item.get('sellerPrice', ''),
                     item.get('sellerStatus', ''),
+                    item.get('orderStatus', '未下单'),
+                    item.get('displaySellerStatus', '未下单'),
+                    item.get('vin', ''),
+                    item.get('engine', ''),
+                    item.get('productionDate', ''),
+                    item.get('chassis', ''),
                     item.get('company', self.COMPANY),
                     item.get('quote_date', '')
                 )

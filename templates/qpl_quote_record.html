@@ -208,9 +208,7 @@
             },
             rowHeight: 36,
             headerHeight: 36,
-            pagination: true,
-            paginationPageSize: 200,
-            paginationPageSizeSelector: false,
+            pagination: false,
             animateRows: true,
             getRowStyle: function(params) {
                 const no = params.data && params.data.supplier_enquiry_no;
@@ -278,17 +276,19 @@
                 defaultPageSize: 200,
                 showScrollToTop: true,
                 onPageChange: function(page, pageSize) {
-                    if (gridApi) {
-                        gridApi.paginationGoToPage(page - 1);
-                    }
+                    refreshGrid(page, pageSize);
                 },
                 onPageSizeChange: function(pageSize) {
                     currentPageSize = pageSize;
-                    if (gridApi) {
-                        gridApi.paginationSetPageSize(pageSize);
-                    }
+                    refreshGrid(1, pageSize);
                 }
             });
+
+            // 同步分页组件的初始 pageSize 到全局变量
+            if (customPagination) {
+                currentPageSize = customPagination.currentPageSize;
+                console.log('[initCustomPagination] currentPageSize synced to:', currentPageSize);
+            }
         }
         
         // 初始化 Grid
@@ -319,7 +319,10 @@
                     format: 'yyyy-MM-dd',
                     range: true,
                     max: 0,
-                    value: ''
+                    value: '',
+                    done: function(value, date, endDate) {
+                        refreshGrid();
+                    }
                 });
             });
         });
@@ -360,9 +363,13 @@
         }
         
         // 刷新表格数据
-        function refreshGrid() {
+        function refreshGrid(page = 1, pageSize = currentPageSize) {
+            console.log('[refreshGrid] page:', page, 'pageSize:', pageSize, 'currentPageSize:', currentPageSize);
             const params = getSearchParams();
-            
+            params.page = page;
+            params.limit = pageSize;
+            console.log('[refreshGrid] params:', params);
+
             fetch('/new/api/qpl_quote/records?' + new URLSearchParams(params))
                 .then(response => response.json())
                 .then(data => {
@@ -382,7 +389,7 @@
                         
                         gridApi.setRowData(currentData);
                         if (customPagination) {
-                            customPagination.update(currentData.length, 1, currentPageSize);
+                            customPagination.update(data.data.total, data.data.page, currentPageSize);
                         }
                     }
                 })

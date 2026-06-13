@@ -76,7 +76,7 @@ class KsInquiryRecordsService:
             params.append(brand)
 
         if seller_status:
-            conditions.append("sellerStatus LIKE %s")
+            conditions.append("display_seller_status LIKE %s")
             params.append(f"%{seller_status}%")
 
         if begin_date:
@@ -112,8 +112,12 @@ class KsInquiryRecordsService:
                 brandId,
                 sellerBtPrice,
                 sellerPrice,
-                sellerStatus,
-                remark
+                display_seller_status,
+                remark,
+                vin,
+                engine,
+                production_date,
+                chassis
             FROM crmapp_ks_inquiry_detail
             WHERE {where_clause}
             ORDER BY quote_date DESC, created_at DESC
@@ -142,7 +146,8 @@ class KsInquiryRecordsService:
             # 硬编码列名（确保与 SQL 一致）- 已删除：quote_date, partType, partsBrandQuality, company, created_at, updated_at
             columns = [
                 'inquiryId', 'partsNum', 'partsName', 'brandName', 'brandNormalized',
-                'brandId', 'sellerBtPrice', 'sellerPrice', 'sellerStatus', 'remark'
+                'brandId', 'sellerBtPrice', 'sellerPrice', 'displaySellerStatus', 'remark',
+                'vin', 'engine', 'productionDate', 'chassis'
             ]
             result = []
             for row in rows:
@@ -173,10 +178,10 @@ class KsInquiryRecordsService:
             List[str]: 卖家状态列表
         """
         sql = """
-            SELECT DISTINCT sellerStatus
+            SELECT DISTINCT display_seller_status
             FROM crmapp_ks_inquiry_detail
-            WHERE sellerStatus IS NOT NULL AND sellerStatus != ''
-            ORDER BY sellerStatus
+            WHERE display_seller_status IS NOT NULL AND display_seller_status != ''
+            ORDER BY display_seller_status
         """
 
         with db_cursor() as cursor:

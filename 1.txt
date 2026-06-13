@@ -1,1 +1,306 @@
-{"channel":"S_STATION","demandList":[{"supplierDemandId":59988754258,"enquiryItemList":[{"addItemOe":"","itemDescription":null,"itemOe":"A0009067902","supplierEnquiryItemId":159493015547,"quoteItemList":[{"brandId":82,"brandName":"奔驰","deliveryAging":2,"prepareGoodTimespan":7,"prepareGoodTimespanUnit":"DAY","itemQuality":1,"itemRemark":"","itemSellPrice":3449,"partsNo":"","quoteImageList":[],"supplierQuoteItemId":null,"standardName":"奔驰 发电机 A0009067902","supplierQuoteProductId":"","pid":"FDJ-BENZ-BY-FDJZC|24","pidSrcList":["SUPPLIER_EPC_OE_MATCH"],"checkPriceSrc":null,"transferDay":"","itemPerhapsReplaceOe":"A0009067902","brandType":"FACTORY","qualityType":"LARGE_WAREHOUSE_CHANNEL","qualityTypeDesc":"大库渠道","qualityTypeId":36458,"quoteTaxType":"INCLUSIVE","originTire":null,"packageAmount":null,"packageUnit":"","quoteExtraInfoVo":{"originTire":null},"priceCheckSnapshot":{"strategy":"HIGHEST","limitType":"FORBIDDEN","limitLevel":"LIMIT_HIGH","limitPrice":5799,"snapshotJsonString":"{\"priceFactors\":[{\"factorType\":\"LIMIT_PRICE_A\",\"price\":5799.00,\"calculateProcess\":{\"purchasePrice\":5799.00},\"calculateMethod\":\"price\\u003dLIMIT_PRICE_A\"}],\"calculateMethod\":\"MIN_PURCHASE_PRICE\",\"freeDeliveryFee\":false,\"calculateResult\":5799,\"finalCalculateResult\":5799,\"fourSPrice\":11596.15,\"fourSInPrice\":5798.08,\"districtLevel\":\"A\",\"brandType\":3,\"oeCodes\":[\"A0009067902\"],\"brandName\":\"奔驰\",\"stdName\":\"发电机\"}"},"quoteItemSalesAttribute":{"categoryId":"/2/","attributeList":[],"productionAttribute":""},"quoteStatus":"WAITING_QUOTE","productList":[{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A0009067902","productKey":"FDJ-BENZ-BY-FDJZC|24","imgList":["https://img1.tuhu.org/Images/Products/hYoEHHE_xblX40nkSsFfWA_w800_h800.jpeg"],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|24","supplierProductId":null,"supplierSalesPrice":null},{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A000906790264","productKey":"FDJ-BENZ-BY-FDJZC|172","imgList":["https://img1.tuhu.org/Images/Products/hYoEHHE_xblX40nkSsFfWA_w800_h800.jpeg"],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|172","supplierProductId":null,"supplierSalesPrice":null},{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A000906790280","productKey":"FDJ-BENZ-BY-FDJZC|140","imgList":["https://img1.tuhu.org/Images/Products/hYoEHHE_xblX40nkSsFfWA_w800_h800.jpeg"],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|140","supplierProductId":null,"supplierSalesPrice":null}]},{"brandId":82,"brandName":"奔驰","deliveryAging":2,"prepareGoodTimespan":7,"prepareGoodTimespanUnit":"DAY","itemQuality":1,"itemRemark":"","itemSellPrice":3449,"partsNo":"","quoteImageList":[],"supplierQuoteItemId":null,"standardName":"奔驰 发电机 A000906790264","supplierQuoteProductId":"","pid":"FDJ-BENZ-BY-FDJZC|172","pidSrcList":["SUPPLIER_EPC_REPLACE_OE_MATCH"],"checkPriceSrc":null,"transferDay":"","itemPerhapsReplaceOe":"A000906790264","brandType":"FACTORY","qualityType":"LARGE_WAREHOUSE_CHANNEL","qualityTypeDesc":"大库渠道","qualityTypeId":36458,"quoteTaxType":"INCLUSIVE","originTire":null,"packageAmount":null,"packageUnit":"","quoteExtraInfoVo":{"originTire":null},"priceCheckSnapshot":{"strategy":"HIGHEST","limitType":"FORBIDDEN","limitLevel":"LIMIT_HIGH","limitPrice":5799,"snapshotJsonString":"{\"priceFactors\":[{\"factorType\":\"LIMIT_PRICE_A\",\"price\":5799.00,\"calculateProcess\":{\"purchasePrice\":5799.00},\"calculateMethod\":\"price\\u003dLIMIT_PRICE_A\"}],\"calculateMethod\":\"MIN_PURCHASE_PRICE\",\"freeDeliveryFee\":false,\"calculateResult\":5799,\"finalCalculateResult\":5799,\"fourSPrice\":11596.16,\"fourSInPrice\":5798.08,\"districtLevel\":\"A\",\"brandType\":3,\"oeCodes\":[\"A000906790264\"],\"brandName\":\"奔驰\",\"stdName\":\"发电机\"}"},"quoteItemSalesAttribute":{"categoryId":"/2/","attributeList":[],"productionAttribute":""},"quoteStatus":"WAITING_QUOTE","productList":[{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A0009067902","productKey":"FDJ-BENZ-BY-FDJZC|24","imgList":[],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|24","supplierProductId":null,"supplierSalesPrice":null},{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A000906790264","productKey":"FDJ-BENZ-BY-FDJZC|172","imgList":["https://img1.tuhu.org/Images/Products/hYoEHHE_xblX40nkSsFfWA_w800_h800.jpeg"],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|172","supplierProductId":null,"supplierSalesPrice":null},{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A000906790280","productKey":"FDJ-BENZ-BY-FDJZC|140","imgList":["https://img1.tuhu.org/Images/Products/hYoEHHE_xblX40nkSsFfWA_w800_h800.jpeg"],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|140","supplierProductId":null,"supplierSalesPrice":null}]},{"brandId":82,"brandName":"奔驰","deliveryAging":2,"prepareGoodTimespan":7,"prepareGoodTimespanUnit":"DAY","itemQuality":1,"itemRemark":"","itemSellPrice":3449,"partsNo":"","quoteImageList":[],"supplierQuoteItemId":null,"standardName":"奔驰 发电机 A000906790280","supplierQuoteProductId":"","pid":"FDJ-BENZ-BY-FDJZC|140","pidSrcList":["SUPPLIER_EPC_REPLACE_OE_MATCH"],"checkPriceSrc":null,"transferDay":"","itemPerhapsReplaceOe":"A000906790280","brandType":"FACTORY","qualityType":"LARGE_WAREHOUSE_CHANNEL","qualityTypeDesc":"大库渠道","qualityTypeId":36458,"quoteTaxType":"INCLUSIVE","originTire":null,"packageAmount":null,"packageUnit":"","quoteExtraInfoVo":{"originTire":null},"priceCheckSnapshot":{"strategy":"HIGHEST","limitType":"FORBIDDEN","limitLevel":"LIMIT_HIGH","limitPrice":3576,"snapshotJsonString":"{\"priceFactors\":[{\"factorType\":\"LIMIT_PRICE_A\",\"price\":3576.00,\"calculateProcess\":{\"purchasePrice\":3576.00},\"calculateMethod\":\"price\\u003dLIMIT_PRICE_A\"}],\"calculateMethod\":\"MIN_PURCHASE_PRICE\",\"freeDeliveryFee\":false,\"calculateResult\":3576,\"finalCalculateResult\":3576,\"fourSPrice\":7151.35,\"fourSInPrice\":3575.68,\"districtLevel\":\"A\",\"brandType\":3,\"oeCodes\":[\"A000906790280\"],\"brandName\":\"奔驰\",\"stdName\":\"发电机\"}"},"quoteItemSalesAttribute":{"categoryId":"/2/","attributeList":[],"productionAttribute":""},"quoteStatus":"WAITING_QUOTE","productList":[{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A0009067902","productKey":"FDJ-BENZ-BY-FDJZC|24","imgList":[],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|24","supplierProductId":null,"supplierSalesPrice":null},{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A000906790264","productKey":"FDJ-BENZ-BY-FDJZC|172","imgList":[],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|172","supplierProductId":null,"supplierSalesPrice":null},{"adaptStrategyList":["OE"],"productName":"奔驰 发电机 A000906790280","productKey":"FDJ-BENZ-BY-FDJZC|140","imgList":["https://img1.tuhu.org/Images/Products/hYoEHHE_xblX40nkSsFfWA_w800_h800.jpeg"],"partNoe":"","pid":"FDJ-BENZ-BY-FDJZC|140","supplierProductId":null,"supplierSalesPrice":null}]}],"itemName":"发电机","closeReason":"","closeRemarks":"","quoteStatus":"WAITING_QUOTE"}]}],"supplierEnquiryNo":"SIQR13244775809","pickUpWay":1,"pickUpWayStr":"代发到店","deliveryAddress":"广东省 佛山市"}
+{
+    "code": 200,
+    "errorMessage": null,
+    "data": [
+        {
+            "name": "品牌",
+            "value": "宝马"
+        },
+        {
+            "name": "车型",
+            "value": "X5 35iX"
+        },
+        {
+            "name": "底盘号",
+            "value": "WBAKR0106J0Z56434"
+        },
+        {
+            "name": "车型名称",
+            "value": "X5"
+        },
+        {
+            "name": "颜色",
+            "value": "B53"
+        },
+        {
+            "name": "车内装饰",
+            "value": "LCMY"
+        },
+        {
+            "name": "驱动器",
+            "value": "AUT"
+        },
+        {
+            "name": "类型编码",
+            "value": "KR01"
+        },
+        {
+            "name": "车型系列",
+            "value": "X5"
+        },
+        {
+            "name": "车身",
+            "value": " SAV"
+        },
+        {
+            "name": "转向",
+            "value": ""
+        },
+        {
+            "name": "门",
+            "value": ""
+        },
+        {
+            "name": "发动机",
+            "value": "N55 "
+        },
+        {
+            "name": "排出量",
+            "value": " 3.0"
+        },
+        {
+            "name": "功率",
+            "value": ""
+        },
+        {
+            "name": "驾驶位置",
+            "value": ""
+        },
+        {
+            "name": "车辆生产日期",
+            "value": "20180400"
+        },
+        {
+            "name": "底盘",
+            "value": "F15"
+        },
+        {
+            "name": "S502A",
+            "value": "大灯清洗装置"
+        },
+        {
+            "name": "S522A",
+            "value": "氙气灯"
+        },
+        {
+            "name": "S255A",
+            "value": "跑车皮革方向盘 安全气囊"
+        },
+        {
+            "name": "S508A",
+            "value": "泊车距离报警系统 (PDC)"
+        },
+        {
+            "name": "S866A",
+            "value": "语言版本 简体中文"
+        },
+        {
+            "name": "S6APA",
+            "value": ""
+        },
+        {
+            "name": "MY",
+            "value": "mokka"
+        },
+        {
+            "name": "S2PAA",
+            "value": "车轮螺栓防松件"
+        },
+        {
+            "name": "S212A",
+            "value": "装备 制动系统 国家"
+        },
+        {
+            "name": "S1A1A",
+            "value": "Ausst. Kraftstoffe mit Verkokungsneigung"
+        },
+        {
+            "name": "S346A",
+            "value": "镀铬条 外部"
+        },
+        {
+            "name": "LC",
+            "value": "皮革 \"Dakota\""
+        },
+        {
+            "name": "S258A",
+            "value": "轮胎 带紧急运行特性"
+        },
+        {
+            "name": "S3E1A",
+            "value": "Exterieur-Design Pure Excellence"
+        },
+        {
+            "name": "S430A",
+            "value": "内后视镜和外后视镜，带自动防眩目装置"
+        },
+        {
+            "name": "S8KMA",
+            "value": ""
+        },
+        {
+            "name": "S402A",
+            "value": "频谱车顶 电气"
+        },
+        {
+            "name": "S6WBA",
+            "value": "多功能仪表盘显示屏"
+        },
+        {
+            "name": "S2WQA",
+            "value": "BMW 轻金属轮辋 W 辐条式样 447"
+        },
+        {
+            "name": "S441A",
+            "value": "吸烟套件"
+        },
+        {
+            "name": "S8SMA",
+            "value": "底盘号码可从外部看到"
+        },
+        {
+            "name": "S8TNA",
+            "value": "白天行车灯可通过车灯菜单设置"
+        },
+        {
+            "name": "S548A",
+            "value": "公里车速表"
+        },
+        {
+            "name": "S459A",
+            "value": "座椅调节装置 电动 带记忆功能"
+        },
+        {
+            "name": "S825A",
+            "value": "收音机 Ozeanien"
+        },
+        {
+            "name": "S428A",
+            "value": "警告用三角标志和急救包"
+        },
+        {
+            "name": "S6ANA",
+            "value": ""
+        },
+        {
+            "name": "S6ACA",
+            "value": "智能紧急呼叫"
+        },
+        {
+            "name": "S328A",
+            "value": "铝制踏板"
+        },
+        {
+            "name": "S5ALA",
+            "value": "主动保护系统"
+        },
+        {
+            "name": "S1CAA",
+            "value": ""
+        },
+        {
+            "name": "S6AKA",
+            "value": "Connected Drive Services"
+        },
+        {
+            "name": "S161A",
+            "value": "废气排放标准 EU5"
+        },
+        {
+            "name": "S609A",
+            "value": "导航系统 Professional"
+        },
+        {
+            "name": "S892A",
+            "value": "车载文件 简体中文"
+        },
+        {
+            "name": "S302A",
+            "value": "报警装置"
+        },
+        {
+            "name": "LCMY",
+            "value": "皮革 Dakota / Mokka"
+        },
+        {
+            "name": "WB53",
+            "value": "sparkling-brown metallic"
+        },
+        {
+            "name": "L8AAA",
+            "value": "国家规格 中国"
+        },
+        {
+            "name": "S925A",
+            "value": ""
+        },
+        {
+            "name": "P7S9A",
+            "value": ""
+        },
+        {
+            "name": "S6AMA",
+            "value": ""
+        },
+        {
+            "name": "S1AKA",
+            "value": "外侧 燃油滤清器"
+        },
+        {
+            "name": "S4ACA",
+            "value": "上等木材规格 杨木 条纹"
+        },
+        {
+            "name": "S534A",
+            "value": "自动空调"
+        },
+        {
+            "name": "S993A",
+            "value": ""
+        },
+        {
+            "name": "S230A",
+            "value": "附加范围 欧规专用"
+        },
+        {
+            "name": "S3AGA",
+            "value": "倒车摄像机"
+        },
+        {
+            "name": "S4NEA",
+            "value": "Blow-By 加热器"
+        },
+        {
+            "name": "S3ATA",
+            "value": "车顶行李架 铝 上光"
+        },
+        {
+            "name": "S6AEA",
+            "value": "Teleservices"
+        },
+        {
+            "name": "S9AAA",
+            "value": "车身外壳保护"
+        },
+        {
+            "name": "S563A",
+            "value": "灯光套件"
+        },
+        {
+            "name": "S676A",
+            "value": "高保真扬声器系统"
+        },
+        {
+            "name": "S845A",
+            "value": "安全带声音提示"
+        },
+        {
+            "name": "S423A",
+            "value": "脚垫 丝绒"
+        },
+        {
+            "name": "S494A",
+            "value": "座椅加热装置 驾驶员/前座乘客"
+        }
+    ]
+}
