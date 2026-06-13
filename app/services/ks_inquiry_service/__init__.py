@@ -4,5 +4,6 @@
 """
 
 from .ks_inquiry_records_service import KsInquiryRecordsService
+from .ks_unquoted_products_service import KsUnquotedProductsService
 
-__all__ = ['KsInquiryRecordsService']
+__all__ = ['KsInquiryRecordsService', 'KsUnquotedProductsService']

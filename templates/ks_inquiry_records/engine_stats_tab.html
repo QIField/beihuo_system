@@ -1,0 +1,125 @@
+<!-- 发动机及底盘维度 -->
+<div id="tab-engine" class="tab-pane">
+    <div class="table-container">
+        <div id="engineChassisGrid" class="ag-theme-alpine"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    let engineChassisGridApi = null;
+    let engineChassisGridOptions = null;
+
+    const engineChassisColumnDefs = [
+        { field: 'engine', headerName: '发动机', width: 200, sortable: true, filter: true, pinned: 'left' },
+        { field: 'chassis', headerName: '底盘', width: 200, sortable: true, filter: true, pinned: 'left' },
+        { field: 'vin', headerName: 'VIN', width: 200, sortable: true, filter: true },
+        { field: 'vehicleProductionDate', headerName: '车辆生产日期', width: 180, sortable: true, filter: true }
+    ];
+
+    engineChassisGridOptions = {
+        columnDefs: engineChassisColumnDefs,
+        rowData: [],
+        defaultColDef: { resizable: true },
+        suppressHorizontalScroll: false,
+        pagination: false,
+        rowSelection: 'single',
+        suppressRowClickSelection: true,
+        onGridReady: function(params) {
+            engineChassisGridApi = params.api;
+            params.api.sizeColumnsToFit();
+            refreshEngineChassisGrid();
+        }
+    };
+
+    function getEngineChassisSearchParams() {
+        let beginDate = '', endDate = '';
+        const dateRangeValue = document.getElementById('dateRange').value;
+        if (dateRangeValue) {
+            const dates = dateRangeValue.split(' - ');
+            beginDate = dates[0] || '';
+            endDate = dates[1] || '';
+        }
+
+        return {
+            begin_date: beginDate,
+            end_date: endDate,
+            company: userCompany,
+            engine: document.getElementById('searchEngine').value || '',
+            chassis: document.getElementById('searchChassis').value || '',
+            vin: document.getElementById('searchVin').value || ''
+        };
+    }
+
+    function refreshEngineChassisGrid() {
+        if (!engineChassisGridApi) return;
+
+        engineChassisGridApi.showLoadingOverlay();
+
+        const params = getEngineChassisSearchParams();
+
+        fetch('/new/api/ks_inquiry/records/engine_chassis?' + new URLSearchParams(params))
+            .then(response => response.json())
+            .then(result => {
+                if (result.code === 0 || result.code === '0') {
+                    const list = result.data.list || [];
+                    console.log('发动机及底盘维度第一条数据:', list[0] || null);
+                    engineChassisGridApi.setRowData(list);
+                } else {
+                    console.error('发动机底盘查询失败:', result.message);
+                    layui.layer.msg('查询失败: ' + result.message, {icon: 2});
+                }
+            })
+            .catch(error => {
+                console.error('发动机底盘查询错误:', error);
+                layui.layer.msg('查询失败，请稍后重试', {icon: 2});
+            })
+            .finally(() => {
+                engineChassisGridApi.hideOverlay();
+            });
+    }
+
+    window.refreshEngineChassis = refreshEngineChassisGrid;
+
+    window.initEngineChassisGrid = function() {
+        if (engineChassisGridApi) {
+            setTimeout(function() {
+                engineChassisGridApi.sizeColumnsToFit();
+            }, 0);
+            refreshEngineChassisGrid();
+            return;
+        }
+
+        const gridDiv = document.querySelector('#engineChassisGrid');
+        if (!gridDiv) return;
+
+        new agGrid.Grid(gridDiv, engineChassisGridOptions);
+
+        gridDiv.addEventListener('dblclick', function(e) {
+            const cellElement = e.target.closest('.ag-cell');
+            if (!cellElement) return;
+
+            const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
+            const colId = cellElement.getAttribute('col-id');
+
+            if (rowId && colId && engineChassisGridApi) {
+                const rowNode = engineChassisGridApi.getRowNode(rowId);
+                if (rowNode && rowNode.data) {
+                    const value = rowNode.data[colId];
+                    if (value !== undefined && value !== null) {
+                        const textToCopy = String(value);
+                        navigator.clipboard.writeText(textToCopy).then(() => {
+                            layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+                        }).catch(err => {
+                            console.error('复制失败:', err);
+                            layui.layer.msg('复制失败', {icon: 2});
+                        });
+                    }
+                }
+            }
+        });
+
+        refreshEngineChassisGrid();
+    };
+})();
+</script>

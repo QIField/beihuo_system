@@ -352,6 +352,7 @@ def init_date_search_table():
                 全国近1个月询价量 INT DEFAULT 0 COMMENT '全国近1个月询价量',
                 全国近3个月月均询价量 INT DEFAULT 0 COMMENT '全国近3个月月均询价量',
                 内部备注 TEXT COMMENT '内部备注',
+                waiting_time VARCHAR(50) COMMENT '待仓时间',
                 预警状态 VARCHAR(255) COMMENT '预警状态',
                 销量 INT DEFAULT 0 COMMENT '销量',
                 查询时间 TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '查询时间',
@@ -377,6 +378,10 @@ def init_date_search_table():
         {
             'name': '近12个月销量',
             'definition': "INT DEFAULT 0 COMMENT '近12个月销量'"
+        },
+        {
+            'name': 'waiting_time',
+            'definition': "VARCHAR(50) COMMENT '待仓时间'"
         }
     ]
     check_and_add_fields('crmapp_date_search', date_search_fields_to_check)

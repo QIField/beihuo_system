@@ -113,6 +113,140 @@ def get_seller_status_options():
         }), 500
 
 
+@bp.route('/records/oe_stats', methods=['GET'])
+def get_oe_stats():
+    """
+    获取OE号统计维度（按partsNum分组聚合）
+
+    Query Parameters:
+        与 /records 接口一致
+
+    Returns:
+        JSON: {code: 0, data: {list: [{partsNum, count, partsName}], total, page, page_size}, message}
+    """
+    try:
+        inquiry_id = request.args.get('inquiry_id', '').strip()
+        parts_num = request.args.get('parts_num', '').strip()
+        parts_name = request.args.get('parts_name', '').strip()
+        brand_name = request.args.get('brand_name', '').strip()
+        brand = request.args.get('brand', '').strip()
+        seller_status = request.args.get('seller_status', '').strip()
+        begin_date = request.args.get('begin_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        company = request.args.get('company', '').strip()
+
+        try:
+            page = int(request.args.get('page', 1))
+            page_size = int(request.args.get('page_size', 200))
+        except ValueError:
+            page = 1
+            page_size = 200
+
+        if page_size > 1000:
+            page_size = 1000
+        if page_size < 1:
+            page_size = 200
+        if page < 1:
+            page = 1
+
+        result = KsInquiryRecordsService.get_oe_stats(
+            inquiry_id=inquiry_id,
+            parts_num=parts_num,
+            parts_name=parts_name,
+            brand_name=brand_name,
+            brand=brand,
+            seller_status=seller_status,
+            begin_date=begin_date,
+            end_date=end_date,
+            company=company,
+            page=page,
+            page_size=page_size
+        )
+
+        return jsonify({
+            'code': 0,
+            'message': 'success',
+            'data': result
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"[KsInquiryRecordsAPI] OE统计错误: {str(e)}")
+        print(f"[KsInquiryRecordsAPI] 堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'code': 500,
+            'message': f'查询失败: {str(e)}',
+            'data': {'list': [], 'total': 0, 'page': 1, 'page_size': 200}
+        }), 500
+
+
+@bp.route('/records/engine_chassis', methods=['GET'])
+def get_engine_chassis():
+    """
+    获取发动机及底盘维度列表（按engine+chassis组合展示，不去重）
+
+    Query Parameters:
+        engine: 发动机型号
+        chassis: 底盘型号
+        vin: VIN码
+        begin_date: 开始日期 (yyyy-MM-dd)
+        end_date: 结束日期 (yyyy-MM-dd)
+        page: 页码（默认1）
+        page_size: 每页条数（默认200）
+
+    Returns:
+        JSON: {code: 0, data: {list: [{engine, chassis, vin, vehicleProductionDate}], total, page, page_size}, message}
+    """
+    try:
+        engine = request.args.get('engine', '').strip()
+        chassis = request.args.get('chassis', '').strip()
+        vin = request.args.get('vin', '').strip()
+        begin_date = request.args.get('begin_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        company = request.args.get('company', '').strip()
+
+        try:
+            page = int(request.args.get('page', 1))
+            page_size = int(request.args.get('page_size', 200))
+        except ValueError:
+            page = 1
+            page_size = 200
+
+        if page_size > 1000:
+            page_size = 1000
+        if page_size < 1:
+            page_size = 200
+        if page < 1:
+            page = 1
+
+        result = KsInquiryRecordsService.get_engine_chassis_list(
+            engine=engine,
+            chassis=chassis,
+            vin=vin,
+            begin_date=begin_date,
+            end_date=end_date,
+            company=company,
+            page=page,
+            page_size=page_size
+        )
+
+        return jsonify({
+            'code': 0,
+            'message': 'success',
+            'data': result
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"[KsInquiryRecordsAPI] 发动机底盘错误: {str(e)}")
+        print(f"[KsInquiryRecordsAPI] 堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'code': 500,
+            'message': f'查询失败: {str(e)}',
+            'data': {'list': [], 'total': 0, 'page': 1, 'page_size': 200}
+        }), 500
+
+
 @bp.route('/brands', methods=['GET'])
 def get_brand_options():
     """

@@ -76,7 +76,7 @@ class KsInquiryRecordsService:
             params.append(brand)
 
         if seller_status:
-            conditions.append("sellerStatus LIKE %s")
+            conditions.append("display_seller_status LIKE %s")
             params.append(f"%{seller_status}%")
 
         if begin_date:
@@ -112,8 +112,12 @@ class KsInquiryRecordsService:
                 brandId,
                 sellerBtPrice,
                 sellerPrice,
-                sellerStatus,
-                remark
+                display_seller_status,
+                remark,
+                vin,
+                engine,
+                production_date,
+                chassis
             FROM crmapp_ks_inquiry_detail
             WHERE {where_clause}
             ORDER BY quote_date DESC, created_at DESC
@@ -142,7 +146,8 @@ class KsInquiryRecordsService:
             # 硬编码列名（确保与 SQL 一致）- 已删除：quote_date, partType, partsBrandQuality, company, created_at, updated_at
             columns = [
                 'inquiryId', 'partsNum', 'partsName', 'brandName', 'brandNormalized',
-                'brandId', 'sellerBtPrice', 'sellerPrice', 'sellerStatus', 'remark'
+                'brandId', 'sellerBtPrice', 'sellerPrice', 'displaySellerStatus', 'remark',
+                'vin', 'engine', 'productionDate', 'chassis'
             ]
             result = []
             for row in rows:
@@ -165,6 +170,234 @@ class KsInquiryRecordsService:
             }
 
     @staticmethod
+    def get_oe_stats(
+        inquiry_id: str = '',
+        parts_num: str = '',
+        parts_name: str = '',
+        brand_name: str = '',
+        brand: str = '',
+        seller_status: str = '',
+        begin_date: str = '',
+        end_date: str = '',
+        company: str = '',
+        page: int = 1,
+        page_size: int = 200
+    ) -> Dict[str, Any]:
+        """
+        获取OE号统计维度（按partsNum分组聚合）
+
+        Returns:
+            Dict: {list: 数据列表, total: 总条数, page: 当前页, page_size: 每页条数}
+        """
+        start_time = time.time()
+
+        conditions = []
+        params = []
+
+        # 构建查询条件（与get_records一致）
+        if inquiry_id:
+            conditions.append("inquiryId LIKE %s")
+            params.append(f"%{inquiry_id}%")
+
+        if parts_num:
+            conditions.append("partsNum LIKE %s")
+            params.append(f"%{parts_num}%")
+
+        if parts_name:
+            conditions.append("partsName LIKE %s")
+            params.append(f"%{parts_name}%")
+
+        if brand_name:
+            conditions.append("brandName LIKE %s")
+            params.append(f"%{brand_name}%")
+
+        if brand:
+            conditions.append("brandNormalized = %s")
+            params.append(brand)
+
+        if seller_status:
+            conditions.append("display_seller_status LIKE %s")
+            params.append(f"%{seller_status}%")
+
+        if begin_date:
+            conditions.append("quote_date >= %s")
+            params.append(begin_date)
+
+        if end_date:
+            conditions.append("quote_date <= %s")
+            params.append(end_date)
+
+        if company:
+            conditions.append("company = %s")
+            params.append(company)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        # 查询不同OE号的总数量
+        count_sql = f"""
+            SELECT COUNT(*) FROM (
+                SELECT partsNum FROM crmapp_ks_inquiry_detail
+                WHERE {where_clause}
+                GROUP BY partsNum
+            ) t
+        """
+
+        # 查询分组聚合数据
+        data_sql = f"""
+            SELECT
+                partsNum,
+                COUNT(*) as count,
+                MAX(partsName) as partsName,
+                MAX(unquoted_products) as unquotedProducts
+            FROM crmapp_ks_inquiry_detail
+            WHERE {where_clause}
+            GROUP BY partsNum
+            ORDER BY count DESC
+            LIMIT %s OFFSET %s
+        """
+
+        # 查询总条数
+        count_result = db_query_one(count_sql, tuple(params), dict_cursor=False)
+        if count_result is None:
+            total = 0
+        elif isinstance(count_result, dict):
+            total = count_result.get('COUNT(*)', 0) or count_result.get('count', 0)
+        else:
+            total = count_result[0] if count_result else 0
+
+        # 查询分页数据
+        offset = (page - 1) * page_size
+        data_params = params.copy()
+        data_params.append(page_size)
+        data_params.append(offset)
+
+        with db_cursor() as cursor:
+            cursor.execute(data_sql, data_params)
+            rows = cursor.fetchall()
+
+            columns = ['partsNum', 'count', 'partsName']
+            result = []
+            for row in rows:
+                if isinstance(row, dict):
+                    record = row
+                else:
+                    record = dict(zip(columns, row))
+                result.append(record)
+
+            end_time = time.time()
+            elapsed_time = (end_time - start_time) * 1000
+            print(f"[KsInquiryRecordsService] OE统计查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
+
+            return {
+                'list': result,
+                'total': total,
+                'page': page,
+                'page_size': page_size
+            }
+
+    @staticmethod
+    def get_engine_chassis_list(
+        engine: str = '',
+        chassis: str = '',
+        vin: str = '',
+        begin_date: str = '',
+        end_date: str = '',
+        company: str = '',
+        page: int = 1,
+        page_size: int = 200
+    ) -> Dict[str, Any]:
+        """
+        获取发动机及底盘维度列表（按engine+chassis组合展示，不去重）
+
+        Returns:
+            Dict: {list: 数据列表, total: 总条数, page: 当前页, page_size: 每页条数}
+        """
+        start_time = time.time()
+
+        conditions = []
+        params = []
+
+        if engine:
+            conditions.append("engine LIKE %s")
+            params.append(f"%{engine}%")
+
+        if chassis:
+            conditions.append("chassis LIKE %s")
+            params.append(f"%{chassis}%")
+
+        if vin:
+            conditions.append("vin LIKE %s")
+            params.append(f"%{vin}%")
+
+        if begin_date:
+            conditions.append("quote_date >= %s")
+            params.append(begin_date)
+
+        if end_date:
+            conditions.append("quote_date <= %s")
+            params.append(end_date)
+
+        if company:
+            conditions.append("company = %s")
+            params.append(company)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        count_sql = f"""
+            SELECT COUNT(*) FROM crmapp_ks_inquiry_detail
+            WHERE {where_clause}
+        """
+
+        data_sql = f"""
+            SELECT
+                engine,
+                chassis,
+                vin,
+                production_date AS vehicleProductionDate
+            FROM crmapp_ks_inquiry_detail
+            WHERE {where_clause}
+            ORDER BY engine, chassis, vin
+            LIMIT %s OFFSET %s
+        """
+
+        count_result = db_query_one(count_sql, tuple(params), dict_cursor=False)
+        if count_result is None:
+            total = 0
+        elif isinstance(count_result, dict):
+            total = count_result.get('COUNT(*)', 0) or count_result.get('count', 0)
+        else:
+            total = count_result[0] if count_result else 0
+
+        offset = (page - 1) * page_size
+        data_params = params.copy()
+        data_params.append(page_size)
+        data_params.append(offset)
+
+        with db_cursor() as cursor:
+            cursor.execute(data_sql, data_params)
+            rows = cursor.fetchall()
+
+            columns = ['engine', 'chassis', 'vin', 'vehicleProductionDate']
+            result = []
+            for row in rows:
+                if isinstance(row, dict):
+                    record = row
+                else:
+                    record = dict(zip(columns, row))
+                result.append(record)
+
+            end_time = time.time()
+            elapsed_time = (end_time - start_time) * 1000
+            print(f"[KsInquiryRecordsService] 发动机底盘查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
+
+            return {
+                'list': result,
+                'total': total,
+                'page': page,
+                'page_size': page_size
+            }
+
+    @staticmethod
     def get_distinct_seller_status() -> List[str]:
         """
         获取所有不重复的卖家状态列表（用于筛选下拉）
@@ -173,10 +406,10 @@ class KsInquiryRecordsService:
             List[str]: 卖家状态列表
         """
         sql = """
-            SELECT DISTINCT sellerStatus
+            SELECT DISTINCT display_seller_status
             FROM crmapp_ks_inquiry_detail
-            WHERE sellerStatus IS NOT NULL AND sellerStatus != ''
-            ORDER BY sellerStatus
+            WHERE display_seller_status IS NOT NULL AND display_seller_status != ''
+            ORDER BY display_seller_status
         """
 
         with db_cursor() as cursor:

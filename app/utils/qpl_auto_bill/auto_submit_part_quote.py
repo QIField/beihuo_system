@@ -107,9 +107,117 @@ def query_mercedes_service_all(oe_list):
     return oe_price_map
 
 
+def _validate_adapt_list(enquiry_item_id, enquiry_no, company):
+    """
+    步骤1-2：适配列表校验
+
+    Returns:
+        tuple: (data, error)
+            - data: {'brand': factory_brand, 'products': factory_product_list} 或 None
+            - error: 错误信息字符串 或 None
+    """
+    adapt_result = get_adapt_product_brand(enquiry_item_id, enquiry_no, company)
+    brand_list = adapt_result.get('data', {}).get('brandList', [])
+
+    factory_brand = next((b for b in brand_list if b.get('brandTypeDesc') == '原厂'), None)
+    if not factory_brand:
+        return None, "适配列表为空，无原厂奔驰产品"
+
+    factory_product_list = factory_brand.get('productList', [])
+    if not factory_product_list:
+        return None, "适配列表为空，无原厂奔驰产品"
+
+    return {'brand': factory_brand, 'products': factory_product_list}, None
+
+
+def _get_best_price_info(product, oe_price_map):
+    """
+    为单个产品获取最优价格信息（含库存检查）
+
+    Args:
+        product: 产品信息
+        oe_price_map: OE价格映射
+
+    Returns:
+        dict: 包含价格、库存等信息，无可用价格或库存时返回None
+    """
+    product_oes = product.get('productOeList', [])
+    product_pid = product.get('pid', '')
+
+    best = None
+    for oe in product_oes:
+        if oe in oe_price_map:
+            price = oe_price_map[oe]['wholesale_price']
+            if best is None or price < best['price']:
+                best = {
+                    'price': price,
+                    'stock': oe_price_map[oe]['stock_info'],
+                    'oe': oe
+                }
+
+    if not best:
+        return None
+
+    # 检查库存
+    selected_warehouse, _ = select_warehouse_and_days(best['stock'])
+    if not selected_warehouse:
+        return None
+
+    return {
+        'pid': product_pid,
+        'sell_price': round(best['price'] * 1.09),
+        'stock_info': best['stock'],
+        'oe': best['oe']
+    }
+
+
+def _run_price_check(product, product_info, tid, car_brand, enquiry_no, enquiry_item_id, company):
+    """
+    对单个产品执行priceCheck
+
+    Returns:
+        tuple: (snapshot, error)
+            - snapshot: priceCheck成功时的快照数据
+            - error: 错误信息字符串，成功时为None
+    """
+    req_item = {
+        "translationOE": product.get('itemPerhapsReplaceOe', ''),
+        "chainType": None,
+        "chainId": None,
+        "pid": product_info['pid'],
+        "price": product_info['sell_price'],
+        "quality": product.get('quality', 1),
+        "productNum": 1,
+        "brandName": product.get('brandName', ''),
+        "queryProductBrandId": product.get('brandId', ''),
+        "uid": None,
+        "supplierEnquiryItemId": enquiry_item_id,
+        "regionalDistributionType": None,
+        "productName": product.get('displaceProductName', ''),
+        "qualityTypeId": product.get('qualityTypeId', ''),
+        "brandOwnerId": "",
+        "quoteTaxType": "INCLUSIVE"
+    }
+
+    result = price_check([req_item], tid, car_brand, enquiry_no, company)
+
+    if not result or result.get('code') != 10000:
+        return None, result.get('message', '无响应') if result else '无响应'
+
+    check_data = result.get('data', [])
+    if not check_data:
+        return None, '无校验结果'
+
+    check_item = check_data[0]
+    if check_item.get('checkResult') != 'SUCCESS' or check_item.get('checkMessage'):
+        return None, check_item.get('checkMessage', 'FAIL')
+
+    return check_item.get('priceCheckSnapshot'), None
+
+
 def process_mercedes_order(detail_data, company='fsbbr'):
     """
-    处理奔驰车订单
+    处理奔驰车订单（管道式重构）
 
     Args:
         detail_data: 询价单详情数据
@@ -117,9 +225,6 @@ def process_mercedes_order(detail_data, company='fsbbr'):
 
     Returns:
         tuple: (mercedes_quote_items, summary_list, failed_items)
-            - mercedes_quote_items: {enquiry_item_id: [quote_item, ...]}
-            - summary_list: [{item_oe, item_name, price, days, product_count}, ...]
-            - failed_items: {enquiry_item_id: "失败原因字符串"}
     """
     if not MERCEDES_SERVICE_AVAILABLE:
         return {}, [], {}
@@ -133,199 +238,113 @@ def process_mercedes_order(detail_data, company='fsbbr'):
 
     for demand in detail_data.get('supplierEnquiryDemandList', []):
         for item in demand.get('supplierEnquiryItemList', []):
-            if item.get('quoteStatus') == 'WAITING_QUOTE':
-                item_oe = item.get('itemOe')
-                item_name = item.get('itemName')
-                enquiry_item_id = item.get('enquiryItemId')
-                # 从 saleCategoryPathId 提取第一个路径段作为 categoryId: "/4/21/332/3612/" -> "/4/"
-                sale_category_path = item.get('saleCategoryPathId', '/5/')
-                path_parts = sale_category_path.split('/')
-                category_id = f"/{path_parts[1]}/" if len(path_parts) >= 2 and path_parts[1] else "/5/"
+            if item.get('quoteStatus') != 'WAITING_QUOTE':
+                continue
 
-                # 调用适配列表接口
-                try:
-                    adapt_result = get_adapt_product_brand(enquiry_item_id, enquiry_no, company)
-                    brand_list = adapt_result.get('data', {}).get('brandList', [])
+            item_oe = item.get('itemOe')
+            item_name = item.get('itemName')
+            enquiry_item_id = item.get('enquiryItemId')
 
-                    # 找到原厂品牌和对应的所有产品
-                    factory_brand = None
-                    factory_product_list = []
-                    product_oe_list = []
+            # 提取 category_id
+            sale_category_path = item.get('saleCategoryPathId', '/5/')
+            path_parts = sale_category_path.split('/')
+            category_id = f"/{path_parts[1]}/" if len(path_parts) >= 2 and path_parts[1] else "/5/"
 
-                    for brand in brand_list:
-                        brand_type_desc = brand.get('brandTypeDesc', '')
-                        if brand_type_desc == '原厂':
-                            factory_brand = brand
-                            factory_product_list = brand.get('productList', [])
-                            for product in factory_product_list:
-                                product_oe_list.extend(product.get('productOeList', []))
-                            break
+            try:
+                # ========== 步骤1-2：适配列表校验 ==========
+                adapt_data, error = _validate_adapt_list(enquiry_item_id, enquiry_no, company)
+                if error:
+                    failed_items[enquiry_item_id] = error
+                    continue
 
-                    if not factory_brand or not factory_product_list:
-                        reason = "适配列表为空，无原厂奔驰产品"
-                        print(f"[汽配龙自动报价][跳过] {enquiry_no} - {item_oe}: {reason}")
-                        failed_items[enquiry_item_id] = reason
-                        continue
+                factory_brand = adapt_data['brand']
+                factory_product_list = adapt_data['products']
 
-                    product_oe_list = list(set(product_oe_list))
-                    if not product_oe_list:
-                        continue
+                # ========== 步骤3：查询价格 ==========
+                product_oe_list = list(set(
+                    oe for p in factory_product_list for oe in p.get('productOeList', [])
+                ))
+                if not product_oe_list:
+                    failed_items[enquiry_item_id] = "适配列表为空，无原厂奔驰产品"
+                    continue
 
-                    # 查询所有OE的价格和库存
-                    oe_price_map = query_mercedes_service_all(product_oe_list)
-                    if not oe_price_map:
-                        reason = "零件信息请求失败"
-                        print(f"[汽配龙自动报价][跳过] {enquiry_no} - {item_oe}: {reason}")
-                        failed_items[enquiry_item_id] = reason
-                        continue
+                oe_price_map = query_mercedes_service_all(product_oe_list)
+                if not oe_price_map:
+                    failed_items[enquiry_item_id] = "零件信息请求失败"
+                    continue
 
-                    # 为每个产品选择最优价格（该产品的所有OE中价格最低的）
-                    print(f"  产品最优价格选择:")
-                    product_price_map = {}  # {pid: {'price': xxx, 'stock_info': [...]}}
-                    for product in factory_product_list:
-                        product_oes = product.get('productOeList', [])
-                        product_pid = product.get('pid', '')
+                # ========== 步骤4：筛选有价格+库存的产品 ==========
+                print(f"  产品最优价格选择:")
+                valid_products = []
+                for product in factory_product_list:
+                    info = _get_best_price_info(product, oe_price_map)
+                    if info:
+                        valid_products.append({'product': product, 'info': info})
                         brand_name = product.get('brandName', factory_brand.get('brandName', ''))
                         product_oe = product.get('itemPerhapsReplaceOe', '未知OE')
-                        
-                        best_price = None
-                        best_stock = None
-                        best_oe = None
-                        
-                        for oe in product_oes:
-                            if oe in oe_price_map:
-                                price = oe_price_map[oe]['wholesale_price']
-                                if best_price is None or price < best_price:
-                                    best_price = price
-                                    best_stock = oe_price_map[oe]['stock_info']
-                                    best_oe = oe
-                        
-                        if best_price is not None:
-                            item_sell_price = round(best_price * 1.09)
-                            product_price_map[product_pid] = {
-                                'price': item_sell_price,
-                                'stock_info': best_stock,
-                                'oe': best_oe
-                            }
-                            print(f"    {brand_name} {product_oe}: 使用OE {best_oe} 的价格 ¥{item_sell_price}")
-                        else:
-                            print(f"    {brand_name} {product_oe}: 无可用价格")
+                        print(f"    {brand_name} {product_oe}: 使用OE {info['oe']} 价格¥{info['sell_price']}")
 
-                    if not product_price_map:
-                        reason = "库存为0"
-                        print(f"[汽配龙自动报价][跳过] {enquiry_no} - {item_oe}: {reason}")
-                        failed_items[enquiry_item_id] = reason
-                        continue
-
-                    # ========== 为每个产品单独进行 priceCheck 校验 ==========
-                    print(f"  priceCheck:")
-                    price_check_map = {}
-                    price_check_errors = []
-                    
-                    for product in factory_product_list:
-                        product_pid = product.get('pid', '')
-                        if product_pid not in product_price_map:
-                            continue
-                        
-                        product_info = product_price_map[product_pid]
-                        item_sell_price = product_info['price']
-                        
-                        req_item = {
-                            "translationOE": product.get('itemPerhapsReplaceOe', ''),
-                            "chainType": None,
-                            "chainId": None,
-                            "pid": product_pid,
-                            "price": item_sell_price,
-                            "quality": product.get('quality', 1),
-                            "productNum": 1,
-                            "brandName": product.get('brandName', factory_brand.get('brandName', '')),
-                            "queryProductBrandId": factory_brand.get('brandId', ''),
-                            "uid": None,
-                            "supplierEnquiryItemId": enquiry_item_id,
-                            "regionalDistributionType": None,
-                            "productName": product.get('displaceProductName', ''),
-                            "qualityTypeId": product.get('qualityTypeId', ''),
-                            "brandOwnerId": "",
-                            "quoteTaxType": "INCLUSIVE"
-                        }
-                        
-                        # 单个产品进行 priceCheck
-                        price_check_result = price_check(
-                            [req_item], tid, car_brand, enquiry_no, company
-                        )
-                        
-                        brand_name = product.get('brandName', '未知品牌')
-                        product_oe = product.get('itemPerhapsReplaceOe', '未知OE')
-                        
-                        if price_check_result and price_check_result.get('code') == 10000:
-                            check_data = price_check_result.get('data', [])
-                            if check_data:
-                                check_item = check_data[0]
-                                check_result_status = check_item.get('checkResult', '')
-                                check_message = check_item.get('checkMessage')
-                                snapshot = check_item.get('priceCheckSnapshot')
-                                
-                                if check_result_status == 'SUCCESS' and not check_message:
-                                    price_check_map[product_pid] = snapshot
-                                    print(f"    ✓ {brand_name} {product_oe} ¥{item_sell_price}")
-                                else:
-                                    msg = check_message or 'FAIL'
-                                    print(f"    ✗ {brand_name} {product_oe} ¥{item_sell_price} - {msg}")
-                                    price_check_errors.append(f"{brand_name} {product_oe}: {msg}")
-                            else:
-                                print(f"    ✗ {brand_name} {product_oe} ¥{item_sell_price} - 无校验结果")
-                                price_check_errors.append(f"{brand_name} {product_oe}: 无校验结果")
-                        else:
-                            api_error = price_check_result.get('message', '未知错误') if price_check_result else '无响应'
-                            print(f"    ✗ {brand_name} {product_oe} ¥{item_sell_price} - {api_error}")
-                            price_check_errors.append(f"{brand_name} {product_oe}: {api_error}")
-
-                    # ========== 构造报价项 ==========
-                    quote_items_for_item = []
-                    for product in factory_product_list:
-                        product_pid = product.get('pid', '')
-                        if product_pid not in price_check_map:
-                            continue
-                        
-                        if product_pid not in product_price_map:
-                            continue
-                        
-                        product_info = product_price_map[product_pid]
-                        item_sell_price = product_info['price']
-                        stock_info = product_info['stock_info']
-                        
-                        # 选择仓库和时效
-                        selected_warehouse, prepare_good_timespan = select_warehouse_and_days(stock_info)
-                        if not selected_warehouse:
-                            continue
-
-                        quote_item = construct_mercedes_quote_item(
-                            factory_brand, product, factory_product_list,
-                            item_sell_price, prepare_good_timespan,
-                            price_check_map.get(product_pid),
-                            category_id
-                        )
-                        quote_items_for_item.append(quote_item)
-
-                    if not quote_items_for_item:
-                        reason = "价格监测失败: " + "；".join(price_check_errors) if price_check_errors else "价格监测失败"
-                        print(f"[汽配龙自动报价][跳过] {enquiry_no} - {item_oe}: {reason}")
-                        failed_items[enquiry_item_id] = reason
-                        continue
-
-                    mercedes_quote_items[enquiry_item_id] = quote_items_for_item
-
-                    # 收集汇总信息
-                    summary_list.append({
-                        'item_oe': item_oe,
-                        'item_name': item_name,
-                        'price': item_sell_price,
-                        'days': prepare_good_timespan,
-                        'product_count': len(quote_items_for_item)
-                    })
-
-                except Exception:
+                if not valid_products:
+                    failed_items[enquiry_item_id] = "无可用价格或库存"
                     continue
+
+                # ========== 步骤5：priceCheck校验 ==========
+                print(f"  priceCheck:")
+                price_check_errors = []
+                passed_products = []
+
+                for vp in valid_products:
+                    product = vp['product']
+                    product_info = vp['info']
+                    brand_name = product.get('brandName', '未知品牌')
+                    product_oe = product.get('itemPerhapsReplaceOe', '未知OE')
+
+                    snapshot, error = _run_price_check(
+                        product, product_info, tid, car_brand,
+                        enquiry_no, enquiry_item_id, company
+                    )
+
+                    if error:
+                        print(f"    ✗ {brand_name} {product_oe} ¥{product_info['sell_price']} - {error}")
+                        price_check_errors.append(f"{brand_name} {product_oe}: {error}")
+                    else:
+                        print(f"    ✓ {brand_name} {product_oe} ¥{product_info['sell_price']}")
+                        passed_products.append({
+                            'product': product,
+                            'info': product_info,
+                            'snapshot': snapshot
+                        })
+
+                if not passed_products:
+                    failed_items[enquiry_item_id] = "；".join(price_check_errors)
+                    continue
+
+                # ========== 步骤6：构造报价项 ==========
+                quote_items_for_item = []
+                for pp in passed_products:
+                    _, prepare_good_timespan = select_warehouse_and_days(pp['info']['stock_info'])
+                    quote_item = construct_mercedes_quote_item(
+                        factory_brand, pp['product'], factory_product_list,
+                        pp['info']['sell_price'], prepare_good_timespan,
+                        pp['snapshot'], category_id
+                    )
+                    quote_items_for_item.append(quote_item)
+
+                mercedes_quote_items[enquiry_item_id] = quote_items_for_item
+
+                # 收集汇总信息
+                last_pp = passed_products[-1]
+                summary_list.append({
+                    'item_oe': item_oe,
+                    'item_name': item_name,
+                    'price': last_pp['info']['sell_price'],
+                    'days': prepare_good_timespan,
+                    'product_count': len(quote_items_for_item)
+                })
+
+            except Exception as e:
+                failed_items[enquiry_item_id] = f"处理异常: {str(e)}"
+                continue
 
     return mercedes_quote_items, summary_list, failed_items
 
@@ -467,7 +486,7 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
     print(f"[汽配龙自动报价][{company}] 查询日期: {begin_date} 至 {end_date}")
 
     result = query_enquiry_list(begin_date, end_date, company=company)
-    orders = result.get('data', [])
+    orders = result.get('data') or []
 
     unique_orders = {order.get('supplierEnquiryNo'): order for order in orders if order.get('supplierEnquiryNo')}
     print(f"[汽配龙自动报价][{company}] 找到 {len(unique_orders)} 个订单")

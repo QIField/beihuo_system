@@ -208,9 +208,7 @@
             },
             rowHeight: 36,
             headerHeight: 36,
-            pagination: true,
-            paginationPageSize: 200,
-            paginationPageSizeSelector: false,
+            pagination: false,
             animateRows: true,
             getRowStyle: function(params) {
                 const no = params.data && params.data.supplier_enquiry_no;
@@ -239,36 +237,67 @@
         // 初始化双击复制功能
         function initDoubleClickCopy() {
             const gridDiv = document.querySelector('#qplQuoteGrid');
-            
+
             gridDiv.addEventListener('dblclick', function(e) {
                 const cellElement = e.target.closest('.ag-cell');
                 if (!cellElement) return;
-                
+
                 const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
                 const colId = cellElement.getAttribute('col-id');
-                
+
                 if (rowId && colId) {
                     const rowNode = gridApi.getRowNode(rowId);
                     if (rowNode && rowNode.data) {
                         const value = rowNode.data[colId];
                         if (value !== undefined && value !== null) {
                             const textToCopy = String(value);
-                            navigator.clipboard.writeText(textToCopy).then(() => {
-                                layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
-                            }).catch(err => {
-                                console.error('复制失败:', err);
-                                layui.layer.msg('复制失败', {icon: 2});
-                            });
+                            copyToClipboard(textToCopy);
                         }
                     }
                 }
             });
         }
+
+        // 复制到剪贴板（兼容降级处理）
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        // 降级复制方案
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+                } else {
+                    layui.layer.msg('复制失败', {icon: 2});
+                }
+            } catch (err) {
+                layui.layer.msg('复制失败', {icon: 2});
+            }
+            document.body.removeChild(textArea);
+        }
         
         // 初始化自定义分页组件
         function initCustomPagination() {
             if (typeof CustomPagination === 'undefined') {
-                console.error('[QplQuote] CustomPagination 组件未加载');
+                layui.layer.msg('分页组件加载失败', {icon: 2});
                 return;
             }
 
@@ -278,17 +307,18 @@
                 defaultPageSize: 200,
                 showScrollToTop: true,
                 onPageChange: function(page, pageSize) {
-                    if (gridApi) {
-                        gridApi.paginationGoToPage(page - 1);
-                    }
+                    refreshGrid(page, pageSize);
                 },
                 onPageSizeChange: function(pageSize) {
                     currentPageSize = pageSize;
-                    if (gridApi) {
-                        gridApi.paginationSetPageSize(pageSize);
-                    }
+                    refreshGrid(1, pageSize);
                 }
             });
+
+            // 同步分页组件的初始 pageSize 到全局变量
+            if (customPagination) {
+                currentPageSize = customPagination.currentPageSize;
+            }
         }
         
         // 初始化 Grid
@@ -319,7 +349,10 @@
                     format: 'yyyy-MM-dd',
                     range: true,
                     max: 0,
-                    value: ''
+                    value: '',
+                    done: function(value, date, endDate) {
+                        refreshGrid();
+                    }
                 });
             });
         });
@@ -360,15 +393,17 @@
         }
         
         // 刷新表格数据
-        function refreshGrid() {
+        function refreshGrid(page = 1, pageSize = currentPageSize) {
             const params = getSearchParams();
-            
+            params.page = page;
+            params.limit = pageSize;
+
             fetch('/new/api/qpl_quote/records?' + new URLSearchParams(params))
                 .then(response => response.json())
                 .then(data => {
                     if (data.code === 0 || data.code === '0') {
                         currentData = data.data.list;
-                        
+
                         // 构建单号 → 颜色索引的映射（按首次出现顺序，两种颜色循环）
                         enquiryNoColorMap = {};
                         let colorCounter = 0;
@@ -379,15 +414,15 @@
                                 colorCounter++;
                             }
                         }
-                        
+
                         gridApi.setRowData(currentData);
                         if (customPagination) {
-                            customPagination.update(currentData.length, 1, currentPageSize);
+                            customPagination.update(data.data.total, data.data.page, pageSize);
                         }
                     }
                 })
                 .catch(error => {
-                    console.error('请求失败:', error);
+                    layui.layer.msg('数据加载失败', {icon: 2});
                 });
         }
     </script>

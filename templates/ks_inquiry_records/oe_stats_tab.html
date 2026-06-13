@@ -1,0 +1,131 @@
+<!-- OE统计维度 -->
+<div id="tab-oe" class="tab-pane">
+    <div class="table-container">
+        <div id="oeStatsGrid" class="ag-theme-alpine"></div>
+    </div>
+</div>
+
+<script>
+    var oeStatsGridApi = null;
+    var oeStatsGridColumnApi = null;
+    var oeStatsCurrentPage = 1;
+    var oeStatsCurrentPageSize = 200;
+    var oeStatsTotalRecords = 0;
+    var oeStatsCustomPagination = null;
+
+    const oeStatsColumnDefs = [
+        { field: 'partsNum', headerName: 'OE号', width: 150, pinned: 'left', sortable: true, filter: true },
+        { field: 'count', headerName: '出现次数', width: 120, pinned: 'left', sortable: true, filter: true },
+        { field: 'partsName', headerName: '配件名称', width: 300, sortable: true, filter: true },
+        { field: 'unquotedProducts', headerName: '未报价产品', width: 420, sortable: true, filter: true }
+    ];
+
+    const oeStatsGridOptions = {
+        columnDefs: oeStatsColumnDefs,
+        rowData: [],
+        defaultColDef: {
+            sortable: true,
+            filter: true,
+            resizable: true,
+            suppressMenu: true
+        },
+        rowHeight: 36,
+        headerHeight: 36,
+        pagination: false,
+        animateRows: true,
+        onGridReady: function(event) {
+            oeStatsGridApi = event.api;
+            oeStatsGridColumnApi = event.columnApi;
+            oeStatsGridApi.sizeColumnsToFit();
+        }
+    };
+
+    function initOeStatsGrid() {
+        if (oeStatsGridApi) {
+            refreshOeStats();
+            return;
+        }
+
+        const gridDiv = document.querySelector('#oeStatsGrid');
+        if (!gridDiv) return;
+
+        new agGrid.Grid(gridDiv, oeStatsGridOptions);
+
+        // 初始化双击复制功能
+        gridDiv.addEventListener('dblclick', function(e) {
+            const cellElement = e.target.closest('.ag-cell');
+            if (!cellElement) return;
+
+            const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
+            const colId = cellElement.getAttribute('col-id');
+
+            if (rowId && colId && oeStatsGridApi) {
+                const rowNode = oeStatsGridApi.getRowNode(rowId);
+                if (rowNode && rowNode.data) {
+                    const value = rowNode.data[colId];
+                    if (value !== undefined && value !== null) {
+                        const textToCopy = String(value);
+                        navigator.clipboard.writeText(textToCopy).then(() => {
+                            layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+                        }).catch(err => {
+                            console.error('复制失败:', err);
+                            layui.layer.msg('复制失败', {icon: 2});
+                        });
+                    }
+                }
+            }
+        });
+
+        // 初始化自定义分页组件
+        if (typeof CustomPagination !== 'undefined') {
+            oeStatsCustomPagination = CustomPagination.init({
+                gridSelector: '#oeStatsGrid',
+                pageSizeOptions: [50, 100, 200, 500],
+                defaultPageSize: 200,
+                showScrollToTop: true,
+                onPageChange: function(page, pageSize) {
+                    oeStatsCurrentPage = page;
+                    oeStatsCurrentPageSize = pageSize;
+                    refreshOeStats(page, pageSize);
+                },
+                onPageSizeChange: function(pageSize) {
+                    oeStatsCurrentPageSize = pageSize;
+                }
+            });
+        }
+
+        refreshOeStats();
+    }
+
+    function updateOeStatsPaginationInfo() {
+        if (oeStatsCustomPagination) {
+            oeStatsCustomPagination.update(oeStatsTotalRecords, oeStatsCurrentPage, oeStatsCurrentPageSize);
+        }
+    }
+
+    function refreshOeStats(page, pageSize) {
+        page = page || oeStatsCurrentPage || 1;
+        pageSize = pageSize || oeStatsCurrentPageSize || 200;
+        oeStatsCurrentPage = page;
+        oeStatsCurrentPageSize = pageSize;
+
+        const params = getSearchParams();
+        params.page = page;
+        params.page_size = pageSize;
+
+        fetch('/new/api/ks_inquiry/records/oe_stats?' + new URLSearchParams(params))
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 0 || data.code === '0') {
+                    oeStatsTotalRecords = data.data.total;
+                    if (oeStatsGridApi) {
+                        oeStatsGridApi.setRowData(data.data.list);
+                    }
+                    updateOeStatsPaginationInfo();
+                }
+            })
+            .catch(error => {
+                console.error('OE统计请求失败:', error);
+            });
+    }
+</script>

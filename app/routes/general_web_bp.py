@@ -65,4 +65,4 @@ def display_unpaid_customer_limit():
 @general_web_bp.route("/ks_inquiry_records")
 def ks_inquiry_records():
     """开思询价明细页面"""
-    return render_template("ks_inquiry_records.html")
+    return render_template("ks_inquiry_records/ks_inquiry_records_main.html")

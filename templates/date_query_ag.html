@@ -18,9 +18,8 @@
     <link rel="stylesheet" href="/static/js/components/filter_panel/filter-panel.css">
     <script src="/static/js/components/filter_panel/filter-panel.js"></script>
     
-    <!-- 一键置顶按钮组件 -->
-    <link rel="stylesheet" href="/static/js/components/scroll-to-top/scroll-to-top.css?v=1">
-    <script src="/static/js/components/scroll-to-top/scroll-to-top.js?v=1"></script>
+    <!-- 自定义分页组件 -->
+    <script src="/static/js/components/custom-pagination/custom-pagination.js"></script>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -193,9 +192,9 @@
             gap: 10px;
         }
 
-        /* 分页条数选择器 */
+        /* 隐藏 AG Grid 原生分页栏，使用自定义分页组件 */
         .ag-paging-panel {
-            position: relative;
+            display: none !important;
         }
 
         /* 分页条数选择器 */
@@ -377,6 +376,10 @@
         let currentData = [];
         let filteredData = [];
         let cartData = new Set();
+        let currentPage = 1;
+        let currentPageSize = 200;
+        let currentDisplayCount = 0;
+        let customPagination = null;
         
         // 列定义
         const columnDefs = [
@@ -399,9 +402,9 @@
                 sortable: false,
                 filter: false,
                 valueGetter: params => {
-                    // 获取当前行的索引并加1
+                    // 获取当前行的全局索引并加1
                     const rowIndex = params.node?.rowIndex;
-                    return rowIndex !== undefined ? rowIndex + 1 : '';
+                    return rowIndex !== undefined ? (currentPage - 1) * currentPageSize + rowIndex + 1 : '';
                 }
             },
             { field: 'oe', headerName: 'OE', width: 180, pinned: 'left', sortable: true, filter: true },
@@ -563,7 +566,8 @@
                 valueGetter: params => parseFloat(params.data['全国近3个月月均询价量']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
             },
-            { field: '内部备注', headerName: '内部备注', width: 150, sortable: true, filter: true }
+            { field: '内部备注', headerName: '内部备注', width: 150, sortable: true, filter: true },
+            { field: 'waiting_time', headerName: '待仓时间', width: 120, sortable: true, filter: true }
         ];
         
         // Grid 配置
@@ -578,9 +582,7 @@
             },
             rowHeight: 36,
             headerHeight: 36,
-            pagination: true,
-            paginationPageSize: 200,
-            paginationPageSizeSelector: [50, 100, 200],
+            pagination: false,
             rowSelection: 'multiple',
             suppressRowClickSelection: true,
             rowMultiSelectWithClick: false,
@@ -615,6 +617,9 @@
                 
                 // 初始化快捷键
                 initShortcuts();
+
+                // 初始化自定义分页组件
+                initCustomPagination();
             }
         };
         
@@ -631,126 +636,59 @@
             // 初始化日期选择器
             initDatePicker();
 
-            // 初始化分页条数选择器
-            setTimeout(initPageSizeSelector, 500);
-
             // 初始化搜索和筛选面板（数据加载后会自动更新）
             initSearchPanel();
             initFilterPanel();
-
-            // 初始化一键置顶按钮（延迟初始化以确保表格已渲染）
-            setTimeout(() => {
-                if (typeof ScrollToTop !== 'undefined') {
-                    ScrollToTop.init({
-                        container: '#myGrid',
-                        threshold: 300,
-                        offsetBottom: 30,
-                        offsetRight: 30,
-                        duration: 600
-                    });
-                    console.log('[ScrollToTop] 置顶按钮已初始化');
-                }
-            }, 800);
         });
 
-        // 初始化分页条数选择器
-        function initPageSizeSelector() {
-            const pagingPanel = document.querySelector('.ag-paging-panel');
-            if (!pagingPanel) {
-                console.log('[分页选择器] 未找到分页面板，稍后重试');
-                setTimeout(initPageSizeSelector, 500);
+        // 初始化自定义分页组件
+        function initCustomPagination() {
+            if (typeof CustomPagination === 'undefined') {
+                layui.layer.msg('分页组件加载失败', {icon: 2});
                 return;
             }
 
-            // 检查是否已存在
-            if (pagingPanel.querySelector('.page-size-selector')) {
-                return;
-            }
-
-            // 创建选择器容器
-            const selectorContainer = document.createElement('div');
-            selectorContainer.className = 'page-size-selector';
-            selectorContainer.innerHTML = `
-                <span>每页显示:</span>
-                <select id="pageSizeSelect">
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                    <option value="200" selected>200</option>
-                </select>
-                <span>条</span>
-            `;
-
-            pagingPanel.appendChild(selectorContainer);
-
-            // 绑定事件
-            const select = selectorContainer.querySelector('#pageSizeSelect');
-            select.addEventListener('change', function() {
-                const newPageSize = parseInt(this.value);
-                if (gridApi) {
-                    gridApi.paginationSetPageSize(newPageSize);
-                    console.log('[分页选择器] 切换到每页', newPageSize, '条');
+            customPagination = CustomPagination.init({
+                gridSelector: '#myGrid',
+                pageSizeOptions: [50, 100, 200, 500],
+                defaultPageSize: 200,
+                showScrollToTop: true,
+                onPageChange: function(page, pageSize) {
+                    currentPageSize = pageSize;
+                    renderCurrentPage(page, pageSize);
+                },
+                onPageSizeChange: function(pageSize) {
+                    currentPageSize = pageSize;
                 }
             });
 
-            // 添加页码跳转器到左侧统计信息位置
-            addPageJumper();
-
-            console.log('[分页选择器] 初始化完成');
+            currentPageSize = customPagination.currentPageSize;
+            currentDisplayCount = 0;
+            updatePaginationInfo(0, 1);
+            updateStats();
         }
 
-        // 添加页码跳转器
-        function addPageJumper() {
-            const pagingPanel = document.querySelector('.ag-paging-panel');
-            const rowSummaryPanel = pagingPanel.querySelector('.ag-paging-row-summary-panel');
+        function updatePaginationInfo(totalRecords = filteredData.length, currentPage = 1) {
+            if (customPagination) {
+                customPagination.update(totalRecords, currentPage, currentPageSize);
+            }
+        }
 
-            if (!rowSummaryPanel) return;
+        function renderCurrentPage(page = 1, pageSize = currentPageSize) {
+            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+            const safePage = Math.min(Math.max(page, 1), totalPages);
+            const startIndex = (safePage - 1) * pageSize;
+            const pageData = filteredData.slice(startIndex, startIndex + pageSize);
 
-            // 清空原有内容
-            rowSummaryPanel.innerHTML = '';
+            currentPage = safePage;
+            currentPageSize = pageSize;
+            currentDisplayCount = pageData.length;
 
-            // 创建跳转器
-            const jumperDiv = document.createElement('div');
-            jumperDiv.className = 'page-jumper';
-            jumperDiv.innerHTML = `
-                <span>跳至</span>
-                <input type="number" id="pageJumperInput" min="1" placeholder="页码">
-                <span>页</span>
-                <button id="pageJumperBtn">跳转</button>
-            `;
-
-            rowSummaryPanel.appendChild(jumperDiv);
-
-            // 绑定事件
-            const input = jumperDiv.querySelector('#pageJumperInput');
-            const btn = jumperDiv.querySelector('#pageJumperBtn');
-
-            const doJump = function() {
-                const pageNum = parseInt(input.value);
-                if (!pageNum || pageNum < 1) {
-                    layui.layer.msg('请输入有效的页码', {icon: 0});
-                    return;
-                }
-
-                const totalPages = gridApi.paginationGetTotalPages();
-                if (pageNum > totalPages) {
-                    layui.layer.msg('页码超出范围，最大页码: ' + totalPages, {icon: 0});
-                    return;
-                }
-
-                // AG Grid 页码从0开始，所以减1
-                gridApi.paginationGoToPage(pageNum - 1);
-                input.value = '';
-                console.log('[页码跳转] 跳转到第', pageNum, '页');
-            };
-
-            btn.addEventListener('click', doJump);
-            input.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    doJump();
-                }
-            });
-
-            console.log('[页码跳转器] 初始化完成');
+            if (gridApi && gridApi.setRowData) {
+                gridApi.setRowData(pageData);
+            }
+            updatePaginationInfo(filteredData.length, safePage);
+            updateStats();
         }
         
         // 自定义拖拽选择功能 - 带调试信息
@@ -1295,8 +1233,7 @@
                     
                     // 刷新表格以应用购物车背景色
                     if (gridApi) {
-                        gridApi.redrawRows();
-                        updateStats();
+                        renderCurrentPage(currentPage, currentPageSize);
                     }
                 }
             } catch (error) {
@@ -1413,13 +1350,10 @@
 
                 // 更新表格数据
                 if (gridApi && gridApi.setRowData) {
-                    gridApi.setRowData(filteredData);
+                    renderCurrentPage(1, currentPageSize);
                 } else {
                     console.error('[AG Grid] API 未准备好');
                 }
-
-                // 更新统计
-                updateStats();
                 
                 layui.layer.msg(`加载了 ${filteredData.length} 条数据（共 ${total} 条）`);
                 
@@ -1546,7 +1480,7 @@
             document.getElementById('totalCount').textContent = currentData.length;
             document.getElementById('selectedCount').textContent = gridApi ? gridApi.getSelectedRows().length : 0;
             document.getElementById('cartCount').textContent = cartData.size;
-            document.getElementById('displayCount').textContent = filteredData.length;
+            document.getElementById('displayCount').textContent = currentDisplayCount;
         }
         
         // 批量添加购物车 - 只添加新商品，不移除
@@ -1617,8 +1551,7 @@
                     gridApi.deselectAll();
                     
                     // 刷新表格以显示购物车高亮
-                    gridApi.redrawRows();
-                    updateStats();
+                    renderCurrentPage(currentPage, currentPageSize);
                 } else {
                     layui.layer.msg(addResult.msg || '添加失败', {icon: 2});
                 }
@@ -1680,10 +1613,7 @@
                 onClear: function() {
                     // 恢复显示所有数据
                     filteredData = [...currentData];
-                    if (gridApi && gridApi.setRowData) {
-                        gridApi.setRowData(filteredData);
-                    }
-                    updateStats();
+                    renderCurrentPage(1, currentPageSize);
                 }
             });
         }
@@ -1781,12 +1711,7 @@
             filteredData = result;
 
             // 更新表格数据
-            if (gridApi && gridApi.setRowData) {
-                gridApi.setRowData(filteredData);
-            }
-
-            // 更新统计信息
-            updateStats();
+            renderCurrentPage(1, currentPageSize);
 
             console.log('[筛选] 已应用所有条件，显示', filteredData.length, '条记录');
         }

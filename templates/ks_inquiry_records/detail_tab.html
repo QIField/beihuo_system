@@ -1,0 +1,167 @@
+<!-- 明细列表 -->
+<div id="tab-detail" class="tab-pane active">
+    <div class="table-container">
+        <div id="ksInquiryGrid" class="ag-theme-alpine"></div>
+    </div>
+</div>
+
+<script>
+    // AG Grid 列定义
+    const columnDefs = [
+        {
+            headerName: '行号',
+            field: 'rowNumber',
+            width: 80,
+            pinned: 'left',
+            sortable: false,
+            filter: false,
+            valueGetter: params => {
+                const rowIndex = params.node?.rowIndex;
+                return rowIndex !== undefined ? rowIndex + 1 : '';
+            }
+        },
+        { field: 'inquiryId', headerName: '询价单号', width: 150, pinned: 'left', sortable: true, filter: true },
+        { field: 'partsNum', headerName: 'OE号', width: 150, sortable: true, filter: true },
+        { field: 'partsName', headerName: '配件名称', width: 200, sortable: true, filter: true },
+        { field: 'brandName', headerName: '品牌', width: 120, sortable: true, filter: true },
+        { field: 'brandNormalized', headerName: '标准化品牌', width: 120, sortable: true, filter: true },
+        { field: 'brandId', headerName: '品牌ID', width: 100, sortable: true, filter: true },
+        { field: 'sellerBtPrice', headerName: '含税价', width: 120, sortable: true, filter: true },
+        { field: 'sellerPrice', headerName: '不含税价', width: 120, sortable: true, filter: true },
+        {
+            field: 'displaySellerStatus',
+            headerName: '卖家状态',
+            width: 120,
+            sortable: true,
+            filter: true
+        },
+        { field: 'remark', headerName: '备注', width: 200, sortable: true, filter: true },
+        { field: 'vin', headerName: '车架号', width: 150, sortable: true, filter: true },
+        { field: 'engine', headerName: '发动机', width: 120, sortable: true, filter: true },
+        { field: 'productionDate', headerName: '车辆生产日期', width: 140, sortable: true, filter: true },
+        { field: 'chassis', headerName: '底盘', width: 120, sortable: true, filter: true }
+    ];
+
+    // Grid 配置
+    const gridOptions = {
+        columnDefs: columnDefs,
+        rowData: [],
+        defaultColDef: {
+            sortable: true,
+            filter: true,
+            resizable: true,
+            suppressMenu: true
+        },
+        rowHeight: 36,
+        headerHeight: 36,
+        // 禁用 AG Grid 自带分页栏，使用自定义分页组件
+        pagination: false,
+        animateRows: true,
+        onGridReady: function(event) {
+            gridApi = event.api;
+            gridColumnApi = event.columnApi;
+
+            gridApi.sizeColumnsToFit();
+
+            // 初始化双击复制功能
+            initDoubleClickCopy();
+
+            // 初始化自定义分页组件
+            initCustomPagination();
+
+            // 加载初始数据
+            refreshGrid();
+        }
+    };
+
+    // 初始化双击复制功能
+    function initDoubleClickCopy() {
+        const gridDiv = document.querySelector('#ksInquiryGrid');
+
+        gridDiv.addEventListener('dblclick', function(e) {
+            const cellElement = e.target.closest('.ag-cell');
+            if (!cellElement) return;
+
+            const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
+            const colId = cellElement.getAttribute('col-id');
+
+            if (rowId && colId) {
+                const rowNode = gridApi.getRowNode(rowId);
+                if (rowNode && rowNode.data) {
+                    const value = rowNode.data[colId];
+                    if (value !== undefined && value !== null) {
+                        const textToCopy = String(value);
+                        navigator.clipboard.writeText(textToCopy).then(() => {
+                            layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+                        }).catch(err => {
+                            console.error('复制失败:', err);
+                            layui.layer.msg('复制失败', {icon: 2});
+                        });
+                    }
+                }
+            }
+        });
+    }
+
+    // 初始化自定义分页组件
+    function initCustomPagination() {
+        if (typeof CustomPagination === 'undefined') {
+            console.error('[KsInquiryRecords] CustomPagination 组件未加载');
+            return;
+        }
+
+        customPagination = CustomPagination.init({
+            gridSelector: '#ksInquiryGrid',
+            pageSizeOptions: [50, 100, 200, 500],
+            defaultPageSize: 200,
+            showScrollToTop: true,
+            onPageChange: function(page, pageSize) {
+                currentPage = page;
+                currentPageSize = pageSize;
+                refreshGrid(page, pageSize);
+            },
+            onPageSizeChange: function(pageSize) {
+                currentPageSize = pageSize;
+            }
+        });
+
+        console.log('[KsInquiryRecords] 自定义分页组件已初始化');
+    }
+
+    // 更新分页信息（在 refreshGrid 中调用）
+    function updatePaginationInfo() {
+        if (customPagination) {
+            customPagination.update(totalRecords, currentPage, currentPageSize);
+        }
+    }
+
+    // 刷新表格数据
+    function refreshGrid(page = 1, pageSize = currentPageSize) {
+        currentPage = page;
+        currentPageSize = pageSize;
+
+        const params = getSearchParams();
+        params.page = page;
+        params.page_size = pageSize;
+
+        console.log(`[refreshGrid] 请求第 ${page} 页, 每页 ${pageSize} 条`);
+
+        fetch('/new/api/ks_inquiry/records?' + new URLSearchParams(params))
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 0 || data.code === '0') {
+                    currentData = data.data.list;
+                    totalRecords = data.data.total;
+                    gridApi.setRowData(currentData);
+
+                    console.log(`[refreshGrid] 总条数: ${totalRecords}, 当前页: ${data.data.page}, 返回 ${currentData.length} 条`);
+
+                    // 更新分页信息
+                    updatePaginationInfo();
+                }
+            })
+            .catch(error => {
+                console.error('请求失败:', error);
+            });
+    }
+</script>
