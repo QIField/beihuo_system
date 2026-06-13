@@ -61,6 +61,7 @@ def init_ks_inquiry_detail_table():
                 engine VARCHAR(100) DEFAULT NULL COMMENT '发动机',
                 production_date VARCHAR(50) DEFAULT NULL COMMENT '车辆生产日期',
                 chassis VARCHAR(100) DEFAULT NULL COMMENT '底盘',
+                unquoted_products TEXT DEFAULT NULL COMMENT '未报价产品，格式：oe+品牌，oe+品牌',
                 company VARCHAR(50) NOT NULL COMMENT '公司标识',
                 quote_date DATE NOT NULL COMMENT '询价日期',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

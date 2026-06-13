@@ -779,15 +779,25 @@ class QuoteCountSyncService:
         print(f"{'='*70}")
         
         # 1. 爬取近5天的开思询价明细
-        crawl_result = self.sync_recent_days(days=5)
+        sync_days = 5
+        crawl_result = self.sync_recent_days(days=sync_days)
+
+        # 2. 计算并写回未报价产品（近2天）
+        try:
+            from app.services.ks_inquiry_service.ks_unquoted_products_service import KsUnquotedProductsService
+            unquoted_result = KsUnquotedProductsService.calculate_recent_days(days=2)
+        except Exception as e:
+            print(f"[QuoteCountSyncService] 计算未报价产品失败: {e}")
+            unquoted_result = {'matched_parts': 0, 'updated_rows': 0, 'error': str(e)}
         
-        # 2. 更新统计表（上月+本月）
+        # 3. 更新统计表（上月+本月）
         stats_result = self.update_stats_from_details()
         
         return {
             'total_items': crawl_result.get('total_items', 0),
             'saved': crawl_result.get('saved', 0),
             'dates': crawl_result.get('dates', []),
+            'unquoted_products': unquoted_result,
             'stats': stats_result
         }
 

@@ -432,30 +432,37 @@ def clean_data_date(value):
 '''
 
 def map_vehicle_fields_from_compare(data_list):
-    """从crmapp_compare_summary批量映射车型和替换号到beihuo数据列表"""
+    """从crmapp_compare_summary批量映射车型、替换号和待仓时间到beihuo数据列表"""
     if not data_list:
         return data_list
     
     barcode_set = set()
+    company_set = set()
     for item in data_list:
         barcode = item.get('物料条码', '')
+        company = item.get('company', '')
         if barcode:
             barcode_set.add(barcode)
+        if company:
+            company_set.add(company)
     
-    if not barcode_set:
+    if not barcode_set or not company_set:
+        for item in data_list:
+            item['waiting_time'] = item.get('waiting_time', '')
         return data_list
     
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
-    placeholders = ','.join(['%s'] * len(barcode_set))
+    barcode_placeholders = ','.join(['%s'] * len(barcode_set))
+    company_placeholders = ','.join(['%s'] * len(company_set))
     sql = f"""
-    SELECT frey_no, company, l_model_zh, replace_number 
+    SELECT frey_no, company, l_model_zh, replace_number, waiting_time
     FROM crmapp_compare_summary 
-    WHERE frey_no IN ({placeholders})
+    WHERE frey_no IN ({barcode_placeholders}) AND company IN ({company_placeholders})
     """
     
-    cursor.execute(sql, list(barcode_set))
+    cursor.execute(sql, list(barcode_set) + list(company_set))
     results = cursor.fetchall()
     conn.close()
     
@@ -464,7 +471,8 @@ def map_vehicle_fields_from_compare(data_list):
         key = (r['frey_no'], r.get('company', ''))
         mapping[key] = {
             'l_model_zh': r.get('l_model_zh', ''),
-            'replace_number': r.get('replace_number', '')
+            'replace_number': r.get('replace_number', ''),
+            'waiting_time': r.get('waiting_time', '')
         }
     
     for item in data_list:
@@ -472,9 +480,11 @@ def map_vehicle_fields_from_compare(data_list):
         if key in mapping:
             item['车型'] = mapping[key]['l_model_zh']
             item['替换号'] = mapping[key]['replace_number']
+            item['waiting_time'] = mapping[key]['waiting_time']
         else:
             item['车型'] = item.get('车型', '')
             item['替换号'] = item.get('替换号', '')
+            item['waiting_time'] = item.get('waiting_time', '')
     
     return data_list
 
@@ -3738,6 +3748,8 @@ def date_ordercount():
         else:
             beihuo_data = []
 
+        beihuo_data = map_vehicle_fields_from_compare(beihuo_data)
+
         # 将查询结果批量存储到数据库中
         if beihuo_data:
             # 先删除该用户和组织的旧数据（如果有）
@@ -3780,6 +3792,7 @@ def date_ordercount():
                     item.get('全国近1个月询价量', 0),
                     item.get('全国近3个月月均询价量', 0),
                     item.get('内部备注', '') or '',
+                    item.get('waiting_time', '') or '',
                     item.get('预警状态', '') or '',
                     item.get('销量', 0)
                 ))
@@ -3790,8 +3803,8 @@ def date_ordercount():
                 username, start_date, end_date, company, 物料条码, 物料名称, 品牌, 品牌号,
                 车型品牌, oe, 标签, 车型, 替换号, 今日销量, 昨日销量, 本月销量, 近7天销量, 近1个月询价量, 近3个月月均询价量,
                 近6个月月均销量, 近12个月月均销量, 近6个月销量, 近12个月销量, 成品可卖天数, 库存数量, 在途数量, 成本价, 库存金额, 供应商,
-                全国近1个月询价量, 全国近3个月月均询价量, 内部备注, 预警状态, 销量
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                全国近1个月询价量, 全国近3个月月均询价量, 内部备注, waiting_time, 预警状态, 销量
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.executemany(insert_sql, batch_data)
             insert_end_time = datetime.now()
@@ -3806,8 +3819,6 @@ def date_ordercount():
         total = len(beihuo_data)
         offset = (page - 1) * page_size
         paginated_data = beihuo_data[offset:offset + page_size]
-
-        paginated_data = map_vehicle_fields_from_compare(paginated_data)
 
         conn.close()
 
