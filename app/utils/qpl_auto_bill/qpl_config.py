@@ -3,6 +3,8 @@
 
 """配置"""
 
+from datetime import datetime
+
 # 基础URL
 BASE_URL = 'https://qpl-gateway.qipeilong.cn'
 
@@ -17,6 +19,11 @@ COMPANY_TOKEN_KEY_MAP = {
     'fsbbr': 'QPL_AUTH_TOKEN_fs',
     # 未来可添加更多组织映射
     # 'gzbbr': 'QPL_AUTH_TOKEN_gz',
+}
+
+# 组织代码到组织名称的映射
+COMPANY_NAME_MAP = {
+    'fsbbr': '佛山巴博瑞',
 }
 
 
@@ -89,6 +96,42 @@ def clear_token_cache(company=None):
         _token_cache.pop(company, None)
     else:
         _token_cache = {}
+
+
+def notify_token_invalid(company='fsbbr'):
+    """推送汽配龙Token失效预警"""
+    company_name = COMPANY_NAME_MAP.get(company, company)
+    remind_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    message = (
+        "===【汽配龙业务预警】===\n"
+        f"组织：{company_name}\n"
+        "汽配龙cookie失效！\n"
+        f"提醒时间：{remind_time}\n"
+        "请及时核对处理！"
+    )
+    try:
+        from app.utils.common_util_module.server_push import message_push
+        return message_push("汽配龙", message)
+    except Exception as e:
+        print(f"[汽配龙配置][{company}] Token失效预警推送失败: {e}")
+        return None
+
+
+def is_token_invalid_response(resp):
+    """判断汽配龙响应是否为Token失效"""
+    return resp.status_code == 401 or resp.text.strip() == 'token无效'
+
+
+def handle_qpl_response(resp, company='fsbbr'):
+    """解析汽配龙响应，Token失效时推送预警"""
+    if is_token_invalid_response(resp):
+        notify_token_invalid(company)
+        return {
+            'code': 401,
+            'message': '汽配龙cookie失效',
+            'data': None
+        }
+    return resp.json()
 
 
 def get_supported_companies():

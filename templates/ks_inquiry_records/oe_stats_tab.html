@@ -12,6 +12,7 @@
     var oeStatsCurrentPageSize = 200;
     var oeStatsTotalRecords = 0;
     var oeStatsCustomPagination = null;
+    var oeStatsGridLoader = null;
 
     const oeStatsColumnDefs = [
         { field: 'partsNum', headerName: 'OE号', width: 150, pinned: 'left', sortable: true, filter: true },
@@ -33,10 +34,17 @@
         headerHeight: 36,
         pagination: false,
         animateRows: true,
+        overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
+        overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
         onGridReady: function(event) {
             oeStatsGridApi = event.api;
             oeStatsGridColumnApi = event.columnApi;
+
+            // 初始化数据加载器
+            oeStatsGridLoader = new AgGridLoader(oeStatsGridApi);
+
             oeStatsGridApi.sizeColumnsToFit();
+            refreshOeStats();
         }
     };
 
@@ -93,8 +101,6 @@
                 }
             });
         }
-
-        refreshOeStats();
     }
 
     function updateOeStatsPaginationInfo() {
@@ -113,19 +119,11 @@
         params.page = page;
         params.page_size = pageSize;
 
-        fetch('/new/api/ks_inquiry/records/oe_stats?' + new URLSearchParams(params))
-            .then(response => response.json())
-            .then(data => {
-                if (data.code === 0 || data.code === '0') {
-                    oeStatsTotalRecords = data.data.total;
-                    if (oeStatsGridApi) {
-                        oeStatsGridApi.setRowData(data.data.list);
-                    }
-                    updateOeStatsPaginationInfo();
-                }
-            })
-            .catch(error => {
-                console.error('OE统计请求失败:', error);
-            });
+        oeStatsGridLoader.load('/new/api/ks_inquiry/records/oe_stats', params, (data) => {
+            oeStatsTotalRecords = data.total;
+            updateOeStatsPaginationInfo();
+        }, (error) => {
+            console.error('OE统计请求失败:', error);
+        });
     }
 </script>

@@ -24,7 +24,7 @@ def init_virtual_inventory_stats_log_table():
                 upload_fail_count INT DEFAULT 0 COMMENT '上传失败数',
                 no_record_count INT DEFAULT 0 COMMENT '没有档案数',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-                UNIQUE KEY uk_business_date (business_date)
+                UNIQUE KEY uk_business_date_company (business_date, company)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='虚拟库存统计日志表';
             """
             cursor.execute(create_table_sql)

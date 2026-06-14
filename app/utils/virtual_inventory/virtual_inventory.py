@@ -2231,18 +2231,46 @@ def main_process():
     print("开始保存当日统计数据")
     print("="*60)
     try:
-        from app.services.virtual_inventory_stats_service import save_daily_statistics
+        from app.services.virtual_inventory_stats_service import save_recent_statistics
 
-        # 获取业务日期范围（当天00:00到23:59）
-        current_time = datetime.now()
-        business_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
-        business_end = business_start.replace(hour=23, minute=59, second=59, microsecond=0)
+        results = save_recent_statistics(days=3)
+        latest_business_date = None
+        latest_stats = []
+        for result in results:
+            if result['code'] == 0:
+                data = result['data']
+                print(f"[统计日志] 保存成功: {data['business_date']} {data['company']}")
+                if latest_business_date is None:
+                    latest_business_date = data['business_date']
+                if data['business_date'] == latest_business_date:
+                    latest_stats.append(data)
+            else:
+                print(f"[统计日志] 保存失败: {result['msg']}")
 
-        result = save_daily_statistics(business_start, business_end)
-        if result['code'] == 0:
-            print(f"[统计日志] 保存成功: {result['data']['business_date']}")
-        else:
-            print(f"[统计日志] 保存失败: {result['msg']}")
+        if latest_stats:
+            from app.utils.common_util_module.server_push import message_push
+
+            company_order = ['fsbbr', 'zhbbr', 'zsbbr', 'dgby', 'dghf']
+            stats_map = {item['company']: item for item in latest_stats}
+            message_lines = [
+                '===【虚拟库存业务汇报】===',
+                f'统计日期：{latest_business_date}'
+            ]
+            for company in company_order:
+                item = stats_map.get(company)
+                if not item:
+                    continue
+                message_lines.append(
+                    f"{company}：总数 {item['total_count']}，上传成功 {item['upload_success_count']}，"
+                    f"新建成功 {item['new_create_success_count']}，新建失败 {item['new_create_fail_count']}，"
+                    f"上传失败 {item['upload_fail_count']}，没有档案 {item['no_record_count']}"
+                )
+
+            try:
+                push_result = message_push('虚拟库存数据', '\n'.join(message_lines))
+                print(f"[统计日志] 微信推送结果: {push_result}")
+            except Exception as push_error:
+                print(f"[统计日志] 微信推送失败: {push_error}")
     except Exception as e:
         print(f"[统计日志] 保存时出错: {e}")
     print("="*60)

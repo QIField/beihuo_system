@@ -29,7 +29,7 @@ from quote_builder import (
     select_warehouse_and_days,
     WAREHOUSE_MAP
 )
-from qpl_config import BASE_URL, get_headers
+from qpl_config import BASE_URL, get_headers, handle_qpl_response
 import requests
 
 try:
@@ -53,7 +53,7 @@ def submit_quote(quote_request, company='fsbbr'):
     """
     url = f'{BASE_URL}/qpl-supplier-enquiry/supplierEnquiryEdit/submitSupplierEnquiry'
     resp = requests.post(url, headers=get_headers(company), json=quote_request, timeout=30)
-    return resp.json()
+    return handle_qpl_response(resp, company)
 
 
 def query_mercedes_service_silent(oe_list):

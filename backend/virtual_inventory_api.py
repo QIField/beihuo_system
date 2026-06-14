@@ -17,6 +17,21 @@ def log_time_cost(operation_name, start_time):
 # 创建蓝图
 virtual_inventory_bp = Blueprint('virtual_inventory', __name__)
 
+VIRTUAL_INVENTORY_TABLE_MAP = {
+    'fsbbr': 'virtual_inventory',
+    'zhbbr': 'virtual_inventory_zhbbr',
+    'zsbbr': 'virtual_inventory_zsbbr',
+    'dgby': 'virtual_inventory_dgby',
+    'dghf': 'virtual_inventory_dghf'
+}
+
+
+def get_current_virtual_inventory_context():
+    company = session.get('current_org') or session.get('store') or 'fsbbr'
+    table_name = VIRTUAL_INVENTORY_TABLE_MAP.get(company, 'virtual_inventory')
+    supplier_column = 'supplier_name' if company == 'fsbbr' else 'upload_supplier_name'
+    return company, table_name, supplier_column
+
 #连接数据库以及表格功能实现========================================================================================
 def login_required(f):
     """登录验证装饰器 - 与主应用一致"""
@@ -596,6 +611,8 @@ def get_virtual_inventory_by_msg_pattern():
         start_date_str = request.args.get('start_date', '').strip()
         end_date_str = request.args.get('end_date', '').strip()
 
+        company, table_name, supplier_column = get_current_virtual_inventory_context()
+
         db_connect_start = time.time()
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -646,7 +663,7 @@ def get_virtual_inventory_by_msg_pattern():
 
         # 无论是否有pattern，都要添加其他搜索条件
         if supplier_name:
-            where_conditions.append("`supplier_name` LIKE %s")
+            where_conditions.append(f"`{supplier_column}` LIKE %s")
             params.append(f"%{supplier_name}%")
         
         if oe_code:
@@ -668,7 +685,7 @@ def get_virtual_inventory_by_msg_pattern():
         where_clause = " AND ".join(where_conditions)
 
         # 获取总记录数
-        count_sql = f"SELECT COUNT(*) AS total FROM virtual_inventory WHERE {where_clause}"
+        count_sql = f"SELECT COUNT(*) AS total FROM {table_name} WHERE {where_clause}"
         cursor.execute(count_sql, params)
         total = cursor.fetchone()['total']
 
@@ -677,7 +694,7 @@ def get_virtual_inventory_by_msg_pattern():
         if field and order:
             # 字段映射，确保安全
             field_mapping = {
-                'supplier_name': '`supplier_name`',
+                'supplier_name': f'`{supplier_column}`',
                 'oe_code': '`oe_code`',
                 'brand': '`brand`',
                 'price': '`price`',
@@ -703,13 +720,13 @@ def get_virtual_inventory_by_msg_pattern():
 
         # 查询数据
         sql = f"""
-            SELECT `supplier_name`, `oe_code`, `brand`, `price`, `expiry_date`, `warehouse`, `stock`, `remark`, 
+            SELECT `{supplier_column}` AS supplier_name, `oe_code`, `brand`, `price`, `expiry_date`, `warehouse`, `stock`, `remark`, 
                    `fetch_time`, `update_msg`
-            FROM virtual_inventory 
+            FROM {table_name}
             WHERE {where_clause}
             {order_clause}
             LIMIT %s OFFSET %s
-        """
+        """      
         params.extend([limit, offset])
         cursor.execute(sql, params)
         rows = cursor.fetchall()
@@ -730,7 +747,7 @@ def get_virtual_inventory_by_msg_pattern():
 
         # 使用索引字段统计成功数量
         simple_success_sql = f"""
-            SELECT COUNT(*) as count FROM virtual_inventory
+            SELECT COUNT(*) as count FROM {table_name}
             WHERE update_status = 'success' AND {where_clause}
         """
         cursor.execute(simple_success_sql, params[:-2])
@@ -865,13 +882,15 @@ def get_supplier_summary():
         start_date_str = request.args.get('start_date', '').strip()
         end_date_str = request.args.get('end_date', '').strip()
 
+        company, table_name, supplier_column = get_current_virtual_inventory_context()
+
         db_connect_start = time.time()
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         log_time_cost("数据库连接", db_connect_start)
 
         # 构建查询条件和参数
-        where_conditions = ["supplier_name IS NOT NULL AND supplier_name != ''"]
+        where_conditions = [f"`{supplier_column}` IS NOT NULL AND `{supplier_column}` != ''"]
         params = []
 
         # 根据日期范围参数添加时间条件
@@ -892,14 +911,14 @@ def get_supplier_summary():
         query_start = time.time()
         sql = f"""
             SELECT
-                supplier_name,
+                `{supplier_column}` AS supplier_name,
                 COUNT(*) as total_count,
                 SUM(CASE WHEN LOWER(update_msg) LIKE %s THEN 1 ELSE 0 END) as success_count,
                 SUM(CASE WHEN LOWER(update_msg) NOT LIKE %s OR update_msg IS NULL OR update_msg = '' THEN 1 ELSE 0 END) as failed_count
-            FROM virtual_inventory
+            FROM {table_name}
             WHERE {where_clause}
-            GROUP BY supplier_name
-            ORDER BY supplier_name
+            GROUP BY `{supplier_column}`
+            ORDER BY `{supplier_column}`
         """
         cursor.execute(sql, ["%update%", "%update%"] + params)
         rows = cursor.fetchall()
@@ -913,6 +932,7 @@ def get_supplier_summary():
         return jsonify({
             'code': 0,
             'msg': '',
+            'company': company,
             'data': rows
         })
 
@@ -1248,13 +1268,16 @@ def get_stats_log_list():
 @virtual_inventory_bp.route('/api/virtual_inventory_stats_log/save', methods=['POST'])
 @login_required
 def manual_save_stats():
-    """手动保存今日统计数据"""
+    """手动保存近三天统计数据"""
     try:
-        from app.services.virtual_inventory_stats_service import save_daily_statistics
+        from app.services.virtual_inventory_stats_service import save_recent_statistics
 
-        start_time, end_time = get_business_date_range()
-        result = save_daily_statistics(start_time, end_time)
-        return jsonify(result)
+        results = save_recent_statistics(days=3)
+        failed_results = [result for result in results if result['code'] != 0]
+        if failed_results:
+            return jsonify({'code': 1, 'msg': '部分统计数据保存失败', 'data': results})
+
+        return jsonify({'code': 0, 'msg': '近三天统计数据保存成功', 'data': results})
 
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'保存失败: {str(e)}'}), 500

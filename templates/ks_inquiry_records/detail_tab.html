@@ -57,9 +57,14 @@
         // 禁用 AG Grid 自带分页栏，使用自定义分页组件
         pagination: false,
         animateRows: true,
+        overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
+        overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
         onGridReady: function(event) {
             gridApi = event.api;
             gridColumnApi = event.columnApi;
+
+            // 初始化数据加载器
+            gridLoader = new AgGridLoader(gridApi);
 
             gridApi.sizeColumnsToFit();
 
@@ -146,22 +151,16 @@
 
         console.log(`[refreshGrid] 请求第 ${page} 页, 每页 ${pageSize} 条`);
 
-        fetch('/new/api/ks_inquiry/records?' + new URLSearchParams(params))
-            .then(response => response.json())
-            .then(data => {
-                if (data.code === 0 || data.code === '0') {
-                    currentData = data.data.list;
-                    totalRecords = data.data.total;
-                    gridApi.setRowData(currentData);
+        gridLoader.load('/new/api/ks_inquiry/records', params, (data) => {
+            currentData = data.list;
+            totalRecords = data.total;
 
-                    console.log(`[refreshGrid] 总条数: ${totalRecords}, 当前页: ${data.data.page}, 返回 ${currentData.length} 条`);
+            console.log(`[refreshGrid] 总条数: ${totalRecords}, 当前页: ${data.page}, 返回 ${currentData.length} 条`);
 
-                    // 更新分页信息
-                    updatePaginationInfo();
-                }
-            })
-            .catch(error => {
-                console.error('请求失败:', error);
-            });
+            // 更新分页信息
+            updatePaginationInfo();
+        }, (error) => {
+            console.error('请求失败:', error);
+        });
     }
 </script>

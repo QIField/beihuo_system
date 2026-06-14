@@ -353,6 +353,48 @@
             var startTime = performance.now();
             console.log('[⏱️ 计时] 开始请求供应商汇总数据...');
 
+            // 定义固定的供应商列表：fsbbr显示原供应商名，其他门店显示佛山1-18
+            var fsbbrSuppliers = [
+                '东莞佳配',
+                '佛山万拓',
+                '佛山巴博瑞',
+                '佛山德孚',
+                '佛山新奔裕汽配',
+                '佳配',
+                '宝翼隆',
+                '广州佳配',
+                '广州德之宝',
+                '广州日昇',
+                '广州昌盛',
+                '广州犇宝',
+                '广星',
+                '沐博',
+                '爱车贝母',
+                '腾隆',
+                '鑫峰',
+                '盛旻'
+            ];
+            var mappedSuppliers = [
+                '佛山1',
+                '佛山2',
+                '佛山3',
+                '佛山4',
+                '佛山5',
+                '佛山6',
+                '佛山7',
+                '佛山8',
+                '佛山9',
+                '佛山10',
+                '佛山11',
+                '佛山12',
+                '佛山13',
+                '佛山14',
+                '佛山15',
+                '佛山16',
+                '佛山17',
+                '佛山18'
+            ];
+
             // 获取日期范围
             var dateRangeValue = $('#dateRange').val();
             var dateRange = app.parseDateRange(dateRangeValue);
@@ -363,41 +405,61 @@
                 apiUrl += '?start_date=' + encodeURIComponent(dateRange.start) + '&end_date=' + encodeURIComponent(dateRange.end);
             }
 
+            // 显示加载动画，禁止其他操作
+            var loadIndex = layer.load(2, {shade: 0.3});
+
             $.ajax({
                 url: apiUrl,
                 type: 'GET',
                 success: function(res) {
+                    // 关闭加载动画
+                    layer.close(loadIndex);
+
                     var endTime = performance.now();
                     var duration = (endTime - startTime).toFixed(2);
                     console.log(`[⏱️ 计时] 供应商汇总数据加载完成，耗时: ${duration}ms`, res);
 
                     if(res.code === 0) {
-                        var summaryData = res.data;
-                        var dateRangeText = dateRange.start && dateRange.end ? 
-                            '（' + dateRange.start + ' 至 ' + dateRange.end + '）' : '（全部数据）';
-                        
-                        // 构建弹窗内容
-                        var content = '<table class="layui-table" style="width: 100%;">';
-                        content += '<thead><tr><th>供应商名称</th><th>上传成功</th><th>上传失败</th><th>操作</th></tr></thead>';
-                        content += '<tbody>';
-                        
-                        summaryData.forEach(function(item) {
-                            content += '<tr>';
-                            content += '<td>' + item.supplier_name + '</td>';
-                            content += '<td>' + item.success_count + '</td>';
-                            content += '<td>' + item.failed_count + '</td>';
-                            content += '<td><button class="layui-btn layui-btn-xs layui-btn-danger search-failed-btn" data-supplier="' + item.supplier_name + '">查看失败数据</button></td>';
-                            content += '</tr>';
-                        });
-                        
-                        content += '</tbody></table>';
-                        
+                    var summaryData = res.data || [];
+                    var fixedSuppliers = res.company === 'fsbbr' ? fsbbrSuppliers : mappedSuppliers;
+                    var dateRangeText = dateRange.start && dateRange.end ?
+                        '（' + dateRange.start + ' 至 ' + dateRange.end + '）' : '（全部数据）';
+
+                    // 将返回的数据转换为以供应商名称为key的map，方便查找
+                    var dataMap = {};
+                    summaryData.forEach(function(item) {
+                        dataMap[item.supplier_name] = {
+                            success_count: item.success_count || 0,
+                            failed_count: item.failed_count || 0
+                        };
+                    });
+
+                    // 构建弹窗内容
+                    var content = '<table class="layui-table" style="width: 100%;">';
+                    content += '<thead><tr><th>供应商名称</th><th>上传成功</th><th>上传失败</th><th>操作</th></tr></thead>';
+                    content += '<tbody>';
+
+                    // 按固定供应商顺序生成表格行
+                    fixedSuppliers.forEach(function(supplierName) {
+                        var data = dataMap[supplierName] || { success_count: 0, failed_count: 0 };
+                        content += '<tr>';
+                        content += '<td>' + supplierName + '</td>';
+                        content += '<td>' + data.success_count + '</td>';
+                        content += '<td>' + data.failed_count + '</td>';
+                        content += '<td><button class="layui-btn layui-btn-xs layui-btn-danger search-failed-btn" data-supplier="' + supplierName + '">查看失败数据</button></td>';
+                        content += '</tr>';
+                    });
+
+                    content += '</tbody></table>';
+
                         // 显示弹窗
                         layer.open({
                             type: 1,
                             title: '各供应商汇总' + dateRangeText,
-                            area: ['700px', '500px'],
+                            area: ['900px', '650px'],  // 放大窗口
                             content: content,
+                            shade: 0.3,  // 添加遮罩层，禁止其他操作
+                            shadeClose: false,  // 点击遮罩不关闭弹窗
                             cancel: function(){
                                 // 弹窗关闭时的回调
                             }
@@ -438,6 +500,9 @@
                     }
                 },
                 error: function(xhr, status, error) {
+                    // 关闭加载动画
+                    layer.close(loadIndex);
+
                     var endTime = performance.now();
                     var duration = (endTime - startTime).toFixed(2);
                     console.error(`[⏱️ 计时] 供应商汇总数据加载失败，耗时: ${duration}ms, 错误:`, error);
