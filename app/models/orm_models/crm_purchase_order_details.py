@@ -50,7 +50,7 @@ class CrmPurchaseOrderDetails(BaseModels):
     store = Column(String(50), nullable=True, comment="门店")
     created_at = Column(DateTime, nullable=True, default=datetime.now, comment="数据创建时间")
     updated_at = Column(DateTime, nullable=True, default=datetime.now, onupdate=datetime.now, comment="数据更新时间")
-
+    operator = Column(String(255), nullable=True, comment="操作人")
     def __repr__(self):
         """
         打印对象时显示的友好格式
@@ -95,6 +95,7 @@ class CrmPurchaseOrderDetails(BaseModels):
             "detail_is_unsalable": self.is_unsalable,
             "detail_ks_price": self.ks_price,
             "detail_store": self.store,
+            "detail_operator": self.operator,
             "detail_created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,  # pyright: ignore[reportGeneralTypeIssues]
             "detail_updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,  # pyright: ignore[reportGeneralTypeIssues]
         }

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>角色管理</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        body {
+            margin: 15px;
+            background-color: #f2f2f2;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
+
+        .search-bar {
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .search-bar label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .search-bar .layui-input-inline {
+            width: 220px;
+        }
+
+        .table-container {
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .role-perm-tree {
+            padding: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+
+        .role-perm-tree .perm-node {
+            margin-bottom: 4px;
+        }
+
+        /* 父节点（模块/目录）样式 */
+        .role-perm-tree .perm-parent {
+            font-weight: bold;
+            color: #1e9fff;
+            padding: 4px 6px;
+            border-left: 3px solid #1e9fff;
+            background: #f0f8ff;
+            border-radius: 2px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            user-select: none;
+        }
+
+        .role-perm-tree .perm-parent:hover {
+            background: #e6f3ff;
+        }
+
+        .role-perm-tree .perm-caret {
+            display: inline-block;
+            width: 14px;
+            margin-right: 4px;
+            transition: transform 0.15s;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .role-perm-tree .perm-caret.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        /* 子节点容器（可折叠） */
+        .role-perm-tree .perm-children {
+            padding-left: 22px;
+            margin-top: 4px;
+            border-left: 1px dashed #cde2f5;
+            margin-left: 10px;
+            display: block;
+        }
+
+        .role-perm-tree .perm-children.collapsed {
+            display: none;
+        }
+
+        /* 叶子（操作权限）行样式 */
+        .role-perm-tree .perm-leaf-row {
+            padding: 3px 6px;
+        }
+
+        .role-perm-tree .perm-leaf-row label {
+            display: inline-flex;
+            align-items: center;
+            min-width: 160px;
+            color: #333;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        .role-perm-tree input[type="checkbox"] {
+            margin-right: 6px;
+        }
+
+        /* 无子项提示 */
+        .role-perm-tree .perm-empty {
+            color: #999;
+            font-size: 12px;
+            padding-left: 22px;
+            font-style: italic;
+        }
+
+        .action-bar {
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 搜索栏 -->
+<div class="search-bar">
+    <label>关键字：</label>
+    <div class="layui-input-inline">
+        <input type="text" id="keywordInput" placeholder="角色名称/编码" class="layui-input" autocomplete="off">
+    </div>
+    <button class="layui-btn layui-btn-normal" id="searchBtn">
+        <i class="layui-icon layui-icon-search"></i> 搜索
+    </button>
+    <button class="layui-btn layui-btn-primary" id="resetBtn">
+        <i class="layui-icon layui-icon-refresh"></i> 重置
+    </button>
+    <div class="action-bar">
+        <button class="layui-btn" id="addRoleBtn">
+            <i class="layui-icon layui-icon-add-1"></i> 新增角色
+        </button>
+    </div>
+</div>
+
+<!-- 角色列表表格 -->
+<div class="table-container">
+    <table id="roleTable" lay-filter="roleTable"></table>
+</div>
+
+<!-- 表格操作列模板 -->
+<script type="text/html" id="tableBar">
+    <a class="layui-btn layui-btn-xs" lay-event="edit">
+        <i class="layui-icon layui-icon-edit"></i> 编辑
+    </a>
+    <a class="layui-btn layui-btn-xs layui-bg-blue" lay-event="assign">
+        <i class="layui-icon layui-icon-auz"></i> 分配权限
+    </a>
+    <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete">
+        <i class="layui-icon layui-icon-delete"></i> 删除
+    </a>
+</script>
+
+<!-- 状态显示模板 -->
+{% raw %}
+<script type="text/html" id="statusTpl">
+    {{#  if(d.status === 1){ }}
+    <span style="color: #5FB878;">启用</span>
+    {{#  } else { }}
+    <span style="color: #FF5722;">禁用</span>
+    {{#  } }}
+</script>
+{% endraw %}
+
+<!-- 新增/编辑角色弹窗 -->
+<script type="text/html" id="roleFormTpl">
+    <form class="layui-form" id="roleForm" style="padding: 20px;" lay-filter="roleForm">
+        <div class="layui-form-item">
+            <label class="layui-form-label">角色名称</label>
+            <div class="layui-input-block">
+                <input type="text" name="role_name" required lay-verify="required" placeholder="请输入角色名称" class="layui-input" autocomplete="off">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">角色编码</label>
+            <div class="layui-input-block">
+                <input type="text" name="role_code" required lay-verify="required" placeholder="如: business_manager，全局唯一" class="layui-input" autocomplete="off">
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">父角色</label>
+            <div class="layui-input-block">
+                <select name="parent_role_id" id="parentRoleSelect" lay-filter="parentRoleSelect">
+                    <option value="">无（顶级角色）</option>
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label">状态</label>
+            <div class="layui-input-block">
+                <input type="radio" name="status" value="1" title="启用" checked>
+                <input type="radio" name="status" value="0" title="禁用">
+            </div>
+        </div>
+        <div class="layui-form-item layui-form-text">
+            <label class="layui-form-label">描述</label>
+            <div class="layui-input-block">
+                <textarea name="description" placeholder="请输入角色描述" class="layui-textarea"></textarea>
+            </div>
+        </div>
+        <div class="layui-form-item">
+            <div class="layui-input-block">
+                <button type="button" class="layui-btn" id="roleSubmitBtn">保存</button>
+                <button type="button" class="layui-btn layui-btn-primary" id="roleCancelBtn">取消</button>
+            </div>
+        </div>
+    </form>
+</script>
+
+<!-- 权限分配弹窗 -->
+<script type="text/html" id="permAssignFormTpl">
+    <div style="padding: 20px;">
+        <div style="margin-bottom: 15px; color: #666;">
+            <strong id="currentRoleNameLabel">当前角色：</strong>
+            <span style="color: #1e9fff;">勾选后点击"保存分配"生效</span>
+        </div>
+        <div class="role-perm-tree" id="permTreeContainer">
+            <div style="text-align: center; padding: 50px; color: #999;">
+                <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i>
+                加载权限中...
+            </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+            <button type="button" class="layui-btn layui-btn-primary" id="permCancelBtn">关闭</button>
+            <button type="button" class="layui-btn layui-btn-normal" id="permSaveBtn">
+                <i class="layui-icon layui-icon-ok"></i> 保存分配
+            </button>
+        </div>
+    </div>
+</script>
+
+<script src="/static/layui/layui.js"></script>
+<script>
+layui.use(['table', 'layer', 'form', 'jquery'], function () {
+    var table = layui.table;
+    var layer = layui.layer;
+    var form = layui.form;
+    var $ = layui.jquery;
+
+    // 当前编辑/分配的角色 ID
+    var currentEditRoleId = null;
+    var currentAssignRoleId = null;
+
+    // ------- 角色列表表格 -------
+    table.render({
+        elem: '#roleTable',
+        url: '/new/api/system_management/roles',
+        method: 'get',
+        page: true,
+        limit: 10,
+        limits: [10, 20, 50, 100],
+        request: {
+            pageName: 'page',
+            limitName: 'limit'
+        },
+        parseData: function (res) {
+            return {
+                "code": res.code === 200 ? 0 : res.code,
+                "msg": res.msg,
+                "count": res.data ? res.data.total : 0,
+                "data": res.data ? res.data.data_list : []
+            };
+        },
+        cols: [[
+            { field: 'id', title: 'ID', width: 70, sort: true },
+            { field: 'role_name', title: '角色名称', minWidth: 140 },
+            { field: 'role_code', title: '角色编码', minWidth: 180 },
+            { field: 'parent_role_name', title: '父角色', width: 120, templet: function (d) {
+                return d.parent_role_name || '<span style="color: #999;">-</span>';
+            }},
+            { field: 'description', title: '描述', minWidth: 220 },
+            { field: 'status', title: '状态', width: 80, templet: '#statusTpl' },
+            { field: 'created_time', title: '创建时间', width: 170 },
+            { title: '操作', width: 260, fixed: 'right', toolbar: '#tableBar' }
+        ]],
+        height: 'full-200'
+    });
+
+    // ------- 搜索 / 重置 -------
+    $('#searchBtn').on('click', function () {
+        var keyword = $('#keywordInput').val().trim();
+        table.reload('roleTable', {
+            where: { keyword: keyword },
+            page: { curr: 1 }
+        });
+    });
+
+    $('#resetBtn').on('click', function () {
+        $('#keywordInput').val('');
+        table.reload('roleTable', {
+            where: {},
+            page: { curr: 1 }
+        });
+    });
+
+    // ------- 新增角色 -------
+    $('#addRoleBtn').on('click', function () {
+        currentEditRoleId = null;
+        openRoleDialog(null);
+    });
+
+    // ------- 表格工具条事件 -------
+    table.on('tool(roleTable)', function (obj) {
+        var data = obj.data;
+        var event = obj.event;
+
+        if (event === 'edit') {
+            currentEditRoleId = data.id;
+            openRoleDialog(data);
+        } else if (event === 'delete') {
+            layer.confirm('确定要删除角色 "' + data.role_name + '" 吗？', {
+                title: '删除确认',
+                icon: 3
+            }, function (index) {
+                layer.close(index);
+                $.ajax({
+                    url: '/new/api/system_management/roles/' + data.id,
+                    type: 'DELETE',
+                    success: function (res) {
+                        if (res.code === 200) {
+                            layer.msg(res.msg || '删除成功', { icon: 1 });
+                            obj.del();
+                        } else {
+                            layer.msg(res.msg || '删除失败', { icon: 2 });
+                        }
+                    },
+                    error: function () {
+                        layer.msg('请求失败，请检查网络', { icon: 2 });
+                    }
+                });
+            });
+        } else if (event === 'assign') {
+            currentAssignRoleId = data.id;
+            openPermAssignDialog(data);
+        }
+    });
+
+    // ------- 打开新增/编辑角色弹窗 -------
+    function openRoleDialog(roleData) {
+        var isEdit = !!roleData;
+        var title = isEdit ? '编辑角色' : '新增角色';
+
+        layer.open({
+            type: 1,
+            title: title,
+            area: ['560px', '520px'],
+            content: $('#roleFormTpl').html(),
+            success: function (layero, index) {
+                // 先加载父角色下拉列表
+                loadParentRoles(function (roles) {
+                    var selectHtml = '<option value="">无（顶级角色）</option>';
+                    $.each(roles, function (i, r) {
+                        // 编辑模式下排除自身和自己的子孙角色（这里简单排除自身）
+                        if (isEdit && r.id === roleData.id) {
+                            return true;
+                        }
+                        var selected = (isEdit && r.id === roleData.parent_role_id) ? 'selected' : '';
+                        selectHtml += '<option value="' + r.id + '" ' + selected + '>' + r.role_name + '</option>';
+                    });
+                    $('#parentRoleSelect').html(selectHtml);
+                    form.render('select');
+                });
+
+                // 编辑模式：填充数据
+                if (isEdit) {
+                    form.val('roleForm', {
+                        role_name: roleData.role_name || '',
+                        role_code: roleData.role_code || '',
+                        description: roleData.description || '',
+                        status: String(roleData.status === undefined ? 1 : roleData.status)
+                    });
+                }
+
+                // 取消按钮
+                layero.find('#roleCancelBtn').on('click', function () {
+                    layer.close(index);
+                });
+
+                // 保存按钮
+                layero.find('#roleSubmitBtn').on('click', function () {
+                    var formData = {
+                        role_name: layero.find('input[name="role_name"]').val().trim(),
+                        role_code: layero.find('input[name="role_code"]').val().trim(),
+                        description: layero.find('textarea[name="description"]').val().trim(),
+                        parent_role_id: layero.find('select[name="parent_role_id"]').val() || null,
+                        status: parseInt(layero.find('input[name="status"]:checked').val() || '1', 10)
+                    };
+
+                    if (!formData.role_name) {
+                        layer.msg('请输入角色名称', { icon: 2 });
+                        return;
+                    }
+                    if (!formData.role_code) {
+                        layer.msg('请输入角色编码', { icon: 2 });
+                        return;
+                    }
+
+                    var ajaxConfig = {
+                        url: '/new/api/system_management/roles',
+                        type: 'POST',
+                        data: JSON.stringify(formData),
+                        contentType: 'application/json'
+                    };
+
+                    if (isEdit) {
+                        ajaxConfig.url = '/new/api/system_management/roles/' + currentEditRoleId;
+                        ajaxConfig.type = 'PUT';
+                    }
+
+                    $.ajax({
+                        ...ajaxConfig,
+                        success: function (res) {
+                            if (res.code === 200) {
+                                layer.msg(res.msg || (isEdit ? '更新成功' : '创建成功'), { icon: 1 });
+                                layer.close(index);
+                                table.reload('roleTable');
+                            } else {
+                                layer.msg(res.msg || '操作失败', { icon: 2 });
+                            }
+                        },
+                        error: function () {
+                            layer.msg('请求失败，请检查网络', { icon: 2 });
+                        }
+                    });
+                });
+            }
+        });
+    }
+
+    // ------- 加载所有角色（用于父角色下拉） -------
+    function loadParentRoles(callback) {
+        $.ajax({
+            url: '/new/api/system_management/roles/all',
+            type: 'GET',
+            success: function (res) {
+                if (res.code === 200 && Array.isArray(res.data)) {
+                    callback(res.data);
+                } else {
+                    callback([]);
+                }
+            },
+            error: function () {
+                callback([]);
+            }
+        });
+    }
+
+    // ------- 打开权限分配弹窗 -------
+    function openPermAssignDialog(roleData) {
+        layer.open({
+            type: 1,
+            title: '分配权限 - ' + (roleData.role_name || ''),
+            area: ['720px', '560px'],
+            content: $('#permAssignFormTpl').html(),
+            success: function (layero, index) {
+                $('#currentRoleNameLabel').text('当前角色：' + (roleData.role_name || ''));
+
+                // 加载权限列表 + 当前角色已分配权限
+                $.when(
+                    $.ajax({ url: '/new/api/system_management/permissions/all', type: 'GET' }),
+                    $.ajax({ url: '/new/api/system_management/roles/' + currentAssignRoleId + '/permissions', type: 'GET' })
+                ).done(function (permRes, rolePermRes) {
+                    var allPermissions = (permRes[0] && permRes[0].code === 200 && permRes[0].data) ? permRes[0].data : [];
+                    var assignedPermissions = (rolePermRes[0] && rolePermRes[0].code === 200 && rolePermRes[0].data) ? rolePermRes[0].data : [];
+
+                    // 提取已分配的权限 ID
+                    var assignedIds = assignedPermissions.map(function (p) { return p.id; });
+
+                    // 按模块分组渲染权限
+                    renderPermissionTree(allPermissions, assignedIds, layero);
+                }).fail(function () {
+                    $('#permTreeContainer', layero).html('<div style="text-align:center; padding: 50px; color: #FF5722;">权限加载失败</div>');
+                });
+
+                // 取消按钮
+                layero.find('#permCancelBtn').on('click', function () {
+                    layer.close(index);
+                });
+
+                // 保存权限分配
+                layero.find('#permSaveBtn').on('click', function () {
+                    var selectedIds = [];
+                    layero.find('#permTreeContainer input.perm-checkbox:checked').each(function () {
+                        selectedIds.push(parseInt($(this).val(), 10));
+                    });
+
+                    $.ajax({
+                        url: '/new/api/system_management/roles/' + currentAssignRoleId + '/permissions',
+                        type: 'PUT',
+                        data: JSON.stringify({ permission_ids: selectedIds }),
+                        contentType: 'application/json',
+                        success: function (res) {
+                            if (res.code === 200) {
+                                layer.msg(res.msg || '权限分配成功', { icon: 1 });
+                                layer.close(index);
+                            } else {
+                                layer.msg(res.msg || '保存失败', { icon: 2 });
+                            }
+                        },
+                        error: function () {
+                            layer.msg('请求失败，请检查网络', { icon: 2 });
+                        }
+                    });
+                });
+            }
+        });
+    }
+
+    // ------- 渲染权限树（递归渲染 children 多层级结构） -------
+    function renderPermissionTree(allPermissions, assignedIds, layero) {
+        var container = $('#permTreeContainer', layero);
+
+        // 兼容旧格式：若后端返回扁平结构（没有 children），
+        // 则在此处基于 parent_permission_id 再构建一次树
+        var treeData = normalizeToTree(allPermissions);
+
+        if (!treeData || treeData.length === 0) {
+            container.html('<div style="text-align:center; padding: 50px; color: #999;">暂无权限数据</div>');
+            return;
+        }
+
+        // 构建 HTML：递归渲染每个节点
+        var html = '<div class="perm-tree-root">';
+        for (var i = 0; i < treeData.length; i++) {
+            html += renderNode(treeData[i], assignedIds, 0);
+        }
+        html += '</div>';
+
+        container.html(html);
+
+        // ------ 折叠/展开：点击节点标题 ------
+        container.find('.perm-parent').on('click', function (e) {
+            // 点击复选框本身时不触发折叠
+            if ($(e.target).is('input')) return;
+            var $this = $(this);
+            var $children = $this.next('.perm-children');
+            var $caret = $this.find('.perm-caret');
+            if ($children.length > 0) {
+                $children.toggleClass('collapsed');
+                $caret.toggleClass('collapsed');
+            }
+        });
+
+        // ------ 联动逻辑：父节点勾选/取消时同步所有后代 ------
+        container.find('input.perm-checkbox').on('change', function () {
+            var isChecked = $(this).prop('checked');
+            var $node = $(this).closest('.perm-node');
+            // 向下：勾选/取消所有后代
+            $node.find('.perm-children input.perm-checkbox').prop('checked', isChecked);
+
+            // 向上：若有任意子节点被勾选，则父节点必须勾选；
+            // 若所有子节点都未勾选，父节点保持当前状态（但不强求取消）
+            syncAncestors($node);
+        });
+    }
+
+    /**
+     * 将后端返回的数据标准化为树结构。
+     * 若数据本身已经是树（节点有 children 数组且 children 非空），则直接使用；
+     * 若是扁平结构（没有 children 或 children 为空但 parent_permission_id 有值），
+     * 则基于 parent_permission_id 在前端构建一次树以保证兼容性。
+     */
+    function normalizeToTree(list) {
+        if (!Array.isArray(list)) return [];
+
+        // 检测是否已树形结构：任一节点存在 children 数组则视为已结构化
+        var hasTreeStructure = false;
+        for (var i = 0; i < list.length; i++) {
+            if (Array.isArray(list[i].children) && list[i].children.length > 0) {
+                hasTreeStructure = true;
+                break;
+            }
+        }
+
+        if (hasTreeStructure) {
+            // 深拷贝并确保每个节点都有 children 字段（递归确保）
+            return cloneWithChildren(list);
+        }
+
+        // 扁平结构：构建 id -> 节点 map，并组装 children
+        var flat = cloneWithChildren(list);
+        var idMap = {};
+        for (var k = 0; k < flat.length; k++) {
+            idMap[flat[k].id] = flat[k];
+        }
+        var roots = [];
+        var orphanOps = [];
+        for (var j = 0; j < flat.length; j++) {
+            var node = flat[j];
+            var pid = node.parent_permission_id;
+            if (pid === null || pid === undefined || pid === '') {
+                roots.push(node);
+            } else if (idMap[pid]) {
+                idMap[pid].children.push(node);
+            } else {
+                // 找不到父节点：操作权限放到"其他"，其他类型作为根
+                if (node.type === 2 || node.type === '2') {
+                    orphanOps.push(node);
+                } else {
+                    roots.push(node);
+                }
+            }
+        }
+        if (orphanOps.length > 0) {
+            roots.push({
+                id: 0,
+                permission_name: '其他',
+                permission_code: 'module:other',
+                parent_permission_id: null,
+                type: 1,
+                status: 1,
+                children: orphanOps
+            });
+        }
+        return roots;
+    }
+
+    function cloneWithChildren(list) {
+        var result = [];
+        for (var i = 0; i < list.length; i++) {
+            var src = list[i];
+            var node = {
+                id: src.id,
+                permission_name: src.permission_name,
+                permission_code: src.permission_code,
+                parent_permission_id: src.parent_permission_id,
+                type: src.type,
+                status: src.status,
+                children: Array.isArray(src.children) ? cloneWithChildren(src.children) : []
+            };
+            result.push(node);
+        }
+        return result;
+    }
+
+    /**
+     * 递归渲染单个节点（及其 children）
+     *  - 有 children：作为父节点（可折叠、有复选框联动）
+     *  - 无 children：作为叶子（单纯的复选框）
+     */
+    function renderNode(node, assignedIds, depth) {
+        var id = node.id;
+        var name = node.permission_name || '(未命名权限)';
+        var code = node.permission_code || '';
+        var hasChildren = Array.isArray(node.children) && node.children.length > 0;
+        var isChecked = assignedIds.indexOf(id) !== -1;
+        var title = code ? (name + ' (' + code + ')') : name;
+
+        var html = '<div class="perm-node" data-id="' + id + '">';
+
+        if (hasChildren) {
+            // 父节点（模块/目录）
+            html += '<div class="perm-parent">';
+            html += '<span class="perm-caret">▼</span>';
+            html += '<label style="margin:0;"><input type="checkbox" class="perm-checkbox" value="' + id + '" ' + (isChecked ? 'checked' : '') + '> ' + escapeHtml(title) + '</label>';
+            html += '</div>';
+            html += '<div class="perm-children">';
+            for (var i = 0; i < node.children.length; i++) {
+                html += renderNode(node.children[i], assignedIds, depth + 1);
+            }
+            html += '</div>';
+        } else {
+            // 叶子节点（操作权限）
+            html += '<div class="perm-leaf-row">';
+            html += '<label><input type="checkbox" class="perm-checkbox" value="' + id + '" ' + (isChecked ? 'checked' : '') + '> ' + escapeHtml(title) + '</label>';
+            html += '</div>';
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * 向上同步：若当前节点的任一兄弟被勾选，则父节点保持/变为选中状态
+     */
+    function syncAncestors($node) {
+        var $parent = $node.parent().closest('.perm-node');
+        if ($parent.length === 0) return;
+        var $parentCheckbox = $parent.children('.perm-parent').find('> label > input.perm-checkbox');
+        if ($parentCheckbox.length === 0) return;
+
+        // 统计父节点下所有直接子节点的选中情况
+        var anyChecked = false;
+        $parent.children('.perm-children').find('> .perm-node > .perm-parent > label > input.perm-checkbox, > .perm-node > .perm-leaf-row > label > input.perm-checkbox').each(function () {
+            if ($(this).prop('checked')) {
+                anyChecked = true;
+                return false; // break
+            }
+        });
+        // 更宽泛地：检查父节点的 children 容器内所有 checkbox
+        if (!anyChecked) {
+            $parent.find('.perm-children input.perm-checkbox').each(function () {
+                if ($(this).prop('checked')) {
+                    anyChecked = true;
+                    return false;
+                }
+            });
+        }
+
+        if (anyChecked) {
+            $parentCheckbox.prop('checked', true);
+        }
+        // 继续向上递归
+        syncAncestors($parent);
+    }
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+});
+</script>
+
+</body>
+</html>

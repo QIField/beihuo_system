@@ -45,6 +45,18 @@
             --ag-selected-row-background-color: #e6f7ff;
         }
 
+        /* 允许 ag-grid 表格内的文本选择，便于用户手动选中复制 */
+        .ag-theme-alpine .ag-cell,
+        .ag-theme-alpine .ag-cell-value,
+        .ag-theme-alpine .ag-row,
+        #superSessionGrid,
+        #superSessionGrid * {
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+        }
+
         body {
             font-family: -apple-system, BlMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: #f0f2f5;
@@ -1423,6 +1435,19 @@
       // 列定义
       var columnDefs = [
         {
+          headerName: '操作',
+          field: 'action',
+          width: 100,
+          pinned: 'right',
+          suppressMovable: true,
+          cellRenderer: function(params) {
+            var pn = params.data.partNumber ? params.data.partNumber.replace(/\s+/g, '') : '';
+            return '<button type="button" class="layui-btn layui-btn-xs copy-chain-btn" ' +
+                   'data-part-number="' + pn + '" ' +
+                   'style="padding: 2px 10px;">复制</button>';
+          }
+        },
+        {
           field: 'partNumber',
           headerName: '零件编号',
           width: 220,
@@ -1464,6 +1489,134 @@
         selectElement.addEventListener('change', function(e) {
           filterAndRenderSuperSession(e.target.value);
         });
+      }
+
+      // 事件委托：给表格内的复制按钮绑定点击事件
+      gridElement.addEventListener('click', function(e) {
+        var target = e.target;
+        if (target && target.classList && target.classList.contains('copy-chain-btn')) {
+          var partNumber = target.getAttribute('data-part-number');
+          copyReplacementChain(partNumber);
+        }
+      });
+    }
+
+    // 向上追溯替换链并复制到剪贴板
+    // 逻辑：从目标行开始，沿 level 向上查找父节点，直到根节点
+    // 结果顺序：当前节点 → 父节点 → 祖父节点 → ... （由下往上）
+    function copyReplacementChain(targetPartNumber) {
+      if (!superSessionGridApi) {
+        layui.layer.msg('暂无数据', { icon: 0 });
+        return;
+      }
+
+      var cleanTarget = targetPartNumber ? targetPartNumber.replace(/\s+/g, '') : '';
+      if (!cleanTarget) {
+        layui.layer.msg('未找到零件编号', { icon: 0 });
+        return;
+      }
+
+      // 1. 获取当前 ag-grid 显示的所有行（按渲染顺序，前面的是上层/根）
+      var allRows = [];
+      superSessionGridApi.forEachNode(function(node) {
+        allRows.push(node.data);
+      });
+
+      if (allRows.length === 0) {
+        layui.layer.msg('暂无数据可复制', { icon: 0 });
+        return;
+      }
+
+      // 2. 找到目标行的索引
+      var targetIdx = -1;
+      for (var i = 0; i < allRows.length; i++) {
+        var pn = allRows[i].partNumber ? allRows[i].partNumber.replace(/\s+/g, '') : '';
+        if (pn === cleanTarget) {
+          targetIdx = i;
+          break;
+        }
+      }
+
+      if (targetIdx === -1) {
+        layui.layer.msg('未找到目标行', { icon: 0 });
+        return;
+      }
+
+      // 3. 从目标行向上追溯，按 level 收集路径
+      //    顺序：当前节点 → 父节点 → 祖父节点 → ... 直到根节点
+      var chain = [];
+      var currentIdx = targetIdx;
+      var currentLevel = allRows[currentIdx].level;
+
+      // 首先加入当前节点
+      chain.push(allRows[currentIdx].partNumber);
+
+      // 向上查找父链：每次找前面最近的 level = currentLevel - 1 的行
+      while (currentLevel > 0) {
+        var parentLevel = currentLevel - 1;
+        var foundIdx = -1;
+
+        // 从当前行的前面一行开始往前找
+        for (var j = currentIdx - 1; j >= 0; j--) {
+          if (allRows[j].level === parentLevel) {
+            foundIdx = j;
+            break;
+          }
+        }
+
+        if (foundIdx === -1) {
+          // 找不到父节点，停止
+          break;
+        }
+
+        chain.push(allRows[foundIdx].partNumber);
+        currentIdx = foundIdx;
+        currentLevel = parentLevel;
+      }
+
+      // 4. 用 \n 连接并复制
+      var textToCopy = chain.join('\n');
+
+      // 复制到剪贴板（现代 API + 兼容方案）
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(textToCopy).then(function() {
+          layui.layer.msg('已复制 ' + chain.length + ' 个零件编号', { icon: 1 });
+        }).catch(function() {
+          fallbackCopyTextChain(textToCopy, chain.length);
+        });
+      } else {
+        fallbackCopyTextChain(textToCopy, chain.length);
+      }
+    }
+
+    // 兼容旧浏览器的复制方法
+    function fallbackCopyTextChain(text, count) {
+      try {
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.top = '0';
+        textarea.style.left = '0';
+        textarea.style.width = '2em';
+        textarea.style.height = '2em';
+        textarea.style.padding = '0';
+        textarea.style.border = 'none';
+        textarea.style.outline = 'none';
+        textarea.style.boxShadow = 'none';
+        textarea.style.background = 'transparent';
+        document.body.appendChild(textarea);
+        textarea.select();
+        textarea.setSelectionRange(0, text.length);
+        var successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        if (successful) {
+          layui.layer.msg('已复制 ' + count + ' 个零件编号', { icon: 1 });
+        } else {
+          layui.layer.msg('复制失败，请手动复制', { icon: 2 });
+        }
+      } catch (e) {
+        layui.layer.msg('复制失败: ' + e.message, { icon: 2 });
       }
     }
 

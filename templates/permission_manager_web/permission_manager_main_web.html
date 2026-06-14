@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>权限管理系统</title>
+  <link rel="stylesheet" href="/static/layui/css/layui.css">
+</head>
+<body class="layui-layout-body">
+  <div class="layui-layout layui-layout-admin">
+ 
+    <!-- 侧边导航 -->
+    <div class="layui-side layui-bg-black">
+      <div class="layui-side-scroll">
+        <ul class="layui-nav layui-nav-tree" lay-filter="side-nav">
+          <li class="layui-nav-item layui-nav-itemed"><a href="#/permission_list">权限管理</a></li>
+          <li class="layui-nav-item"><a href="#/role_management">角色管理</a></li>
+          <li class="layui-nav-item"><a href="#/user_role_assignment">用户角色分配</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 主内容区（路由视图出口） -->
+    <div class="layui-body" id="main-view" style="padding: 15px;">
+      <!-- 页面内容动态加载 -->
+    </div>
+  </div>
+
+  <script src="/static/layui/layui.js"></script>
+  <script>
+  layui.use(['jquery', 'layer', 'table', 'form', 'dropdown'], function(){
+    const $ = layui.jquery;
+
+    // 1. 路由表（值为完整路由路径）
+    const routes = {
+      '/permission_list': '/web/permission_manager/permission_list',
+      '/role_management': '/web/permission_manager/role_management',
+      '/user_role_assignment': '/web/permission_manager/user_role_assignment'
+    };
+
+    // 2. 渲染视图函数
+    function renderView() {
+      const hash = location.hash.replace('#', '') || '/permission_list';
+      const url = routes[hash];
+      if (!url) {
+        $('#main-view').html('<div>404 页面不存在</div>');
+        return;
+      }
+      // 加载HTML片段
+      $('#main-view').load(url, function(response, status, xhr){
+        if (status === 'error') {
+          $('#main-view').html('<div>页面加载失败: ' + xhr.status + ' ' + xhr.statusText + '</div>');
+        }
+      });
+    }
+
+    // 3. 监听hash变化
+    window.addEventListener('hashchange', renderView);
+    renderView(); // 首次加载
+  });
+  </script>
+</body>
+</html>

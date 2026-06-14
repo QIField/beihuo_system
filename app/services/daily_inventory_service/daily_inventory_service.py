@@ -12,9 +12,64 @@
 
 from app.models.orm_models.crm_purchase_order_list import CrmPurchaseOrderList
 from app.models.orm_models.crm_purchase_order_details import CrmPurchaseOrderDetails
+from app.models.orm_models.system_models.crmapp_users import CrmappUsers
 from app.utils.orm.session import orm_session
 from sqlalchemy import func
 from typing import Dict, Optional
+
+
+def mark_order_detail_viewed(purchase_order_line_id: int, user_id: int) -> Optional[Dict]:
+    """
+    标记订单明细为已查看，更新操作人字段
+
+    :param purchase_order_line_id: 订单明细ID
+    :param user_id: 当前登录用户ID，用于查询用户名写入操作人字段
+    :return: 包含状态和消息的字典，失败时返回None
+    """
+    try:
+        with orm_session() as session:
+            # 1. 通过用户ID查询用户名
+            user = session.query(CrmappUsers).filter(
+                CrmappUsers.id == user_id
+            ).first()
+
+            if not user:
+                return {
+                    'status': False,
+                    'msg': '用户不存在，请重新登录',
+                    'data': None
+                }
+
+            operator = user.username
+
+            # 2. 查询订单明细记录
+            detail = session.query(CrmPurchaseOrderDetails).filter(
+                CrmPurchaseOrderDetails.purchase_order_line_id == purchase_order_line_id
+            ).first()
+
+            if not detail:
+                return {
+                    'status': False,
+                    'msg': '订单明细不存在',
+                    'data': None
+                }
+
+            # 3. 更新操作人字段
+            detail.operator = operator  # pyright: ignore[reportAttributeAccessIssue]
+            session.commit()
+
+            return {
+                'status': True,
+                'msg': '确认查看成功',
+                'data': {
+                    'purchase_order_line_id': purchase_order_line_id,
+                    'operator': operator
+                }
+            }
+    except Exception as e:
+        error_msg = f'标记查看失败: {str(e)}'
+        print(error_msg)
+        return {'status': False, 'msg': error_msg, 'data': None}
 
 
 def get_purchase_order_list_with_details(page: int = 1, page_size: int = 10, date: str = '', keyword: str = '', order_type: str = '', business_type: str = '') -> Optional[Dict]:
@@ -132,6 +187,6 @@ def get_purchase_order_list_with_details(page: int = 1, page_size: int = 10, dat
 
 
 
-if __name__ == '__main__':
-    data = get_purchase_order_list_with_details(page_size=3)
-    print(data)
+# if __name__ == '__main__':
+#     data = get_purchase_order_list_with_details(page_size=3)
+#     print(data)

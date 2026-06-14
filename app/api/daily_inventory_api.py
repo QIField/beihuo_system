@@ -10,9 +10,11 @@
 提供采购订单列表及其明细的查询接口
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
+from app.core.permission.decorators import require_authentication, require_permission
 from app.services.daily_inventory_service.daily_inventory_service import get_purchase_order_list_with_details
 from app.services.daily_inventory_service.daily_inventory_crawler import daily_inventory_crawler_service
+from app.services.daily_inventory_service.daily_inventory_service import mark_order_detail_viewed
 
 
 
@@ -21,6 +23,7 @@ daily_inventory_bp = Blueprint('daily_inventory_bp', __name__, url_prefix='/dail
 
 
 @daily_inventory_bp.route('/purchase-orders', methods=['GET'])
+# @require_permission('daily_inventory:update')
 def api_get_purchase_orders():
     """
     获取采购订单列表及其明细（按订单分页）
@@ -108,6 +111,7 @@ def api_get_purchase_orders():
 
 
 @daily_inventory_bp.route('/update-data', methods=['POST'])
+# @require_permission('daily_inventory:update')
 def api_update_daily_inventory():
     """
     触发每日库存数据更新（同步执行）
@@ -165,6 +169,100 @@ def api_update_daily_inventory():
             'msg': f'触发更新失败: {str(e)}',
             'data': None
         })
+
+
+@daily_inventory_bp.route('/mark-viewed', methods=['POST'])
+@require_permission('daily_inventory:tag_view')
+def api_mark_order_detail_viewed():
+    """
+    标记订单明细为已查看，更新操作人字段为当前登录用户
+
+    请求参数 (JSON body):
+        - purchase_order_line_id: 订单明细ID（必需）
+
+    返回:
+        {
+            "code": 200,
+            "msg": "确认查看成功",
+            "data": {
+                "purchase_order_line_id": 123,
+                "operator": "username"
+            }
+        }
+    """
+    try:
+        # 检查用户是否登录
+        if 'logged_in' not in session:
+            return jsonify({
+                'code': 401,
+                'msg': '未登录，请先登录',
+                'data': None
+            }), 401
+
+        # 获取当前登录用户ID
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({
+                'code': 401,
+                'msg': '用户信息异常，请重新登录',
+                'data': None
+            }), 401
+
+        # 将user_id转换为整数
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            return jsonify({
+                'code': 401,
+                'msg': '用户ID格式异常，请重新登录',
+                'data': None
+            }), 401
+
+        # 获取请求参数
+        data = request.get_json() or {}
+        purchase_order_line_id = data.get('purchase_order_line_id')
+
+        # 参数验证
+        if not purchase_order_line_id:
+            return jsonify({
+                'code': 400,
+                'msg': '订单明细ID不能为空',
+                'data': None
+            }), 400
+
+        # 转换ID为整数
+        try:
+            purchase_order_line_id = int(purchase_order_line_id)
+        except (ValueError, TypeError):
+            return jsonify({
+                'code': 400,
+                'msg': '订单明细ID必须是整数',
+                'data': None
+            }), 400
+
+        # 调用服务层更新操作人（传入user_id，服务层会查询用户名）
+        result = mark_order_detail_viewed(purchase_order_line_id, user_id)
+
+        if result and result.get('status'):
+            return jsonify({
+                'code': 200,
+                'msg': result.get('msg', '确认查看成功'),
+                'data': result.get('data')
+            })
+        else:
+            return jsonify({
+                'code': 500,
+                'msg': result.get('msg', '确认查看失败') if result else '确认查看失败',
+                'data': None
+            }), 500
+
+    except Exception as e:
+        print(f'[daily_inventory_api] 标记查看异常: {str(e)}')
+        return jsonify({
+            'code': 500,
+            'msg': f'确认查看失败: {str(e)}',
+            'data': None
+        }), 500
 
 
 

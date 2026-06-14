@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>权限列表</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        .container { padding: 20px; }
+        .search-bar {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f7f7f7;
+            border-radius: 6px;
+        }
+        .search-bar .layui-inline { margin-right: 15px; margin-bottom: 10px; }
+        .layui-table-view { border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <blockquote class="layui-elem-quote">权限列表管理</blockquote>
+
+        <!-- 搜索栏 -->
+        <div class="search-bar">
+            <div class="layui-inline">
+                <input type="text" id="keyword" placeholder="请输入权限名称或编码" autocomplete="off" class="layui-input" style="width: 240px;">
+            </div>
+            <div class="layui-inline">
+                <select id="permType" lay-filter="permTypeFilter">
+                    <option value="">全部类型</option>
+                    <option value="1">模块权限</option>
+                    <option value="2">操作权限</option>
+                </select>
+            </div>
+            <div class="layui-inline">
+                <button class="layui-btn layui-btn-normal" id="btnSearch">
+                    <i class="layui-icon layui-icon-search"></i> 搜索
+                </button>
+                <button class="layui-btn layui-btn-primary" id="btnReset">
+                    <i class="layui-icon layui-icon-refresh"></i> 重置
+                </button>
+                <button class="layui-btn layui-btn-normal" id="btnAdd" style="margin-left: 20px;">
+                    <i class="layui-icon layui-icon-add-1"></i> 新增权限
+                </button>
+            </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <table id="permissionTable" lay-filter="permissionTable"></table>
+    </div>
+
+    <!-- 新增/编辑 弹窗表单模板 -->
+    <script type="text/html" id="permissionForm">
+        <form class="layui-form layui-form-pane" lay-filter="permissionForm" style="padding: 20px;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">权限名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="permission_name" lay-verify="required" placeholder="如：删除购物车" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">权限编码</label>
+                <div class="layui-input-block">
+                    <input type="text" name="permission_code" lay-verify="required" placeholder="如：cart:delete" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">权限类型</label>
+                <div class="layui-input-block">
+                    <select name="type" id="formType">
+                        <option value="1">模块权限</option>
+                        <option value="2" selected>操作权限</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">父权限</label>
+                <div class="layui-input-block">
+                    <select name="parent_permission_id" id="formParent">
+                        <option value="">无</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item layui-form-text">
+                <label class="layui-form-label">描述</label>
+                <div class="layui-input-block">
+                    <textarea name="description" placeholder="请输入描述（可选）" class="layui-textarea" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="layui-form-item" pane>
+                <label class="layui-form-label">状态</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="status" lay-skin="switch" lay-text="启用|禁用" checked>
+                </div>
+            </div>
+            <button type="submit" lay-submit lay-filter="permissionForm" style="display:none;"></button>
+        </form>
+    </script>
+
+    <!-- 操作列按钮模板 -->
+    <script type="text/html" id="tableBar">
+        <a class="layui-btn layui-btn-xs" lay-event="edit">
+            <i class="layui-icon layui-icon-edit"></i> 编辑
+        </a>
+        <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="del">
+            <i class="layui-icon layui-icon-delete"></i> 删除
+        </a>
+    </script>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+        layui.use(['table', 'layer', 'form', 'jquery'], function(){
+            var table = layui.table;
+            var layer = layui.layer;
+            var form = layui.form;
+            var $ = layui.jquery;
+            var modalIndex;       // 弹窗索引
+            var isEdit = false;   // 是否编辑模式
+            var editId = null;    // 正在编辑的权限ID
+
+            // ============== 1. 渲染数据表格 ==============
+            table.render({
+                elem: '#permissionTable',
+                url: '/new/api/system_management/permissions',
+                method: 'get',
+                page: true,
+                limit: 10,
+                limits: [10, 20, 50, 100],
+                request: {
+                    pageName: 'page',
+                    limitName: 'limit'
+                },
+                parseData: function(res){
+                    return {
+                        "code": res.code === 200 ? 0 : res.code,
+                        "msg": res.msg,
+                        "count": res.data ? res.data.total : 0,
+                        "data": res.data ? res.data.data_list : []
+                    };
+                },
+                cols: [[
+                    {field: 'id', title: 'ID', width: 70, sort: true},
+                    {field: 'permission_name', title: '权限名称', minWidth: 160},
+                    {field: 'permission_code', title: '权限编码', minWidth: 160},
+                    {field: 'type_name', title: '类型', width: 100, templet: function(d){
+                        return '<span class="layui-badge' + (d.type === 1 ? ' layui-bg-blue' : '') + '">' + d.type_name + '</span>';
+                    }},
+                    {field: 'status', title: '状态', width: 80, templet: function(d){
+                        return d.status === 1
+                            ? '<span style="color: #5FB878;">启用</span>'
+                            : '<span style="color: #FF5722;">禁用</span>';
+                    }},
+                    {field: 'description', title: '描述', minWidth: 200},
+                    {field: 'created_time', title: '创建时间', width: 170},
+                    {field: 'updated_time', title: '更新时间', width: 170},
+                    {title: '操作', width: 160, fixed: 'right', toolbar: '#tableBar'}
+                ]],
+                height: 'full-200'
+            });
+
+            // ============== 2. 搜索/重置按钮 ==============
+            $('#btnSearch').on('click', function(){
+                var keyword = $('#keyword').val().trim();
+                var permType = $('#permType').val();
+                table.reload('permissionTable', {
+                    where: { keyword: keyword, type: permType },
+                    page: { curr: 1 }
+                });
+            });
+
+            $('#btnReset').on('click', function(){
+                $('#keyword').val('');
+                $('#permType').val('');
+                form.render('select');
+                table.reload('permissionTable', { where: {}, page: { curr: 1 } });
+            });
+
+            // ============== 3. 新增按钮 ==============
+            $('#btnAdd').on('click', function(){ openAddModal(); });
+
+            // ============== 4. 监听行工具事件（编辑/删除） ==============
+            table.on('tool(permissionTable)', function(obj){
+                var data = obj.data;
+                if (obj.event === 'edit') { openEditModal(data); }
+                else if (obj.event === 'del') { doDelete(data); }
+            });
+
+            // ============== 5. 监听表单提交 ==============
+            form.on('submit(permissionForm)', function(data){
+                var formData = data.field;
+                // 状态 checkbox：on -> 1，未选中 -> 0
+                formData.status = formData.status === 'on' ? 1 : 0;
+                // 空值的父权限ID处理：'' -> null
+                if (formData.parent_permission_id === '' || formData.parent_permission_id === '0') {
+                    formData.parent_permission_id = null;
+                }
+
+                if (isEdit && editId) { doUpdate(formData); }
+                else { doCreate(formData); }
+                return false;  // 阻止表单默认提交
+            });
+
+            // ============== 6. 打开新增弹窗 ==============
+            function openAddModal() {
+                isEdit = false;
+                editId = null;
+
+                modalIndex = layer.open({
+                    type: 1,
+                    title: '新增权限',
+                    area: ['600px', '520px'],
+                    content: $('#permissionForm').html(),
+                    btn: ['确定', '取消'],
+                    yes: function(index, layero){
+                        layero.find('button[lay-submit]').trigger('click');
+                    },
+                    success: function(layero, index){
+                        // 加载父权限下拉（仅模块权限可选）
+                        loadParentOptions();
+                        form.render();
+                    }
+                });
+            }
+
+            // ============== 7. 打开编辑弹窗 ==============
+            function openEditModal(data) {
+                isEdit = true;
+                editId = data.id;
+
+                modalIndex = layer.open({
+                    type: 1,
+                    title: '编辑权限',
+                    area: ['600px', '520px'],
+                    content: $('#permissionForm').html(),
+                    btn: ['确定', '取消'],
+                    yes: function(index, layero){
+                        layero.find('button[lay-submit]').trigger('click');
+                    },
+                    success: function(layero, index){
+                        // 先加载父权限下拉
+                        loadParentOptions(function(){
+                            // 回填数据
+                            layero.find('input[name="permission_name"]').val(data.permission_name);
+                            layero.find('input[name="permission_code"]').val(data.permission_code);
+                            layero.find('textarea[name="description"]').val(data.description || '');
+                            layero.find('select[name="type"]').val(data.type);
+                            layero.find('select[name="parent_permission_id"]').val(data.parent_permission_id || '');
+                            if (data.status === 1) {
+                                layero.find('input[name="status"]').prop('checked', true);
+                            }
+                            form.render();
+                        });
+                    }
+                });
+            }
+
+            // ============== 8. 加载父权限下拉列表（只显示模块权限） ==============
+            function loadParentOptions(callback) {
+                $.ajax({
+                    url: '/new/api/system_management/permissions/modules',
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(res){
+                        var html = '<option value="">无</option>';
+                        if (res.code === 200 && Array.isArray(res.data)) {
+                            // 后端已过滤 type=1，直接渲染所有条目
+                            res.data.forEach(function(item){
+                                html += '<option value="' + item.id + '">' + item.permission_name + '</option>';
+                            });
+                        }
+                        $('select[name="parent_permission_id"]').html(html);
+                        form.render('select');
+                        if (callback) callback();
+                    },
+                    error: function(){
+                        $('select[name="parent_permission_id"]').html('<option value="">无</option>');
+                        form.render('select');
+                        if (callback) callback();
+                    }
+                });
+            }
+
+            // ============== 9. 提交新增 ==============
+            function doCreate(formData) {
+                $.ajax({
+                    url: '/new/api/system_management/permissions',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: function(res){
+                        if (res.code === 200) {
+                            layer.msg('新增成功', {icon: 1});
+                            layer.close(modalIndex);
+                            table.reload('permissionTable');
+                        } else {
+                            layer.msg(res.msg || '新增失败', {icon: 2});
+                        }
+                    },
+                    error: function(){
+                        layer.msg('请求失败，请检查网络', {icon: 2});
+                    }
+                });
+            }
+
+            // ============== 10. 提交编辑 ==============
+            function doUpdate(formData) {
+                $.ajax({
+                    url: '/new/api/system_management/permissions/' + editId,
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: function(res){
+                        if (res.code === 200) {
+                            layer.msg('更新成功', {icon: 1});
+                            layer.close(modalIndex);
+                            table.reload('permissionTable');
+                        } else {
+                            layer.msg(res.msg || '更新失败', {icon: 2});
+                        }
+                    },
+                    error: function(){
+                        layer.msg('请求失败，请检查网络', {icon: 2});
+                    }
+                });
+            }
+
+            // ============== 11. 删除 ==============
+            function doDelete(data) {
+                layer.confirm(
+                    '确定要删除权限「' + data.permission_name + '」吗？',
+                    { icon: 3, title: '确认删除' },
+                    function(index){
+                        $.ajax({
+                            url: '/new/api/system_management/permissions/' + data.id,
+                            type: 'DELETE',
+                            success: function(res){
+                                if (res.code === 200) {
+                                    layer.msg('删除成功', {icon: 1});
+                                    table.reload('permissionTable');
+                                } else {
+                                    layer.msg(res.msg || '删除失败', {icon: 2});
+                                }
+                            },
+                            error: function(){
+                                layer.msg('请求失败', {icon: 2});
+                            }
+                        });
+                        layer.close(index);
+                    }
+                );
+            }
+        });
+    </script>
+</body>
+</html>

@@ -240,6 +240,13 @@
     <script type="text/html" id="emptyToolbar">
     </script>
 
+    <!-- 表格行操作列模板 -->
+    <script type="text/html" id="dailyInventoryToolBar">
+      <div class="action-btns">
+        <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="detail">确认查看</a>
+      </div>
+    </script>
+
     <script src="/static/layui/layui.js"></script>
     <script>
         // 配置 soulTable 扩展
@@ -350,14 +357,17 @@
                         return '¥' + (d.detail_price || 0);
                       }},
                     {field: 'detail_unit_cost', title: '单件成本', hide: true, width: 100, templet: function(d) {
-                        return '¥' + (d.unit_cost || 0);
+                        return '¥' + (d.detail_unit_cost || 0);
                       }},
                     {field: 'detail_amount_money', title: '商品金额', width: 110, templet: function(d) {
                         return '¥' + (d.detail_amount_money || 0);
                       }, hide: true},
                     {field: 'detail_ks_price', title: '开思价', width: 110, templet: function(d) {
                         return d.detail_ks_price ? '¥' + d.detail_ks_price : '-';
-                      }}
+                      }},
+                    {field: 'detail_operator', title: '操作人', width: 100},
+                    { title: '操作', width: 120, fixed: 'right', align: 'center', templet: '#dailyInventoryToolBar' }
+                     
                 ]],
                 done: function() {
           // 表格渲染完成后，调用 tableMerge.render() 实现单元格合并
@@ -366,6 +376,49 @@
           // 暂时禁用拖拽功能
           // soulTable.render(this);
         }
+            });
+
+            // 表格行工具事件
+            table.on('tool(dailyInventoryTable)', function(obj) {
+                var data = obj.data;
+                if (obj.event === 'detail') {
+                    // 调用后端 API 标记该订单明细为已查看，记录操作人
+                    $.ajax({
+                        url: '/new/api/daily_inventory/mark-viewed',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            purchase_order_line_id: data.detail_purchase_order_line_id
+                        }),
+                        success: function(res) {
+                            if (res.code === 200) {
+                                layer.msg(res.msg || '确认查看成功', { icon: 1 });
+                                // 局部刷新：使用 layui 的 obj.update() 只更新当前行的操作人字段
+                                // 无需调用 tableIns.reload() 重新请求接口刷新整个表格，避免回到第一页
+                                if (res.data && res.data.operator) {
+                                    obj.update({
+                                        detail_operator: res.data.operator
+                                    });
+                                }
+                            } else {
+                                layer.msg(res.msg || '确认查看失败', { icon: 2 });
+                            }
+                        },
+                        error: function (xhr) {
+                          // 尝试解析后端返回的 JSON（权限不足、未登录等 HTTP 4xx 会走到这里）
+                          var errMsg = '网络错误，请稍后重试';
+                          try {
+                            var errData = JSON.parse(xhr.responseText);
+                            if (errData && errData.msg) {
+                            errMsg = errData.msg;
+                          }
+                          } catch (e) {
+                          // 解析失败时使用默认错误消息
+                          }
+                          layer.msg(errMsg, { icon: 2 });
+                      },
+                    });
+                }
             });
             
             // 搜索按钮点击事件
@@ -431,8 +484,18 @@
                     layer.msg(res.msg || '数据更新失败', { icon: 2 });
                   }
                 },
-                error: function() {
-                  layer.msg('网络错误，请稍后重试', { icon: 2 });
+                error: function(xhr) {
+                  // 尝试解析后端返回的 JSON（权限不足、未登录等 HTTP 4xx 会走到这里）
+                  var errMsg = '网络错误，请稍后重试';
+                  try {
+                    var errData = JSON.parse(xhr.responseText);
+                    if (errData && errData.msg) {
+                      errMsg = errData.msg;
+                    }
+                  } catch (e) {
+                    // 解析失败时使用默认错误消息
+                  }
+                  layer.msg(errMsg, { icon: 2 });
                 },
                 complete: function() {
                   // 恢复按钮状态

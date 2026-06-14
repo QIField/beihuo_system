@@ -175,7 +175,7 @@ def _batch_insert_purchase_order_details(data_list: List[Dict]) -> None:
         if data_list:
             
             stmt = insert(CrmPurchaseOrderDetails).values(data_list)
-            update_dict = {c.name: c for c in stmt.inserted if c.name not in ['purchase_order_line_id', 'updated_at', 'created_at']}
+            update_dict = {c.name: c for c in stmt.inserted if c.name not in ['purchase_order_line_id', 'updated_at', 'created_at','operator']}
             stmt = stmt.on_duplicate_key_update(**update_dict)
             session.execute(stmt)
             session.commit()
