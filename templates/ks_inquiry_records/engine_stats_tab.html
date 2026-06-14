@@ -9,6 +9,7 @@
 (function() {
     let engineChassisGridApi = null;
     let engineChassisGridOptions = null;
+    let engineChassisGridLoader = null;
 
     const engineChassisColumnDefs = [
         { field: 'engine', headerName: '发动机', width: 200, sortable: true, filter: true, pinned: 'left' },
@@ -23,10 +24,16 @@
         defaultColDef: { resizable: true },
         suppressHorizontalScroll: false,
         pagination: false,
+        overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
+        overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
         rowSelection: 'single',
         suppressRowClickSelection: true,
         onGridReady: function(params) {
             engineChassisGridApi = params.api;
+
+            // 初始化数据加载器
+            engineChassisGridLoader = new AgGridLoader(engineChassisGridApi);
+
             params.api.sizeColumnsToFit();
             refreshEngineChassisGrid();
         }
@@ -52,31 +59,15 @@
     }
 
     function refreshEngineChassisGrid() {
-        if (!engineChassisGridApi) return;
-
-        engineChassisGridApi.showLoadingOverlay();
+        if (!engineChassisGridApi || !engineChassisGridLoader) return;
 
         const params = getEngineChassisSearchParams();
 
-        fetch('/new/api/ks_inquiry/records/engine_chassis?' + new URLSearchParams(params))
-            .then(response => response.json())
-            .then(result => {
-                if (result.code === 0 || result.code === '0') {
-                    const list = result.data.list || [];
-                    console.log('发动机及底盘维度第一条数据:', list[0] || null);
-                    engineChassisGridApi.setRowData(list);
-                } else {
-                    console.error('发动机底盘查询失败:', result.message);
-                    layui.layer.msg('查询失败: ' + result.message, {icon: 2});
-                }
-            })
-            .catch(error => {
-                console.error('发动机底盘查询错误:', error);
-                layui.layer.msg('查询失败，请稍后重试', {icon: 2});
-            })
-            .finally(() => {
-                engineChassisGridApi.hideOverlay();
-            });
+        engineChassisGridLoader.load('/new/api/ks_inquiry/records/engine_chassis', params, (data) => {
+            console.log('发动机及底盘维度第一条数据:', data.list[0] || null);
+        }, (error) => {
+            layui.layer.msg('查询失败，请稍后重试', {icon: 2});
+        });
     }
 
     window.refreshEngineChassis = refreshEngineChassisGrid;

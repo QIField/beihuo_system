@@ -148,10 +148,13 @@
 
     <!-- AG Grid JS - 使用本地文件 -->
     <script src="/static/ag-grid/ag-grid-community.min.js"></script>
-    
+
+    <!-- AG Grid Loader 组件 -->
+    <script src="/static/js/components/ag-grid-loader/ag-grid-loader.js"></script>
+
     <!-- 通用复制工具 -->
     <script src="/static/js/copy-utils.js"></script>
-    
+
     <script>
         // 全局变量
         let gridApi = null;
@@ -160,6 +163,7 @@
         let currentPageSize = 200;
         let customPagination = null;
         let enquiryNoColorMap = {};
+        let gridLoader = null;
         
         // AG Grid 列定义
         const columnDefs = [
@@ -210,6 +214,8 @@
             headerHeight: 36,
             pagination: false,
             animateRows: true,
+            overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
+            overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
             getRowStyle: function(params) {
                 const no = params.data && params.data.supplier_enquiry_no;
                 const colorIndex = enquiryNoColorMap[no];
@@ -220,15 +226,18 @@
             onGridReady: function(event) {
                 gridApi = event.api;
                 gridColumnApi = event.columnApi;
-                
+
+                // 初始化数据加载器
+                gridLoader = new AgGridLoader(gridApi);
+
                 gridApi.sizeColumnsToFit();
-                
+
                 // 初始化双击复制功能
                 initDoubleClickCopy();
-                
+
                 // 初始化自定义分页组件
                 initCustomPagination();
-                
+
                 // 加载初始数据
                 refreshGrid();
             }
@@ -398,32 +407,30 @@
             params.page = page;
             params.limit = pageSize;
 
-            fetch('/new/api/qpl_quote/records?' + new URLSearchParams(params))
-                .then(response => response.json())
-                .then(data => {
-                    if (data.code === 0 || data.code === '0') {
-                        currentData = data.data.list;
+            gridLoader.load('/new/api/qpl_quote/records', params, (data) => {
+                currentData = data.list;
 
-                        // 构建单号 → 颜色索引的映射（按首次出现顺序，两种颜色循环）
-                        enquiryNoColorMap = {};
-                        let colorCounter = 0;
-                        for (let i = 0; i < currentData.length; i++) {
-                            const no = currentData[i].supplier_enquiry_no;
-                            if (no !== undefined && no !== null && !(no in enquiryNoColorMap)) {
-                                enquiryNoColorMap[no] = colorCounter % 2;
-                                colorCounter++;
-                            }
-                        }
-
-                        gridApi.setRowData(currentData);
-                        if (customPagination) {
-                            customPagination.update(data.data.total, data.data.page, pageSize);
-                        }
+                // 构建单号 → 颜色索引的映射（按首次出现顺序，两种颜色循环）
+                enquiryNoColorMap = {};
+                let colorCounter = 0;
+                for (let i = 0; i < currentData.length; i++) {
+                    const no = currentData[i].supplier_enquiry_no;
+                    if (no !== undefined && no !== null && !(no in enquiryNoColorMap)) {
+                        enquiryNoColorMap[no] = colorCounter % 2;
+                        colorCounter++;
                     }
-                })
-                .catch(error => {
-                    layui.layer.msg('数据加载失败', {icon: 2});
-                });
+                }
+
+                // 刷新行样式
+                gridApi.refreshCells({ force: true });
+
+                // 更新分页
+                if (customPagination) {
+                    customPagination.update(data.total, data.page, pageSize);
+                }
+            }, (error) => {
+                layui.layer.msg('数据加载失败', {icon: 2});
+            });
         }
     </script>
 </body>

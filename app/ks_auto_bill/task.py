@@ -21,6 +21,8 @@ from typing import Optional, Tuple, List
 from app.ks_auto_bill.ks_login import login, COMPANIES
 from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info, print_date_range
 from app.ks_auto_bill.crm_auto_bill import send_orders_to_crm
+from app.utils.ks_auto_bill_model import COMPANY_CONFIG
+from app.utils.common_util_module.server_push import message_push
 
 
 # 简单文件锁类（内联定义，避免导入问题）
@@ -219,6 +221,24 @@ def check_login_status(session):
         return False
 
 
+def push_cookie_invalid_warning(company):
+    """推送开思 cookie 失效预警"""
+    organization = COMPANY_CONFIG.get(company, {}).get('name', company)
+    remind_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    message = (
+        "===【开思业务预警】===\n"
+        f"组织：{organization}\n"
+        "开思cookie失效！\n"
+        f"提醒时间：{remind_time}\n"
+        "请及时核对处理！"
+    )
+    try:
+        message_push("开思", message)
+        print(f"[开思自动对单][{company}] 已推送 cookie 失效预警")
+    except Exception as e:
+        print(f"[开思自动对单][{company}] 推送 cookie 失效预警失败: {e}")
+
+
 def is_running_time():
     """检查是否在运行时间段内（8:30-19:00）"""
     now = datetime.now()
@@ -241,14 +261,18 @@ def process_company_once(company):
 
     # 检查登录状态
     session = get_session(company)
+    had_session = session is not None
     print(f"\n[开思自动对单][{company}] 检查登录状态...")
 
     if not check_login_status(session):
         print(f"[开思自动对单][{company}] 登录已过期或未登录，重新登录...")
         session = login(company)
 
-        if session is None:
-            error_msg = "登录失败"
+        if not check_login_status(session):
+            set_session(None, company)
+            if had_session:
+                push_cookie_invalid_warning(company)
+            error_msg = "登录失败或 cookie 已失效"
             print(f"[开思自动对单][{company}] {error_msg}")
             return False, error_msg, 0, 0, 0
 

@@ -341,6 +341,15 @@ class KsInquiryRecordsService:
             conditions.append("company = %s")
             params.append(company)
 
+        conditions.append("""
+            (
+                COALESCE(TRIM(engine), '') != ''
+                OR COALESCE(TRIM(chassis), '') != ''
+                OR COALESCE(TRIM(vin), '') != ''
+                OR COALESCE(TRIM(production_date), '') != ''
+            )
+        """)
+
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
         count_sql = f"""

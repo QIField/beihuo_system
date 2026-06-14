@@ -12,7 +12,7 @@ if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 import requests
-from qpl_config import BASE_URL, get_headers
+from qpl_config import BASE_URL, get_headers, handle_qpl_response
 
 
 def query_enquiry_list(begin_date, end_date, page_num=1, page_size=100, company='fsbbr'):
@@ -45,7 +45,7 @@ def query_enquiry_list(begin_date, end_date, page_num=1, page_size=100, company=
         "endDate": end_date
     }
     resp = requests.post(url, headers=get_headers(company), json=payload, timeout=30)
-    return resp.json()
+    return handle_qpl_response(resp, company)
 
 
 def get_enquiry_detail(supplier_enquiry_no, company='fsbbr'):
@@ -62,7 +62,7 @@ def get_enquiry_detail(supplier_enquiry_no, company='fsbbr'):
     url = f'{BASE_URL}/qpl-supplier-enquiry/supplierDemandDetail/getSupplierEnquiryDetail'
     payload = {"supplierEnquiryNo": supplier_enquiry_no}
     resp = requests.post(url, headers=get_headers(company), json=payload, timeout=30)
-    return resp.json()
+    return handle_qpl_response(resp, company)
 
 
 def get_adapt_product_brand(supplier_enquiry_item_id, supplier_enquiry_no, company='fsbbr'):
@@ -83,7 +83,7 @@ def get_adapt_product_brand(supplier_enquiry_item_id, supplier_enquiry_no, compa
         "supplierEnquiryNo": supplier_enquiry_no
     }
     resp = requests.post(url, headers=get_headers(company), json=payload, timeout=30)
-    return resp.json()
+    return handle_qpl_response(resp, company)
 
 
 def price_check(price_check_req_list, tid, car_brand, supplier_enquiry_no, company='fsbbr'):
@@ -109,7 +109,7 @@ def price_check(price_check_req_list, tid, car_brand, supplier_enquiry_no, compa
         "channel": "S_STATION"
     }
     resp = requests.post(url, headers=get_headers(company), json=payload, timeout=30)
-    return resp.json()
+    return handle_qpl_response(resp, company)
 
 
 def get_pickup_way_and_distance(shop_uid, supplier_enquiry_no, tuhu_supplier_id=None, company='fsbbr'):
@@ -133,7 +133,7 @@ def get_pickup_way_and_distance(shop_uid, supplier_enquiry_no, tuhu_supplier_id=
     if tuhu_supplier_id is not None:
         payload["tuhuSupplierId"] = tuhu_supplier_id
     resp = requests.post(url, headers=get_headers(company), json=payload, timeout=30)
-    return resp.json()
+    return handle_qpl_response(resp, company)
 
 
 def extract_pickup_info(pickup_api_result):
