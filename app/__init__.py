@@ -9,14 +9,12 @@
 
 def expansion_app(app):
 
-
     from app.api import api_bp        # 导入接口
     app.register_blueprint(api_bp)     # 注册接口
-    
+
     # 注册页面路由蓝图（根路径访问）
     from app.routes import general_web_bp
     app.register_blueprint(general_web_bp)
-
 
 
     from app.routes.customer_quota_manager_web import customer_quota_manager_web_bp
@@ -29,7 +27,12 @@ def expansion_app(app):
     # 注册仓库管理蓝图
     from app.routes.warehouse_manager_web import warehouse_manager_web_bp
     app.register_blueprint(warehouse_manager_web_bp)
-    
+
     # 注册新的主蓝图
     from app.routes import common_web_bp
     app.register_blueprint(common_web_bp)
+
+    # 初始化权限检查器：将 PermissionService 的方法注册到 PermissionCheckerRegistry
+    # 注册完成后，接口上就可以使用 @require_permission、@require_role 等装饰器
+    from app.services.permission_service import init_permission_checkers
+    init_permission_checkers()

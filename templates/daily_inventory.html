@@ -404,13 +404,19 @@
                                 layer.msg(res.msg || '确认查看失败', { icon: 2 });
                             }
                         },
-                        error: function(xhr) {
-                            if (xhr.status === 401) {
-                                layer.msg('未登录，请先登录', { icon: 2 });
-                            } else {
-                                layer.msg('网络错误，请稍后重试', { icon: 2 });
-                            }
-                        }
+                        error: function (xhr) {
+                          // 尝试解析后端返回的 JSON（权限不足、未登录等 HTTP 4xx 会走到这里）
+                          var errMsg = '网络错误，请稍后重试';
+                          try {
+                            var errData = JSON.parse(xhr.responseText);
+                            if (errData && errData.msg) {
+                            errMsg = errData.msg;
+                          }
+                          } catch (e) {
+                          // 解析失败时使用默认错误消息
+                          }
+                          layer.msg(errMsg, { icon: 2 });
+                      },
                     });
                 }
             });
@@ -478,8 +484,18 @@
                     layer.msg(res.msg || '数据更新失败', { icon: 2 });
                   }
                 },
-                error: function() {
-                  layer.msg('网络错误，请稍后重试', { icon: 2 });
+                error: function(xhr) {
+                  // 尝试解析后端返回的 JSON（权限不足、未登录等 HTTP 4xx 会走到这里）
+                  var errMsg = '网络错误，请稍后重试';
+                  try {
+                    var errData = JSON.parse(xhr.responseText);
+                    if (errData && errData.msg) {
+                      errMsg = errData.msg;
+                    }
+                  } catch (e) {
+                    // 解析失败时使用默认错误消息
+                  }
+                  layer.msg(errMsg, { icon: 2 });
                 },
                 complete: function() {
                   // 恢复按钮状态

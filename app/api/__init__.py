@@ -26,6 +26,7 @@ from .car_parts_library_api import car_parts_library_bp
 from .qpl_quote_api import qpl_quote_bp
 from .ks_inquiry_api import ks_inquiry_records_bp
 
+
 # 注册比价数据对比蓝图（设置正确的 url_prefix）
 api_bp.register_blueprint(compare_bp, url_prefix='/compare')
 api_bp.register_blueprint(qpl_quote_bp)
@@ -40,10 +41,13 @@ api_bp.register_blueprint(wms_upload_site_bp)
 api_bp.register_blueprint(car_parts_library_bp)
 
 
+
 # 注册 system_inventory_api 子蓝图
 from .daily_inventory_api import daily_inventory_bp
 api_bp.register_blueprint(daily_inventory_bp)
 
-
+# 注册 system_management_api 子蓝图(系统管理)
+from .system_management_api import system_management_bp
+api_bp.register_blueprint(system_management_bp)
 
 __all__ = ["api_bp"]

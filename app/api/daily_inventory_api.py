@@ -11,6 +11,7 @@
 """
 
 from flask import Blueprint, request, jsonify, session
+from app.core.permission.decorators import require_authentication, require_permission
 from app.services.daily_inventory_service.daily_inventory_service import get_purchase_order_list_with_details
 from app.services.daily_inventory_service.daily_inventory_crawler import daily_inventory_crawler_service
 from app.services.daily_inventory_service.daily_inventory_service import mark_order_detail_viewed
@@ -22,6 +23,7 @@ daily_inventory_bp = Blueprint('daily_inventory_bp', __name__, url_prefix='/dail
 
 
 @daily_inventory_bp.route('/purchase-orders', methods=['GET'])
+# @require_permission('daily_inventory:update')
 def api_get_purchase_orders():
     """
     获取采购订单列表及其明细（按订单分页）
@@ -109,6 +111,7 @@ def api_get_purchase_orders():
 
 
 @daily_inventory_bp.route('/update-data', methods=['POST'])
+# @require_permission('daily_inventory:update')
 def api_update_daily_inventory():
     """
     触发每日库存数据更新（同步执行）
@@ -169,6 +172,7 @@ def api_update_daily_inventory():
 
 
 @daily_inventory_bp.route('/mark-viewed', methods=['POST'])
+@require_permission('daily_inventory:tag_view')
 def api_mark_order_detail_viewed():
     """
     标记订单明细为已查看，更新操作人字段为当前登录用户

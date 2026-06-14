@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>用户角色分配</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        body {
+            margin: 15px;
+            background-color: #f2f2f2;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
+
+        .page-container {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .user-panel {
+            flex: 0 0 480px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .role-panel {
+            flex: 1;
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            min-height: 500px;
+        }
+
+        .panel-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .role-list {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+            padding: 15px;
+            background: #fafafa;
+        }
+
+        .role-item {
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: #fff;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .role-item:hover {
+            border-color: #1e9fff;
+            box-shadow: 0 2px 6px rgba(30, 159, 255, 0.15);
+        }
+
+        .role-item.assigned {
+            border-color: #5FB878;
+            background: #f6fff6;
+        }
+
+        .role-checkbox-wrap {
+            flex: 0 0 auto;
+            padding-top: 2px;
+        }
+
+        .role-info {
+            flex: 1;
+        }
+
+        .role-name {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .role-name .badge {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 1px 6px;
+            font-size: 11px;
+            background: #1e9fff;
+            color: #fff;
+            border-radius: 2px;
+            font-weight: normal;
+        }
+
+        .role-code {
+            color: #999;
+            font-size: 12px;
+            margin-top: 3px;
+        }
+
+        .role-desc {
+            color: #666;
+            font-size: 12px;
+            margin-top: 5px;
+            line-height: 1.5;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-size: 13px;
+        }
+
+        .action-bar {
+            margin-top: 15px;
+            text-align: right;
+        }
+
+        .selected-user-info {
+            padding: 12px 15px;
+            background: #e8f4ff;
+            border: 1px solid #b3d8ff;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .selected-user-info strong {
+            color: #1e9fff;
+        }
+
+        .role-meta {
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-container">
+
+    <!-- 左侧：用户列表 -->
+    <div class="user-panel">
+        <div class="panel-title">用户列表</div>
+
+        <div class="search-bar">
+            <div class="layui-input-inline" style="width: 200px;">
+                <input type="text" id="keywordInput" placeholder="用户名/门店/部门/职级" class="layui-input" autocomplete="off">
+            </div>
+            <button class="layui-btn layui-btn-primary layui-btn-sm" id="searchBtn">
+                <i class="layui-icon layui-icon-search"></i> 搜索
+            </button>
+            <button class="layui-btn layui-btn-primary layui-btn-sm" id="resetBtn">
+                <i class="layui-icon layui-icon-refresh"></i> 重置
+            </button>
+        </div>
+
+        <table id="userTable" lay-filter="userTable"></table>
+    </div>
+
+    <!-- 右侧：角色分配 -->
+    <div class="role-panel">
+        <div class="panel-title">角色分配</div>
+
+        <div class="selected-user-info" id="selectedUserInfo" style="display: none;">
+            当前用户：<strong id="currentUserName">-</strong>
+            （ID: <span id="currentUserId">-</span>，门店: <span id="currentUserStore">-</span>）
+        </div>
+
+        <div class="role-list" id="roleList">
+            <div class="empty-state">
+                <i class="layui-icon layui-icon-username" style="font-size: 30px;"></i>
+                <div style="margin-top: 8px;">请从左侧选择一位用户</div>
+            </div>
+        </div>
+
+        <div class="action-bar" id="actionBar" style="display: none;">
+            <button class="layui-btn layui-btn-primary" id="resetRoleBtn">
+                <i class="layui-icon layui-icon-refresh-3"></i> 重置选择
+            </button>
+            <button class="layui-btn" id="saveRoleBtn">
+                <i class="layui-icon layui-icon-ok"></i> 保存分配
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<!-- 右侧表格操作列模板（用于选中状态显示） -->
+{% raw %}
+<script type="text/html" id="userTableBar">
+    {{#  if(d.id == window._selectedUserId){ }}
+    <span class="layui-badge layui-bg-blue">当前选中</span>
+    {{#  } else { }}
+    <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="select">
+        <i class="layui-icon layui-icon-right"></i> 选择
+    </a>
+    {{#  } }}
+</script>
+{% endraw %}
+
+<script src="/static/layui/layui.js"></script>
+<script>
+layui.use(['table', 'jquery'], function () {
+    var table = layui.table;
+    var $ = layui.jquery;
+
+    // 当前选中的用户 ID（用于高亮显示 + 提交保存）
+    window._selectedUserId = null;
+
+    // ------- 渲染用户表格 -------
+    table.render({
+        elem: '#userTable',
+        url: '/new/api/system_management/user-roles/users',
+        method: 'get',
+        page: true,
+        limit: 10,
+        limits: [10, 20, 50, 100],
+        request: {
+            pageName: 'page',
+            limitName: 'limit'
+        },
+        parseData: function (res) {
+            return {
+                "code": res.code === 200 ? 0 : res.code,
+                "msg": res.msg,
+                "count": res.data ? res.data.total : 0,
+                "data": res.data ? res.data.data_list : []
+            };
+        },
+        cols: [[
+            { field: 'id', title: 'ID', width: 60, sort: true },
+            { field: 'username', title: '用户名', width: 130 },
+            { field: 'department', title: '部门', width: 90, templet: function (d) {
+                return d.department || '<span style="color:#ccc;">-</span>';
+            }},
+            { field: 'job_level', title: '职级', width: 90, templet: function (d) {
+                return d.job_level || '<span style="color:#ccc;">-</span>';
+            }},
+            { field: 'store', title: '门店', width: 90 },
+            { title: '操作', width: 95, align: 'center', toolbar: '#userTableBar' }
+        ]],
+        height: 'full-120'
+    });
+
+    // ------- 搜索 / 重置 -------
+    $('#searchBtn').on('click', function () {
+        var keyword = $('#keywordInput').val().trim();
+        table.reload('userTable', {
+            where: { keyword: keyword },
+            page: { curr: 1 }
+        });
+    });
+
+    $('#resetBtn').on('click', function () {
+        $('#keywordInput').val('');
+        table.reload('userTable', {
+            where: {},
+            page: { curr: 1 }
+        });
+    });
+
+    // ------- 选择用户 -> 加载角色分配 -------
+    table.on('tool(userTable)', function (obj) {
+        var data = obj.data;
+        var event = obj.event;
+
+        if (event === 'select') {
+            selectUser(data);
+            // 刷新整个表格以更新"当前选中"显示
+            table.reload('userTable');
+        }
+    });
+
+    // 点击行也可以选中
+    table.on('row(userTable)', function (obj) {
+        selectUser(obj.data);
+        table.reload('userTable');
+    });
+
+    // ------- 选择用户 -------
+    function selectUser(userData) {
+        window._selectedUserId = userData.id;
+
+        // 显示用户信息
+        $('#selectedUserInfo').show();
+        $('#currentUserName').text(userData.username || '-');
+        $('#currentUserId').text(userData.id || '-');
+        $('#currentUserStore').text(userData.store || '-');
+
+        // 显示"保存"按钮栏
+        $('#actionBar').show();
+
+        // 加载该用户的角色分配
+        loadUserRoles(userData.id);
+    }
+
+    // ------- 加载用户的角色分配状态 -------
+    function loadUserRoles(userId) {
+        var roleListEl = $('#roleList');
+        roleListEl.html('<div class="empty-state"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop" style="font-size: 24px;"></i><div style="margin-top: 8px;">加载中...</div></div>');
+
+        $.ajax({
+            url: '/new/api/system_management/user-roles/user/' + userId + '/roles',
+            type: 'GET',
+            success: function (res) {
+                if (res.code === 200 && Array.isArray(res.data)) {
+                    renderRoleList(res.data);
+                } else {
+                    roleListEl.html('<div class="empty-state" style="color:#FF5722;">角色数据加载失败: ' + (res.msg || '') + '</div>');
+                }
+            },
+            error: function () {
+                roleListEl.html('<div class="empty-state" style="color:#FF5722;">请求失败，请检查网络</div>');
+            }
+        });
+    }
+
+    // ------- 渲染角色列表（带复选框） -------
+    function renderRoleList(roles) {
+        var roleListEl = $('#roleList');
+
+        if (!roles || roles.length === 0) {
+            roleListEl.html('<div class="empty-state">暂无角色数据，请先在"角色管理"中创建角色</div>');
+            return;
+        }
+
+        var html = '';
+        $.each(roles, function (i, role) {
+            var isAssigned = role.assigned === 1 || role.assigned === true;
+            var statusText = role.status === 1
+                ? '<span style="color:#5FB878;">启用</span>'
+                : '<span style="color:#FF5722;">禁用</span>';
+
+            html += '<div class="role-item ' + (isAssigned ? 'assigned' : '') + '" data-role-id="' + role.id + '">';
+            html += '  <div class="role-checkbox-wrap">';
+            html += '    <input type="checkbox" class="role-checkbox" value="' + role.id + '" ' + (isAssigned ? 'checked' : '') + ' lay-skin="primary" title="' + role.role_name + '">';
+            html += '  </div>';
+            html += '  <div class="role-info">';
+            html += '    <div class="role-name">';
+            html +=        role.role_name;
+            html += '      <span class="badge">' + role.role_code + '</span>';
+            html += '    </div>';
+            html += '    <div class="role-desc">';
+            html +=      (role.description || '暂无描述');
+            html += '    </div>';
+            html += '    <div class="role-meta">状态: ' + statusText + '</div>';
+            html += '  </div>';
+            html += '</div>';
+        });
+
+        roleListEl.html(html);
+
+        // 绑定复选框点击事件（动态更新 assigned 样式）
+        roleListEl.find('.role-checkbox').on('change', function () {
+            var item = $(this).closest('.role-item');
+            if ($(this).prop('checked')) {
+                item.addClass('assigned');
+            } else {
+                item.removeClass('assigned');
+            }
+        });
+    }
+
+    // ------- 重置选择（恢复到该用户当前的已分配状态） -------
+    $('#resetRoleBtn').on('click', function () {
+        if (!window._selectedUserId) return;
+        loadUserRoles(window._selectedUserId);
+        layer.msg('已重置', { icon: 0 });
+    });
+
+    // ------- 保存角色分配 -------
+    $('#saveRoleBtn').on('click', function () {
+        if (!window._selectedUserId) {
+            layer.msg('请先选择一位用户', { icon: 2 });
+            return;
+        }
+
+        // 收集所有勾选的角色 ID
+        var roleIds = [];
+        $('#roleList .role-checkbox:checked').each(function () {
+            roleIds.push(parseInt($(this).val(), 10));
+        });
+
+        var confirmText = '确认保存角色分配？将为该用户分配 ' + roleIds.length + ' 个角色。';
+
+        layer.confirm(confirmText, {
+            title: '保存确认',
+            icon: 3,
+            btn: ['确认', '取消']
+        }, function (index) {
+            layer.close(index);
+
+            var loadIndex = layer.load(1, { shade: [0.1, '#000'] });
+
+            $.ajax({
+                url: '/new/api/system_management/user-roles/user/' + window._selectedUserId + '/roles',
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({ role_ids: roleIds }),
+                success: function (res) {
+                    layer.close(loadIndex);
+                    if (res.code === 200) {
+                        layer.msg(res.msg || '保存成功', { icon: 1 });
+                        // 重新加载以显示最新状态
+                        loadUserRoles(window._selectedUserId);
+                    } else {
+                        layer.msg(res.msg || '保存失败', { icon: 2 });
+                    }
+                },
+                error: function () {
+                    layer.close(loadIndex);
+                    layer.msg('请求失败，请检查网络', { icon: 2 });
+                }
+            });
+        });
+    });
+
+});
+</script>
+
+</body>
+</html>

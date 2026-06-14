@@ -62,6 +62,53 @@ class CrmappUsers(BaseModels):
     )
 
 
+    def get_ip_records(self):
+        """
+        安全解析 ip_records JSON 字段为 Python 列表。
+
+        ip_records 在数据库中可能为：
+          - None（未设置过）→ 返回 []
+          - list（SQLAlchemy JSON 自动反序列化）→ 直接返回
+          - 字符串（某些特殊情况下仍为 JSON 字符串）→ 解析后返回
+        """
+        value = self.ip_records
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, list) else []
+            except (ValueError, TypeError):
+                return []
+        # 其他异常类型：保险处理
+        return []
+
+    def get_allowed_orgs(self):
+        """
+        安全解析 allowed_orgs JSON 字段为 Python 列表 / None。
+
+        allowed_orgs 语义：
+          - None → 表示允许切换所有组织（不限制）
+          - list → 表示只允许切换列表中列出的组织代码
+        """
+        value = self.allowed_orgs
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return parsed
+                # 如果是其他类型（如 dict/str），视为配置异常，按"不限制"处理
+                return None
+            except (ValueError, TypeError):
+                return None
+        return None
+
     def to_dict(self, include_sensitive=False):
         """
         将对象转换为字典
