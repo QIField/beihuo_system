@@ -112,11 +112,11 @@ class KsInquiryRecordsService:
                 brandId,
                 sellerBtPrice,
                 sellerPrice,
-                display_seller_status,
+                display_seller_status AS displaySellerStatus,
                 remark,
                 vin,
                 engine,
-                production_date,
+                production_date AS productionDate,
                 chassis
             FROM crmapp_ks_inquiry_detail
             WHERE {where_clause}
@@ -243,16 +243,49 @@ class KsInquiryRecordsService:
         """
 
         # 查询分组聚合数据
+        # 配件名称优先取：原厂 > 原厂国内4S件 > 其他
         data_sql = f"""
             SELECT
-                partsNum,
-                COUNT(*) as count,
-                MAX(partsName) as partsName,
-                MAX(unquoted_products) as unquotedProducts
-            FROM crmapp_ks_inquiry_detail
-            WHERE {where_clause}
-            GROUP BY partsNum
-            ORDER BY count DESC
+                a.partsNum,
+                a.count,
+                COALESCE(b.partsName, c.partsName, d.partsName) as partsName,
+                a.unquotedProducts
+            FROM (
+                SELECT
+                    partsNum,
+                    COUNT(DISTINCT inquiryId) as count,
+                    MAX(unquoted_products) as unquotedProducts
+                FROM crmapp_ks_inquiry_detail
+                WHERE {where_clause}
+                GROUP BY partsNum
+            ) a
+            LEFT JOIN (
+                SELECT partsNum, partsName
+                FROM crmapp_ks_inquiry_detail
+                WHERE brandNormalized = '原厂'
+                  AND ({where_clause})
+                GROUP BY partsNum
+            ) b ON a.partsNum = b.partsNum
+            LEFT JOIN (
+                SELECT partsNum, partsName
+                FROM crmapp_ks_inquiry_detail
+                WHERE brandNormalized = '原厂国内4S件'
+                  AND ({where_clause})
+                GROUP BY partsNum
+            ) c ON a.partsNum = c.partsNum
+            LEFT JOIN (
+                SELECT partsNum, partsName
+                FROM (
+                    SELECT partsNum, partsName, COUNT(*) as name_count
+                    FROM crmapp_ks_inquiry_detail
+                    WHERE ({where_clause})
+                    GROUP BY partsNum, partsName
+                    ORDER BY name_count DESC
+                    LIMIT 1
+                ) t
+                GROUP BY partsNum
+            ) d ON a.partsNum = d.partsNum
+            ORDER BY a.count DESC
             LIMIT %s OFFSET %s
         """
 
@@ -266,8 +299,9 @@ class KsInquiryRecordsService:
             total = count_result[0] if count_result else 0
 
         # 查询分页数据
+        # 注意：data_sql 中 where_clause 出现了 4 次，参数需要重复 4 次
         offset = (page - 1) * page_size
-        data_params = params.copy()
+        data_params = params.copy() * 4  # 4个子查询都使用相同的where条件
         data_params.append(page_size)
         data_params.append(offset)
 
@@ -275,7 +309,7 @@ class KsInquiryRecordsService:
             cursor.execute(data_sql, data_params)
             rows = cursor.fetchall()
 
-            columns = ['partsNum', 'count', 'partsName']
+            columns = ['partsNum', 'count', 'partsName', 'unquotedProducts']
             result = []
             for row in rows:
                 if isinstance(row, dict):

@@ -1272,7 +1272,7 @@ def manual_save_stats():
     try:
         from app.services.virtual_inventory_stats_service import save_recent_statistics
 
-        results = save_recent_statistics(days=3)
+        results = save_recent_statistics(days=1)
         failed_results = [result for result in results if result['code'] != 0]
         if failed_results:
             return jsonify({'code': 1, 'msg': '部分统计数据保存失败', 'data': results})

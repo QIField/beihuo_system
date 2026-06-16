@@ -57,7 +57,7 @@ function processCopyValue(value, field, headerName) {
  * @param {Function} onError - 失败回调
  */
 function copyToClipboardUniversal(text, onSuccess, onError) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
         navigator.clipboard.writeText(String(text)).then(function() {
             if (onSuccess) onSuccess();
         }).catch(function(err) {

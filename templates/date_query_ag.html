@@ -598,6 +598,45 @@
                 const selectedRows = gridApi.getSelectedRows();
                 document.getElementById('selectedCount').textContent = selectedRows.length;
             },
+            onSortChanged: function(event) {
+                // 获取当前排序状态
+                const sortModel = gridApi.getSortModel();
+                if (sortModel && sortModel.length > 0) {
+                    const sort = sortModel[0];
+                    const colId = sort.colId;
+                    const sortDir = sort.sort; // 'asc' 或 'desc'
+                    
+                    // 对全部数据进行排序
+                    filteredData.sort((a, b) => {
+                        let valueA = a[colId];
+                        let valueB = b[colId];
+                        
+                        // 处理 undefined/null
+                        if (valueA === undefined || valueA === null) valueA = '';
+                        if (valueB === undefined || valueB === null) valueB = '';
+                        
+                        // 尝试数值排序
+                        const numA = parseFloat(valueA);
+                        const numB = parseFloat(valueB);
+                        
+                        let result;
+                        if (!isNaN(numA) && !isNaN(numB) && String(valueA).trim() !== '' && String(valueB).trim() !== '') {
+                            // 数值比较
+                            result = numA - numB;
+                        } else {
+                            // 字符串比较
+                            const strA = String(valueA).toLowerCase();
+                            const strB = String(valueB).toLowerCase();
+                            result = strA < strB ? -1 : (strA > strB ? 1 : 0);
+                        }
+                        
+                        return sortDir === 'asc' ? result : -result;
+                    });
+                    
+                    // 重新渲染当前页
+                    renderCurrentPage(currentPage, currentPageSize);
+                }
+            },
             onGridReady: function(event) {
                 console.log('[AG Grid] onGridReady 触发');
                 

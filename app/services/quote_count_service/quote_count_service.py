@@ -16,8 +16,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 import time
 import requests
+import base64
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 
 from app.utils.database_connection import db_cursor
 
@@ -85,6 +88,19 @@ class QuoteCountSyncService:
         'zsbbr': 'W5eWV8OPpIMnYpU4iOm',
     }
 
+    # company -> quoteUser 映射
+    COMPANY_TO_QUOTE_USER = {
+        'fsbbr': '65d1a2a93b53ad0001338c73',
+        'zhbbr': '609b54f4d4753a0001f291b4',
+        'dgby': '616e3fd3a7157800017cefbf',
+        'dghf': '6101116ad28c230001afa74c',
+        'zsbbr': '669c6c3efbe2d50001def2b5',
+    }
+
+    # AES 解密配置
+    AES_KEY = "QUOTE_LIST#ABCDE".encode("utf-8")
+    AES_IV = "asdfghjklzxcvbnm".encode("utf-8")
+
     # 需要特殊处理的品牌（宝马/奔驰）
     SPECIAL_BRANDS = {'宝马', '奔驰'}
     # 品质映射表
@@ -92,6 +108,43 @@ class QuoteCountSyncService:
         'ORIGINAL_CURRENCY': '原厂',
         'ORIGINAL_INLAND_4S': '原厂国内4s件'
     }
+
+    @staticmethod
+    def _aes_decrypt(cipher_b64: str) -> str:
+        """AES-CBC 解密"""
+        if not cipher_b64:
+            return ''
+        try:
+            cipher_data = base64.b64decode(cipher_b64)
+            aes = AES.new(QuoteCountSyncService.AES_KEY, AES.MODE_CBC, QuoteCountSyncService.AES_IV)
+            plain_bytes = unpad(aes.decrypt(cipher_data), AES.block_size)
+            return plain_bytes.decode("utf-8")
+        except Exception:
+            return ''
+
+    @staticmethod
+    def _extract_show_address(decrypted_json: str) -> str:
+        """从解密后的JSON中提取showAddress"""
+        if not decrypted_json:
+            return ''
+        try:
+            import json
+            data = json.loads(decrypted_json)
+            return data.get('showAddress', '')
+        except Exception:
+            return ''
+
+    @staticmethod
+    def _extract_garage_company_name(decrypted_json: str) -> str:
+        """从解密后的JSON中提取garageCompanyName"""
+        if not decrypted_json:
+            return ''
+        try:
+            import json
+            data = json.loads(decrypted_json)
+            return data.get('garageCompanyName', '')
+        except Exception:
+            return ''
 
     @staticmethod
     def normalize_brand(brand_name: str, parts_brand_quality: str) -> str:
@@ -206,10 +259,11 @@ class QuoteCountSyncService:
 
         return None
 
-    def _fetch_quotation_list(self, start_ts: int, end_ts: int) -> List[str]:
-        """获取指定时间范围内的所有订单ID列表"""
-        order_ids = []
+    def _fetch_quotation_list(self, start_ts: int, end_ts: int) -> List[Dict]:
+        """获取指定时间范围内的所有订单列表（包含加密字段）"""
+        orders = []
         page_num = 1
+        quote_user = self.COMPANY_TO_QUOTE_USER.get(self.COMPANY, '')
 
         while True:
             payload = {
@@ -220,7 +274,7 @@ class QuoteCountSyncService:
                 "inquiryId": "",
                 "statusId": "ALL",
                 "garageCompanyId": "",
-                "quoteUser": "",
+                "quoteUser": quote_user,
                 "quoteType": "ALL",
                 "systemQuoteReportStatus": "",
                 "quoteScope": "ALL",
@@ -257,7 +311,17 @@ class QuoteCountSyncService:
             for item in quotation_list:
                 order_id = item.get('id')
                 if order_id:
-                    order_ids.append(order_id)
+                    encrypt_address = item.get('encryptAddress', '')
+                    encrypt_user_infos = item.get('encryptInquiryUserInfos', '')
+                    decrypted_address = self._aes_decrypt(encrypt_address)
+                    decrypted_user_infos = self._aes_decrypt(encrypt_user_infos)
+                    show_address = self._extract_show_address(decrypted_address)
+                    garage_company_name = self._extract_garage_company_name(decrypted_user_infos)
+                    orders.append({
+                        'order_id': order_id,
+                        'show_address': show_address,
+                        'garage_company_name': garage_company_name,
+                    })
 
             print(f"[订单列表] 第{page_num}页获取 {len(quotation_list)} 条订单")
 
@@ -269,8 +333,8 @@ class QuoteCountSyncService:
             page_num += 1
             time.sleep(0.5)  # 翻页间隔0.5秒
 
-        print(f"[订单列表] 共获取 {len(order_ids)} 个订单ID")
-        return order_ids
+        print(f"[订单列表] 共获取 {len(orders)} 个订单")
+        return orders
 
     def _fetch_inquiry_basic(self, order_id: str) -> Optional[str]:
         """
@@ -310,16 +374,18 @@ class QuoteCountSyncService:
         for item in data:
             name = item.get('name', '')
             value = item.get('value', '')
-            if name == "发动机":
+            # 发动机：优先"发动机"，其次"发动机编码"
+            if name in ["发动机", "发动机编码"]:
                 config["engine"] = value
             elif name == "车辆生产日期":
                 config["production_date"] = value
-            elif name == "底盘":
+            # 底盘：优先"底盘"，其次"车型编码"
+            elif name in ["底盘", "车型编码"]:
                 config["chassis"] = value
 
         return config
 
-    def _fetch_quotation_detail(self, order_id: str) -> List[Dict]:
+    def _fetch_quotation_detail(self, order_id: str, show_address: str = '', garage_company_name: str = '') -> List[Dict]:
         """
         获取指定订单的询价明细，返回完整字段
         联合唯一键：inquiryId + brandName + partsNum + company
@@ -485,6 +551,8 @@ class QuoteCountSyncService:
                             'engine': car_config.get('engine', ''),
                             'productionDate': car_config.get('production_date', ''),
                             'chassis': car_config.get('chassis', ''),
+                            'showAddress': show_address,
+                            'garageCompanyName': garage_company_name,
                         })
 
             # 如果第一个接口有数据，直接返回（不切换到第二个接口）
@@ -507,8 +575,8 @@ class QuoteCountSyncService:
                 INSERT INTO crmapp_ks_inquiry_detail
                 (inquiryId, partsNum, partsName, brandName, brandNormalized, brandId, partType,
                  partsBrandQuality, remark, sellerBtPrice, sellerPrice, sellerStatus, order_status, display_seller_status,
-                 vin, engine, production_date, chassis, company, quote_date, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                 vin, engine, production_date, chassis, show_address, garage_company_name, company, quote_date, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     partsName = VALUES(partsName),
                     brandNormalized = VALUES(brandNormalized),
@@ -525,6 +593,8 @@ class QuoteCountSyncService:
                     engine = VALUES(engine),
                     production_date = VALUES(production_date),
                     chassis = VALUES(chassis),
+                    show_address = VALUES(show_address),
+                    garage_company_name = VALUES(garage_company_name),
                     quote_date = VALUES(quote_date),
                     updated_at = NOW()
             """
@@ -550,6 +620,8 @@ class QuoteCountSyncService:
                     item.get('engine', ''),
                     item.get('productionDate', ''),
                     item.get('chassis', ''),
+                    item.get('showAddress', ''),
+                    item.get('garageCompanyName', ''),
                     item.get('company', self.COMPANY),
                     item.get('quote_date', '')
                 )
@@ -596,18 +668,21 @@ class QuoteCountSyncService:
             print(f"[每日爬取] 处理日期: {date_str}")
             print(f"{'='*60}")
             
-            # 1. 获取该日期的所有订单ID
-            order_ids = self._fetch_quotation_list(start_ts, end_ts)
-            if not order_ids:
+            # 1. 获取该日期的所有订单
+            orders = self._fetch_quotation_list(start_ts, end_ts)
+            if not orders:
                 print(f"[每日爬取] {date_str} 无订单数据")
                 continue
-            
-            print(f"[每日爬取] 获取 {len(order_ids)} 个订单")
-            
+
+            print(f"[每日爬取] 获取 {len(orders)} 个订单")
+
             # 2. 获取每个订单的明细
             all_items = []
-            for idx, order_id in enumerate(order_ids, 1):
-                items = self._fetch_quotation_detail(order_id)
+            for idx, order in enumerate(orders, 1):
+                order_id = order.get('order_id')
+                show_address = order.get('show_address', '')
+                garage_company_name = order.get('garage_company_name', '')
+                items = self._fetch_quotation_detail(order_id, show_address, garage_company_name)
                 
                 # 为每条明细添加 quote_date 和 company
                 for item in items:
@@ -617,7 +692,7 @@ class QuoteCountSyncService:
                 all_items.extend(items)
                 
                 if idx % 50 == 0:
-                    print(f"[进度] 已处理 {idx}/{len(order_ids)} 个订单，获取 {len(all_items)} 条明细")
+                    print(f"[进度] 已处理 {idx}/{len(orders)} 个订单，获取 {len(all_items)} 条明细")
                 
                 time.sleep(0.2)  # 订单明细请求间隔0.2秒
             
@@ -627,7 +702,7 @@ class QuoteCountSyncService:
                 print(f"[保存] {date_str} 完成: 保存 {saved} 条明细")
                 
                 all_results['dates'].append(date_str)
-                all_results['total_orders'] += len(order_ids)
+                all_results['total_orders'] += len(orders)
                 all_results['total_items'] += len(all_items)
                 all_results['saved'] += saved
             

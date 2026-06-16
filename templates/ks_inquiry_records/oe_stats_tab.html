@@ -73,10 +73,9 @@
                     const value = rowNode.data[colId];
                     if (value !== undefined && value !== null) {
                         const textToCopy = String(value);
-                        navigator.clipboard.writeText(textToCopy).then(() => {
+                        copyToClipboardUniversal(textToCopy, function() {
                             layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
-                        }).catch(err => {
-                            console.error('复制失败:', err);
+                        }, function() {
                             layui.layer.msg('复制失败', {icon: 2});
                         });
                     }
