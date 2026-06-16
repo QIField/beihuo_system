@@ -237,7 +237,7 @@
             <!-- 分隔符 -->
             <span style="color: #999;" class="filter-detail-only">|</span>
 
-            <!-- 筛选按钮容器（品牌和卖家状态） -->
+            <!-- 筛选按钮容器（品牌和下单状态） -->
             <div id="ksFilterButtons" class="filter-detail-only"></div>
 
             <!-- 分隔符（重置前，始终显示） -->
@@ -376,7 +376,7 @@
             });
         }
 
-        // 初始化品牌和卖家状态筛选按钮（使用FilterPanel）
+        // 初始化品牌和下单状态筛选按钮（使用FilterPanel）
         function initKsFilterButtons() {
             // 先创建按钮（无论API是否成功）
             createKsFilterButtons();
@@ -412,11 +412,11 @@
             };
             container.appendChild(brandBtn);
 
-            // 创建卖家状态筛选按钮
+            // 创建下单状态筛选按钮
             const statusBtn = document.createElement('button');
             statusBtn.className = 'filter-btn';
             statusBtn.id = 'ksFilterBtn_sellerStatus';
-            statusBtn.textContent = '卖家状态';
+            statusBtn.textContent = '下单状态';
             statusBtn.onclick = function(e) {
                 e.stopPropagation();
                 toggleKsFilterPanel('sellerStatus', this);
@@ -448,7 +448,7 @@
                 title = '品牌';
                 options = brandOptions.map(name => ({ value: name, text: name }));
             } else {
-                title = '卖家状态';
+                title = '下单状态';
                 options = [
                     { value: '未下单', text: '未下单' },
                     { value: '本店下单', text: '本店下单' },
@@ -594,7 +594,7 @@
             // 初始化筛选面板（根据当前标签动态显示）
             updateSearchPanelForTab('detail');
 
-            // 初始化品牌ID和卖家状态筛选按钮（使用FilterPanel）
+            // 初始化品牌ID和下单状态筛选按钮（使用FilterPanel）
             initKsFilterButtons();
 
             // 初始化layui日期组件

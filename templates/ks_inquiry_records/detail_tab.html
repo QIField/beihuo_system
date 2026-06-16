@@ -21,6 +21,7 @@
             }
         },
         { field: 'inquiryId', headerName: '询价单号', width: 150, pinned: 'left', sortable: true, filter: true },
+        { field: 'customerName', headerName: '客户名称', width: 150, sortable: true, filter: true },
         { field: 'partsNum', headerName: 'OE号', width: 150, sortable: true, filter: true },
         { field: 'partsName', headerName: '配件名称', width: 200, sortable: true, filter: true },
         { field: 'brandName', headerName: '品牌', width: 120, sortable: true, filter: true },
@@ -30,7 +31,7 @@
         { field: 'sellerPrice', headerName: '不含税价', width: 120, sortable: true, filter: true },
         {
             field: 'displaySellerStatus',
-            headerName: '卖家状态',
+            headerName: '下单状态',
             width: 120,
             sortable: true,
             filter: true
@@ -96,10 +97,9 @@
                     const value = rowNode.data[colId];
                     if (value !== undefined && value !== null) {
                         const textToCopy = String(value);
-                        navigator.clipboard.writeText(textToCopy).then(() => {
+                        copyToClipboardUniversal(textToCopy, function() {
                             layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
-                        }).catch(err => {
-                            console.error('复制失败:', err);
+                        }, function() {
                             layui.layer.msg('复制失败', {icon: 2});
                         });
                     }

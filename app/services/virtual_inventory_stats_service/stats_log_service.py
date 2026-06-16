@@ -16,7 +16,7 @@ COMPANY_TABLES = [
 ]
 
 
-def save_recent_statistics(days=3):
+def save_recent_statistics(days=1):
     """保存最近指定天数的统计数据，按 business_date 和 company 覆盖更新"""
     results = []
     current_time = datetime.now()

@@ -2233,7 +2233,7 @@ def main_process():
     try:
         from app.services.virtual_inventory_stats_service import save_recent_statistics
 
-        results = save_recent_statistics(days=3)
+        results = save_recent_statistics(days=1)
         latest_business_date = None
         latest_stats = []
         for result in results:

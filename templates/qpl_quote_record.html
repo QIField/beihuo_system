@@ -267,40 +267,13 @@
             });
         }
 
-        // 复制到剪贴板（兼容降级处理）
+        // 复制到剪贴板（使用通用复制工具）
         function copyToClipboard(text) {
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(() => {
-                    layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
-                }).catch(() => {
-                    fallbackCopy(text);
-                });
-            } else {
-                fallbackCopy(text);
-            }
-        }
-
-        // 降级复制方案
-        function fallbackCopy(text) {
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-9999px';
-            textArea.style.top = '-9999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
-                } else {
-                    layui.layer.msg('复制失败', {icon: 2});
-                }
-            } catch (err) {
+            copyToClipboardUniversal(text, function() {
+                layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+            }, function() {
                 layui.layer.msg('复制失败', {icon: 2});
-            }
-            document.body.removeChild(textArea);
+            });
         }
         
         // 初始化自定义分页组件
