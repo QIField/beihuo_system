@@ -191,12 +191,18 @@ def clean_material_html(html_text, oe):
 
     # 第二步：拆成 key-value
     kv_list = []
+    has_part_name = False  # 是否已添加"零件名"（用于识别 HTML 中空标签行的零件名称）
     for item in row_list:
         parts = item.replace("'", '').replace('[', '').replace(']', '').split(',')
         if item == '新零件号':
             kv_list.append(['新零件号', ''])
         if len(parts) > 1 and len(parts[0]) > 0:
             kv_list.append(parts)
+        # 修复：HTML 中"零件名"一行的标签是 &nbsp;（空标签），导致 parts[0] 为空，被过滤
+        # 当 parts[0] 为空但 parts[1] 有值时，将其识别为"零件名"（只处理第一个匹配项）
+        elif len(parts) > 1 and len(parts[0]) == 0 and len(parts[1]) > 0 and not has_part_name:
+            kv_list.append(['零件名', parts[1]])
+            has_part_name = True
 
     # 第三步：组装字典（价格自动 ×1.13）
     result = {
@@ -233,3 +239,167 @@ def records_to_json(records, indent=2, ensure_ascii=False):
     if isinstance(records, dict):
         records = [records]
     return json.dumps(records, indent=indent, ensure_ascii=ensure_ascii, default=str)
+
+
+
+
+
+
+
+
+
+def map_detail_key_clean(data_fields):
+    """
+    对传入字典的 key 进行标准化清洗：去除所有空格、去除冒号（:）。
+
+    场景：爬虫解析出来的 key 可能带有首尾空格、"可用库存:" 等
+          脏字符，在进入数据库字段映射前，先把 key 统一标准化。
+
+    :param data_fields: dict，如 {" 零件名 ": "xxx", "可用库存:": 10}
+    :return: 清洗后的 dict，如 {"零件名": "xxx", "可用库存": 10}
+    """
+    if not data_fields or not isinstance(data_fields, dict):
+        return data_fields
+
+    cleaned = {}
+    for key, value in data_fields.items():
+        # 仅对字符串类型的 key 做清洗（其它类型如 int 直接原样保留）
+        if isinstance(key, str):
+            new_key = key.replace(' ', '').replace(':', '').strip()
+        else:
+            new_key = key
+
+        # 如果清洗后的 key 与原 key 不同，且新 key 已存在，
+        # 则保留先出现的那个（避免覆盖已有 key 的风险）
+        if new_key in cleaned:
+            continue
+        cleaned[new_key] = value
+
+    return cleaned
+
+
+def map_detail_data_clean(data):
+    """
+    对传入字典的 value 按属性字段分别进行数值化清洗（与 demo/test 规则一致）。
+
+    逐个字段的清洗规则：
+      - 毛重：              如 "1.067KG" → 1.067（去除 KG 后缀，转 float）
+      - 净重：              如 "1.067KG" → 1.067（去除 KG 后缀，转 float）
+      - 体积：              如 "22.040CDM" → 22.040（去除 CDM 后缀，转 float）
+      - 零售价：            如 "601.77RMB" → 601.77（去除 RMB 后缀，转 float）
+      - 经销商折扣(Stock)： 如 "25%" → 0.25（去除 % 后缀，除以 100）
+      - 经销商折扣(Rush)：  如 "25%" → 0.25（去除 % 后缀，除以 100）
+      - 经销商净值(Stock)： 如 "451.33RMB" → 451.33（去除 RMB 后缀，转 float）
+      - 经销商净值(Rush)：  如 "451.33RMB" → 451.33（去除 RMB 后缀，转 float）
+      - 可用库存：          如 "35件" → 35（去除 "件" 字后缀，转 float）
+      - 其它字段：          原样保留（如 oe、零件名、基本单元、族组、采集时间等）
+
+    :param data: dict，爬虫解析出的原始字段
+    :return: 清洗后的 dict
+    """
+    if not data or not isinstance(data, dict):
+        return data
+
+    cleaned = {}
+    for key, value in data.items():
+        # 非字符串类型（int/float/None 等）原样保留
+        if not isinstance(value, str):
+            cleaned[key] = value
+            continue
+
+        text = value.strip()
+
+        # —— 1. 毛重：去除 "KG" 单位 ——
+        if key == '毛重':
+            try:
+                num_str = text.replace('KG', '').replace('kg', '').strip()
+                cleaned[key] = float(num_str)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 2. 净重：去除 "KG" 单位 ——
+        if key == '净重':
+            try:
+                num_str = text.replace('KG', '').replace('kg', '').strip()
+                cleaned[key] = float(num_str)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 3. 体积：去除 "CDM" 单位 ——
+        if key == '体积':
+            try:
+                num_str = text.replace('CDM', '').replace('cdm', '').strip()
+                cleaned[key] = float(num_str)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 4. 零售价：去除 "RMB" 单位 ——
+        if key == '零售价':
+            try:
+                num_str = text.replace('RMB', '').replace('rmb', '').strip()
+                cleaned[key] = float(num_str)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 5. 经销商折扣(Stock)：百分比 → 小数 ——
+        if key == '经销商折扣(Stock)':
+            try:
+                num_str = text.replace('%', '').strip()
+                cleaned[key] = round(float(num_str) / 100.0, 4)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 6. 经销商折扣(Rush)：百分比 → 小数 ——
+        if key == '经销商折扣(Rush)':
+            try:
+                num_str = text.replace('%', '').strip()
+                cleaned[key] = round(float(num_str) / 100.0, 4)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 7. 经销商净值(Stock)：去除 "RMB" 单位 ——
+        if key == '经销商净值(Stock)':
+            try:
+                num_str = text.replace('RMB', '').replace('rmb', '').strip()
+                cleaned[key] = float(num_str)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 8. 经销商净值(Rush)：去除 "RMB" 单位 ——
+        if key == '经销商净值(Rush)':
+            try:
+                num_str = text.replace('RMB', '').replace('rmb', '').strip()
+                cleaned[key] = float(num_str)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 9. 可用库存：去除 "件" 字 ——
+        if key == '可用库存':
+            try:
+                num_str = text.replace('件', '').strip()
+                cleaned[key] = float(num_str)
+                continue
+            except (ValueError, TypeError):
+                cleaned[key] = value
+                continue
+
+        # —— 其它字段：原样保留 ——
+        cleaned[key] = value
+
+    return cleaned

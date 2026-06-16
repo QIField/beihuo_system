@@ -337,6 +337,11 @@ def import_parts_api():
                 'msg': '请选择要上传的文件',
                 'data': None
             })
+        
+        # car_type = data.get('car_type')
+        user_id = session.get('user_id')
+
+
 
         # 调用服务层处理
         result = import_parts(file, file.filename)
@@ -347,8 +352,8 @@ def import_parts_api():
             if user_id:
                 success_part_numbers = result.get('data', {}).get('success_part_numbers', [])
                 if success_part_numbers:
-                    # 生成分类名：excel + 秒级时间戳
-                    category = f'excel{int(time.time())}'
+                    # 生成分类名：excel_奔驰 + 秒级时间戳
+                    category = f'excel_benz_{user_id}_{int(time.time())}'
                     batch_add_to_favorites(user_id, success_part_numbers, category)
 
         if result.get('status'):
