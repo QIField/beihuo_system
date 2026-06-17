@@ -26,7 +26,9 @@ def set_bmw_config_api():
 
     请求体 (JSON):
         {
-            "cookie": "BMW Brilliance 登录态 Cookie"
+            "cookie": "BMW Brilliance 登录态 Cookie",
+            "tax_rate": 1.13,
+         
         }
 
     返回:
@@ -47,15 +49,10 @@ def set_bmw_config_api():
             })
 
         cookie = data.get('cookie')
+        tax_rate = data.get('tax_rate')
+       
 
-        if not cookie or not str(cookie).strip():
-            return jsonify({
-                'code': 400,
-                'msg': 'cookie 不能为空',
-                'data': None
-            })
-
-        result = set_bmw_config(cookie=cookie)
+        result = set_bmw_config(cookie=cookie, tax_rate=tax_rate)
 
         if result.get('code') == 200:
             return jsonify({
@@ -87,7 +84,9 @@ def get_bmw_config_api():
             "code": 200,
             "msg": "查询成功",
             "data": {
-                "cookie": "BMW Brilliance 登录态 Cookie"
+                "cookie": "BMW Brilliance 登录态 Cookie",
+                "tax_rate": 1.13,
+             
             }
         }
     """
@@ -104,7 +103,7 @@ def get_bmw_config_api():
             return jsonify({
                 'code': 200,
                 'msg': '配置不存在，返回默认值',
-                'data': {'cookie': ''}
+                'data': {'cookie': '', 'tax_rate': 1.13}
             })
     except Exception as e:
         return jsonify({

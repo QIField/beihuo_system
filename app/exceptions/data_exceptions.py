@@ -55,3 +55,16 @@ class DataFormatError(DataError):
             raise DataFormatError(f"价格格式异常: {price_text}")
     """
     pass
+
+
+class DataPersistenceError(DataError):
+    """
+    数据持久化失败 —— 数据库 upsert / commit 等操作出错
+
+    用法：
+        try:
+            session.execute(statement)
+        except Exception as e:
+            raise DataPersistenceError(f"数据库写入失败: {e}") from e
+    """
+    pass

@@ -19,6 +19,16 @@ from app.services.car_parts_library_service.car_parts_library_bmw_service import
     update_part,
     delete_part,
 )
+from app.services.car_parts_library_service.bmw_crawler import data_crawler
+from app.exceptions import (
+    ParameterError,
+    CrawlerError,
+    DataError,
+    DataParseError,
+    DataNotFoundError,
+    DataPersistenceError,
+    BeihuoBaseException,
+)
 
 
 # 创建宝马配件库蓝图
@@ -361,6 +371,135 @@ def delete_part_api():
         return jsonify({
             'code': 500,
             'msg': f'删除失败: {str(e)}',
+            'data': None,
+        })
+
+
+# ====================================================
+# 接口七：实时获取零件信息和库存信息（不入库）
+# ====================================================
+@bmw_parts_bp.route('/fetch-realtime', methods=['POST'])
+def fetch_realtime_data():
+    """
+    实时获取宝马零件信息和库存信息（不入库）
+
+    请求参数 (JSON):
+        {
+            "key": "密钥",
+            "part_number": "零件编号（OE号）",
+            "cookie": "BMW Brilliance 登录态 Cookie（可选，不传则使用配置中的 cookie）"
+        }
+
+    返回:
+        {
+            "code": 200,
+            "msg": "success",
+            "data": {
+                "part_number": "零件编号",
+                "part_info": {...零件详情...},
+                "stock_info": {...库存信息...}
+            }
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'code': 400,
+                'msg': '请求参数不能为空',
+                'data': None,
+            })
+
+        key = data.get('key')
+        if not key:
+            return jsonify({
+                'code': 400,
+                'msg': '密钥不能为空',
+                'data': None,
+            })
+        if key != '7Y4Y6RNdkDCwTJDJEBWz':
+            return jsonify({
+                'code': 403,
+                'msg': '密钥验证失败',
+                'data': None,
+            })
+
+        part_number = data.get('part_number')
+        if not part_number or not str(part_number).strip():
+            return jsonify({
+                'code': 400,
+                'msg': '零件编号不能为空',
+                'data': None,
+            })
+
+        oe_clean = str(part_number).strip()
+        cookie = data.get('cookie')
+
+        # data_crawler 内部调用的清洗函数已改为直接抛异常，
+        # 此处不再检查 detail/stock 中的 error 字段，失败时异常会直接向上传播
+        result = data_crawler(oe_clean, cookie, is_unit=True)
+
+       
+
+        return jsonify({
+            'code': 200,
+            'msg': '获取成功',
+            'data':result,
+        })
+    except ParameterError as e:
+        # 参数校验失败（零件号为空等）
+        return jsonify({
+            'code': 400,
+            'msg': '参数错误: {}'.format(str(e)),
+            'data': None,
+        })
+    except DataNotFoundError as e:
+        # 零件不存在或未激活（上游清洗函数抛出）
+        return jsonify({
+            'code': 404,
+            'msg': '数据未查询到: {}'.format(str(e)),
+            'data': None,
+        })
+    except DataParseError as e:
+        # HTML 结构异常、解析失败（页面结构变更等）
+        return jsonify({
+            'code': 502,
+            'msg': '数据解析(请查看是否cookie不正确)失败: {}'.format(str(e)),
+            'data': None,
+        })
+    except DataPersistenceError as e:
+        # 数据入库失败（当前接口不涉及入库，保留以防御性捕获）
+        return jsonify({
+            'code': 500,
+            'msg': '数据持久化失败: {}'.format(str(e)),
+            'data': None,
+        })
+    except CrawlerError as e:
+        # 爬虫请求失败（Cookie 失效、网络问题等）
+        return jsonify({
+            'code': 502,
+            'msg': '爬虫异常: {}'.format(str(e)),
+            'data': None,
+        })
+    except DataError as e:
+        # 其他数据层异常（兜底）
+        return jsonify({
+            'code': 500,
+            'msg': '数据异常: {}'.format(str(e)),
+            'data': None,
+        })
+    except BeihuoBaseException as e:
+        # 其他自定义业务异常
+        return jsonify({
+            'code': 500,
+            'msg': '业务异常: {}'.format(str(e)),
+            'data': None,
+        })
+    except Exception as e:
+        # 未预见的异常
+        return jsonify({
+            'code': 500,
+            'msg': '获取数据失败: {}'.format(str(e)),
             'data': None,
         })
 

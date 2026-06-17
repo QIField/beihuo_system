@@ -16,22 +16,26 @@ from app.services.system_setting_service.beihuo_system_config_service import upd
 from config.config_list_manager.config_cache import get_config_value
 
 
-def set_bmw_config(cookie: Optional[str] = None) -> Dict:
+def set_bmw_config(cookie: Optional[str] = None,
+                   tax_rate: Optional[float] = None,
+                   ) -> Dict:
     """
     设置宝马大库配置
 
-    当前仅支持 cookie 字段，后续如需扩展可直接新增参数。
     所有参数都是可选的，如果参数为 None，则保留原有配置不变。
 
-    :param cookie: BMW Brilliance 的登录态 Cookie（可选），默认保留原值
+    :param cookie: BMW Brilliance 的登录态 Cookie（可选）
+    :param tax_rate: 税率（可选），默认 1.13
     :return: 设置结果字典，包含 code 和 message
     """
     # 构建要更新的字典
     update_dict = {}
 
-    # 只添加传入的参数（不是 None 的）
     if cookie is not None:
         update_dict['cookie'] = cookie
+    if tax_rate is not None:
+        update_dict['tax_rate'] = float(tax_rate)
+    
 
     # 使用通用函数更新配置
     return update_json_config(
@@ -39,7 +43,7 @@ def set_bmw_config(cookie: Optional[str] = None) -> Dict:
         update_dict,
         config_group='car_parts',
         label='宝马大库配置',
-        remark='用于访问 BMW Brilliance 大库的配置信息'
+        remark='用于访问 BMW Brilliance 大库的配置信息及配件价格计算参数'
     )
 
 

@@ -26,6 +26,8 @@
 # TODO: 当前文件未使用 json 模块，若后续无需使用建议移除以避免 linter 告警
 import json
 
+from app.exceptions.crawler_exceptions import CrawlerError
+from app.exceptions.data_exceptions import DataError
 from app.scripts.spiders.spider_entities.bmw_brilliance import BMWBrillianceSpider
 from app.scripts.spiders.pipeline_clean.bmw_brilliance_clear import (
     clean_stock_html,
@@ -34,15 +36,18 @@ from app.scripts.spiders.pipeline_clean.bmw_brilliance_clear import (
     map_detail_key_clean,
 )
 from app.exceptions import (
+    BeihuoBaseException,
     ParameterError,
     CrawlerRequestError,
     CrawlerResponseEmptyError,
     DataNotFoundError,
     DataParseError,
+    DataPersistenceError,
 )
 from app.utils.orm.session import orm_session
 from app.models.orm_models.car_parts_library_bmw import CarPartsLibraryBmw
 from app.models.orm_models.car_parts_library_bmw_stock import CarPartsLibraryBmwStock
+from config.config_list_manager.config_cache import get_config_value
 from sqlalchemy.dialects.mysql import insert
 
 
@@ -325,7 +330,7 @@ def query_part_detail(oe, cookie, crawler=None,is_unit=True):
 # ====================================================
 
 
-def data_crawler(oe, cookie,is_unit=True):
+def data_crawler(oe, cookie=None, is_unit=True):
     """
     【接口三】一次性抓取零件的"库存信息 + 详细信息"，并返回合并后的字典。
 
@@ -333,20 +338,24 @@ def data_crawler(oe, cookie,is_unit=True):
     一次调用获得一个零件的完整快照。不执行任何数据库写入 / upsert 操作。
 
     :param oe:           零件号，如 "51749879093"
-    :param cookie:       BMW Brilliance 的有效登录 Cookie
+    :param cookie:       BMW Brilliance 的有效登录 Cookie（可选，不传或为空时从配置 bmw_car_parts_libray 中获取）
     :param as_db_fields: 是否将中文 key 转换为数据库字段 key（透传给两个子接口）
     :param is_unit:      数值 / 单位处理开关（透传给 query_part_detail）
     :return:             {'stock': stock_dict, 'detail': detail_dict}
+    :raises ParameterError: cookie 为空且配置中也没有设置时抛出
     :raises:              子接口可能抛出的所有异常（ParameterError / CrawlerError / DataError 等）
     """
 
-    
+    if not cookie or not str(cookie).strip():
+        config = get_config_value('bmw_car_parts_libray')
+        if config and isinstance(config, dict):
+            cookie = config.get('cookie', '')
+    if not cookie or not str(cookie).strip():
+        raise ParameterError('未配置 BMW Brilliance 登录 Cookie，请在请求中传入 cookie 或在配置中设置')
 
     stock = query_part_stock(oe, cookie)
-    detail = query_part_detail(oe, cookie,is_unit=is_unit)
+    detail = query_part_detail(oe, cookie, is_unit=is_unit)
 
-
-    
 
 
 
@@ -362,39 +371,22 @@ def data_upsert(oe, cookie):
     一次性抓取零件的"库存信息 + 详细信息"，并执行 upsert 操作。
 
     该函数是 data_crawler 的完整落地版本：
-    1. 调用 data_crawler 获取原始数据
+    1. 调用 data_crawler 获取原始数据（异常直接上抛，不做二次包装）
     2. 通过 map_detail_cn_to_db / map_stock_cn_to_db 转换为数据库字段
     3. 对两个表（详情表 + 库存表）分别执行 upsert
 
     【异常策略】
-    - 若爬取/清洗返回的 dict 中含 error 字段，视为"数据获取失败"，
-      不执行任何数据库操作，并向上抛出 DataParseError；
-    - 数据库执行期间的异常交由上层或外层 try/except 捕获。
+    - 爬取/清洗阶段的异常直接向上抛出（ParameterError / CrawlerError / DataError 等）；
+    - 数据库执行期间异常抛出 DataPersistenceError。
 
     :param oe:           零件号，如 "51749879093"
     :param cookie:       BMW Brilliance 的有效登录 Cookie
     :return:             字典 {'status': bool, 'msg': str, 'detail_updated': bool, 'stock_updated': bool}
-    :raises DataParseError: 爬取/清洗返回的结果中含 error 字段（数据获取失败，不入库）
+    :raises DataPersistenceError: 数据库 upsert 操作失败
     """
 
-    # 1. 爬取数据
+    # 1. 爬取数据（异常直接上抛）
     data = data_crawler(oe, cookie, is_unit=False)
-    # print(data)
-
-    # 1.1 检测爬取/清洗是否失败（返回的 dict 中含 error 字段）
-    stock_raw = data.get('stock', {}) if isinstance(data.get('stock'), dict) else {}
-    detail_raw = data.get('detail', {}) if isinstance(data.get('detail'), dict) else {}
-
-    errors = []
-    if stock_raw and stock_raw.get('error'):
-        errors.append("库存: {}".format(stock_raw.get('error')))
-    if detail_raw and detail_raw.get('error'):
-        errors.append("详情: {}".format(detail_raw.get('error')))
-
-    if errors:
-        error_msg = "零件 {} 数据获取失败：{}".format(oe, "；".join(errors))
-        print("[BMW] {}".format(error_msg))
-        raise DataParseError(error_msg)
 
     # 2. 中文 key → 数据库字段 key 的映射
     detail = map_detail_cn_to_db(data['detail'])
@@ -441,12 +433,7 @@ def data_upsert(oe, cookie):
             # session.rollback()  # pyright: ignore[reportAttributeAccessIssue]
             msg = f"零件 {oe} 入库失败: {str(e)}"
             print(msg)
-            return {
-                'status': False,
-                'msg': msg,
-                'detail_updated': detail_updated,
-                'stock_updated': stock_updated,
-            }
+            raise DataPersistenceError(msg) from e
 
 
 
@@ -454,63 +441,63 @@ def data_upsert(oe, cookie):
 
 
 
-def test_external_data_interface():
-    """
-    【手动测试入口】演示如何正确调用库存 / 详情接口并按异常层级捕获错误。
+# def test_external_data_interface():
+#     """
+#     【手动测试入口】演示如何正确调用库存 / 详情接口并按异常层级捕获错误。
 
-    使用步骤：
-      1. 将下方 test_cookie 替换为你在 BMW Brilliance 页面登录后获取的有效 Cookie；
-      2. 修改 test_oe 为你要查询的零件号；
-      3. 在 if __name__ == "__main__" 中调用 test_external_data_interface() 即可。
+#     使用步骤：
+#       1. 将下方 test_cookie 替换为你在 BMW Brilliance 页面登录后获取的有效 Cookie；
+#       2. 修改 test_oe 为你要查询的零件号；
+#       3. 在 if __name__ == "__main__" 中调用 test_external_data_interface() 即可。
 
-    异常捕获顺序（从具体到宽泛，体现自定义异常的分层设计）：
-      ParameterError → CrawlerError → DataError → BeihuoBaseException → Exception
-    """
-    from app.exceptions import (
-        BeihuoBaseException,
-        ParameterError,
-        CrawlerError,
-        DataError,
-    )
+#     异常捕获顺序（从具体到宽泛，体现自定义异常的分层设计）：
+#       ParameterError → CrawlerError → DataError → BeihuoBaseException → Exception
+#     """
+#     from app.exceptions import (
+#         BeihuoBaseException,
+#         ParameterError,
+#         CrawlerError,
+#         DataError,
+#     )
 
-    test_cookie = "sap-contextid=SID%3aANON%3apcqpdi44_CQP_44%3aeeFVhYt4p37HAi_RqtF54_BkajnLxx2Z3qXugJ85-NEW; TS0190948c=014e90d2cd8c14c99180a6381ae029d07034d6e40f7fd7e0ecf1a9d4136e9de34d4de428c36f8003e919ec19d5050c015dfa6f760da563872adc657e3cf7959d0a9f6ce3765fa41d94f1b6f7714c9ed9a96a49061541e52105b181aec8cd35378525022fef96f1c3b5bbdf1fcc4fe068539093c387f042980af7e1a3b3209c4c9ed687f64a5c3f0374dd66febaac75d07231fe0af94cfc54372e9af5cce678c2fccc9bcfe8696f8f257efbbd05e0a24f377a338b96ed23d87f4a3bc779d761737544d63d2160ab2a8b4cd2cefd2a06697960a015b5121dd5567d3f2164b7147720ef4241f52b87348f95a86ea04d705bbd31c1b22d; sap-appcontext=c2FwLXNlc3Npb25pZD1TSUQlM2FBTk9OJTNhcGNxcGRpNDRfQ1FQXzQ0JTNhZWVGVi1hZ05UTXRkeUdzRWJxVllpQ1Z4Q2dQTHh4M29ncVZSbmlYQS1BVFQ%3d; TS01d0dca4=014e90d2cd4f5fe3b242d5ccf0d53b5537096b8ae060a44c8d4b5112479d92896a503525318c52c420edd4e78303d5a356515101b4482c3b9ac6470e14dbebc12f423c67d757c1702bcdd8043e61dba4bfe30d62d6b4d6765cdfbc7d0d932572dc8963cdbbe3d408891689c1664fb19fc2527182ce62831ed3070fcb11aacf66b37c78cad2675508826b86b3158529bb8da8834197ff64713e7fe8343393dec182a604f94c; SelectedMaterials=; Order_Selected_materials=; _qimei_uuid42=1991c0f1f091000dd09c5505067aa9f81ee3184806; _qimei_i_3=5cf845d4925301d89593fd395e8d75e6a5eaa5a416525585e1897a5f72c7216b67613e943989e283d4aa; _qimei_h38=c79cc6f2d09c5505067aa9f80200000f21991c; _qimei_fingerprint=54550af90219e3b56fc9224203a3db6d; sap-usercontext=sap-client=100; BIGipServercqpcn.bmwbrill.cn_pool_8443=2345587466.64288.0000; MYSAPSSO2=AjQxMDMBABhDAE0AMAA3ADcAOQAwACAAIAAgACAAIAACAAYxADAAMAADABBDAFEAUAAgACAAIAAgACAABAAYMgAwADIANgAwADYAMQA1ADAAMgA1ADIABQAEAAAACAkAAjEA%2fwFWMIIBUgYJKoZIhvcNAQcCoIIBQzCCAT8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHATGCAR4wggEaAgEBMG8wZDELMAkGA1UEBhMCREUxHDAaBgNVBAoTE1NBUCBUcnVzdCBDb21tdW5pdHkxEzARBgNVBAsTClNBUCBXZWIgQVMxFDASBgNVBAsTC0kwMDIwNDc0MjYxMQwwCgYDVQQDEwNDUVACByAVCQIJU1kwCQYFKw4DAhoFAKBdMBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2MDYxNTAyNTIxOVowIwYJKoZIhvcNAQkEMRYEFBYPHqv71Do%2fgW%21gypci%21vt2mhW9MAkGByqGSM44BAMELzAtAhQooXculaMAcYfANvFSQJOzsgqAyAIVAJPoWZMDRhzTtOqCFWKbVa8VNBS1; _qimei_i_1=76cc66d192530388c7c1fc645b8d20e5f2eea1f1145c52d3bdd920582493206c616361973980ebdd85acf9fa; lf_actionspage=spp05_order_create.htm%3foninputprocessing(update); ordtype_create=; date_create=; po_create=; sppbasket=; back_page=SPP05_ORDER_CREATE_FRAME.htm; SAP_SESSIONID_CQP_100=hmN7dr1qFEaFmMnICJ1B3IcWuYRofRHxtB7VHinbDGY%3d; TS016675fd=014e90d2cd00c6ec941c6207d5302ea9d1b9baa71c915d511c62fc5ca689427a1ff74a15ffa74237785b1ddc2c6850ccdd7eecaf068b26f4c83b158e3ce241d2ebe4958a5549c1acbd04a185d3f5ea6e9ba8b0015349e60d55f656f27c9615b2f84b66567e48c38b878f4e7908dc2e201fa3d37a24861b0894118535f42454e53a899eba4b74b9c50fa747da5a133ab38d3884659b9ba7294c247564a14b44fef4e2e8ff60cb222d8cf7d9a7c5b18314a85f63a18a43f048e29d15eaebb91ff04fe6cc857882ea01d6333cb3eb51b1f7d523b017c2c8ebc12eea75e4cd6cc77d9e11f585578373c160cc0ececa369212b25fde37730d82296859bc0ab65b0514a6440c279d"
+#     test_cookie = "sap-contextid=SID%3aANON%3apcqpdi44_CQP_44%3aeeFVhYt4p37HAi_RqtF54_BkajnLxx2Z3qXugJ85-NEW; TS0190948c=014e90d2cd8c14c99180a6381ae029d07034d6e40f7fd7e0ecf1a9d4136e9de34d4de428c36f8003e919ec19d5050c015dfa6f760da563872adc657e3cf7959d0a9f6ce3765fa41d94f1b6f7714c9ed9a96a49061541e52105b181aec8cd35378525022fef96f1c3b5bbdf1fcc4fe068539093c387f042980af7e1a3b3209c4c9ed687f64a5c3f0374dd66febaac75d07231fe0af94cfc54372e9af5cce678c2fccc9bcfe8696f8f257efbbd05e0a24f377a338b96ed23d87f4a3bc779d761737544d63d2160ab2a8b4cd2cefd2a06697960a015b5121dd5567d3f2164b7147720ef4241f52b87348f95a86ea04d705bbd31c1b22d; sap-appcontext=c2FwLXNlc3Npb25pZD1TSUQlM2FBTk9OJTNhcGNxcGRpNDRfQ1FQXzQ0JTNhZWVGVi1hZ05UTXRkeUdzRWJxVllpQ1Z4Q2dQTHh4M29ncVZSbmlYQS1BVFQ%3d; TS01d0dca4=014e90d2cd4f5fe3b242d5ccf0d53b5537096b8ae060a44c8d4b5112479d92896a503525318c52c420edd4e78303d5a356515101b4482c3b9ac6470e14dbebc12f423c67d757c1702bcdd8043e61dba4bfe30d62d6b4d6765cdfbc7d0d932572dc8963cdbbe3d408891689c1664fb19fc2527182ce62831ed3070fcb11aacf66b37c78cad2675508826b86b3158529bb8da8834197ff64713e7fe8343393dec182a604f94c; SelectedMaterials=; Order_Selected_materials=; _qimei_uuid42=1991c0f1f091000dd09c5505067aa9f81ee3184806; _qimei_i_3=5cf845d4925301d89593fd395e8d75e6a5eaa5a416525585e1897a5f72c7216b67613e943989e283d4aa; _qimei_h38=c79cc6f2d09c5505067aa9f80200000f21991c; _qimei_fingerprint=54550af90219e3b56fc9224203a3db6d; sap-usercontext=sap-client=100; BIGipServercqpcn.bmwbrill.cn_pool_8443=2345587466.64288.0000; MYSAPSSO2=AjQxMDMBABhDAE0AMAA3ADcAOQAwACAAIAAgACAAIAACAAYxADAAMAADABBDAFEAUAAgACAAIAAgACAABAAYMgAwADIANgAwADYAMQA1ADAAMgA1ADIABQAEAAAACAkAAjEA%2fwFWMIIBUgYJKoZIhvcNAQcCoIIBQzCCAT8CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHATGCAR4wggEaAgEBMG8wZDELMAkGA1UEBhMCREUxHDAaBgNVBAoTE1NBUCBUcnVzdCBDb21tdW5pdHkxEzARBgNVBAsTClNBUCBXZWIgQVMxFDASBgNVBAsTC0kwMDIwNDc0MjYxMQwwCgYDVQQDEwNDUVACByAVCQIJU1kwCQYFKw4DAhoFAKBdMBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2MDYxNTAyNTIxOVowIwYJKoZIhvcNAQkEMRYEFBYPHqv71Do%2fgW%21gypci%21vt2mhW9MAkGByqGSM44BAMELzAtAhQooXculaMAcYfANvFSQJOzsgqAyAIVAJPoWZMDRhzTtOqCFWKbVa8VNBS1; _qimei_i_1=76cc66d192530388c7c1fc645b8d20e5f2eea1f1145c52d3bdd920582493206c616361973980ebdd85acf9fa; lf_actionspage=spp05_order_create.htm%3foninputprocessing(update); ordtype_create=; date_create=; po_create=; sppbasket=; back_page=SPP05_ORDER_CREATE_FRAME.htm; SAP_SESSIONID_CQP_100=hmN7dr1qFEaFmMnICJ1B3IcWuYRofRHxtB7VHinbDGY%3d; TS016675fd=014e90d2cd00c6ec941c6207d5302ea9d1b9baa71c915d511c62fc5ca689427a1ff74a15ffa74237785b1ddc2c6850ccdd7eecaf068b26f4c83b158e3ce241d2ebe4958a5549c1acbd04a185d3f5ea6e9ba8b0015349e60d55f656f27c9615b2f84b66567e48c38b878f4e7908dc2e201fa3d37a24861b0894118535f42454e53a899eba4b74b9c50fa747da5a133ab38d3884659b9ba7294c247564a14b44fef4e2e8ff60cb222d8cf7d9a7c5b18314a85f63a18a43f048e29d15eaebb91ff04fe6cc857882ea01d6333cb3eb51b1f7d523b017c2c8ebc12eea75e4cd6cc77d9e11f585578373c160cc0ececa369212b25fde37730d82296859bc0ab65b0514a6440c279d"
 
 
 
-    test_oe = "51749879093"
+#     test_oe = "51749879093"
 
-    print("=== 测试：库存查询 ===")
-    try:
-        stock = query_part_stock(test_oe, test_cookie)
-        print(stock)
-        for key, value in stock.items():
-            print(f"{key}: {value}")
-    except ParameterError as e:
-        print(f"参数错误: {e}")
-    except CrawlerError as e:
-        print(f"爬虫异常: {e}")
-    except DataError as e:
-        print(f"数据异常: {e}")
-    except BeihuoBaseException as e:
-        print(f"业务异常: {e}")
-    except Exception as e:
-        print(f"未知异常: {e}")
+#     print("=== 测试：库存查询 ===")
+#     try:
+#         stock = query_part_stock(test_oe, test_cookie)
+#         print(stock)
+#         for key, value in stock.items():
+#             print(f"{key}: {value}")
+#     except ParameterError as e:
+#         print(f"参数错误: {e}")
+#     except CrawlerError as e:
+#         print(f"爬虫异常: {e}")
+#     except DataError as e:
+#         print(f"数据异常: {e}")
+#     except BeihuoBaseException as e:
+#         print(f"业务异常: {e}")
+#     except Exception as e:
+#         print(f"未知异常: {e}")
 
-    print()
-    print("=== 测试：详情查询 ===")
-    try:
-        detail = query_part_detail(test_oe, test_cookie)
-        print(detail)
-    except ParameterError as e:
-        print(f"参数错误: {e}")
-    except CrawlerError as e:
-        print(f"爬虫异常: {e}")
-    except DataError as e:
-        print(f"数据异常: {e}")
-    except BeihuoBaseException as e:
-        print(f"业务异常: {e}")
-    except Exception as e:
-        print(f"未知异常: {e}")
+#     print()
+#     print("=== 测试：详情查询 ===")
+#     try:
+#         detail = query_part_detail(test_oe, test_cookie)
+#         print(detail)
+#     except ParameterError as e:
+#         print(f"参数错误: {e}")
+#     except CrawlerError as e:
+#         print(f"爬虫异常: {e}")
+#     except DataError as e:
+#         print(f"数据异常: {e}")
+#     except BeihuoBaseException as e:
+#         print(f"业务异常: {e}")
+#     except Exception as e:
+#         print(f"未知异常: {e}")
 
 
 
@@ -521,29 +508,47 @@ def test_external_data_interface():
 # ====================================================
 # 脚本主入口（交互式地打印 data_crawler 的返回结果）
 # ====================================================
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    # 如需走"带异常分层捕获"的测试流程，可改为调用：
-    # test_external_data_interface()
+#     # 如需走"带异常分层捕获"的测试流程，可改为调用：
+#     # test_external_data_interface()
 
-    test_oe = "11137600482"
-    test_cookie = "sap-contextid=SID%3aANON%3apcqpdi47_CQP_47%3aQUr9lHRSvLk2ZBrLmxM5qVuh5U2ffeRlVjlFnFlJ-NEW; TS0190948c=014e90d2cde74851421d085f93d97b61eb8fc945bdffe3d7ca4ef5bf8e741d5417cb9ba91625d541969fdc1da6c21c243a8a6911e6666cf6edd97dee1639c66c857a8cf8af6b805cb86d61b74e41d55f661899acb43f62aed90a58835d1838e4a64ea0522bce09dd28e3142c032212bd2cc2cc41b69e7048551204011325d3f1a3ea51a40fdc298cb6cb5682c38b14b20aa9fab0ad9f435eaee56a913738a2c662a04cbc619e6bb309fd12d76d10a619b165ff4d175238df9f24df80bebe756eed2dc4ba2bb791965b9ea9dbd7b70d30c1ddd717fe4ab8ec88540e5980769adb426f0b699b6ab432826637c19877102f068a69ce42; sap-appcontext=c2FwLXNlc3Npb25pZD1TSUQlM2FBTk9OJTNhcGNxcGRpNDdfQ1FQXzQ3JTNhUVVyOXR5SElnXzdkUDUxbWtWRVZOZWpxZU1DY2ZlUjhWamtqeUpBTy1BVFQ%3d; TS01d0dca4=014e90d2cdaf664ac9c10b33848dfc0500db728e63ffe3d7ca4ef5bf8e741d5417cb9ba91625d541969fdc1da6c21c243a8a6911e6666cf6edd97dee1639c66c857a8cf8af6b805cb86d61b74e41d55f661899acb43f62aed90a58835d1838e4a64ea0522bce09dd28e3142c032212bd2cc2cc41b69e7048551204011325d3f1a3ea51a40fa7d04b2eb9c793a8b51e02f0888fe33e95cd8e24a12055636ebbc5515098c524; SelectedMaterials=; Order_Selected_materials=; _qimei_uuid42=1991c0f1f091000dd09c5505067aa9f81ee3184806; _qimei_i_3=5cf845d4925301d89593fd395e8d75e6a5eaa5a416525585e1897a5f72c7216b67613e943989e283d4aa; _qimei_h38=c79cc6f2d09c5505067aa9f80200000f21991c; _qimei_fingerprint=54550af90219e3b56fc9224203a3db6d; sap-usercontext=sap-client=100; BIGipServercqpcn.bmwbrill.cn_pool_8443=2395919114.64288.0000; MYSAPSSO2=AjQxMDMBABhDAE0AMAA3ADcAOQAwACAAIAAgACAAIAACAAYxADAAMAADABBDAFEAUAAgACAAIAAgACAABAAYMgAwADIANgAwADYAMQA2ADAAMwAwADMABQAEAAAACAkAAjEA%2fwFVMIIBUQYJKoZIhvcNAQcCoIIBQjCCAT4CAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHATGCAR0wggEZAgEBMG8wZDELMAkGA1UEBhMCREUxHDAaBgNVBAoTE1NBUCBUcnVzdCBDb21tdW5pdHkxEzARBgNVBAsTClNBUCBXZWIgQVMxFDASBgNVBAsTC0kwMDIwNDc0MjYxMQwwCgYDVQQDEwNDUVACByAVCQIJU1kwCQYFKw4DAhoFAKBdMBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2MDYxNjAzMDMxMFowIwYJKoZIhvcNAQkEMRYEFK2kiPW1YGyI5LVXA9dJpv3ieD%2fEMAkGByqGSM44BAMELjAsAhRSpXD1M7u6oS1omM%21A66ZlAzAyqwIUQ9yuhoMhsIsPhRPxjha3jVN2phs%3d; SAP_SESSIONID_CQP_100=crvdgXu1Jm4pAwKG9Dc5CegfO3RpLxHxk9vHkEG5-HQ%3d; lf_actionspage=spp05_order_create.htm%3foninputprocessing(update); ordtype_create=; date_create=; po_create=; sppbasket=; back_page=SPP05_ORDER_CREATE_FRAME.htm; TS016675fd=014e90d2cd3ba36b5af2bae4cde6e74efd739c89d549f4b535aeceafb0d97d9328e514239f85b382ef4a49f4c53a6df16c952df356f5cd27215161ee1e128a26acf2361456fdb89016d337efe8a18d4e6e3870d1e672bc5e2e3711897b521e947f6ff6022dac260161828031e3eb5b23dd9e4a53726e0076e40f4c65697f911d0cb34996aa79fed11e1b2488b6251f36ffbe8c8c4d29d9cf2e2994242c8a3523c163e7a006bdaedf7622a0c57eff20cba99e282dcd0a6a0447f921781f936534700cb5077966cdc1c0f684cdd8b9e25e8c9ebc8196a98819a0ca574e57353d29cefc9ed31f6355f2f96261183f8ece383bad46e7f9144c5077e3e7facb3b119115d5f87716; _qimei_i_1=4dc765d192530388c7c1fc645b8d20e5f2eea1f1145c52d3bdd920582493206c616361973980ebdd8595f4ec"
-    #test_cookie = "sap-contextid=SID%3aANON%3ap"
+#     test_oe = "11137600482"
+#     test_cookie = "sap-contextid=SID%3aANON%3apcqpdi45_CQP_45%3a_Kg1E8l4lLNOmcctW8NR0HozJhC-TFMmOuAkjvmx-NEW; TS0190948c=014e90d2cd21cbb8a51ffc28beda15c054243d04cab8ffaea2d614ff93d05c3001ea7df0e55b7238dcb8037bb5eeb49504e9cac767891059d24aecfc75f0f7854373c3ba26d5ff65560a2de2c7c2b9f7053e8a131db950e841a92af8baf703644f713418c7ef5ea607f4ecf3b1d7e443ba1c70d6dc5a310cf11af843f51dea1aab934f5156920337b769a4abd0ae1f931d6dbae53096a031ede7786fcfe6a98bfb450a184b5e79e8852e8153412705648aace485235138f0ba4956b4866e3c61f84fc24a93d7c11d190acdadd6835e54737064afec781270b6bf62f78b8213d97212335e18; sap-appcontext=c2FwLXNlc3Npb25pZD1TSUQlM2FBTk9OJTNhcGNxcGRpNDVfQ1FQXzQ1JTNhX0tnMVpZS3hNRmsyN2hoRkVSTnJ5Y2RKRzZTX1RGTlhPdUR4bnpkZC1BVFQ%3d; TS01d0dca4=014e90d2cd386108b5935fd9f9ba081f9349634aa0b8ffaea2d614ff93d05c3001ea7df0e55b7238dcb8037bb5eeb49504e9cac767891059d24aecfc75f0f7854373c3ba26d5ff65560a2de2c7c2b9f7053e8a131db950e841a92af8baf703644f713418c7ef5ea607f4ecf3b1d7e443ba1c70d6dc8269fb6c504b678909570c50a2cdc036cb65990e9f07f6889479f88de9ca8195; SelectedMaterials=; Order_Selected_materials=; _qimei_uuid42=1991c0f1f091000dd09c5505067aa9f81ee3184806; _qimei_i_3=5cf845d4925301d89593fd395e8d75e6a5eaa5a416525585e1897a5f72c7216b67613e943989e283d4aa; _qimei_h38=c79cc6f2d09c5505067aa9f80200000f21991c; _qimei_fingerprint=54550af90219e3b56fc9224203a3db6d; BIGipServercqpcn.bmwbrill.cn_pool_8443=2362364682.64288.0000; sap-usercontext=sap-client=100; MYSAPSSO2=AjQxMDMBABhDAE0AMAA3ADcAOQAwACAAIAAgACAAIAACAAYxADAAMAADABBDAFEAUAAgACAAIAAgACAABAAYMgAwADIANgAwADYAMQA3ADAAMgA0ADcABQAEAAAACAkAAjEA%2fwFXMIIBUwYJKoZIhvcNAQcCoIIBRDCCAUACAQExCzAJBgUrDgMCGgUAMAsGCSqGSIb3DQEHATGCAR8wggEbAgEBMG8wZDELMAkGA1UEBhMCREUxHDAaBgNVBAoTE1NBUCBUcnVzdCBDb21tdW5pdHkxEzARBgNVBAsTClNBUCBXZWIgQVMxFDASBgNVBAsTC0kwMDIwNDc0MjYxMQwwCgYDVQQDEwNDUVACByAVCQIJU1kwCQYFKw4DAhoFAKBdMBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2MDYxNzAyNDc1MFowIwYJKoZIhvcNAQkEMRYEFM%2fYZ2QjqPW5KrEgjO8TXsCwzO68MAkGByqGSM44BAMEMDAuAhUAwlEhJs9iMBvuN%2fSTkaVheuEmhOkCFQCyJmEMo5mUVYodt9tw30UceFmCTA%3d%3d; SAP_SESSIONID_CQP_100=i3GLOSqq61RKnxoczv3_rO5WTI9p9hHxhn9zrUlrRiU%3d; lf_actionspage=spp05_order_create.htm%3foninputprocessing(update); ordtype_create=; date_create=; po_create=; sppbasket=; back_page=SPP05_ORDER_CREATE_FRAME.htm; TS016675fd=014e90d2cd8ba86a8949baba6af8dc176dc4e1baa5b8ffaea2d614ff93d05c3001ea7df0e55b7238dcb8037bb5eeb49504e9cac767891059d24aecfc75f0f7854373c3ba26d5ff65560a2de2c7c2b9f7053e8a131db950e841a92af8baf703644f713418c7ef5ea607f4ecf3b1d7e443ba1c70d6dc5a310cf11af843f51dea1aab934f5156920337b769a4abd0ae1f931d6dbae53096a031ede7786fcfe6a98bfb450a184b5e79e8852e8153412705648aace485235138f0ba4956b4866e3c61f84fc24a9310eca868ca23cf7862781fbb15de11956b459f4d2d2361fd3d8865bc01aa9e4b4aa40a088ba5fb48e0d6448c26c18d45; _qimei_i_1=73dd7fd192530388c7c1fc645b8d20e5f2eea1f1145c52d3bdd920582493206c616361973980ebdd8597c5e6"
+  
+#     #test_cookie = "sap-contextid=SID%3aANON%3ap"
 
-    # # 使用 data_crawler 一次性抓取库存 + 详情，随后分别打印，便于观察返回结构。
-    # data = data_crawler(test_oe, test_cookie)
+#     try:
+#         data = data_crawler(test_oe, test_cookie)
 
-    # for key, value in data['stock'].items():
-    #     print(f"{key}: {value}")
+#         print(f"[BMW] 零件 {test_oe} 库存信息:")
+#         for key, value in data['stock'].items():
+#             print(f"  {key}: {value}")
 
-    # print("="*50)
-    # # print(data)  # 如需查看整个原始字典，取消该行注释
-    # for key, value in data['detail'].items():
-    #     print(f"{key}: {value}")
+#         print("="*50)
+
+#         print(f"[BMW] 零件 {test_oe} 详情信息:")
+#         for key, value in data['detail'].items():
+#             print(f"  {key}: {value}")
+
+#     except ParameterError as e:
+#         print(f"[BMW][参数错误] {e}")
+#     except DataNotFoundError as e:
+#         print(f"[BMW][数据未查询到] {e}")
+#     except DataParseError as e:
+#         print(f"[BMW][数据解析失败] {e}")
+#     except CrawlerError as e:
+#         print(f"[BMW][爬虫请求失败] {e}")
+#     except DataError as e:
+#         print(f"[BMW][数据异常] {e}")
+#     except BeihuoBaseException as e:
+#         print(f"[BMW][业务异常] {e}")
+#     except Exception as e:
+#         print(f"[BMW][未知异常] {e}")
 
     
-    result = data_upsert(test_oe, test_cookie)
-    print(f"\n[BMW] 入库结果: {result}")
+    # result = data_upsert(test_oe, test_cookie)
+    # print(f"\n[BMW] 入库结果: {result}")
    
     
     

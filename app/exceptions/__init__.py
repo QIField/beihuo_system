@@ -19,6 +19,7 @@ from app.exceptions.data_exceptions import (
     DataParseError,
     DataNotFoundError,
     DataFormatError,
+    DataPersistenceError,
 )
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     "DataParseError",
     "DataNotFoundError",
     "DataFormatError",
+    "DataPersistenceError",
 ]

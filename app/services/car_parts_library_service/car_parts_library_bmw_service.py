@@ -12,6 +12,8 @@ from app.utils.orm.session import orm_session
 from app.models.orm_models.car_parts_library_bmw import CarPartsLibraryBmw
 from app.models.orm_models.car_parts_library_bmw_stock import CarPartsLibraryBmwStock
 from app.services.car_parts_library_service.bmw_crawler import data_upsert
+from app.exceptions import CrawlerError, DataError, DataPersistenceError
+from config.config_list_manager.config_cache import get_config_value
 # ====================================================
 # 接口一：根据零件号获取配件详情（含库存信息）
 # ====================================================
@@ -34,6 +36,17 @@ def get_part_by_number(part_number: str) -> Optional[Dict]:
 
         oe_clean = str(part_number).strip()
 
+         # 先获取配置
+        tax_rate = 1.13
+        # discount_rate = 0.83
+        try:
+            config = get_config_value('bmw_car_parts_libray')
+            if config and isinstance(config, dict):
+                tax_rate = config.get('tax_rate', 1.13)
+               # discount_rate = config.get('discount_rate', 0.83)
+        except Exception:
+            pass 
+
         with orm_session() as session:
             # 查询零件基础信息
             part = session.query(CarPartsLibraryBmw).filter(
@@ -48,7 +61,7 @@ def get_part_by_number(part_number: str) -> Optional[Dict]:
                 CarPartsLibraryBmwStock.part_number == oe_clean
             ).first()
 
-            result = part.to_dict()
+            result = part.to_web_dict(tax_rate)
             result['stock_info'] = stock.to_dict() if stock else None
 
             return result
@@ -119,7 +132,7 @@ def get_parts_list_page(
             # 6. 组装数据
             data = []
             for item in items:
-                item_dict = item.to_dict()
+                item_dict = item.to_web_dict()
                 item_dict['stock_info'] = stock_dict.get(item.part_number, None)  # pyright: ignore[reportCallIssue, reportArgumentType]
                 data.append(item_dict)
 
@@ -186,13 +199,23 @@ def data_refresh(part_numbers: List[str]) -> Dict:
                     if result.get('stock_updated'):
                         stock_count += 1
                     print(f"[{idx + 1}/{len(part_numbers)}] 零件 {oe} 刷新成功: {result.get('msg')}")
-                else:
-                    failed.append({'part_number': oe, 'reason': result.get('msg', '未知错误')})
-                    print(f"[{idx + 1}/{len(part_numbers)}] 零件 {oe} 刷新失败: {result.get('msg')}")
 
+            except DataPersistenceError as persist_err:
+                # 数据库写入失败（专属异常类型）
+                failed.append({'part_number': oe, 'reason': str(persist_err), 'type': 'persistence'})
+                print(f"[{idx + 1}/{len(part_numbers)}] 零件 {oe} 入库失败: {str(persist_err)}")
+            except DataError as data_err:
+                # 数据解析/查询失败（HTML 结构异常、零件不存在等）
+                failed.append({'part_number': oe, 'reason': str(data_err), 'type': 'data'})
+                print(f"[{idx + 1}/{len(part_numbers)}] 零件 {oe} 数据异常: {str(data_err)}")
+            except CrawlerError as crawler_err:
+                # 爬虫请求失败（网络/cookie 问题）
+                failed.append({'part_number': oe, 'reason': str(crawler_err), 'type': 'crawler'})
+                print(f"[{idx + 1}/{len(part_numbers)}] 零件 {oe} 爬虫失败: {str(crawler_err)}")
             except Exception as inner_e:
-                failed.append({'part_number': oe, 'reason': str(inner_e)})
-                print(f"[{idx + 1}/{len(part_numbers)}] 零件 {oe} 刷新异常: {str(inner_e)}")
+                # 其他未知异常
+                failed.append({'part_number': oe, 'reason': str(inner_e), 'type': 'unknown'})
+                print(f"[{idx + 1}/{len(part_numbers)}] 零件 {oe} 未知异常: {str(inner_e)}")
 
         total_success = parts_count + stock_count
         msg = (

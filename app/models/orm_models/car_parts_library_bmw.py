@@ -33,7 +33,6 @@ class CarPartsLibraryBmw(BaseModels):
     # ===================== 价格信息（数据库存储原始值，均为varchar） =====================
     retail_price = Column(String(50), nullable=True, comment='零售价(爬虫返回的原始含税价格)')
     discount_stock = Column(String(50), nullable=True, comment='经销商折扣(Stock, 含%如25%)')
-    discount_rush = Column(String(50), nullable=True, comment='经销商折扣(Rush, 含%如25%)')
     dealer_net_stock = Column(String(50), nullable=True, comment='经销商净值(Stock订单，含税)')
     dealer_net_rush = Column(String(50), nullable=True, comment='经销商净值(Rush订单，含税)')
 
@@ -60,7 +59,6 @@ class CarPartsLibraryBmw(BaseModels):
             'volume': self.volume,
             'retail_price': self.retail_price,
             'discount_stock': self.discount_stock,
-            'discount_rush': self.discount_rush,
             'dealer_net_stock': self.dealer_net_stock,
             'dealer_net_rush': self.dealer_net_rush,
             'available_stock': self.available_stock,
@@ -68,4 +66,24 @@ class CarPartsLibraryBmw(BaseModels):
             'created_at': self.created_at,
             'updated_at': self.updated_at,
         }
+
+  
+    def to_web_dict(self, tax_rate: float = 1.13):
+        """
+        转换为前端字典（返回数据库原始字段 + 计算字段）
+        :param tax_rate: 税率，默认 1.13（同奔驰默认值）
+        :return: 字典形式的对象数据，含 price_4s_tax_in 等计算字段
+        """
+        result = self.to_dict()
+        price_4s_tax_in = None
+
+        if self.retail_price is not None:
+            try:
+                retail_price_float = float(self.retail_price)  # pyright: ignore[reportArgumentType]
+                price_4s_tax_in = tax_rate * retail_price_float
+            except (ValueError, TypeError):
+                price_4s_tax_in = None
+
+        result['price_4s_tax_in'] = price_4s_tax_in
+        return result
 

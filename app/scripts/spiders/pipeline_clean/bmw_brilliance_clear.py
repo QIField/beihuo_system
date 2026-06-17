@@ -13,6 +13,8 @@ import json
 from datetime import datetime
 from lxml import etree
 
+from app.exceptions import DataParseError, DataNotFoundError
+
 
 # ===================== 通用工具函数 =====================
 
@@ -67,30 +69,34 @@ def clean_stock_html(html_text, oe):
 
     :param html_text: 原始 HTML 字符串（response.text）
     :param oe: 零件号
-    :return: dict，结构如 {'oe': 'xxx', '主仓': 10, '北京': 3, 'error': '...'（失败时）}
+    :return: dict，结构如 {'oe': 'xxx', '主仓': 10, '北京': 3, ...}
+    :raises DataParseError: HTML 结构异常、解析失败等
+    :raises DataNotFoundError: 零件不存在或未激活
     """
     if not html_text:
-        return {"oe": oe, "error": "空响应"}
+        raise DataParseError("[{}] 空响应".format(oe))
 
     if '不存在或未激活' in html_text:
-        return {"oe": oe, "status": "未查询到", "remark": "零件不存在或未激活"}
+        raise DataNotFoundError("[{}] 零件不存在或未激活".format(oe))
 
     # 切出核心表格区域
     try:
         html_parts = str(html_text).split('<!-- Header  -->')
         if len(html_parts) < 2:
-            return {"oe": oe, "error": "HTML 结构异常（找不到 Header 标记）"}
+            raise DataParseError("[{}] HTML 结构异常（找不到 Header 标记）".format(oe))
         table_part = html_parts[1].split('<table  border="0" cellpadding="0" cellspacing="0">')[0]
+    except DataParseError:
+        raise
     except Exception as e:
-        return {"oe": oe, "error": "HTML 切片失败: {}".format(e)}
+        raise DataParseError("[{}] HTML 切片失败: {}".format(oe, e))
 
     html_dom = etree.HTML(table_part)
     if html_dom is None:
-        return {"oe": oe, "error": "HTML 解析失败"}
+        raise DataParseError("[{}] HTML 解析失败".format(oe))
 
     trs = html_dom.xpath('/html/body/table/tr')
     if not trs or len(trs) < 4:
-        return {"oe": oe, "error": "解析到的表格行数不足"}
+        raise DataParseError("[{}] 解析到的表格行数不足".format(oe))
 
     # 列索引配置（与原脚本一致）
     STOCK_COL_INDEXES = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25, 26, 28, 29, 30, 32, 33, 34]
@@ -167,17 +173,18 @@ def clean_material_html(html_text, oe):
     :param html_text: 原始 HTML 字符串（response.text）
     :param oe: 零件号
     :return: dict，结构如 {'oe': 'xxx', '4S含税售价': 123.45, '4S含税进价': 100.00, ...}
+    :raises DataParseError: HTML 结构异常、解析失败等
     """
     if not html_text:
-        return {"oe": oe, "error": "空响应"}
+        raise DataParseError("[{}] 空响应".format(oe))
 
     html_dom = etree.HTML(html_text)
     if html_dom is None:
-        return {"oe": oe, "error": "HTML 解析失败"}
+        raise DataParseError("[{}] HTML 解析失败".format(oe))
 
     trs = html_dom.xpath('/html/body/table[1]/tr/td[2]/table/tr')
     if not trs:
-        return {"oe": oe, "error": "解析不到详情表格"}
+        raise DataParseError("[{}] 解析不到详情表格".format(oe))
 
     # 第一步：逐行提取文本
     row_list = []

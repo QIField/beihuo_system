@@ -175,8 +175,11 @@ def get_user_favorite_categories() -> Dict:
             # 查询所有不重复的分类（全局共享）
             categories = session.query(CarPartsFavorite.category).distinct().all()
 
-            # 转换为列表
-            category_list = [cat[0] for cat in categories]
+            # 只保留奔驰相关的分类（excel_benz_ 前缀文件上传 + 奔驰主收藏）
+            category_list = [
+                cat[0] for cat in categories
+                if cat[0] and (str(cat[0]).startswith('excel_benz_') or '奔驰' in str(cat[0]))
+            ]
 
             # 如果没有分类，添加默认的"奔驰主收藏"
             if not category_list:
