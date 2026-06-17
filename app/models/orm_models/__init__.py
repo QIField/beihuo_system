@@ -11,5 +11,7 @@ from .car_parts_library_benz import CarPartsLibraryBenz
 from .car_parts_library_benz_stock import CarPartsLibraryBenzStock
 from .crm_purchase_order_list import CrmPurchaseOrderList
 from .crm_purchase_order_details import CrmPurchaseOrderDetails
+from .warehouse_inventory_latest import WarehouseInventoryLatest
+from .inventory_record_latest import InventoryRecordLatest
 
-__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails"]
+__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest"]

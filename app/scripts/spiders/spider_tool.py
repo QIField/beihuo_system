@@ -37,10 +37,11 @@ class SpiderTool:
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
-    def fetch(self, url, method="GET", params=None, json=None, headers=None):
+    def fetch(self, url, method="GET", params=None, json=None, headers=None, verify=False):
         """
         统一请求入口（业务类只调用这个方法）
         :param headers: 临时请求头（如Authorization）
+        :param verify: 是否验证SSL证书，默认False（CRM接口需要跳过验证）
         """
         # 合并请求头（公共头 + 临时头）
         req_headers = self.session.headers.copy()
@@ -54,7 +55,8 @@ class SpiderTool:
                 params=params,
                 json=json,
                 headers=req_headers,
-                timeout=self.timeout
+                timeout=self.timeout,
+                verify=verify
             )
 
             if response.status_code != 200:

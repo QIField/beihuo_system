@@ -73,7 +73,7 @@
 
             // 监听登录提交
             form.on('submit(loginSubmit)', function(data){
-                fetch('/api/login', {
+                fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

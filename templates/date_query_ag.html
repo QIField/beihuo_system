@@ -599,8 +599,22 @@
                 document.getElementById('selectedCount').textContent = selectedRows.length;
             },
             onSortChanged: function(event) {
-                // 获取当前排序状态
-                const sortModel = gridApi.getSortModel();
+                // 尝试多种方式获取排序状态（兼容不同版本 AG Grid）
+                let sortModel = [];
+                
+                if (gridOptions.api && gridOptions.api.getSortModel) {
+                    sortModel = gridOptions.api.getSortModel();
+                } else if (gridColumnApi && gridColumnApi.getSortModel) {
+                    sortModel = gridColumnApi.getSortModel();
+                } else if (event.api && event.api.getSortModel) {
+                    sortModel = event.api.getSortModel();
+                } else if (gridOptions.api && gridOptions.api.sortController) {
+                    const sortController = gridOptions.api.sortController;
+                    if (sortController.getSortModel) {
+                        sortModel = sortController.getSortModel();
+                    }
+                }
+                
                 if (sortModel && sortModel.length > 0) {
                     const sort = sortModel[0];
                     const colId = sort.colId;

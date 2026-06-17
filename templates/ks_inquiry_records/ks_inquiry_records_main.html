@@ -255,6 +255,8 @@
             <input type="hidden" id="searchEngine">
             <input type="hidden" id="searchChassis">
             <input type="hidden" id="searchVin">
+            <input type="hidden" id="searchCarBrandName">
+            <input type="hidden" id="searchGarageName">
         </div>
 
         <!-- 标签内容 -->
@@ -292,6 +294,7 @@
                 brand_name: document.getElementById('searchBrandName').value || '',
                 brand: document.getElementById('searchBrand').value || '',
                 seller_status: document.getElementById('searchSellerStatus').value || '',
+                car_brand_name: document.getElementById('searchCarBrandName').value || '',
                 begin_date: beginDate,
                 end_date: endDate,
                 company: userCompany
@@ -310,6 +313,8 @@
             document.getElementById('searchEngine').value = '';
             document.getElementById('searchChassis').value = '';
             document.getElementById('searchVin').value = '';
+            document.getElementById('searchCarBrandName').value = '';
+            document.getElementById('searchGarageName').value = '';
 
             updateKsFilterButtonStates();
 
@@ -355,9 +360,7 @@
                 ];
             } else if (tabId === 'engine') {
                 fields = [
-                    { label: '发动机', inputId: 'searchEngine' },
-                    { label: '底盘', inputId: 'searchChassis' },
-                    { label: 'VIN', inputId: 'searchVin' }
+                    { label: '客户名称', inputId: 'searchGarageName' }
                 ];
             }
 
@@ -422,6 +425,17 @@
                 toggleKsFilterPanel('sellerStatus', this);
             };
             container.appendChild(statusBtn);
+
+            // 创建车辆品牌筛选按钮
+            const carBrandBtn = document.createElement('button');
+            carBrandBtn.className = 'filter-btn';
+            carBrandBtn.id = 'ksFilterBtn_carBrandName';
+            carBrandBtn.textContent = '车辆品牌';
+            carBrandBtn.onclick = function(e) {
+                e.stopPropagation();
+                toggleKsFilterPanel('carBrandName', this);
+            };
+            container.appendChild(carBrandBtn);
         }
 
         // 切换筛选面板
@@ -447,6 +461,12 @@
             if (field === 'brand') {
                 title = '品牌';
                 options = brandOptions.map(name => ({ value: name, text: name }));
+            } else if (field === 'carBrandName') {
+                title = '车辆品牌';
+                options = [
+                    { value: '宝马', text: '宝马' },
+                    { value: '奔驰', text: '奔驰' }
+                ];
             } else {
                 title = '下单状态';
                 options = [
@@ -457,9 +477,14 @@
             }
 
             // 获取当前选中的值
-            const currentValue = field === 'brand'
-                ? document.getElementById('searchBrand').value
-                : document.getElementById('searchSellerStatus').value;
+            let currentValue;
+            if (field === 'brand') {
+                currentValue = document.getElementById('searchBrand').value;
+            } else if (field === 'carBrandName') {
+                currentValue = document.getElementById('searchCarBrandName').value;
+            } else {
+                currentValue = document.getElementById('searchSellerStatus').value;
+            }
 
             // 构建选项列表（使用FilterPanel的样式）
             let listHtml = '';
@@ -514,6 +539,8 @@
 
             if (field === 'brand') {
                 document.getElementById('searchBrand').value = selectedValues.join(',');
+            } else if (field === 'carBrandName') {
+                document.getElementById('searchCarBrandName').value = selectedValues.join(',');
             } else {
                 document.getElementById('searchSellerStatus').value = selectedValues.join(',');
             }
@@ -548,6 +575,7 @@
         function updateKsFilterButtonStates() {
             const brandBtn = document.getElementById('ksFilterBtn_brand');
             const statusBtn = document.getElementById('ksFilterBtn_sellerStatus');
+            const carBrandBtn = document.getElementById('ksFilterBtn_carBrandName');
 
             // 重置所有按钮样式
             if (brandBtn) {
@@ -560,6 +588,12 @@
                 statusBtn.classList.remove('active');
                 if (document.getElementById('searchSellerStatus').value) {
                     statusBtn.classList.add('active');
+                }
+            }
+            if (carBrandBtn) {
+                carBrandBtn.classList.remove('active');
+                if (document.getElementById('searchCarBrandName').value) {
+                    carBrandBtn.classList.add('active');
                 }
             }
         }

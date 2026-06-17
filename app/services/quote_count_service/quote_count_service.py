@@ -65,7 +65,7 @@ class QuoteCountSyncService:
     """
 
     QUOTATION_LIST_URL = "https://www.cassmall.com/inquiry/seller/quote/list/v1"
-    PAGE_SIZE = 500
+    PAGE_SIZE = 50
     MAX_RETRY = 3
     RETRY_DELAY = 2
     COMPANY = 'fsbbr'
@@ -313,6 +313,7 @@ class QuoteCountSyncService:
                 if order_id:
                     encrypt_address = item.get('encryptAddress', '')
                     encrypt_user_infos = item.get('encryptInquiryUserInfos', '')
+                    car_brand_name = item.get('carBrandName', '')
                     decrypted_address = self._aes_decrypt(encrypt_address)
                     decrypted_user_infos = self._aes_decrypt(encrypt_user_infos)
                     show_address = self._extract_show_address(decrypted_address)
@@ -321,6 +322,7 @@ class QuoteCountSyncService:
                         'order_id': order_id,
                         'show_address': show_address,
                         'garage_company_name': garage_company_name,
+                        'car_brand_name': car_brand_name,
                     })
 
             print(f"[订单列表] 第{page_num}页获取 {len(quotation_list)} 条订单")
@@ -385,7 +387,7 @@ class QuoteCountSyncService:
 
         return config
 
-    def _fetch_quotation_detail(self, order_id: str, show_address: str = '', garage_company_name: str = '') -> List[Dict]:
+    def _fetch_quotation_detail(self, order_id: str, show_address: str = '', garage_company_name: str = '', car_brand_name: str = '') -> List[Dict]:
         """
         获取指定订单的询价明细，返回完整字段
         联合唯一键：inquiryId + brandName + partsNum + company
@@ -553,6 +555,7 @@ class QuoteCountSyncService:
                             'chassis': car_config.get('chassis', ''),
                             'showAddress': show_address,
                             'garageCompanyName': garage_company_name,
+                            'carBrandName': car_brand_name,
                         })
 
             # 如果第一个接口有数据，直接返回（不切换到第二个接口）
@@ -575,8 +578,8 @@ class QuoteCountSyncService:
                 INSERT INTO crmapp_ks_inquiry_detail
                 (inquiryId, partsNum, partsName, brandName, brandNormalized, brandId, partType,
                  partsBrandQuality, remark, sellerBtPrice, sellerPrice, sellerStatus, order_status, display_seller_status,
-                 vin, engine, production_date, chassis, show_address, garage_company_name, company, quote_date, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                 vin, engine, production_date, chassis, show_address, garage_company_name, car_brand_name, company, quote_date, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     partsName = VALUES(partsName),
                     brandNormalized = VALUES(brandNormalized),
@@ -595,6 +598,7 @@ class QuoteCountSyncService:
                     chassis = VALUES(chassis),
                     show_address = VALUES(show_address),
                     garage_company_name = VALUES(garage_company_name),
+                    car_brand_name = VALUES(car_brand_name),
                     quote_date = VALUES(quote_date),
                     updated_at = NOW()
             """
@@ -622,6 +626,7 @@ class QuoteCountSyncService:
                     item.get('chassis', ''),
                     item.get('showAddress', ''),
                     item.get('garageCompanyName', ''),
+                    item.get('carBrandName', ''),
                     item.get('company', self.COMPANY),
                     item.get('quote_date', '')
                 )
@@ -682,7 +687,8 @@ class QuoteCountSyncService:
                 order_id = order.get('order_id')
                 show_address = order.get('show_address', '')
                 garage_company_name = order.get('garage_company_name', '')
-                items = self._fetch_quotation_detail(order_id, show_address, garage_company_name)
+                car_brand_name = order.get('car_brand_name', '')
+                items = self._fetch_quotation_detail(order_id, show_address, garage_company_name, car_brand_name)
                 
                 # 为每条明细添加 quote_date 和 company
                 for item in items:

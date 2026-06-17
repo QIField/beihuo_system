@@ -962,7 +962,12 @@ def delete_scheduled_job(job_id):
 
 # ==================== 用户认证 API ====================
 
-@app.route('/api/login', methods=['POST'])
+@app.route('/login', methods=['GET'])
+def login_page():
+    """渲染登录页面"""
+    return render_template('login.html')
+
+@app.route('/api/auth/login', methods=['POST'])
 def login():
     """用户登录 - 设置独立的权限字段"""
     data = request.get_json()
@@ -1257,7 +1262,7 @@ def delete_user(user_id):
 
 
 # 添加登出API接口
-@app.route('/api/logout', methods=['POST'])
+@app.route('/api/auth/logout', methods=['POST'])
 def logout():
     session.clear()
     return jsonify({'code': 0, 'msg': '退出成功'})

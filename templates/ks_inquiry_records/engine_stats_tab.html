@@ -1,90 +1,80 @@
 <!-- 发动机及底盘维度 -->
 <div id="tab-engine" class="tab-pane">
-    <div class="table-container">
-        <div id="engineChassisGrid" class="ag-theme-alpine"></div>
+    <!-- 第一行：底盘统计和OE号码统计并排 -->
+    <div style="display: flex; gap: 30px; margin-bottom: 10px;">
+        <div>
+            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">底盘统计</div>
+            <div id="chassisGrid" class="ag-theme-alpine" style="height: 300px; width: 420px;"></div>
+        </div>
+        <div>
+            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">OE号码统计</div>
+            <div id="oeNumGrid" class="ag-theme-alpine" style="height: 300px; width: 420px;"></div>
+        </div>
     </div>
+
+    <!-- 第二行：发动机统计 -->
+    <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">发动机统计</div>
+    <div id="engineGrid" class="ag-theme-alpine" style="height: 300px; width: 420px;"></div>
 </div>
 
 <script>
 (function() {
-    let engineChassisGridApi = null;
-    let engineChassisGridOptions = null;
-    let engineChassisGridLoader = null;
+    let chassisGridApi = null;
+    let engineGridApi = null;
+    let oeNumGridApi = null;
 
-    const engineChassisColumnDefs = [
-        { field: 'engine', headerName: '发动机', width: 200, sortable: true, filter: true, pinned: 'left' },
-        { field: 'chassis', headerName: '底盘', width: 200, sortable: true, filter: true, pinned: 'left' },
-        { field: 'vin', headerName: 'VIN', width: 200, sortable: true, filter: true },
-        { field: 'vehicleProductionDate', headerName: '车辆生产日期', width: 180, sortable: true, filter: true }
+    // 底盘表格列定义
+    const chassisColumnDefs = [
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: true, suppressMenu: true },
+        { field: 'chassis', headerName: '底盘', width: 140, sortable: true, suppressMenu: true },
+        { field: 'count', headerName: '出现次数', width: 100, sortable: true, suppressMenu: true }
     ];
 
-    engineChassisGridOptions = {
-        columnDefs: engineChassisColumnDefs,
-        rowData: [],
-        defaultColDef: { resizable: true },
-        suppressHorizontalScroll: false,
-        pagination: false,
-        overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
-        overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
-        rowSelection: 'single',
-        suppressRowClickSelection: true,
-        onGridReady: function(params) {
-            engineChassisGridApi = params.api;
+    // 发动机表格列定义
+    const engineColumnDefs = [
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: true, suppressMenu: true },
+        { field: 'engine', headerName: '发动机代码', width: 140, sortable: true, suppressMenu: true },
+        { field: 'count', headerName: '出现次数', width: 100, sortable: true, suppressMenu: true }
+    ];
 
-            // 初始化数据加载器
-            engineChassisGridLoader = new AgGridLoader(engineChassisGridApi);
+    // OE号码表格列定义
+    const oeNumColumnDefs = [
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: true, suppressMenu: true },
+        { field: 'partsNum', headerName: 'OE号码', width: 140, sortable: true, suppressMenu: true },
+        { field: 'count', headerName: '出现次数', width: 100, sortable: true, suppressMenu: true }
+    ];
 
-            params.api.sizeColumnsToFit();
-            refreshEngineChassisGrid();
-        }
-    };
-
-    function getEngineChassisSearchParams() {
-        let beginDate = '', endDate = '';
-        const dateRangeValue = document.getElementById('dateRange').value;
-        if (dateRangeValue) {
-            const dates = dateRangeValue.split(' - ');
-            beginDate = dates[0] || '';
-            endDate = dates[1] || '';
-        }
-
+    // 通用表格配置
+    function createGridOptions(columnDefs, gridType) {
         return {
-            begin_date: beginDate,
-            end_date: endDate,
-            company: userCompany,
-            engine: document.getElementById('searchEngine').value || '',
-            chassis: document.getElementById('searchChassis').value || '',
-            vin: document.getElementById('searchVin').value || ''
+            columnDefs: columnDefs,
+            rowData: [],
+            defaultColDef: { resizable: true },
+            suppressHorizontalScroll: false,
+            pagination: false,
+            overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
+            overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
+            rowSelection: 'single',
+            suppressRowClickSelection: true,
+            onGridReady: function(params) {
+                if (gridType === 'chassis') chassisGridApi = params.api;
+                else if (gridType === 'engine') engineGridApi = params.api;
+                else if (gridType === 'oeNum') oeNumGridApi = params.api;
+
+                params.api.sizeColumnsToFit();
+
+                // 添加双击复制功能
+                setupDoubleClickCopy(params.api, gridType);
+            }
         };
     }
 
-    function refreshEngineChassisGrid() {
-        if (!engineChassisGridApi || !engineChassisGridLoader) return;
-
-        const params = getEngineChassisSearchParams();
-
-        engineChassisGridLoader.load('/new/api/ks_inquiry/records/engine_chassis', params, (data) => {
-            console.log('发动机及底盘维度第一条数据:', data.list[0] || null);
-        }, (error) => {
-            layui.layer.msg('查询失败，请稍后重试', {icon: 2});
-        });
-    }
-
-    window.refreshEngineChassis = refreshEngineChassisGrid;
-
-    window.initEngineChassisGrid = function() {
-        if (engineChassisGridApi) {
-            setTimeout(function() {
-                engineChassisGridApi.sizeColumnsToFit();
-            }, 0);
-            refreshEngineChassisGrid();
-            return;
-        }
-
-        const gridDiv = document.querySelector('#engineChassisGrid');
+    // 设置双击复制功能
+    function setupDoubleClickCopy(gridApi, gridType) {
+        const gridId = gridType === 'chassis' ? 'chassisGrid' :
+                       gridType === 'engine' ? 'engineGrid' : 'oeNumGrid';
+        const gridDiv = document.querySelector('#' + gridId);
         if (!gridDiv) return;
-
-        new agGrid.Grid(gridDiv, engineChassisGridOptions);
 
         gridDiv.addEventListener('dblclick', function(e) {
             const cellElement = e.target.closest('.ag-cell');
@@ -93,8 +83,8 @@
             const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
             const colId = cellElement.getAttribute('col-id');
 
-            if (rowId && colId && engineChassisGridApi) {
-                const rowNode = engineChassisGridApi.getRowNode(rowId);
+            if (rowId && colId && gridApi) {
+                const rowNode = gridApi.getRowNode(rowId);
                 if (rowNode && rowNode.data) {
                     const value = rowNode.data[colId];
                     if (value !== undefined && value !== null) {
@@ -108,8 +98,149 @@
                 }
             }
         });
+    }
 
-        refreshEngineChassisGrid();
+    // 获取搜索参数（包含日期范围和客户名称）
+    function getEngineSearchParams() {
+        let beginDate = '', endDate = '';
+        const dateRangeValue = document.getElementById('dateRange').value;
+        if (dateRangeValue) {
+            const dates = dateRangeValue.split(' - ');
+            beginDate = dates[0] || '';
+            endDate = dates[1] || '';
+        }
+
+        return {
+            garage_name: document.getElementById('searchGarageName').value || '',
+            begin_date: beginDate,
+            end_date: endDate,
+            company: userCompany
+        };
+    }
+
+    // 搜索修理厂统计
+    window.searchGarageStats = function() {
+        const params = getEngineSearchParams();
+        if (!params.garage_name) {
+            layui.layer.msg('请输入客户名称', {icon: 0});
+            return;
+        }
+
+        loadChassisStats(params);
+        loadEngineStats(params);
+        loadOeNumStats(params);
+    };
+
+    // 加载底盘统计
+    function loadChassisStats(params) {
+        if (!chassisGridApi) return;
+
+        chassisGridApi.showLoadingOverlay();
+
+        fetch('/new/api/ks_inquiry/records/garage_chassis_stats?' + new URLSearchParams(params))
+        .then(response => response.json())
+        .then(data => {
+            if (data.code === 0 || data.code === '0') {
+                chassisGridApi.setRowData(data.data?.list || []);
+            } else {
+                layui.layer.msg(data.message || '查询失败', {icon: 2});
+                chassisGridApi.setRowData([]);
+            }
+        })
+        .catch(error => {
+            console.error('底盘统计查询失败:', error);
+            layui.layer.msg('查询失败，请稍后重试', {icon: 2});
+            chassisGridApi.setRowData([]);
+        });
+    }
+
+    // 加载发动机统计
+    function loadEngineStats(params) {
+        if (!engineGridApi) return;
+
+        engineGridApi.showLoadingOverlay();
+
+        fetch('/new/api/ks_inquiry/records/garage_engine_stats?' + new URLSearchParams(params))
+        .then(response => response.json())
+        .then(data => {
+            if (data.code === 0 || data.code === '0') {
+                engineGridApi.setRowData(data.data?.list || []);
+            } else {
+                layui.layer.msg(data.message || '查询失败', {icon: 2});
+                engineGridApi.setRowData([]);
+            }
+        })
+        .catch(error => {
+            console.error('发动机统计查询失败:', error);
+            layui.layer.msg('查询失败，请稍后重试', {icon: 2});
+            engineGridApi.setRowData([]);
+        });
+    }
+
+    // 加载OE号码统计
+    function loadOeNumStats(params) {
+        if (!oeNumGridApi) return;
+
+        oeNumGridApi.showLoadingOverlay();
+
+        fetch('/new/api/ks_inquiry/records/garage_oenum_stats?' + new URLSearchParams(params))
+        .then(response => response.json())
+        .then(data => {
+            if (data.code === 0 || data.code === '0') {
+                oeNumGridApi.setRowData(data.data?.list || []);
+            } else {
+                layui.layer.msg(data.message || '查询失败', {icon: 2});
+                oeNumGridApi.setRowData([]);
+            }
+        })
+        .catch(error => {
+            console.error('OE号码统计查询失败:', error);
+            layui.layer.msg('查询失败，请稍后重试', {icon: 2});
+            oeNumGridApi.setRowData([]);
+        });
+    }
+
+    // 初始化表格
+    window.initEngineChassisGrid = function() {
+        // 初始化底盘表格
+        if (!chassisGridApi) {
+            const chassisDiv = document.querySelector('#chassisGrid');
+            if (chassisDiv) {
+                new agGrid.Grid(chassisDiv, createGridOptions(chassisColumnDefs, 'chassis'));
+            }
+        } else {
+            setTimeout(() => chassisGridApi.sizeColumnsToFit(), 0);
+        }
+
+        // 初始化发动机表格
+        if (!engineGridApi) {
+            const engineDiv = document.querySelector('#engineGrid');
+            if (engineDiv) {
+                new agGrid.Grid(engineDiv, createGridOptions(engineColumnDefs, 'engine'));
+            }
+        } else {
+            setTimeout(() => engineGridApi.sizeColumnsToFit(), 0);
+        }
+
+        // 初始化OE号码表格
+        if (!oeNumGridApi) {
+            const oeNumDiv = document.querySelector('#oeNumGrid');
+            if (oeNumDiv) {
+                new agGrid.Grid(oeNumDiv, createGridOptions(oeNumColumnDefs, 'oeNum'));
+            }
+        } else {
+            setTimeout(() => oeNumGridApi.sizeColumnsToFit(), 0);
+        }
+    };
+
+    // 刷新表格（供外部调用）
+    window.refreshEngineChassis = function() {
+        const params = getEngineSearchParams();
+        if (params.garage_name) {
+            loadChassisStats(params);
+            loadEngineStats(params);
+            loadOeNumStats(params);
+        }
     };
 })();
 </script>
