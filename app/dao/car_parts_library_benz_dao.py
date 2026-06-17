@@ -56,11 +56,88 @@ class CarPartsLibraryBenzDao:
             print(f"批量更新失败: {str(e)}")
             raise
 
+    
+
+
+    @staticmethod
+    def batch_upsert(session, data_list: List[Dict]) -> int:
+        """
+        批量插入或更新数据（以 part_number 为唯一索引）
+        
+        使用原生 SQL 的 INSERT ... ON DUPLICATE KEY UPDATE，真正批量执行
+
+        :param session: 数据库会话
+        :param data_list: 数据列表
+        :return: 处理的记录数
+        """
+        if not data_list:
+            return 0
+
+        try:
+            # 确保所有数据的 part_number 都去除空格（安全措施）
+            processed_data_list = []
+            for data in data_list:
+                if 'part_number' in data and data['part_number']:
+                    data = data.copy()  # 复制一份，避免修改原始数据
+                    data['part_number'] = data['part_number'].replace(' ', '')
+                processed_data_list.append(data)
+
+            # 获取所有字段名（除了 created_at 和 updated_at，因为它们会自动处理）
+            all_columns = [
+                'part_number', 'descriptions', 'description_cn', 'marketing_code',
+                'dealer_discount_group', 'msrp', 'dealer_fixed_nominal_margin',
+                'wholesale_price', 'marketing_code_description', 'quantity_unit',
+                'sales_pack_size', 'weight', 'length', 'width', 'height',
+                'effective_date', 'data_source', 'l_model_zh', 'brand', 'category',
+                'ccc_mark', 'volume', 'hazmat_code', 'origin_country', 'shelf_life',
+                'is_hazmat', 'purchase_price', 'part_nr_info_super_session'
+            ]
+
+            # 获取第一条数据的字段作为参考
+            first_data = processed_data_list[0]
+            insert_columns = []
+            for col in all_columns:
+                if col in first_data:
+                    insert_columns.append(col)
+
+            if not insert_columns:
+                return 0
+
+            # 构建更新字段列表（排除 part_number）
+            update_columns = [col for col in insert_columns if col not in ['part_number']]
+            update_clause = ', '.join([f'{col} = VALUES({col})' for col in update_columns])
+
+            # 只构建一次 SQL
+            placeholders = [f':{col}' for col in insert_columns]
+            sql = text(f"""
+                INSERT INTO car_parts_library_benz ({', '.join(insert_columns)})
+                VALUES ({', '.join(placeholders)})
+                ON DUPLICATE KEY UPDATE {update_clause}
+            """)
+
+            # 真正的批量执行 - 一次性提交所有数据
+            session.execute(sql, processed_data_list)
+
+            return len(processed_data_list)
+
+        except Exception as e:
+            print(f"批量插入或更新失败: {str(e)}")
+            raise
+
+
+
+
+
+
+
+
+
+
     @staticmethod
     def upsert(session, data: Dict) -> int:
         """
         单条插入或更新数据（以 part_number 为唯一索引）
-        
+
         使用原生 SQL 的 INSERT ... ON DUPLICATE KEY UPDATE
 
         :param session: 数据库会话

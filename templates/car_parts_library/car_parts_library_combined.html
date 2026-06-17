@@ -454,7 +454,7 @@
         <label class="layui-form-label">选择分类</label>
         <div class="layui-input-block">
           <select name="category" lay-verify="required" id="favoriteCategorySelect">
-            <option value="主收藏">主收藏</option>
+            <option value="奔驰主收藏">奔驰主收藏</option>
           </select>
         </div>
       </div>
@@ -495,10 +495,10 @@
   <script type="text/html" id="favoritesTableToolBar">
     <div class="layui-btn-container">
       <button class="layui-btn layui-btn-sm layui-btn-normal" lay-event="batchMoveToMain">
-        <i class="layui-icon layui-icon-transfer"></i> 移动到主收藏
+        <i class="layui-icon layui-icon-transfer"></i> 移动到奔驰主收藏
       </button>
       <button class="layui-btn layui-btn-sm layui-btn-primary" lay-event="batchCopyToMain">
-        <i class="layui-icon layui-icon-template"></i> 复制到主收藏
+        <i class="layui-icon layui-icon-template"></i> 复制到奔驰主收藏
       </button>
       <button class="layui-btn layui-btn-sm layui-btn-warm" lay-event="batchRefreshFavorite">
         <i class="layui-icon layui-icon-refresh"></i> 更新选中数据
@@ -2369,49 +2369,45 @@
             url: '/new/api/car-parts/get-categories',
             method: 'GET',
             success: function(res) {
-              if (res.code === 200 && res.data && res.data.categories && res.data.categories.length > 0) {
-                var categoryList = res.data.categories.map(function(category) {
-                  return { title: category, id: category };
-                });
-                
-                // 默认使用"主收藏"分类
-                var defaultCategory = categoryList.find(function(cat) {
-                  return cat.id === '主收藏';
-                });
-                
-                // 如果没有找到"主收藏"，则使用第一个分类
-                if (!defaultCategory) {
-                  defaultCategory = categoryList[0];
-                }
-                
-                currentCategory = defaultCategory.id;
-                
-                // 初始化 dropdown
-                dropdown.render({
-                  elem: layero.find('#favoritesCategoryBtn'),
-                  data: categoryList,
-                  click: function(obj) {
-                    this.elem.find('span').text(obj.title);
-                    currentCategory = obj.id;
-                    var config = createFavoriteTableConfig(currentCategory);
-                    table.reload('favoritesTable', {
-                      url: config.url,
-                      method: config.method,
-                      page: config.page,
-                      where: config.where,
-                      cols: config.cols
-                    });
-                  }
-                });
-                
-                // 设置默认显示的分类
-                layero.find('#favoritesCategoryBtn span').text(defaultCategory.title);
-                
-                // 渲染表格，使用默认分类（只发送一次请求）
-                var config = createFavoriteTableConfig(currentCategory);
-                state.favoriteTableIns = table.render(config);
+              var categories = (res.code === 200 && res.data && res.data.categories) ? res.data.categories : [];
 
-              }
+              // 确保"奔驰主收藏"始终是第一个选项
+              categories = categories.filter(function(c) { return c !== '奔驰主收藏'; });
+              categories.unshift('奔驰主收藏');
+
+              var categoryList = categories.map(function(category) {
+                return { title: category, id: category };
+              });
+
+              // 默认使用"奔驰主收藏"分类
+              var defaultCategory = categoryList[0];
+
+              currentCategory = defaultCategory.id;
+
+              // 初始化 dropdown
+              dropdown.render({
+                elem: layero.find('#favoritesCategoryBtn'),
+                data: categoryList,
+                click: function(obj) {
+                  this.elem.find('span').text(obj.title);
+                  currentCategory = obj.id;
+                  var config = createFavoriteTableConfig(currentCategory);
+                  table.reload('favoritesTable', {
+                    url: config.url,
+                    method: config.method,
+                    page: config.page,
+                    where: config.where,
+                    cols: config.cols
+                  });
+                }
+              });
+
+              // 设置默认显示的分类
+              layero.find('#favoritesCategoryBtn span').text(defaultCategory.title);
+
+              // 渲染表格，使用默认分类（只发送一次请求）
+              var config = createFavoriteTableConfig(currentCategory);
+              state.favoriteTableIns = table.render(config);
             }
           });
 
@@ -2421,7 +2417,7 @@
 
             if (obj.event === 'batchMoveToMain') {
               if (!checkStatus.data.length) return layer.msg('请先选择要移动的收藏', { icon: 0 });
-              layer.confirm('确定要将选中的收藏移动到主收藏吗？', function(confirmIndex) {
+              layer.confirm('确定要将选中的收藏移动到奔驰主收藏吗？', function(confirmIndex) {
                 var partNumbers = checkStatus.data.map(function(item) {
                   return item.part_number;
                 });
@@ -2458,7 +2454,7 @@
               });
             } else if (obj.event === 'batchCopyToMain') {
               if (!checkStatus.data.length) return layer.msg('请先选择要复制的收藏', { icon: 0 });
-              layer.confirm('确定要将选中的收藏复制到主收藏吗？', function(confirmIndex) {
+              layer.confirm('确定要将选中的收藏复制到奔驰主收藏吗？', function(confirmIndex) {
                 var partNumbers = checkStatus.data.map(function(item) {
                   return item.part_number;
                 });
@@ -2976,7 +2972,7 @@
           return item.part_number;
         });
 
-        // 直接使用主收藏
+        // 直接使用奔驰主收藏
         var loading = layer.load(1, { shade: [0.3, '#000'], content: '正在添加收藏...' });
 
         $.ajax({
@@ -2985,7 +2981,7 @@
           contentType: 'application/json',
           data: JSON.stringify({
             part_numbers: partNumbers,
-            category: '主收藏'
+            category: '奔驰主收藏'
           }),
           success: function(res) {
             layer.close(loading);
