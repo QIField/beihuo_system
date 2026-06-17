@@ -33,6 +33,7 @@ class CarPartsLibraryBmw(BaseModels):
     # ===================== 价格信息（数据库存储原始值，均为varchar） =====================
     retail_price = Column(String(50), nullable=True, comment='零售价(爬虫返回的原始含税价格)')
     discount_stock = Column(String(50), nullable=True, comment='经销商折扣(Stock, 含%如25%)')
+    discount_rush = Column(String(50), nullable=True, comment='经销商折扣(Rush, 含%如25%)')
     dealer_net_stock = Column(String(50), nullable=True, comment='经销商净值(Stock订单，含税)')
     dealer_net_rush = Column(String(50), nullable=True, comment='经销商净值(Rush订单，含税)')
 

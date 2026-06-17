@@ -18,35 +18,61 @@ from app.exceptions import DataParseError, DataNotFoundError
 
 # ===================== 通用工具函数 =====================
 
+# 列索引分组（35 列 × 7 个仓库，三者互斥）
+# 普通列：选择 / 零件 / 折扣代码 / 零售价 / 危品 / 销售单位 / 锁止 / 再定购点 / 主仓
+STOCK_COL_INDEXES = [0, 1, 2, 3, 4, 5, 6, 9, 10, 13, 14, 17, 18, 21, 22, 25, 26, 29, 30, 33, 34]
+# "库房-SYxx" 列（列名来自 b/i/text()，值来自 b/i/text()）
+WAREHOUSE_COL_INDEXES = [7, 11, 15, 19, 23, 27, 31]
+# "在途-SYxx" 列（列名来自 text()，值来自 a/text() 或 text()）
+IN_TRANSIT_COL_INDEXES = [8, 12, 16, 20, 24, 28, 32]
+
+
 def _clean_text(text_list):
-    """清洗 xpath 提取到的文本列表：去括号、空格、\xa0"""
+    """清洗 xpath 提取到的文本：去括号、空格、\xa0、逗号分隔符等"""
     if not text_list:
         return ""
-    text = str(text_list).replace('[', '').replace(']', '').replace(' ', '').replace('\\xa0', '').replace("','", '').replace("'", '')
-    return text.strip()
+    # text_list 本身可能是 list，也可能是字符串（调用方已取 index 元素）
+    if isinstance(text_list, list):
+        parts = []
+        for item in text_list:
+            if item is None:
+                continue
+            s = str(item).replace('\xa0', '').replace(' ', '').replace(',', '').strip()
+            if s:
+                parts.append(s)
+        return ''.join(parts)
+    text = str(text_list).replace('\xa0', '').replace(' ', '').replace(',', '').strip()
+    return text
 
 
 def _translate_warehouse(text):
-    """SY01/SY02 仓库代号 → 中文城市名"""
+    """SY01/SY02 仓库代号 → 中文城市名（兼容 '库房,SY01' / '库房SY01' 格式）"""
+    if not text:
+        return text
     mapping = {
-        "SY01": "-北京",
-        "SY02": "-上海",
-        "SY03": "-佛山",
-        "SY06": "-成都",
-        "SY07": "-沈阳",
-        "SY08": "-合肥",
-        "SY09": "-宁波",
+        "SY01": "北京",
+        "SY02": "上海",
+        "SY03": "佛山",
+        "SY06": "成都",
+        "SY07": "沈阳",
+        "SY08": "合肥",
+        "SY09": "宁波",
     }
+    result = text
     for code, city in mapping.items():
-        text = text.replace(code, city)
-    return text
+        if code in result:
+            # 把 "库房,SY01" / "库房SY01" 统一成 "库房-北京"
+            result = result.replace(',', '').replace('，', '')
+            result = result.replace(code, '-' + city)
+            break
+    return result
 
 
 def _parse_rmb_price(value_str):
     """解析带 RMB 的价格（自动 ×1.13 换算含税价）"""
     if value_str and isinstance(value_str, str) and 'RMB' in value_str:
         try:
-            num = float(str(value_str).replace('RMB', '').replace(',', ''))
+            num = float(str(value_str).replace('RMB', '').replace(',', '').replace('\xa0', '').strip())
             return round(num * 1.13, 2)
         except (ValueError, TypeError):
             pass
@@ -54,10 +80,34 @@ def _parse_rmb_price(value_str):
 
 
 def _safe_extract_cell(cell, xpath_expr, index=0):
-    """从 lxml cell 中安全提取文本（取不到返回空字符串）"""
+    """从 lxml cell 中安全提取文本（取不到返回空字符串），同时清洗 \xa0"""
     result = cell.xpath(xpath_expr)
     if result and len(result) > index:
-        return str(result[index]).replace(' ', '')
+        return str(result[index]).replace(' ', '').replace('\xa0', '').strip()
+    return ''
+
+
+def _extract_onmouseover_reorderpoint(cell):
+    """
+    从 <a onmouseover="doTooltip(event,'可用库存 over reorderpoint: X')">
+    中提取 "X" 数值，取不到返回空字符串。
+    其它（<table> 形式的 onmouseover）也统一返回空字符串，由调用方决定是否回退使用 text()
+    """
+    attrs = cell.xpath('a/@onmouseover')
+    if not attrs:
+        return ''
+    # 只识别 "可用库存 over reorderpoint: X" 这种短文本
+    for attr in attrs:
+        s = str(attr).replace(' ', '').replace('\xa0', '')
+        marker = "可用库存overreorderpoint:"
+        if marker in s:
+            num_part = s.split(marker, 1)[1]
+            # 截断到 ')' 之前
+            if ")" in num_part:
+                num_part = num_part.split(")", 1)[0]
+            # 去除引号等脏字符
+            num_part = num_part.replace("'", '').replace('"', '').strip()
+            return num_part
     return ''
 
 
@@ -67,9 +117,22 @@ def clean_stock_html(html_text, oe):
     """
     清洗【库存查询】接口返回的 HTML —— 对应爬虫 get_stock_check
 
+    HTML 结构（表头在第 3 行，数据在第 4 行，共 35 列）：
+      0: 选择
+      1: 零件（数据行中 a/text() = OE 号，text() = 零件名，写两条）
+      2: 折扣代码
+      3: 零售价（RMB，需 × 1.13）
+      4: 危品
+      5: 销售单位
+      6: 锁止
+      7, 11, 15, 19, 23, 27, 31: 库房-SY0x（列名来自 b/i/text()，值来自 text()）
+      8, 12, 16, 20, 24, 28, 32: 在途-SY0x（列名来自 text()，值来自 a/@onmouseover 中 "可用库存 over reorderpoint: X"）
+      9, 13, 17, 21, 25, 29, 33: 再定购点-SY0x
+      10, 14, 18, 22, 26, 30, 34: 主仓-SY0x
+
     :param html_text: 原始 HTML 字符串（response.text）
     :param oe: 零件号
-    :return: dict，结构如 {'oe': 'xxx', '主仓': 10, '北京': 3, ...}
+    :return: dict，结构如 {'oe': 'xxx', '零件': 'xxx', '库房-北京': 15, ...}
     :raises DataParseError: HTML 结构异常、解析失败等
     :raises DataNotFoundError: 零件不存在或未激活
     """
@@ -98,20 +161,27 @@ def clean_stock_html(html_text, oe):
     if not trs or len(trs) < 4:
         raise DataParseError("[{}] 解析到的表格行数不足".format(oe))
 
-    # 列索引配置（与原脚本一致）
-    STOCK_COL_INDEXES = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25, 26, 28, 29, 30, 32, 33, 34]
-    WAREHOUSE_COL_INDEXES = [7, 11, 15, 19, 23, 27, 31]
-
     # ---- 第 3 行（索引3）：表头 ----
     name_list = []
     titles = trs[3].xpath('td')
     for k1, v1 in enumerate(titles):
-        if k1 in STOCK_COL_INDEXES:
-            name = _clean_text(v1.xpath('text()'))
-        elif k1 in WAREHOUSE_COL_INDEXES:
+        if k1 == 0:
+            # 第 0 列（选择）：跳过
+            continue
+        if k1 == 1:
+            # 第 1 列：对应数据行的两个值（OE 号 + 零件名）
+            # 由于 result 顶部已有 "oe" 字段，这里第一个值写 "零件"，第二个写 "零件名"
+            # 但原始终端只保留一个 "零件"（零件名），因此 OE 号不写入 name_list
+            name_list.append('零件')
+            continue
+
+        if k1 in WAREHOUSE_COL_INDEXES:
             name = _clean_text(v1.xpath('b/i/text()'))
+        elif k1 in IN_TRANSIT_COL_INDEXES or k1 in STOCK_COL_INDEXES:
+            name = _clean_text(v1.xpath('text()'))
         else:
             continue
+
         name = _translate_warehouse(name)
         name_list.append(name)
 
@@ -120,26 +190,38 @@ def clean_stock_html(html_text, oe):
     values = trs[4].xpath('td') if len(trs) > 4 else []
     for k1, v1 in enumerate(values):
         if k1 == 0:
-            continue  # 第 0 列跳过
-
-        if k1 == 1:
-            # 第 1 列：OE 号链接文本 + 普通文本
-            value_list.append(_safe_extract_cell(v1, 'a/text()'))
-            value_list.append(_safe_extract_cell(v1, 'text()'))
+            # 第 0 列（选择 checkbox）：跳过
             continue
 
-        if k1 in STOCK_COL_INDEXES:
+        if k1 == 1:
+            # 第 1 列：只取 text() 中的零件名（OE 号已由 result["oe"] 提供）
+            part_name = _safe_extract_cell(v1, 'text()')
+            value_list.append(part_name)
+            continue
+
+        if k1 in WAREHOUSE_COL_INDEXES:
+            # "库房-北京" 等：优先 <b><i>15</i></b>；否则 a/text()；否则 text()；
+            # 再否则尝试 onmouseover 中的 "可用库存 over reorderpoint: X"（合肥 / 宁波 等特殊列）
+            cell_val = _safe_extract_cell(v1, 'b/i/text()')
+            if not cell_val:
+                cell_val = _safe_extract_cell(v1, 'a/text()')
+            if not cell_val:
+                cell_val = _safe_extract_cell(v1, 'text()')
+            if not cell_val:
+                cell_val = _extract_onmouseover_reorderpoint(v1)
+        elif k1 in IN_TRANSIT_COL_INDEXES:
+            # "在途-北京" 等：优先取 a/text()（如 "8" / "52" / "64"）；
+            # 若没有 a/text()（沈阳/合肥 等只有 text()= "0\xa0"），则回退到 text()
+            cell_val = _safe_extract_cell(v1, 'a/text()')
+            if not cell_val:
+                cell_val = _safe_extract_cell(v1, 'text()')
+        elif k1 in STOCK_COL_INDEXES:
+            # 再定购点 / 主仓 / 折扣代码 等普通列（text() 即可）
             cell_val = _safe_extract_cell(v1, 'text()')
-        elif k1 in WAREHOUSE_COL_INDEXES:
-            # 从 onmouseover 属性中提取可用库存
-            attr_str = str(v1.xpath('a/@onmouseover')).replace(' ', '') \
-                .replace("doTooltip(event,'可用库存overreorderpoint:", '') \
-                .replace("')", '').replace('["', '').replace('"]', '')
-            cell_val = attr_str if attr_str and attr_str != '[]' else ''
         else:
             continue
 
-        # 价格处理（RMB × 1.13）
+        # RMB 价格 × 1.13
         cell_val = _parse_rmb_price(cell_val)
         value_list.append(cell_val)
 
@@ -265,6 +347,9 @@ def map_detail_key_clean(data_fields):
     :param data_fields: dict，如 {" 零件名 ": "xxx", "可用库存:": 10}
     :return: 清洗后的 dict，如 {"零件名": "xxx", "可用库存": 10}
     """
+
+
+
     if not data_fields or not isinstance(data_fields, dict):
         return data_fields
 

@@ -18,7 +18,7 @@ headers = {
 # 请求参数
 payload = {
     "key": "7Y4Y6RNdkDCwTJDJEBWz",
-    "part_number": "28108070791"  # 替换为实际零件编号
+    "part_number": "22116769185"  # 替换为实际零件编号
 }
 
 try:
