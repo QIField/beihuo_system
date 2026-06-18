@@ -220,7 +220,7 @@ class CrmGzbbrSpider:
     # page 分页页码
     # limit 分页每页数量
     def get_product_list(self, page=1, limit=400, brand_id="", warehouse_id="",
-                         kw_id="", product_type="1"):
+                         kw_id="", product_type="1", kw_nos=""):
         """
         获取产品列表（库存数据）
 
@@ -230,6 +230,7 @@ class CrmGzbbrSpider:
         :param warehouse_id: 仓库ID
         :param kw_id: 库位ID
         :param product_type: 类型，默认"1"
+        :param kw_nos: 库位号列表，逗号分隔，如 "01-01-01-01-01,01-09-09-09-08"
         :return: 请求响应对象
         """
         url = f"{self.BASE_URL}/api/crm.Product/getProductList"
@@ -240,6 +241,7 @@ class CrmGzbbrSpider:
             "warehouse_id": warehouse_id,
             "kw_id": kw_id,
             "type": product_type,
+            "kw_nos": kw_nos,
         }
         print("【请求API地址】", url)
         print("【请求参数】", data)
