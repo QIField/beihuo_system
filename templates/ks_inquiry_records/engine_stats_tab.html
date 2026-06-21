@@ -1,20 +1,39 @@
+<!-- ECharts 本地引入 -->
+<script src="{{ url_for('static', filename='js/lib/echarts.min.js') }}"></script>
+
 <!-- 发动机及底盘维度 -->
 <div id="tab-engine" class="tab-pane">
-    <!-- 第一行：底盘统计和OE号码统计并排 -->
-    <div style="display: flex; gap: 30px; margin-bottom: 10px;">
-        <div>
-            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">底盘统计</div>
-            <div id="chassisGrid" class="ag-theme-alpine" style="height: 300px; width: 420px;"></div>
+    <!-- 第一行：三个柱状图并排（自适应宽度） -->
+    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">底盘 TOP 10</div>
+            <div id="chassisChart" style="height: 300px; width: 100%; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px;"></div>
         </div>
-        <div>
-            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">OE号码统计</div>
-            <div id="oeNumGrid" class="ag-theme-alpine" style="height: 300px; width: 420px;"></div>
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">OE号码 TOP 10</div>
+            <div id="oeNumChart" style="height: 300px; width: 100%; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">发动机 TOP 10</div>
+            <div id="engineChart" style="height: 300px; width: 100%; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px;"></div>
         </div>
     </div>
 
-    <!-- 第二行：发动机统计 -->
-    <div style="font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 10px 0;">发动机统计</div>
-    <div id="engineGrid" class="ag-theme-alpine" style="height: 300px; width: 420px;"></div>
+    <!-- 第二行：三个表格并排（自适应宽度） -->
+    <div style="display: flex; gap: 20px; margin-bottom: 10px;">
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 10px 0 10px 0;">底盘统计</div>
+            <div id="chassisGrid" class="ag-theme-alpine" style="height: 300px; width: 100%;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 10px 0 10px 0;">OE号码统计</div>
+            <div id="oeNumGrid" class="ag-theme-alpine" style="height: 300px; width: 100%;"></div>
+        </div>
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 16px; font-weight: 600; color: #333; margin: 10px 0 10px 0;">发动机统计</div>
+            <div id="engineGrid" class="ag-theme-alpine" style="height: 300px; width: 100%;"></div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -22,6 +41,77 @@
     let chassisGridApi = null;
     let engineGridApi = null;
     let oeNumGridApi = null;
+
+    // ECharts 实例
+    let chassisChartInstance = null;
+    let engineChartInstance = null;
+    let oeNumChartInstance = null;
+
+    // 初始化图表（等待 echarts 加载完成）
+    function initCharts() {
+        if (typeof echarts === 'undefined') {
+            setTimeout(initCharts, 100);
+            return;
+        }
+        const chassisDom = document.getElementById('chassisChart');
+        const oeNumDom = document.getElementById('oeNumChart');
+        const engineDom = document.getElementById('engineChart');
+        if (chassisDom && !chassisChartInstance) chassisChartInstance = echarts.init(chassisDom);
+        if (oeNumDom && !oeNumChartInstance) oeNumChartInstance = echarts.init(oeNumDom);
+        if (engineDom && !engineChartInstance) engineChartInstance = echarts.init(engineDom);
+
+        // 设置空状态
+        setEmptyChart(chassisChartInstance);
+        setEmptyChart(oeNumChartInstance);
+        setEmptyChart(engineChartInstance);
+    }
+
+    // 设置空状态
+    function setEmptyChart(instance) {
+        if (!instance) return;
+        instance.clear();
+        instance.setOption({
+            title: { text: '暂无数据', left: 'center', top: 'middle', textStyle: { color: '#999', fontSize: 14, fontWeight: 'normal' } }
+        });
+    }
+
+    // 渲染柱状图（TOP 10）
+    function renderChart(instance, list, labelField, title, color) {
+        if (!instance) return;
+        if (!list || list.length === 0) {
+            setEmptyChart(instance);
+            return;
+        }
+        const top10 = list.slice(0, 10);
+        const categories = top10.map(item => item[labelField] || '未知');
+        const values = top10.map(item => item.count || 0);
+
+        instance.setOption({
+            title: null,
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            grid: { left: '3%', right: '4%', bottom: '18%', top: '8%', containLabel: true },
+            xAxis: {
+                type: 'category',
+                data: categories,
+                axisLabel: { rotate: 30, fontSize: 11, interval: 0 }
+            },
+            yAxis: { type: 'value', name: '次数' },
+            series: [{
+                name: title,
+                type: 'bar',
+                data: values,
+                itemStyle: { color: color, borderRadius: [4, 4, 0, 0] },
+                label: { show: true, position: 'top', fontSize: 11 }
+            }]
+        }, true);
+    }
+
+    // 窗口尺寸变化时图表自适应
+    window.addEventListener('resize', function() {
+        chassisChartInstance && chassisChartInstance.resize();
+        engineChartInstance && engineChartInstance.resize();
+        oeNumChartInstance && oeNumChartInstance.resize();
+    });
 
     // 底盘表格列定义
     const chassisColumnDefs = [
@@ -199,15 +289,18 @@
                     }
                 }
                 chassisGridApi.setRowData(displayList);
+                renderChart(chassisChartInstance, displayList, 'chassis', '底盘', '#5470c6');
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 chassisGridApi.setRowData([]);
+                setEmptyChart(chassisChartInstance);
             }
         })
         .catch(error => {
             console.error('底盘统计查询失败:', error);
             layui.layer.msg('查询失败，请稍后重试', {icon: 2});
             chassisGridApi.setRowData([]);
+            setEmptyChart(chassisChartInstance);
         });
     }
 
@@ -237,15 +330,18 @@
                     }
                 }
                 engineGridApi.setRowData(displayList);
+                renderChart(engineChartInstance, displayList, 'engine', '发动机', '#91cc75');
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 engineGridApi.setRowData([]);
+                setEmptyChart(engineChartInstance);
             }
         })
         .catch(error => {
             console.error('发动机统计查询失败:', error);
             layui.layer.msg('查询失败，请稍后重试', {icon: 2});
             engineGridApi.setRowData([]);
+            setEmptyChart(engineChartInstance);
         });
     }
 
@@ -275,15 +371,18 @@
                     }
                 }
                 oeNumGridApi.setRowData(displayList);
+                renderChart(oeNumChartInstance, displayList, 'partsNum', 'OE号码', '#fac858');
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 oeNumGridApi.setRowData([]);
+                setEmptyChart(oeNumChartInstance);
             }
         })
         .catch(error => {
             console.error('OE号码统计查询失败:', error);
             layui.layer.msg('查询失败，请稍后重试', {icon: 2});
             oeNumGridApi.setRowData([]);
+            setEmptyChart(oeNumChartInstance);
         });
     }
 
@@ -318,6 +417,15 @@
         } else {
             setTimeout(() => oeNumGridApi.sizeColumnsToFit(), 0);
         }
+
+        // 初始化柱状图
+        initCharts();
+        // 切换 tab 后图表需要 resize 以适配显示尺寸
+        setTimeout(() => {
+            chassisChartInstance && chassisChartInstance.resize();
+            engineChartInstance && engineChartInstance.resize();
+            oeNumChartInstance && oeNumChartInstance.resize();
+        }, 50);
     };
 
     // 刷新表格（供外部调用）
