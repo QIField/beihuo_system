@@ -14,6 +14,9 @@ CRM 仓库库存同步服务
     sync_company_inventory('fsbbr')
 """
 
+import os
+
+import pandas as pd
 from datetime import datetime, date, timedelta
 
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
@@ -419,7 +422,7 @@ def _sync_special_kw_records(spider, company):
 
 def _send_notification(company, sku_total, special_sku_total):
     """
-    查询当天变动记录并发送微信通知
+    查询当天变动记录，导出 Excel，并发送微信通知（简短摘要 + 下载链接）
 
     :param company: 门店代码
     :param sku_total: getProductList 全部产品的总数
@@ -427,15 +430,9 @@ def _send_notification(company, sku_total, special_sku_total):
     """
     today = date.today()
     tomorrow = today + timedelta(days=1)
+    today_str = today.strftime('%Y-%m-%d')
 
-    # 构建消息头部（全部库位）
-    lines = [
-        "===【crm特殊仓位库存变化业务汇报】===",
-        f"统计时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        f"sku：{sku_total}",
-    ]
-
-    # 全部库位当天记录
+    # 查询当天全部记录与特殊记录
     with orm_session() as session:
         records = session.query(InventoryRecordLatest).filter(
             InventoryRecordLatest.company == company,
@@ -443,22 +440,6 @@ def _send_notification(company, sku_total, special_sku_total):
             InventoryRecordLatest.workdate < tomorrow,
         ).order_by(InventoryRecordLatest.workdate.desc()).all()
 
-        if records:
-            for r in records:
-                workdate_str = r.workdate.strftime('%Y-%m-%d %H:%M') if r.workdate else ''
-                lines.append(
-                    f"{r.number or ''}+{r.brand_name or ''}+{r.change_number or ''}+"
-                    f"{r.kw_no or ''}+{r.operator_name or ''}+{workdate_str}"
-                )
-        else:
-            lines.append("今日无变动记录")
-
-    # 特殊库位统计
-    lines.append("")
-    lines.append("6个特殊仓位统计")
-    lines.append(f"sku：{special_sku_total}")
-
-    with orm_session() as session:
         special_records = session.query(InventoryRecordLatest).filter(
             InventoryRecordLatest.company == company,
             InventoryRecordLatest.workdate >= today,
@@ -466,17 +447,37 @@ def _send_notification(company, sku_total, special_sku_total):
             InventoryRecordLatest.kw_no.in_(SPECIAL_KW_NOS),
         ).order_by(InventoryRecordLatest.workdate.desc()).all()
 
-        if special_records:
-            for r in special_records:
-                workdate_str = r.workdate.strftime('%Y-%m-%d %H:%M') if r.workdate else ''
-                lines.append(
-                    f"{r.number or ''}+{r.brand_name or ''}+{r.change_number or ''}+"
-                    f"{r.kw_no or ''}+{r.operator_name or ''}+{workdate_str}"
-                )
-        else:
-            lines.append("今日无特殊仓位变动记录")
+    # 导出 Excel
+    data = []
+    for r in records:
+        data.append({
+            'OE号': r.number or '',
+            '品牌': r.brand_name or '',
+            '变动数量': r.change_number or 0,
+            '库位号': r.kw_no or '',
+            '操作人': r.operator_name or '',
+            '操作时间': r.workdate.strftime('%Y-%m-%d %H:%M') if r.workdate else '',
+            '产品名称': r.product_name or '',
+            '仓库名称': r.warehouse_name or '',
+            '备注': r.note or '',
+        })
 
-    message = "\n".join(lines)
+    df = pd.DataFrame(data)
+    export_dir = os.path.join('static', 'exports')
+    os.makedirs(export_dir, exist_ok=True)
+    file_path = os.path.join(export_dir, f'inventory_{company}_{today_str}.xlsx')
+    df.to_excel(file_path, index=False)
+
+    # 构建简短消息（附带下载链接）
+    message = (
+        f"===【crm特殊仓位库存变化业务汇报】===\n"
+        f"日期：{today_str}\n"
+        f"门店：{company}\n"
+        f"常规变动：{len(records)} 条\n"
+        f"特殊仓位变动：{len(special_records)} 条\n"
+        f"sku：{sku_total}（常规）/ {special_sku_total}（特殊）\n"
+        f"详细记录下载：http://x.fsbbr.net/web/download_inventory/{company}/{today_str}"
+    )
 
     try:
         message_push("crm", message)

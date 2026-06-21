@@ -12,6 +12,7 @@ from .customer_quota_manager_web import customer_quota_manager_web_bp
 from .report_wx_quote_data_web import report_wx_quote_data_web_bp
 from .warehouse_manager_web import warehouse_manager_web_bp
 from .qpl_quote_web import qpl_quote_web_bp
+from .excel_download import excel_download_bp
 
 
 common_web_bp = Blueprint(
@@ -30,5 +31,7 @@ common_web_bp.register_blueprint(daily_inventory_web_bp)
 from .permission_manager_web import permission_manager_web_bp
 common_web_bp.register_blueprint(permission_manager_web_bp)
 
-__all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp','warehouse_manager_web_bp','common_web_bp']
+common_web_bp.register_blueprint(excel_download_bp)
+
+__all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp','warehouse_manager_web_bp','common_web_bp','excel_download_bp']
 

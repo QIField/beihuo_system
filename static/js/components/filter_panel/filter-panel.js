@@ -498,6 +498,152 @@ var FilterPanel = (function() {
         filterConfig.data = newData;
     }
 
+    // ==================== 外部选项筛选面板功能 ====================
+
+    var externalFilterConfig = {
+        fields: [],
+        onApply: null,
+        activeValues: {}
+    };
+
+    /**
+     * 使用外部选项初始化筛选按钮（适用于非 AG Grid 数据的场景）
+     * @param {Object} options - 配置选项
+     * @param {string} options.container - 按钮容器选择器
+     * @param {Array} options.fields - 字段配置 [{ field: 'brand', label: '品牌', options: [{value, text}] }]
+     * @param {Function} options.onApply - 应用筛选的回调函数 function(field, selectedValues)
+     * @param {Object} options.initialValues - 初始选中值 { brand: ['宝马'] }
+     */
+    function initWithOptions(options) {
+        externalFilterConfig = Object.assign({
+            container: null,
+            fields: [],
+            onApply: null,
+            initialValues: {}
+        }, options);
+
+        externalFilterConfig.activeValues = Object.assign({}, options.initialValues || {});
+
+        // 渲染筛选按钮
+        renderExternalFilterButtons();
+    }
+
+    /**
+     * 渲染外部选项筛选按钮
+     */
+    function renderExternalFilterButtons() {
+        var container = document.querySelector(externalFilterConfig.container);
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        externalFilterConfig.fields.forEach(function(fieldConfig) {
+            var btn = document.createElement('button');
+            btn.className = 'filter-btn';
+            btn.id = 'externalFilterBtn_' + fieldConfig.field;
+            btn.setAttribute('data-field', fieldConfig.field);
+            btn.textContent = fieldConfig.label;
+
+            // 初始高亮状态
+            var currentValues = externalFilterConfig.activeValues[fieldConfig.field] || [];
+            if (currentValues.length > 0) {
+                btn.classList.add('active');
+            }
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                togglePanelWithOptions(fieldConfig, btn);
+            });
+
+            container.appendChild(btn);
+        });
+    }
+
+    /**
+     * 切换外部选项筛选面板
+     * @param {Object} fieldConfig - 字段配置
+     * @param {HTMLElement} btnElement - 按钮元素
+     */
+    function togglePanelWithOptions(fieldConfig, btnElement) {
+        if (currentPanel && currentMode === 'external' && currentField === fieldConfig.field) {
+            closeAll();
+            return;
+        }
+        closeAll();
+        createPanelWithOptions(fieldConfig, btnElement);
+    }
+
+    /**
+     * 创建外部选项筛选面板（带搜索框）
+     * @param {Object} fieldConfig - 字段配置
+     * @param {HTMLElement} btnElement - 按钮元素
+     */
+    function createPanelWithOptions(fieldConfig, btnElement) {
+        currentMode = 'external';
+        currentField = fieldConfig.field;
+
+        var panel = document.createElement('div');
+        panel.className = 'filter-dropdown-panel show';
+        panel.id = 'filter-panel-dropdown';
+        panel.style.display = 'block';
+
+        var currentFilter = externalFilterConfig.activeValues[fieldConfig.field] || [];
+
+        var listHtml = '';
+        fieldConfig.options.forEach(function(opt) {
+            var isChecked = currentFilter.includes(opt.value) ? 'checked' : '';
+            listHtml += '<div class="filter-dropdown-item" onclick="FilterPanel.toggleItemCheckbox(this)">' +
+                '<input type="checkbox" value="' + opt.value + '" ' + isChecked + ' onclick="event.stopPropagation()">' +
+                '<label>' + opt.text + '</label>' +
+            '</div>';
+        });
+
+        panel.innerHTML =
+            '<div class="filter-dropdown-header">' + fieldConfig.label + '筛选</div>' +
+            '<div class="filter-dropdown-search" style="padding: 8px 12px; box-sizing: border-box;">' +
+                '<input type="text" placeholder="搜索..." oninput="FilterPanel.filterSearch(this)" style="width: 100%; padding: 5px 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 12px; box-sizing: border-box;">' +
+            '</div>' +
+            '<div class="filter-dropdown-list">' + listHtml + '</div>' +
+            '<div class="filter-dropdown-footer">' +
+                '<button onclick="FilterPanel.selectAll()">全选</button>' +
+                '<button onclick="FilterPanel.invert()">反选</button>' +
+                '<button class="btn-confirm" onclick="FilterPanel.applyFilterWithOptions()">确定</button>' +
+                '<button onclick="FilterPanel.cancel()">取消</button>' +
+            '</div>';
+
+        var rect = btnElement.getBoundingClientRect();
+        panel.style.position = 'fixed';
+        panel.style.left = rect.left + 'px';
+        panel.style.top = (rect.bottom + 4) + 'px';
+        panel.style.zIndex = '999999999';
+
+        document.body.appendChild(panel);
+        currentPanel = panel;
+
+        btnElement.classList.add('active');
+    }
+
+    /**
+     * 应用外部选项筛选
+     */
+    function applyFilterWithOptions() {
+        if (!currentPanel) return;
+
+        var checkboxes = currentPanel.querySelectorAll('input[type="checkbox"]:checked');
+        var selectedValues = Array.from(checkboxes).map(function(cb) { return cb.value; });
+
+        externalFilterConfig.activeValues[currentField] = selectedValues;
+
+        if (typeof externalFilterConfig.onApply === 'function') {
+            externalFilterConfig.onApply(currentField, selectedValues);
+        }
+
+        closeAll();
+    }
+
+    // ==================== AG Grid 列菜单功能（已迁移） ====================
+    // 该部分代码已迁移至 grid-column-menu.js 与 column-preference.js
+
     /**
      * 销毁组件
      */
@@ -514,6 +660,7 @@ var FilterPanel = (function() {
         filterConfig = {};
         searchConfig = {};
         activeFilters = {};
+        externalFilterConfig = { fields: [], onApply: null, activeValues: {} };
     }
 
     /**
@@ -521,7 +668,10 @@ var FilterPanel = (function() {
      * @param {Event} e - 点击事件
      */
     function handleDocumentClick(e) {
-        if (!e.target.closest('.filter-btn') && !e.target.closest('.filter-dropdown-panel')) {
+        var isFilterBtn = e.target.closest('.filter-btn');
+        var isDropdownPanel = e.target.closest('.filter-dropdown-panel');
+
+        if (!isFilterBtn && !isDropdownPanel) {
             closeAll();
         }
     }
@@ -533,6 +683,8 @@ var FilterPanel = (function() {
     return {
         // 筛选面板
         init: init,
+        initWithOptions: initWithOptions,
+        applyFilterWithOptions: applyFilterWithOptions,
         updateData: updateData,
         getActiveFilters: getActiveFilters,
         setActiveFilters: setActiveFilters,

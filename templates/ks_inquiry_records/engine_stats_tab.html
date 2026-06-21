@@ -25,28 +25,28 @@
 
     // 底盘表格列定义
     const chassisColumnDefs = [
-        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: true, suppressMenu: true },
-        { field: 'chassis', headerName: '底盘', width: 140, sortable: true, suppressMenu: true },
-        { field: 'count', headerName: '出现次数', width: 100, sortable: true, suppressMenu: true }
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
+        { field: 'chassis', headerName: '底盘', width: 140, sortable: false, suppressMenu: true },
+        { field: 'count', headerName: '出现次数', width: 100, sortable: false, suppressMenu: true }
     ];
 
     // 发动机表格列定义
     const engineColumnDefs = [
-        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: true, suppressMenu: true },
-        { field: 'engine', headerName: '发动机代码', width: 140, sortable: true, suppressMenu: true },
-        { field: 'count', headerName: '出现次数', width: 100, sortable: true, suppressMenu: true }
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
+        { field: 'engine', headerName: '发动机代码', width: 140, sortable: false, suppressMenu: true },
+        { field: 'count', headerName: '出现次数', width: 100, sortable: false, suppressMenu: true }
     ];
 
     // OE号码表格列定义
     const oeNumColumnDefs = [
-        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: true, suppressMenu: true },
-        { field: 'partsNum', headerName: 'OE号码', width: 140, sortable: true, suppressMenu: true },
-        { field: 'count', headerName: '出现次数', width: 100, sortable: true, suppressMenu: true }
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
+        { field: 'partsNum', headerName: 'OE号码', width: 140, sortable: false, suppressMenu: true },
+        { field: 'count', headerName: '出现次数', width: 100, sortable: false, suppressMenu: true }
     ];
 
     // 通用表格配置
     function createGridOptions(columnDefs, gridType) {
-        return {
+        var gridOpts = {
             columnDefs: columnDefs,
             rowData: [],
             defaultColDef: { resizable: true },
@@ -61,12 +61,39 @@
                 else if (gridType === 'engine') engineGridApi = params.api;
                 else if (gridType === 'oeNum') oeNumGridApi = params.api;
 
+                var columnApi = params.columnApi;
+
                 params.api.sizeColumnsToFit();
 
                 // 添加双击复制功能
                 setupDoubleClickCopy(params.api, gridType);
+
+                // 添加列菜单功能（含持久化）
+                var gridSelector = gridType === 'chassis' ? '#chassisGrid' :
+                                   gridType === 'engine' ? '#engineGrid' : '#oeNumGrid';
+                var gridKeyName = gridType === 'chassis' ? 'engine_chassis_grid' :
+                                  gridType === 'engine' ? 'engine_engine_grid' : 'engine_oenum_grid';
+                if (typeof GridColumnMenu !== 'undefined') {
+                    GridColumnMenu.init(params.api, gridSelector, columnDefs, {
+                        columnApi: columnApi,
+                        gridOptions: gridOpts,
+                        persist: true,
+                        pageKey: 'ks_inquiry_records',
+                        gridKey: gridKeyName,
+                        onSort: function(colId, direction) {
+                            // 排序改变，重新加载对应表格
+                            const searchParams = getEngineSearchParams();
+                            if (searchParams.garage_name) {
+                                if (gridType === 'chassis') loadChassisStats(searchParams);
+                                else if (gridType === 'engine') loadEngineStats(searchParams);
+                                else if (gridType === 'oeNum') loadOeNumStats(searchParams);
+                            }
+                        }
+                    });
+                }
             }
         };
+        return gridOpts;
     }
 
     // 设置双击复制功能
@@ -118,6 +145,20 @@
         };
     }
 
+    // 获取指定表格的排序参数
+    function getSortParams(gridSelector) {
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getSortState) {
+            const state = GridColumnMenu.getSortState(gridSelector);
+            if (state.sortColumn) {
+                return {
+                    sort_column: state.sortColumn,
+                    sort_dir: state.sortDir
+                };
+            }
+        }
+        return {};
+    }
+
     // 搜索修理厂统计
     window.searchGarageStats = function() {
         const params = getEngineSearchParams();
@@ -137,11 +178,27 @@
 
         chassisGridApi.showLoadingOverlay();
 
-        fetch('/new/api/ks_inquiry/records/garage_chassis_stats?' + new URLSearchParams(params))
+        // 合并排序参数
+        const sortParams = getSortParams('#chassisGrid');
+        const finalParams = Object.assign({}, params, sortParams);
+
+        fetch('/new/api/ks_inquiry/records/garage_chassis_stats?' + new URLSearchParams(finalParams))
         .then(response => response.json())
         .then(data => {
             if (data.code === 0 || data.code === '0') {
-                chassisGridApi.setRowData(data.data?.list || []);
+                const list = data.data?.list || [];
+                // 缓存原始数据并应用列筛选
+                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                    GridColumnMenu.setOriginalRows('#chassisGrid', list);
+                }
+                let displayList = list;
+                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
+                    displayList = GridColumnMenu.filterRows(list, '#chassisGrid');
+                    if (displayList.length !== list.length) {
+                        console.log(`[loadChassisStats] 列筛选后: ${displayList.length}/${list.length} 条`);
+                    }
+                }
+                chassisGridApi.setRowData(displayList);
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 chassisGridApi.setRowData([]);
@@ -160,11 +217,26 @@
 
         engineGridApi.showLoadingOverlay();
 
-        fetch('/new/api/ks_inquiry/records/garage_engine_stats?' + new URLSearchParams(params))
+        // 合并排序参数
+        const sortParams = getSortParams('#engineGrid');
+        const finalParams = Object.assign({}, params, sortParams);
+
+        fetch('/new/api/ks_inquiry/records/garage_engine_stats?' + new URLSearchParams(finalParams))
         .then(response => response.json())
         .then(data => {
             if (data.code === 0 || data.code === '0') {
-                engineGridApi.setRowData(data.data?.list || []);
+                const list = data.data?.list || [];
+                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                    GridColumnMenu.setOriginalRows('#engineGrid', list);
+                }
+                let displayList = list;
+                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
+                    displayList = GridColumnMenu.filterRows(list, '#engineGrid');
+                    if (displayList.length !== list.length) {
+                        console.log(`[loadEngineStats] 列筛选后: ${displayList.length}/${list.length} 条`);
+                    }
+                }
+                engineGridApi.setRowData(displayList);
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 engineGridApi.setRowData([]);
@@ -183,11 +255,26 @@
 
         oeNumGridApi.showLoadingOverlay();
 
-        fetch('/new/api/ks_inquiry/records/garage_oenum_stats?' + new URLSearchParams(params))
+        // 合并排序参数
+        const sortParams = getSortParams('#oeNumGrid');
+        const finalParams = Object.assign({}, params, sortParams);
+
+        fetch('/new/api/ks_inquiry/records/garage_oenum_stats?' + new URLSearchParams(finalParams))
         .then(response => response.json())
         .then(data => {
             if (data.code === 0 || data.code === '0') {
-                oeNumGridApi.setRowData(data.data?.list || []);
+                const list = data.data?.list || [];
+                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                    GridColumnMenu.setOriginalRows('#oeNumGrid', list);
+                }
+                let displayList = list;
+                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
+                    displayList = GridColumnMenu.filterRows(list, '#oeNumGrid');
+                    if (displayList.length !== list.length) {
+                        console.log(`[loadOeNumStats] 列筛选后: ${displayList.length}/${list.length} 条`);
+                    }
+                }
+                oeNumGridApi.setRowData(displayList);
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 oeNumGridApi.setRowData([]);

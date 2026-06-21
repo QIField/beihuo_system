@@ -61,6 +61,8 @@ def init_ks_inquiry_detail_table():
                 engine VARCHAR(100) DEFAULT NULL COMMENT '发动机',
                 production_date VARCHAR(50) DEFAULT NULL COMMENT '车辆生产日期',
                 chassis VARCHAR(100) DEFAULT NULL COMMENT '底盘',
+                location_name VARCHAR(255) DEFAULT NULL COMMENT '仓库位置名称（来自storeQuoteItemResults.locationName）',
+                arrival_time VARCHAR(50) DEFAULT NULL COMMENT '到货时间（arrivalTime=0为"现货"，>0为"调货+N天"）',
                 unquoted_products TEXT DEFAULT NULL COMMENT '未报价产品，格式：oe+品牌，oe+品牌',
                 company VARCHAR(50) NOT NULL COMMENT '公司标识',
                 quote_date DATE NOT NULL COMMENT '询价日期',

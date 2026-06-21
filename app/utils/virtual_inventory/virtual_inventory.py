@@ -1662,6 +1662,9 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
     import decimal
     from datetime import datetime, date
     import time
+
+    # 延迟导入 update_status 分类函数，避免循环依赖
+    from backend.virtual_inventory_api import get_update_status
     
     def convert_decimal_to_serializable(obj):
         if isinstance(obj, decimal.Decimal):
@@ -1760,6 +1763,16 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
 
         record_groups = split_array_by_500_loop(serializable_records)
         original_row_groups = split_array_by_500_loop(original_rows)
+
+        # 预构造 id -> 品牌 / temp_brand 字典，避免后续在循环里对 DataFrame 做 O(N) 的 boolean 索引
+        # 原实现每条结果都跑一次 original_df.loc[original_df['id'] == record_id, '...']
+        # 在大数据量下会退化为 O(N^2)，此处改为 O(1) 字典查询
+        try:
+            id_to_orig_brand = dict(zip(original_df['id'].tolist(), original_df['品牌'].tolist()))
+            id_to_temp_brand = dict(zip(original_df['id'].tolist(), original_df['temp_brand'].tolist()))
+        except Exception:
+            id_to_orig_brand = {}
+            id_to_temp_brand = {}
 
         for i, group in enumerate(record_groups):
             # 使用传入的token，不再重复获取
@@ -1868,13 +1881,9 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                                 operation_name = result_item['operation_name']
                                 # 检查是否使用了品牌别名
                                 if operation_name == 'update':
-                                    # 获取原始品牌和映射后的品牌
-                                    # 使用正确的列名 '品牌' 而不是 'brand'
-                                    original_brand_values = original_df.loc[original_df['id'] == record_id, '品牌'].values
-                                    mapped_brand_values = original_df.loc[original_df['id'] == record_id, 'temp_brand'].values
-
-                                    original_brand = original_brand_values[0] if len(original_brand_values) > 0 else ''
-                                    mapped_brand = mapped_brand_values[0] if len(mapped_brand_values) > 0 else ''
+                                    # 使用预构造的字典做 O(1) 查询，避免对 DataFrame 做 boolean 索引
+                                    original_brand = id_to_orig_brand.get(record_id, '')
+                                    mapped_brand = id_to_temp_brand.get(record_id, '')
 
                                     if original_brand != mapped_brand and mapped_brand in reverse_brand_mapping:
                                         alias_used = reverse_brand_mapping[mapped_brand]
@@ -1892,13 +1901,13 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                                     mapped_brand = brand_mapping_info[record_id]
                                     update_msg = f"update，使用{mapped_brand}上传"
 
-                            update_data.append((update_msg, record_id))
+                            update_data.append((update_msg, get_update_status(update_msg), record_id))
 
                     # 批量更新数据库
                     if update_data:
                         update_sql = f"""
                             UPDATE {table_name}
-                            SET update_msg = %s
+                            SET update_msg = %s, update_status = %s
                             WHERE id = %s
                         """
                         db_manager.execute_many(update_sql, update_data)
@@ -1914,6 +1923,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         return result
     
     start_time = time.time()
+    result = None  # 兼容函数末尾 return result：即使所有公司都跳过也不会抛 NameError
 
     # 加载品牌映射
     brand_mapping = load_crm_aliases_mapping()
@@ -1980,131 +1990,216 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
 
         print(f"[{company}] 成功获取token和仓库/供应商数据")
 
-        # 从对应公司表查询数据
+        # ========== 游标分页处理（按 id 升序逐页拉取并上传，避免一次性把全表数据装入内存导致 OOM） ==========
+        PAGE_SIZE = 5000  # 单页拉取行数，过小会增加 SQL 次数，过大会失去内存优化效果
+
+        # 1) 先查 id 范围 + 总数（一次轻量 SQL），锁定上界，避免上传期间漏读未来插入
         db_manager = get_db_connection()
         try:
             if today_only:
-                query = f"""
-                    SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg, upload_supplier_name
+                range_sql = f"""
+                    SELECT MIN(id) AS min_id, MAX(id) AS max_id, COUNT(*) AS cnt
                     FROM {table_name}
                     WHERE DATE(fetch_time) = CURDATE()
                 """
             else:
-                query = f"""
-                    SELECT id, supplier_name, oe_code, brand, price, expiry_date, warehouse, stock, remark, update_msg, upload_supplier_name
+                range_sql = f"""
+                    SELECT MIN(id) AS min_id, MAX(id) AS max_id, COUNT(*) AS cnt
                     FROM {table_name}
                 """
-            rows = db_manager.execute_query(query)
+            range_rows = db_manager.execute_query(range_sql)
         except Exception as e:
-            print(f"[{company}] 查询数据时出错: {e}")
+            print(f"[{company}] 查询 id 范围失败: {e}")
+            db_manager.close()
             continue
         finally:
-            db_manager.close()
+            try:
+                db_manager.close()
+            except Exception:
+                pass
 
-        if not rows:
+        if not range_rows or range_rows[0].get('cnt') in (None, 0) or range_rows[0].get('max_id') is None:
             print(f"[{company}] 没有数据需要上传")
             continue
 
-        # 👇 新增: 黑名单过滤
-        print(f"[{company}] 开始黑名单过滤...")
-        from ..inventory_tasks import filter_by_blacklist
-        rows_before_filter = len(rows)
-        rows = filter_by_blacklist(rows)
-        rows_after_filter = len(rows)
-        removed_count = rows_before_filter - rows_after_filter
-        print(f"[{company}] 黑名单过滤完成: 原始 {rows_before_filter} 条, 剔除 {removed_count} 条, 剩余 {rows_after_filter} 条")
+        min_id = range_rows[0]['min_id']
+        max_id_lock = range_rows[0]['max_id']
+        total_count = range_rows[0]['cnt']
+        print(f"[{company}] 待上传 {total_count} 条，id 范围 [{min_id}, {max_id_lock}]，分页大小 {PAGE_SIZE}")
 
-        if not rows:
-            print(f"[{company}] 过滤后没有数据需要上传")
-            continue
+        from ..inventory_tasks import filter_by_blacklist  # 提前导入，避免循环内重复导入
 
-        # 非佛山公司过滤掉菲尔品牌
-        if company != 'fsbbr':
-            rows_before_feier = len(rows)
-            rows = [row for row in rows if row.get('brand') != '菲尔']
-            rows_after_feier = len(rows)
-            feier_removed = rows_before_feier - rows_after_feier
-            if feier_removed > 0:
-                print(f"[{company}] 菲尔品牌过滤: 剔除 {feier_removed} 条菲尔品牌数据, 剩余 {rows_after_feier} 条")
+        # 2) 游标分页：用 WHERE id > last_id AND id <= max_id_lock 的 keyset pagination
+        #    - 主键索引扫描，毫秒级
+        #    - 不依赖 id 是否连续，空洞自动跳过
+        #    - 不重复、不遗漏
+        last_id = (min_id - 1) if min_id is not None else 0
+        page_no = 0
+        processed_total = 0
+        result = None  # 保留最后一页的 result 用于函数返回值兼容
 
-        if not rows:
-            print(f"[{company}] 过滤后没有数据需要上传")
-            continue
+        while True:
+            page_no += 1
+            page_start_time = time.time()
 
-        print(f"[{company}] 准备上传 {len(rows)} 条{'当天' if today_only else '全部'}数据")
+            # 拉取一页
+            db_manager = get_db_connection()
+            try:
+                if today_only:
+                    page_sql = f"""
+                        SELECT id, supplier_name, oe_code, brand, price, expiry_date,
+                               warehouse, stock, remark, update_msg, upload_supplier_name
+                        FROM {table_name}
+                        WHERE id > %s AND id <= %s
+                          AND DATE(fetch_time) = CURDATE()
+                        ORDER BY id ASC
+                        LIMIT %s
+                    """
+                else:
+                    page_sql = f"""
+                        SELECT id, supplier_name, oe_code, brand, price, expiry_date,
+                               warehouse, stock, remark, update_msg, upload_supplier_name
+                        FROM {table_name}
+                        WHERE id > %s AND id <= %s
+                        ORDER BY id ASC
+                        LIMIT %s
+                    """
+                rows = db_manager.execute_query(page_sql, (last_id, max_id_lock, PAGE_SIZE))
+            except Exception as e:
+                print(f"[{company}] 页 {page_no} 查询失败: {e}")
+                rows = None
+            finally:
+                try:
+                    db_manager.close()
+                except Exception:
+                    pass
 
-        # 构建DataFrame
-        df = pd.DataFrame(rows, columns=['id', 'supplier_name', 'oe_code', 'brand', 'price', 'expiry_date', 'warehouse', 'stock', 'remark', 'update_msg', 'upload_supplier_name'])
+            if not rows:
+                break
 
-        # 记录原始品牌用于判断是否使用了别名
-        original_brand_series = df['brand'].copy()
+            # 推进游标
+            last_id = rows[-1]['id']
+            page_row_count = len(rows)
 
-        # 向量化品牌映射
-        df['temp_brand'] = df['brand'].map(brand_mapping).fillna(df['brand'])
+            # ---------- 单页内独立完成：黑名单过滤 → 菲尔过滤 → DataFrame → merge → 上传 → 回写 ----------
+            try:
+                # 黑名单过滤
+                rows_before_filter = len(rows)
+                rows = filter_by_blacklist(rows)
+                removed_count = rows_before_filter - len(rows)
+                if removed_count > 0:
+                    print(f"[{company}] 页 {page_no} 黑名单剔除 {removed_count} 条")
 
-        # 重命名列
-        df = df.rename(columns={
-            'supplier_name': '供应商名称',
-            'oe_code': '原厂OE码',
-            'brand': '品牌',
-            'price': '价格',
-            'expiry_date': '失效时间',
-            'warehouse': '仓库名称',
-            'stock': '库存',
-            'remark': '备注',
-            'update_msg': '更新信息',
-            'upload_supplier_name': '上传供应商名称'
-        })
+                # 非佛山公司过滤掉菲尔品牌
+                if company != 'fsbbr':
+                    rows_before_feier = len(rows)
+                    rows = [row for row in rows if row.get('brand') != '菲尔']
+                    feier_removed = rows_before_feier - len(rows)
+                    if feier_removed > 0:
+                        print(f"[{company}] 页 {page_no} 菲尔品牌剔除 {feier_removed} 条")
 
-        # 使用映射后的品牌
-        df['品牌'] = df['temp_brand']
+                if not rows:
+                    print(f"[{company}] 页 {page_no} 过滤后无数据，跳过")
+                    processed_total += page_row_count
+                    continue
 
-        # 直接使用upload_supplier_name列作为上传用的供应商名称
-        # 如果upload_supplier_name为NULL，则使用supplier_name作为回退
-        df['供应商名称_映射'] = df['上传供应商名称'].fillna(df['供应商名称'])
-        # 确保是字符串类型并去除空格
-        df['供应商名称_映射'] = df['供应商名称_映射'].astype(str).str.strip()
+                # 构建 DataFrame
+                df = pd.DataFrame(rows, columns=['id', 'supplier_name', 'oe_code', 'brand', 'price', 'expiry_date',
+                                                 'warehouse', 'stock', 'remark', 'update_msg', 'upload_supplier_name'])
 
-        # 在合并前保存原始品牌信息
-        df_with_original = df.copy()
-        df_with_original['original_brand'] = original_brand_series.values
+                # 记录原始品牌（用于判断是否使用了别名）
+                original_brand_series = df['brand'].copy()
 
-        # 合并数据（使用upload_supplier_name进行匹配）
-        df_merged = pd.merge(df_with_original, ck_data, left_on='仓库名称', right_on='warehouse_name', how='inner')
-        df_merged = pd.merge(df_merged, gys_data, left_on='供应商名称_映射', right_on='name', how='inner')
+                # 向量化品牌映射
+                df['temp_brand'] = df['brand'].map(brand_mapping).fillna(df['brand'])
 
-        if df_merged.empty:
-            print(f"[{company}] 没有匹配的仓库或供应商数据，无法上传")
-            continue
+                # 重命名列
+                df = df.rename(columns={
+                    'supplier_name': '供应商名称',
+                    'oe_code': '原厂OE码',
+                    'brand': '品牌',
+                    'price': '价格',
+                    'expiry_date': '失效时间',
+                    'warehouse': '仓库名称',
+                    'stock': '库存',
+                    'remark': '备注',
+                    'update_msg': '更新信息',
+                    'upload_supplier_name': '上传供应商名称'
+                })
 
-        # 重命名和筛选
-        df_final = df_merged.rename(columns={'supplier_channel_id': 'supplier_channel_id', '原厂OE码': 'number', '品牌': 'brand_name',
-                                '价格': 'price', 'cass_warehouse_id': 'cass_warehouse_id', '库存': 'stock',
-                                '失效时间': 'lose_date', '备注': 'remark'})
-        df_final = df_final[['id', 'supplier_channel_id', 'number', 'brand_name', 'price', 'cass_warehouse_id', 'stock', 'lose_date', 'remark', 'original_brand']]
-        df_final = df_final.fillna('')
+                # 使用映射后的品牌
+                df['品牌'] = df['temp_brand']
 
-        # 分离ID和数据
-        ids = df_final['id'].tolist()
-        df_data = df_final.drop(columns=['id', 'original_brand'])
-        records = df_data.to_dict(orient='records')
+                # 上传供应商名称（NULL 回退到 supplier_name）
+                df['供应商名称_映射'] = df['上传供应商名称'].fillna(df['供应商名称'])
+                df['供应商名称_映射'] = df['供应商名称_映射'].astype(str).str.strip()
 
-        # 优化filtered_rows构建，包含原始品牌信息
-        id_to_row = {row['id']: row for row in df_merged.to_dict('records')}
-        filtered_rows = [id_to_row[record_id] for record_id in ids if record_id in id_to_row]
+                # 直接在 df 上添加 original_brand 列（不再 df.copy() 节省内存）
+                df['original_brand'] = original_brand_series.values
 
-        # 品牌映射信息记录
-        brand_mapping_info = dict(df[df['品牌'] != df['temp_brand']].set_index('id')['temp_brand'])
+                # 合并仓库 / 供应商映射
+                df_merged = pd.merge(df, ck_data, left_on='仓库名称', right_on='warehouse_name', how='inner')
+                df_merged = pd.merge(df_merged, gys_data, left_on='供应商名称_映射', right_on='name', how='inner')
 
-        # 上传数据
-        try:
-            result = batchSave(records, filtered_rows, brand_mapping_info, reverse_brand_mapping, df_with_original, company, token=token)
-            print(f"[{company}] 推送完成，耗时: {time.time() - company_start_time:.2f}s")
-        except Exception as e:
-            print(f"[{company}] 推送失败: {e}")
-            import traceback
-            traceback.print_exc()
-            continue
+                if df_merged.empty:
+                    print(f"[{company}] 页 {page_no} 没有匹配的仓库或供应商数据，跳过")
+                    processed_total += page_row_count
+                    # 释放
+                    del df, df_merged, rows, original_brand_series
+                    import gc
+                    gc.collect()
+                    continue
+
+                # 重命名和筛选上传需要的列
+                df_final = df_merged.rename(columns={
+                    'supplier_channel_id': 'supplier_channel_id', '原厂OE码': 'number', '品牌': 'brand_name',
+                    '价格': 'price', 'cass_warehouse_id': 'cass_warehouse_id', '库存': 'stock',
+                    '失效时间': 'lose_date', '备注': 'remark'
+                })
+                df_final = df_final[['id', 'supplier_channel_id', 'number', 'brand_name', 'price',
+                                     'cass_warehouse_id', 'stock', 'lose_date', 'remark', 'original_brand']]
+                df_final = df_final.fillna('')
+
+                # 分离 ID 和上传数据
+                ids = df_final['id'].tolist()
+                df_data = df_final.drop(columns=['id', 'original_brand'])
+                records = df_data.to_dict(orient='records')
+
+                # 构建 id -> 合并后行的字典（用于 batchSave 内部回写 update_msg 时确定记录 id）
+                id_to_row = {row_dict['id']: row_dict for row_dict in df_merged.to_dict('records')}
+                filtered_rows = [id_to_row[record_id] for record_id in ids if record_id in id_to_row]
+
+                # 品牌映射信息（用于 batchSave 内部识别使用了别名的记录）
+                brand_mapping_info = dict(df[df['品牌'] != df['temp_brand']].set_index('id')['temp_brand'])
+
+                # 调用批量上传（内部仍按 500 条/批分组）
+                # 注意：原实现把 df_with_original 传给 batchSave，这里直接传 df（已包含 id / 品牌 / temp_brand / original_brand 列）
+                result = batchSave(records, filtered_rows, brand_mapping_info, reverse_brand_mapping, df, company, token=token)
+
+                processed_total += page_row_count
+                print(f"[{company}] 页 {page_no} 完成（本页 {page_row_count} 条，累计 {processed_total}/{total_count}），耗时 {time.time() - page_start_time:.2f}s")
+
+                # 显式释放本页对象
+                del df, df_merged, df_final, df_data, records, filtered_rows, id_to_row
+                del ids, brand_mapping_info, original_brand_series, rows
+                import gc
+                gc.collect()
+
+            except Exception as e:
+                print(f"[{company}] 页 {page_no} 处理异常，跳过本页: {e}")
+                import traceback
+                traceback.print_exc()
+                # 异常时也要释放可能存在的局部变量
+                try:
+                    del df, df_merged, df_final, df_data, records, filtered_rows, id_to_row
+                    del ids, brand_mapping_info, original_brand_series, rows
+                except Exception:
+                    pass
+                import gc
+                gc.collect()
+                continue
+
+        print(f"[{company}] 推送完成：应处理 {total_count} 条，累计扫描 {processed_total} 条，耗时 {time.time() - company_start_time:.2f}s")
 
     print(f"\n{'='*60}")
     print(f"所有公司推送完成，总耗时: {time.time() - start_time:.2f}s")
