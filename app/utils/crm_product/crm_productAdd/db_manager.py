@@ -203,9 +203,12 @@ def update_msg_with_processed_result(db_manager, oe_number, brand, result):
     """
     try:
         if db_manager:
-            sql = "UPDATE virtual_inventory SET update_msg = %s WHERE oe_code = %s AND brand = %s"
+            # 延迟导入 update_status 分类函数，避免循环依赖
+            from backend.virtual_inventory_api import get_update_status
+            sql = "UPDATE virtual_inventory SET update_msg = %s, update_status = %s WHERE oe_code = %s AND brand = %s"
             new_msg = f"OE号【{oe_number}】处理结果：{result}"
-            affected_rows = db_manager.execute_update(sql, (new_msg, oe_number, brand))
+            new_status = get_update_status(new_msg)
+            affected_rows = db_manager.execute_update(sql, (new_msg, new_status, oe_number, brand))
             print(f"OE号 {oe_number} 和品牌 {brand} 的处理结果已更新到数据库，影响行数: {affected_rows}")
     except Exception as e:
         print(f"更新数据库中 OE号 {oe_number} 和品牌 {brand} 的处理结果时出错: {e}")

@@ -1,0 +1,60 @@
+/**
+ * Grid Column Menu Component Styles
+ * 表头列菜单组件样式（依赖 filter-panel.css 提供基础下拉面板样式）
+ */
+
+/* 表头菜单按钮 */
+.ag-col-menu-btn {
+    cursor: pointer;
+    padding: 0 6px;
+    opacity: 0.5;
+    font-size: 12px;
+    margin-left: 4px;
+    user-select: none;
+    transition: opacity 0.2s;
+}
+
+.ag-col-menu-btn:hover {
+    opacity: 1;
+}
+
+/* 一级菜单选项 */
+.col-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #333;
+    transition: background 0.15s, color 0.15s;
+}
+
+.col-menu-item:hover {
+    background: #f5f5f5;
+}
+
+/* 列勾选项 */
+.col-visibility-item {
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.col-visibility-item:hover {
+    background: #f5f5f5;
+}
+
+/* 列值筛选项 */
+.col-filter-item {
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.col-filter-item:hover {
+    background: #f5f5f5;
+}

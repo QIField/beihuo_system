@@ -2522,7 +2522,7 @@ document.addEventListener('click', function(e) {
 document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('logoutBtn')) {
         document.getElementById('logoutBtn').onclick = function() {
-            fetch('/api/logout', {
+            fetch('/api/auth/logout', {
                 method: 'POST'
             })
             .then(response => response.json())

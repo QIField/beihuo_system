@@ -13,7 +13,14 @@ from app.services.qpl_quote_service import process_and_save_quotes_for_all_compa
 
 
 def qpl_auto_quote_task():
-    """启动后台线程执行任务（支持多组织循环）"""
+    """启动后台线程执行任务（支持多组织循环）
+
+    运行时段：每天 08:00 - 20:00
+    晚上 20:00 至次日 08:00 不执行（完全静默，不输出日志）
+    """
+    now_hour = datetime.now().hour
+    if now_hour < 8 or now_hour >= 20:
+        return
     thread = Thread(target=process_and_save_quotes_for_all_companies, daemon=True)
     thread.start()
 

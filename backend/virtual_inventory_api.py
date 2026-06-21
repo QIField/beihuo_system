@@ -44,86 +44,134 @@ def login_required(f):
 
 def get_update_status(update_msg):
     """
-    根据 update_msg 内容判断更新状态
-    返回: 'success', 'failed', 'new_success', 'new_failed', 'empty'
+    根据 update_msg 内容判断 update_status（8 种中文细分状态 + 其他/NULL）
+
+    优先级从上到下，命中即返回：
+      1. NULL                       - update_msg 为空
+      2. 上传成功                   - 包含 update 或等于 add
+      3. 新建成功-已存在            - CRM 反馈：物料已关联当前组织
+      4. 新建成功-新创建            - CRM 反馈：成功创建产品
+      5. 新建失败-未找到产品名称    - CRM 反馈
+      6. 新建失败-车型不能为空      - CRM 反馈
+      7. 上传失败-过期时间错误      - B2B 接口报错
+      8. 上传失败-品牌不存在        - B2B 接口报错
+      9. 上传失败-产品不存在        - B2B 接口报错
+     10. 其他                       - 兜底
     """
     if not update_msg:
-        return 'empty'
+        return None  # NULL
 
-    msg_lower = update_msg.lower()
+    msg = update_msg
+    msg_lower = msg.lower()
 
-    # 上传成功：包含 update
-    if 'update' in msg_lower:
-        return 'success'
+    # 上传成功：B2B 接口返回 update/add
+    if 'update' in msg_lower or msg_lower == 'add':
+        return '上传成功'
 
-    # 新建成功
-    if 'oe号【' in update_msg and '】处理结果：成功' in update_msg:
-        return 'new_success'
+    # CRM 新建产品的结果（以 'OE号【' 开头）
+    if msg.startswith('OE号【'):
+        if '】处理结果：已存在 - 该物料已关联当前组织!' in msg:
+            return '新建成功-已存在'
+        if '】处理结果：成功 - product_id:' in msg:
+            return '新建成功-新创建'
+        if '】处理结果：失败 - 未找到产品名称' in msg:
+            return '新建失败-未找到产品名称'
+        if '】处理结果：失败 - 车型不能为空' in msg:
+            return '新建失败-车型不能为空'
+        # 其他 OE号【】开头的失败统一归到"其他"
+        return '其他'
 
-    # 新建失败
-    if 'oe号【' in update_msg and '】处理结果：失败' in update_msg:
-        return 'new_failed'
+    # B2B 上传失败的细分
+    if msg.startswith('过期时间【') and '不能小于当前时间' in msg:
+        return '上传失败-过期时间错误'
+    if msg.startswith('品牌名称【') and '总部不存在' in msg:
+        return '上传失败-品牌不存在'
+    if msg.startswith('物料所属品牌【') and '产品数据不存在' in msg:
+        return '上传失败-产品不存在'
 
-    # 其他都归类为失败
-    return 'failed'
+    return '其他'
 
 def refresh_update_status():
     """
     刷新所有记录的 update_status 字段
     用于初始化或数据迁移后更新状态
+    覆盖 5 张公司表：virtual_inventory / virtual_inventory_zhbbr / virtual_inventory_zsbbr / virtual_inventory_dgby / virtual_inventory_dghf
+    全量重打标：不再只刷 update_status IS NULL 的记录，而是按新规则重算所有记录
     """
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    tables = [
+        'virtual_inventory',
+        'virtual_inventory_zhbbr',
+        'virtual_inventory_zsbbr',
+        'virtual_inventory_dgby',
+        'virtual_inventory_dghf'
+    ]
+    grand_total = 0
+    for table in tables:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
 
-        print("开始刷新 update_status 字段...")
+            print(f"开始刷新 [{table}] update_status 字段...")
 
-        # 分批更新，避免一次性更新太多数据
-        batch_size = 5000
-        offset = 0
-        total_updated = 0
+            # 分批更新（按 id 游标分页，避免 OFFSET 在大表上越来越慢）
+            batch_size = 5000
+            last_id = 0
+            total_updated = 0
 
-        while True:
-            # 获取一批需要更新的记录
-            cursor.execute("""
-                SELECT id, update_msg FROM virtual_inventory
-                WHERE update_status IS NULL
-                LIMIT %s OFFSET %s
-            """, (batch_size, offset))
+            while True:
+                cursor.execute(f"""
+                    SELECT id, update_msg FROM {table}
+                    WHERE id > %s
+                    ORDER BY id ASC
+                    LIMIT %s
+                """, (last_id, batch_size))
 
-            rows = cursor.fetchall()
-            if not rows:
-                break
+                rows = cursor.fetchall()
+                if not rows:
+                    break
 
-            # 更新这批记录
-            for row in rows:
-                status = get_update_status(row[1])
-                cursor.execute("""
-                    UPDATE virtual_inventory
+                # 更新这批记录
+                update_data = []
+                for row in rows:
+                    status = get_update_status(row[1])
+                    update_data.append((status, row[0]))
+                cursor.executemany(f"""
+                    UPDATE {table}
                     SET update_status = %s
                     WHERE id = %s
-                """, (status, row[0]))
+                """, update_data)
 
-            conn.commit()
-            total_updated += len(rows)
-            print(f"已更新 {total_updated} 条记录的 update_status")
+                conn.commit()
+                total_updated += len(rows)
+                last_id = rows[-1][0]
+                print(f"[{table}] 已更新 {total_updated} 条记录的 update_status")
 
-            if len(rows) < batch_size:
-                break
+                if len(rows) < batch_size:
+                    break
 
-            offset += batch_size
+            print(f"[{table}] update_status 刷新完成，共更新 {total_updated} 条记录")
+            grand_total += total_updated
 
-        print(f"update_status 刷新完成，共更新 {total_updated} 条记录")
+        except Exception as e:
+            print(f"[{table}] 刷新 update_status 失败: {e}")
+            if 'conn' in locals():
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        finally:
+            if 'cursor' in locals():
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if 'conn' in locals():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
-    except Exception as e:
-        print(f"刷新 update_status 失败: {e}")
-        if 'conn' in locals():
-            conn.rollback()
-    finally:
-        if 'cursor' in locals():
-            cursor.close()
-        if 'conn' in locals():
-            conn.close()
+    print(f"全部表刷新完成，累计更新 {grand_total} 条记录")
 
 @virtual_inventory_bp.route('/virtual_inventory')
 @login_required
@@ -748,7 +796,7 @@ def get_virtual_inventory_by_msg_pattern():
         # 使用索引字段统计成功数量
         simple_success_sql = f"""
             SELECT COUNT(*) as count FROM {table_name}
-            WHERE update_status = 'success' AND {where_clause}
+            WHERE update_status = '上传成功' AND {where_clause}
         """
         cursor.execute(simple_success_sql, params[:-2])
         success_count = cursor.fetchone()['count']
@@ -842,7 +890,7 @@ def get_virtual_inventory_statistics_by_pattern():
         total = cursor.fetchone()['total']
 
         # 统计成功数量 - 使用 update_status 字段，避免 LIKE
-        success_sql = f"SELECT COUNT(*) as count FROM virtual_inventory WHERE update_status = 'success' AND {where_clause}"
+        success_sql = f"SELECT COUNT(*) as count FROM virtual_inventory WHERE update_status = '上传成功' AND {where_clause}"
         cursor.execute(success_sql, params)
         success_count = cursor.fetchone()['count']
         log_time_cost("统计查询(使用update_status索引)", query_start)
@@ -959,117 +1007,169 @@ def admin_refresh_update_status():
 def refresh_update_status_sync():
     """
     同步刷新所有记录的 update_status 字段
+    覆盖 5 张公司表，全量重打标
     返回刷新结果统计
     """
     start_time = time.time()
+    # 8 种状态 + 其他 + NULL 兜底
+    detail_keys = [
+        '上传成功',
+        '新建成功-已存在', '新建成功-新创建',
+        '新建失败-未找到产品名称', '新建失败-车型不能为空',
+        '上传失败-过期时间错误', '上传失败-品牌不存在', '上传失败-产品不存在',
+        '其他', 'NULL'
+    ]
     result = {
         'code': 0,
         'msg': '',
         'total_updated': 0,
-        'details': {
-            'success': 0,
-            'failed': 0,
-            'new_success': 0,
-            'new_failed': 0,
-            'empty': 0
-        }
+        'details': {k: 0 for k in detail_keys},
+        'per_table': {}
     }
 
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    tables = [
+        'virtual_inventory',
+        'virtual_inventory_zhbbr',
+        'virtual_inventory_zsbbr',
+        'virtual_inventory_dgby',
+        'virtual_inventory_dghf'
+    ]
 
-        print("[管理后台] 开始刷新 update_status 字段...")
+    for table in tables:
+        table_updated = 0
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
 
-        # 分批更新，避免一次性更新太多数据
-        batch_size = 5000
-        offset = 0
+            print(f"[管理后台] 开始刷新 [{table}] update_status 字段...")
 
-        while True:
-            # 获取一批需要更新的记录
-            cursor.execute("""
-                SELECT id, update_msg FROM virtual_inventory
-                WHERE update_status IS NULL
-                LIMIT %s OFFSET %s
-            """, (batch_size, offset))
+            # 按 id 游标分页全量重打标
+            batch_size = 5000
+            last_id = 0
 
-            rows = cursor.fetchall()
-            if not rows:
-                break
+            while True:
+                cursor.execute(f"""
+                    SELECT id, update_msg FROM {table}
+                    WHERE id > %s
+                    ORDER BY id ASC
+                    LIMIT %s
+                """, (last_id, batch_size))
 
-            # 更新这批记录
-            for row in rows:
-                status = get_update_status(row[1])
-                cursor.execute("""
-                    UPDATE virtual_inventory
+                rows = cursor.fetchall()
+                if not rows:
+                    break
+
+                update_data = []
+                for row in rows:
+                    status = get_update_status(row[1])
+                    update_data.append((status, row[0]))
+                    # 统计 None 用 'NULL' 作为 key
+                    key = status if status is not None else 'NULL'
+                    if key in result['details']:
+                        result['details'][key] += 1
+
+                cursor.executemany(f"""
+                    UPDATE {table}
                     SET update_status = %s
                     WHERE id = %s
-                """, (status, row[0]))
+                """, update_data)
 
-                result['details'][status] += 1
+                conn.commit()
+                table_updated += len(rows)
+                last_id = rows[-1][0]
+                print(f"[管理后台][{table}] 已更新 {table_updated} 条")
 
-            conn.commit()
-            result['total_updated'] += len(rows)
-            print(f"[管理后台] 已更新 {result['total_updated']} 条记录")
+                if len(rows) < batch_size:
+                    break
 
-            if len(rows) < batch_size:
-                break
+            result['per_table'][table] = table_updated
+            result['total_updated'] += table_updated
+            print(f"[管理后台][{table}] 刷新完成，共更新 {table_updated} 条")
 
-            offset += batch_size
+        except Exception as e:
+            print(f"[管理后台][{table}] 刷新 update_status 失败: {e}")
+            if 'conn' in locals():
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            result['per_table'][table] = f"失败: {e}"
+        finally:
+            if 'cursor' in locals():
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if 'conn' in locals():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
-        cost_time = (time.time() - start_time) * 1000
-        result['msg'] = f"刷新完成，共更新 {result['total_updated']} 条记录，耗时 {cost_time:.2f}ms"
-        print(f"[管理后台] {result['msg']}")
-
-    except Exception as e:
-        result['code'] = 1
-        result['msg'] = f"刷新失败: {str(e)}"
-        print(f"[管理后台] 刷新 update_status 失败: {e}")
-        if 'conn' in locals():
-            conn.rollback()
-    finally:
-        if 'cursor' in locals():
-            cursor.close()
-        if 'conn' in locals():
-            conn.close()
+    cost_time = (time.time() - start_time) * 1000
+    result['msg'] = f"刷新完成，5 张表累计更新 {result['total_updated']} 条记录，耗时 {cost_time:.2f}ms"
+    print(f"[管理后台] {result['msg']}")
 
     return result
 
 @virtual_inventory_bp.route('/api/admin/check_update_status', methods=['GET'])
 @login_required
 def admin_check_update_status():
-    """管理接口：检查 update_status 字段的统计情况"""
+    """管理接口：检查 update_status 字段的统计情况（5 张公司表分别统计）"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        tables = [
+            'virtual_inventory',
+            'virtual_inventory_zhbbr',
+            'virtual_inventory_zsbbr',
+            'virtual_inventory_dgby',
+            'virtual_inventory_dghf'
+        ]
+        all_stats = {}
 
-        # 统计各种状态的数量
-        cursor.execute("""
-            SELECT
-                update_status,
-                COUNT(*) as count
-            FROM virtual_inventory
-            GROUP BY update_status
-        """)
-        rows = cursor.fetchall()
+        for table in tables:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor(pymysql.cursors.DictCursor)
 
-        # 统计为空的记录数
-        cursor.execute("""
-            SELECT COUNT(*) as count FROM virtual_inventory
-            WHERE update_status IS NULL
-        """)
-        null_count = cursor.fetchone()['count']
+                # 统计各种状态的数量
+                cursor.execute(f"""
+                    SELECT
+                        update_status,
+                        COUNT(*) as count
+                    FROM {table}
+                    GROUP BY update_status
+                """)
+                rows = cursor.fetchall()
 
-        conn.close()
+                # 统计为空的记录数
+                cursor.execute(f"""
+                    SELECT COUNT(*) as count FROM {table}
+                    WHERE update_status IS NULL
+                """)
+                null_count = cursor.fetchone()['count']
 
-        # 整理结果
-        status_stats = {row['update_status'] or 'NULL': row['count'] for row in rows}
-        status_stats['未分类(NULL)'] = null_count
+                # 整理本表结果
+                table_stats = {row['update_status'] or 'NULL': row['count'] for row in rows}
+                table_stats['未分类(NULL)'] = null_count
+                all_stats[table] = table_stats
+            except Exception as e:
+                all_stats[table] = {'error': str(e)}
+            finally:
+                if 'cursor' in locals():
+                    try:
+                        cursor.close()
+                    except Exception:
+                        pass
+                if 'conn' in locals():
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
 
         return jsonify({
             'code': 0,
             'msg': '查询成功',
-            'data': status_stats
+            'data': all_stats
         })
 
     except Exception as e:

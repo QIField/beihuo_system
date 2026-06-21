@@ -17,7 +17,14 @@
     <!-- Filter Panel Component -->
     <link rel="stylesheet" href="/static/js/components/filter_panel/filter-panel.css">
     <script src="/static/js/components/filter_panel/filter-panel.js"></script>
-    
+
+    <!-- Grid Column Menu Component（表头列菜单：升降序、列勾选、值筛选）-->
+    <link rel="stylesheet" href="/static/js/components/grid-column-menu/grid-column-menu.css">
+    <script src="/static/js/components/grid-column-menu/grid-column-menu.js"></script>
+
+    <!-- Column Preference Component（列状态持久化：按用户保存）-->
+    <script src="/static/js/components/column-preference/column-preference.js"></script>
+
     <!-- 自定义分页组件 -->
     <script src="/static/js/components/custom-pagination/custom-pagination.js"></script>
 
@@ -407,21 +414,20 @@
                     return rowIndex !== undefined ? (currentPage - 1) * currentPageSize + rowIndex + 1 : '';
                 }
             },
-            { field: 'oe', headerName: 'OE', width: 180, pinned: 'left', sortable: true, filter: true },
-            { field: '物料名称', headerName: '物料名称', width: 180, pinned: 'left', sortable: true, filter: true },
-            { field: '品牌', headerName: '品牌', width: 150, pinned: 'left', sortable: true, filter: true },
-            { field: '物料条码', headerName: '物料条码', width: 120, pinned: 'left', sortable: true, filter: true },
-            { field: '品牌号', headerName: '品牌号', width: 110, pinned: 'left', sortable: true, filter: true },
-            { field: '替换号', headerName: '替换号', width: 90, pinned: 'left', sortable: true, filter: true },
-            { field: '车型品牌', headerName: '车型品牌', width: 105, pinned: 'left', sortable: true, filter: true },
-            { field: '标签', headerName: '标签', width: 95, pinned: 'left', sortable: true, filter: true },
-            { field: '车型', headerName: '车型', width: 100, pinned: 'left', sortable: true, filter: true },
+            { field: 'oe', headerName: 'OE', width: 180, pinned: 'left', filter: true },
+            { field: '物料名称', headerName: '物料名称', width: 180, pinned: 'left', filter: true },
+            { field: '品牌', headerName: '品牌', width: 150, pinned: 'left', filter: true },
+            { field: '物料条码', headerName: '物料条码', width: 120, pinned: 'left', filter: true },
+            { field: '品牌号', headerName: '品牌号', width: 110, pinned: 'left', filter: true },
+            { field: '替换号', headerName: '替换号', width: 90, pinned: 'left', filter: true },
+            { field: '车型品牌', headerName: '车型品牌', width: 105, pinned: 'left', filter: true },
+            { field: '标签', headerName: '标签', width: 95, pinned: 'left', filter: true },
+            { field: '车型', headerName: '车型', width: 100, pinned: 'left', filter: true },
             { 
                 field: '库存数量', 
                 headerName: '库存数量', 
                 width: 120, 
                 pinned: 'left',
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 cellClass: 'stock-cell',
                 valueGetter: params => parseFloat(params.data['库存数量']) || 0,
@@ -432,7 +438,6 @@
                 headerName: '在途数量', 
                 width: 120, 
                 pinned: 'left',
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 cellClass: 'stock-cell',
                 valueGetter: params => parseFloat(params.data['在途数量']) || 0,
@@ -443,7 +448,6 @@
                 headerName: '销量', 
                 width: 100, 
                 pinned: 'left',
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 valueGetter: params => parseFloat(params.data['销量']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
@@ -473,7 +477,6 @@
                 headerName: '库存金额', 
                 width: 140, 
                 pinned: 'left',
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 valueGetter: params => parseFloat(params.data['库存金额']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
@@ -482,18 +485,16 @@
                 field: '成本价', 
                 headerName: '成本价', 
                 width: 140, 
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 valueGetter: params => parseFloat(params.data['成本价']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
             },
-            { field: '成品可卖天数', headerName: '成品可卖天数', width: 175, sortable: true, filter: true },
-            { field: '预警状态', headerName: '预警状态', width: 140, sortable: true, filter: true },
+            { field: '成品可卖天数', headerName: '成品可卖天数', width: 175, filter: true },
+            { field: '预警状态', headerName: '预警状态', width: 140, filter: true },
             { 
                 field: '供应商', 
                 headerName: '供应商', 
                 width: 140, 
-                sortable: true, 
                 filter: true,
                 cellRenderer: function(params) {
                     const supplierContent = params.value || '';
@@ -534,7 +535,6 @@
                 field: '近1个月询价量', 
                 headerName: '近1个月询价量', 
                 width: 120, 
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 valueGetter: params => parseFloat(params.data['近1个月询价量']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
@@ -543,7 +543,6 @@
                 field: '近3个月月均询价量', 
                 headerName: '近3个月月均询价量', 
                 width: 130, 
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 valueGetter: params => parseFloat(params.data['近3个月月均询价量']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
@@ -552,7 +551,6 @@
                 field: '全国近1个月询价量', 
                 headerName: '全国近1个月询价量', 
                 width: 130, 
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 valueGetter: params => parseFloat(params.data['全国近1个月询价量']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
@@ -561,13 +559,12 @@
                 field: '全国近3个月月均询价量', 
                 headerName: '全国近3个月月均询价量', 
                 width: 140, 
-                sortable: true, 
                 filter: 'agNumberColumnFilter',
                 valueGetter: params => parseFloat(params.data['全国近3个月月均询价量']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
             },
-            { field: '内部备注', headerName: '内部备注', width: 150, sortable: true, filter: true },
-            { field: 'waiting_time', headerName: '待仓时间', width: 120, sortable: true, filter: true }
+            { field: '内部备注', headerName: '内部备注', width: 150, filter: true },
+            { field: 'waiting_time', headerName: '待仓时间', width: 120, filter: true }
         ];
         
         // Grid 配置
@@ -575,7 +572,7 @@
             columnDefs: columnDefs,
             rowData: [],
             defaultColDef: {
-                sortable: true,
+                sortable: false,  // 禁用原生表头点击排序，改用 GridColumnMenu 下拉菜单
                 filter: true,
                 resizable: true,
                 suppressMenu: true  // 禁用菜单按钮（三条杠）
@@ -598,62 +595,49 @@
                 const selectedRows = gridApi.getSelectedRows();
                 document.getElementById('selectedCount').textContent = selectedRows.length;
             },
-            onSortChanged: function(event) {
-                // 获取当前排序状态
-                const sortModel = gridApi.getSortModel();
-                if (sortModel && sortModel.length > 0) {
-                    const sort = sortModel[0];
-                    const colId = sort.colId;
-                    const sortDir = sort.sort; // 'asc' 或 'desc'
-                    
-                    // 对全部数据进行排序
-                    filteredData.sort((a, b) => {
-                        let valueA = a[colId];
-                        let valueB = b[colId];
-                        
-                        // 处理 undefined/null
-                        if (valueA === undefined || valueA === null) valueA = '';
-                        if (valueB === undefined || valueB === null) valueB = '';
-                        
-                        // 尝试数值排序
-                        const numA = parseFloat(valueA);
-                        const numB = parseFloat(valueB);
-                        
-                        let result;
-                        if (!isNaN(numA) && !isNaN(numB) && String(valueA).trim() !== '' && String(valueB).trim() !== '') {
-                            // 数值比较
-                            result = numA - numB;
-                        } else {
-                            // 字符串比较
-                            const strA = String(valueA).toLowerCase();
-                            const strB = String(valueB).toLowerCase();
-                            result = strA < strB ? -1 : (strA > strB ? 1 : 0);
-                        }
-                        
-                        return sortDir === 'asc' ? result : -result;
-                    });
-                    
-                    // 重新渲染当前页
-                    renderCurrentPage(currentPage, currentPageSize);
-                }
-            },
             onGridReady: function(event) {
                 console.log('[AG Grid] onGridReady 触发');
-                
+
                 gridApi = event.api;
                 gridColumnApi = event.columnApi;
-                
+
                 console.log('[AG Grid] API 获取成功', { gridApi, gridColumnApi });
-                
+
                 // 自动调整列宽以适应内容
                 gridApi.sizeColumnsToFit();
-                
+
+                // 接入 GridColumnMenu（含持久化）
+                if (typeof GridColumnMenu !== 'undefined') {
+                    GridColumnMenu.init(gridApi, '#myGrid', columnDefs, {
+                        columnApi: gridColumnApi,
+                        gridOptions: gridOptions,
+                        persist: true,
+                        pageKey: 'date_query_ag',
+                        gridKey: 'main_grid',
+                        onSort: function(colId, sortDir) {
+                            // 前端排序：对全量 filteredData 排序后重新渲染当前页
+                            sortFilteredData(colId, sortDir);
+                            renderCurrentPage(1, currentPageSize);
+                        },
+                        onDataRefresh: function(filterState) {
+                            // 值筛选：基于 _originalRows 已自动过滤并 setRowData，
+                            // 但我们使用前端分页，需要同步更新 filteredData
+                            const allRows = currentData;
+                            filteredData = GridColumnMenu.filterRows(allRows, '#myGrid');
+                            // 若有当前排序，重新应用一次
+                            const ss = GridColumnMenu.getSortState('#myGrid');
+                            if (ss.sortColumn) sortFilteredData(ss.sortColumn, ss.sortDir);
+                            renderCurrentPage(1, currentPageSize);
+                        }
+                    });
+                }
+
                 // 添加自定义拖拽选择功能
                 initDragSelection();
-                
+
                 // 初始化双击复制功能
                 initDoubleClickCopy();
-                
+
                 // 初始化快捷键
                 initShortcuts();
 
@@ -661,6 +645,39 @@
                 initCustomPagination();
             }
         };
+
+        // 数值列白名单：排序时强制按数值比较（NaN 视为最小）
+        const NUMERIC_COLUMNS = new Set([
+            '库存数量', '在途数量', '销量', '库存金额', '成本价',
+            '近1个月询价量', '近3个月月均询价量',
+            '全国近1个月询价量', '全国近3个月月均询价量'
+        ]);
+
+        // 前端排序：对 filteredData 排序，数值列按数值比较，其他列按字符串比较
+        function sortFilteredData(colId, sortDir) {
+            if (!colId || !sortDir) return;
+            const isNumeric = NUMERIC_COLUMNS.has(colId);
+
+            filteredData.sort((a, b) => {
+                if (isNumeric) {
+                    // 数值列：parseFloat，NaN/空值视为 -Infinity 排到最前/最后
+                    const na = parseFloat(a[colId]);
+                    const nb = parseFloat(b[colId]);
+                    const va = isNaN(na) ? -Infinity : na;
+                    const vb = isNaN(nb) ? -Infinity : nb;
+                    return sortDir === 'asc' ? va - vb : vb - va;
+                }
+                // 非数值列：字符串比较
+                let valueA = a[colId];
+                let valueB = b[colId];
+                if (valueA === undefined || valueA === null) valueA = '';
+                if (valueB === undefined || valueB === null) valueB = '';
+                const strA = String(valueA).toLowerCase();
+                const strB = String(valueB).toLowerCase();
+                const result = strA < strB ? -1 : (strA > strB ? 1 : 0);
+                return sortDir === 'asc' ? result : -result;
+            });
+        }
         
         // 初始化 Grid
         document.addEventListener('DOMContentLoaded', function() {
@@ -722,6 +739,11 @@
             currentPage = safePage;
             currentPageSize = pageSize;
             currentDisplayCount = pageData.length;
+
+            // 缓存全量数据到 GridColumnMenu，供列筛选使用（基于 currentData 全集）
+            if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                GridColumnMenu.setOriginalRows('#myGrid', currentData);
+            }
 
             if (gridApi && gridApi.setRowData) {
                 gridApi.setRowData(pageData);

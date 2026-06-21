@@ -212,6 +212,77 @@ class CrmGzbbrSpider:
         print("【请求参数】", data)
         return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
 
+    # https://crm.gzbbr.com/api/crm.Product/getProductList
+    # brand_id 品牌ID
+    # warehouse_id 仓库ID
+    # kw_id 库位ID
+    # type 类型
+    # page 分页页码
+    # limit 分页每页数量
+    def get_product_list(self, page=1, limit=400, brand_id="", warehouse_id="",
+                         kw_id="", product_type="1", kw_nos=""):
+        """
+        获取产品列表（库存数据）
+
+        :param page: 分页页码，默认1
+        :param limit: 分页每页数量，默认400
+        :param brand_id: 品牌ID
+        :param warehouse_id: 仓库ID
+        :param kw_id: 库位ID
+        :param product_type: 类型，默认"1"
+        :param kw_nos: 库位号列表，逗号分隔，如 "01-01-01-01-01,01-09-09-09-08"
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/crm.Product/getProductList"
+        data = {
+            "page": page,
+            "limit": limit,
+            "brand_id": brand_id,
+            "warehouse_id": warehouse_id,
+            "kw_id": kw_id,
+            "type": product_type,
+            "kw_nos": kw_nos,
+        }
+        print("【请求API地址】", url)
+        print("【请求参数】", data)
+        return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
+
+    # https://crm.gzbbr.com/api/crm.Product/inventoryRecordList
+    # orders_no 订单号
+    # kw_no 库位号
+    # warehouse_id 仓库ID
+    # page 分页页码
+    # limit 分页每页数量
+    # type 类型 1=入库，-1=出库
+    # product_id 产品ID
+    def get_inventory_record_list(self, product_id, page=1, limit=20, record_type=1,
+                                  orders_no="", kw_no="", warehouse_id=""):
+        """
+        获取产品库存变动记录列表
+
+        :param product_id: 产品ID（必填）
+        :param page: 分页页码，默认1
+        :param limit: 分页每页数量，默认20
+        :param record_type: 变动类型，1=入库/增加，-1=出库/减少
+        :param orders_no: 订单号
+        :param kw_no: 库位号
+        :param warehouse_id: 仓库ID
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/crm.Product/inventoryRecordList"
+        params = {
+            "orders_no": orders_no,
+            "kw_no": kw_no,
+            "warehouse_id": warehouse_id,
+            "page": page,
+            "limit": limit,
+            "type": record_type,
+            "product_id": product_id,
+        }
+        print("【请求API地址】", url)
+        print("【请求参数】", params)
+        return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
     def close(self):
         """
         关闭会话连接，释放资源

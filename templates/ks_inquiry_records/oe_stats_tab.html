@@ -15,17 +15,17 @@
     var oeStatsGridLoader = null;
 
     const oeStatsColumnDefs = [
-        { field: 'partsNum', headerName: 'OE号', width: 150, pinned: 'left', sortable: true, filter: true },
-        { field: 'count', headerName: '出现次数', width: 120, pinned: 'left', sortable: true, filter: true },
-        { field: 'partsName', headerName: '配件名称', width: 300, sortable: true, filter: true },
-        { field: 'unquotedProducts', headerName: '未报价产品', width: 420, sortable: true, filter: true }
+        { field: 'partsNum', headerName: 'OE号', width: 150, pinned: 'left', sortable: false, filter: true },
+        { field: 'count', headerName: '出现次数', width: 120, pinned: 'left', sortable: false, filter: true },
+        { field: 'partsName', headerName: '配件名称', width: 300, sortable: false, filter: true },
+        { field: 'unquotedProducts', headerName: '未报价产品', width: 420, sortable: false, filter: true }
     ];
 
     const oeStatsGridOptions = {
         columnDefs: oeStatsColumnDefs,
         rowData: [],
         defaultColDef: {
-            sortable: true,
+            sortable: false,
             filter: true,
             resizable: true,
             suppressMenu: true
@@ -44,6 +44,21 @@
             oeStatsGridLoader = new AgGridLoader(oeStatsGridApi);
 
             oeStatsGridApi.sizeColumnsToFit();
+
+            // 初始化列菜单功能（含持久化）
+            if (typeof GridColumnMenu !== 'undefined') {
+                GridColumnMenu.init(oeStatsGridApi, '#oeStatsGrid', oeStatsColumnDefs, {
+                    columnApi: oeStatsGridColumnApi,
+                    gridOptions: oeStatsGridOptions,
+                    persist: true,
+                    pageKey: 'ks_inquiry_records',
+                    gridKey: 'oe_grid',
+                    onSort: function(colId, direction) {
+                        refreshOeStats(1, oeStatsCurrentPageSize);
+                    }
+                });
+            }
+
             refreshOeStats();
         }
     };
@@ -114,13 +129,36 @@
         oeStatsCurrentPage = page;
         oeStatsCurrentPageSize = pageSize;
 
-        const params = getSearchParams();
+        const params = getSearchParams(currentTab);
         params.page = page;
         params.page_size = pageSize;
+
+        // 添加排序参数
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getSortState) {
+            const sortState = GridColumnMenu.getSortState('#oeStatsGrid');
+            if (sortState.sortColumn) {
+                params.sort_column = sortState.sortColumn;
+                params.sort_dir = sortState.sortDir;
+            }
+        }
 
         oeStatsGridLoader.load('/new/api/ks_inquiry/records/oe_stats', params, (data) => {
             oeStatsTotalRecords = data.total;
             updateOeStatsPaginationInfo();
+
+            // 缓存原始数据 + 应用列筛选
+            const list = data.list || [];
+            if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                GridColumnMenu.setOriginalRows('#oeStatsGrid', list);
+            }
+            let displayList = list;
+            if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
+                displayList = GridColumnMenu.filterRows(list, '#oeStatsGrid');
+                if (displayList.length !== list.length) {
+                    console.log(`[refreshOeStats] 列筛选后: ${displayList.length}/${list.length} 条`);
+                    oeStatsGridApi.setRowData(displayList);
+                }
+            }
         }, (error) => {
             console.error('OE统计请求失败:', error);
         });

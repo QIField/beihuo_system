@@ -227,7 +227,7 @@ def init_ks_quote_count_task():
             print("="*70)
             
             # 1. 先解析微信询价（近7天）
-            print("\n[1/3] 解析微信询价数据...")
+            print("\n[1/4] 解析微信询价数据...")
             try:
                 from app.services.quote_count_service.weixin_quote_service import WeixinQuoteParserService
                 weixin_result = WeixinQuoteParserService().parse_recent_days(days=7)
@@ -239,19 +239,28 @@ def init_ks_quote_count_task():
                 weixin_result = {'saved_count': 0}
             
             # 2. 再爬开思询价
-            print("\n[2/3] 爬取开思询价数据...")
+            print("\n[2/4] 爬取开思询价数据...")
             from app.services.quote_count_service import QuoteCountSyncService
             ks_result = QuoteCountSyncService().sync_recent_two_months()
             
             # 3. 统计结果
-            print("\n[3/3] 询价次数同步完成")
+            print("\n[3/4] 询价次数同步完成")
             print(f"  - 微信: {weixin_result.get('saved_count', 0)} 条")
             print(f"  - 开思: {ks_result.get('total_items', 0)} 条")
+
+            # 4. 开思非本店下单业务汇报（爬取完毕后的子任务）
+            print("\n[4/4] 开思非本店下单业务汇报...")
+            from app.services.ks_inquiry_service.ks_nonself_report_service import (
+                run_ks_nonself_daily_report,
+            )
+            nonself_result = run_ks_nonself_daily_report()
+
             print("="*70 + "\n")
-            
+
             return {
                 'weixin': weixin_result,
-                'ks': ks_result
+                'ks': ks_result,
+                'ks_nonself_report': nonself_result
             }
 
         task_manager.schedule(

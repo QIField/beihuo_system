@@ -25,12 +25,14 @@ from .wms_upload_site_api import wms_upload_site_bp
 from .car_parts_library_api import car_parts_library_bp
 from .qpl_quote_api import qpl_quote_bp
 from .ks_inquiry_api import ks_inquiry_records_bp
+from .user_preference_api import column_preference_bp
 
 
 # 注册比价数据对比蓝图（设置正确的 url_prefix）
 api_bp.register_blueprint(compare_bp, url_prefix='/compare')
 api_bp.register_blueprint(qpl_quote_bp)
 api_bp.register_blueprint(ks_inquiry_records_bp)
+api_bp.register_blueprint(column_preference_bp)
 
 # 将 system_setting 子蓝图注册到主蓝图
 api_bp.register_blueprint(system_setting_bp)
