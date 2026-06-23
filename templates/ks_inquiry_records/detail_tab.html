@@ -11,7 +11,19 @@
         MergeCellHelper.createRowNumberColumn({ width: 80, pinned: 'left' }),
         { field: 'inquiryId', headerName: '询价单号', width: 150, pinned: 'left', sortable: false, filter: true },
         { field: 'customerName', headerName: '客户名称', width: 150, sortable: false, filter: true },
-        { field: 'partsNum', headerName: 'OE号', width: 150, sortable: false, filter: true },
+        {
+            field: 'partsNum',
+            headerName: 'OE号',
+            width: 150,
+            sortable: false,
+            filter: true,
+            valueFormatter: function(params) {
+                if (params.data && params.data._partsNumDisplayIndex) {
+                    return params.data._partsNumDisplayIndex + '、' + params.value;
+                }
+                return params.value;
+            }
+        },
         { field: 'partsName', headerName: '配件名称', width: 200, sortable: false, filter: true },
         { field: 'carBrandName', headerName: '车辆品牌', width: 120, sortable: false, filter: true },
         { field: 'brandName', headerName: '品牌', width: 120, sortable: false, filter: true },
@@ -24,7 +36,15 @@
             headerName: '下单状态',
             width: 120,
             sortable: false,
-            filter: true
+            filter: true,
+            rowSpan: function(params) {
+                return (params.data && params.data._contentRowSpan) ? params.data._contentRowSpan : 1;
+            },
+            cellClassRules: {
+                'merged-cell': function(params) {
+                    return params.data && params.data._contentRowSpan >= 1;
+                }
+            }
         },
         { field: 'locationName', headerName: '发货地', width: 140, sortable: false, filter: true },
         { field: 'arrivalTime', headerName: '备货时间', width: 140, sortable: false, filter: true },
@@ -83,6 +103,9 @@
                     onDataRefresh: function(filterState) {
                         console.log('[detail_tab] 列筛选触发:', filterState);
                         refreshGrid(currentPage, currentPageSize);
+                    },
+                    getFilterValues: function(colId, callback) {
+                        fetchDetailColumnValues(colId, callback);
                     }
                 });
             }
@@ -173,6 +196,14 @@
             }
         }
 
+        // 添加列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#ksInquiryGrid');
+            if (filterState.active && filterState.filters) {
+                params.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
         console.log(`[refreshGrid] 请求第 ${page} 页, 每页 ${pageSize} 条`);
         console.log(`[refreshGrid] 请求参数 params:`, params);
 
@@ -191,6 +222,27 @@
                     const aId = a.inquiryId || '';
                     const bId = b.inquiryId || '';
                     return aId.localeCompare(bId);
+                });
+
+                // 生成 OE号显示序号：同一 content 内按当前顺序编号
+                const groups = {};
+                sortedList.forEach((item, idx) => {
+                    if (!item.content_item_index) {
+                        // 旧数据没有 content_item_index，不参与 content 级合并
+                        item._contentStatusGroupKey = '__no_content_' + idx;
+                        return;
+                    }
+                    const contentIdx = String(item.content_item_index).split('_')[0];
+                    const key = (item.inquiryId || 'unknown') + '_' + contentIdx;
+                    item._contentGroupKey = key;
+                    item._contentStatusGroupKey = key + '_' + (item.displaySellerStatus || '');
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(item);
+                });
+                Object.values(groups).forEach(group => {
+                    group.forEach((item, idx) => {
+                        item._partsNumDisplayIndex = idx + 1;
+                    });
                 });
             }
 
@@ -211,22 +263,22 @@
 
             console.log(`[refreshGrid] 总条数: ${totalRecords}, 当前页: ${data.page}, 返回 ${sortedList.length} 条`);
 
-            // 缓存原始数据到 GridColumnMenu，供列筛选使用
+            // 缓存原始数据到 GridColumnMenu，供列筛选下拉选项使用
             if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
                 GridColumnMenu.setOriginalRows('#ksInquiryGrid', sortedList);
             }
 
-            // 应用列筛选（如果有活跃的筛选条件）
+            // 列筛选已由后端完成，前端不再二次过滤
             let displayData = sortedList;
-            if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
-                displayData = GridColumnMenu.filterRows(sortedList, '#ksInquiryGrid');
-                if (displayData.length !== sortedList.length) {
-                    console.log(`[refreshGrid] 列筛选后: ${displayData.length}/${sortedList.length} 条`);
-                }
-            }
 
             // 预处理：给 displayData 按 inquiryId 计算 rowSpan 值（跨列合并）
             MergeCellHelper.computeRowSpans(displayData, 'inquiryId');
+
+            // 预处理：给 displayData 按 content + 下单状态合并下单状态列
+            MergeCellHelper.computeRowSpans(displayData, '_contentStatusGroupKey', {
+                spanField: '_contentRowSpan',
+                indexField: '_contentStatusGroupIndex'
+            });
 
             // 手动设置数据到 grid（AG Grid 原生 rowSpan 会自动处理合并渲染）
             gridApi.setRowData(displayData);
@@ -236,5 +288,43 @@
         }, (error) => {
             console.error('请求失败:', error);
         });
+    }
+
+    // 从后端获取指定列的全量不重复值（用于列头下拉筛选）
+    function fetchDetailColumnValues(colId, callback) {
+        const params = getSearchParams(currentTab);
+        params.column = colId;
+        params.grid_type = 'detail';
+
+        // 带上其他列已激活的筛选条件（排除当前列本身，否则下拉里只会出现已选项）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#ksInquiryGrid');
+            if (filterState.active && filterState.filters) {
+                const otherFilters = {};
+                Object.keys(filterState.filters).forEach(function(key) {
+                    if (key !== colId) {
+                        otherFilters[key] = filterState.filters[key];
+                    }
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/column_values?' + new URLSearchParams(params))
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    callback(result.data?.values || []);
+                } else {
+                    console.error('[detail_tab] 获取列值失败:', result.message);
+                    callback([]);
+                }
+            })
+            .catch(function(error) {
+                console.error('[detail_tab] 获取列值请求失败:', error);
+                callback([]);
+            });
     }
 </script>

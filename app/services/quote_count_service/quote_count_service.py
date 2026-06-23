@@ -467,7 +467,7 @@ class QuoteCountSyncService:
                 if vin:
                     car_config = self._fetch_car_config(vin)
 
-            # === 新增：调用 resolveitems/detail 获取 content 级别下单状态 ===
+            # === 调用 resolveitems/detail 获取 content 级别下单状态与 resolve_parts_num ===
             resolve_result_ids = []
             for content in content_list:
                 store_resolve_item = content.get('storeResolveItem', {})
@@ -476,6 +476,7 @@ class QuoteCountSyncService:
                     resolve_result_ids.append(resolve_result_id)
 
             ordered_resolve_ids = set()
+            resolve_parts_map = {}
             if resolve_result_ids:
                 store_id = self.COMPANY_TO_STORE_ID.get(self.COMPANY, 'FSBBR001')
                 resolve_payload = {
@@ -491,21 +492,33 @@ class QuoteCountSyncService:
                 )
                 if resolve_result and resolve_result.get('code') == 200:
                     for item_data in resolve_result.get('data', []):
+                        resolve_id = item_data.get('resolveResultId', '')
                         if item_data.get('orderStatusId') == 'ORDERED':
-                            ordered_resolve_ids.add(item_data.get('resolveResultId'))
-            # === 新增结束 ===
+                            ordered_resolve_ids.add(resolve_id)
+                        # 收集 resolveResultId -> {partsNum, partsName} 映射
+                        pn = item_data.get('partsNum', '')
+                        p_name = item_data.get('partsName', '')
+                        if pn or p_name:
+                            resolve_parts_map[resolve_id] = {
+                                'partsNum': pn.strip().upper().replace(' ', '') if pn else '',
+                                'partsName': p_name.strip() if p_name else ''
+                            }
+            # === 结束 ===
 
             # 遍历所有content，收集所有storeQuoteItemResults
-            for content in content_list:
+            for content_index, content in enumerate(content_list, 1):
                 store_quote_item_results = content.get('storeQuoteItemResults', [])
 
                 if not store_quote_item_results:
                     continue
 
-                # === 新增：计算该 content 的显示状态 ===
+                # === 计算该 content 的显示状态 ===
                 store_resolve_item = content.get('storeResolveItem', {})
                 resolve_result_id = store_resolve_item.get('resolveResultId', '')
                 content_order_status = '已下单' if resolve_result_id in ordered_resolve_ids else '未下单'
+                resolve_parts = resolve_parts_map.get(resolve_result_id, {})
+                resolve_parts_num = resolve_parts.get('partsNum', '')
+                resolve_parts_name = resolve_parts.get('partsName', '')
 
                 has_ordered_in_content = any(
                     sqir.get('sellerStatus') == 'ORDERED'
@@ -520,7 +533,7 @@ class QuoteCountSyncService:
                     content_display_status = '非本店下单'
                 # === 新增结束 ===
 
-                for item in store_quote_item_results:
+                for item_index, item in enumerate(store_quote_item_results, 1):
                     # 去除OE号中的空格并转为大写
                     parts_num = item.get('partsNum', '').strip().upper().replace(' ', '')
                     brand_name = item.get('brandName', '').strip()
@@ -573,6 +586,9 @@ class QuoteCountSyncService:
                             'carBrandName': car_brand_name,
                             'locationName': location_name,
                             'arrivalTime': arrival_time_desc,
+                            'contentItemIndex': f'{content_index}_{item_index}',
+                            'resolvePartsNum': resolve_parts_num,
+                            'resolvePartsName': resolve_parts_name,
                         })
 
             # 如果第一个接口有数据，直接返回（不切换到第二个接口）
@@ -596,8 +612,8 @@ class QuoteCountSyncService:
                 (inquiryId, partsNum, partsName, brandName, brandNormalized, brandId, partType,
                  partsBrandQuality, remark, sellerBtPrice, sellerPrice, sellerStatus, order_status, display_seller_status,
                  vin, engine, production_date, chassis, show_address, garage_company_name, car_brand_name,
-                 location_name, arrival_time, company, quote_date, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                 location_name, arrival_time, content_item_index, resolve_parts_num, resolve_parts_name, company, quote_date, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     partsName = VALUES(partsName),
                     brandNormalized = VALUES(brandNormalized),
@@ -619,6 +635,9 @@ class QuoteCountSyncService:
                     car_brand_name = VALUES(car_brand_name),
                     location_name = VALUES(location_name),
                     arrival_time = VALUES(arrival_time),
+                    content_item_index = VALUES(content_item_index),
+                    resolve_parts_num = VALUES(resolve_parts_num),
+                    resolve_parts_name = VALUES(resolve_parts_name),
                     quote_date = VALUES(quote_date),
                     updated_at = NOW()
             """
@@ -649,6 +668,9 @@ class QuoteCountSyncService:
                     item.get('carBrandName', ''),
                     item.get('locationName', ''),
                     item.get('arrivalTime', ''),
+                    item.get('contentItemIndex', ''),
+                    item.get('resolvePartsNum', ''),
+                    item.get('resolvePartsName', ''),
                     item.get('company', self.COMPANY),
                     item.get('quote_date', '')
                 )

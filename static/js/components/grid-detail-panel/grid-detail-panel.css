@@ -1,0 +1,118 @@
+/**
+ * GridDetailPanel 组件样式
+ * 主表点击后展开副表面板的布局样式
+ */
+
+.grid-detail-panel-wrapper {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.grid-detail-master-wrapper {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.grid-detail-resizer {
+    background: #e8e8e8;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.2s;
+    z-index: 10;
+}
+
+.grid-detail-resizer:hover,
+.grid-detail-resizer.active {
+    background: #1890ff;
+}
+
+.grid-detail-resizer.vertical {
+    height: 6px;
+    cursor: row-resize;
+}
+
+.grid-detail-resizer.horizontal {
+    width: 6px;
+    cursor: col-resize;
+}
+
+.grid-detail-resizer::after {
+    content: '';
+    position: absolute;
+    background: #ccc;
+    border-radius: 2px;
+}
+
+.grid-detail-resizer.vertical::after {
+    width: 30px;
+    height: 4px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.grid-detail-resizer.horizontal::after {
+    width: 4px;
+    height: 30px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.grid-detail-detail-wrapper {
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    min-width: 150px;
+    min-height: 150px;
+}
+
+.grid-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #fafafa;
+    border-bottom: 1px solid #e8e8e8;
+    flex-shrink: 0;
+}
+
+.grid-detail-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.grid-detail-close {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    line-height: 1;
+    color: #999;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.grid-detail-close:hover {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.grid-detail-grid {
+    flex: 1;
+    overflow: hidden;
+}

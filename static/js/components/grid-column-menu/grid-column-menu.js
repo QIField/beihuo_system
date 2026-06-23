@@ -91,6 +91,7 @@ var GridColumnMenu = (function() {
             sortDir: null,
             onSort: options.onSort || null,
             onDataRefresh: options.onDataRefresh || null,
+            getFilterValues: options.getFilterValues || null,
             persist: !!options.persist,
             pageKey: options.pageKey || '',
             gridKey: options.gridKey || ''
@@ -397,7 +398,59 @@ var GridColumnMenu = (function() {
             }
         }
 
-        // 优先用缓存的全量数据，避免筛选后丢失未选值
+        var hasActiveFilter = gridInfo.columnFilters &&
+            gridInfo.columnFilters[colId] && gridInfo.columnFilters[colId].length > 0;
+        var currentFilter = hasActiveFilter ? gridInfo.columnFilters[colId] : null;
+        var allValuesChecked = !hasActiveFilter;
+
+        // 创建面板，默认显示加载中
+        var panel = document.createElement('div');
+        panel.className = 'filter-dropdown-panel show';
+        panel.style.cssText = 'position: fixed; display: block; min-width: 200px; z-index: 999999999; max-height: 400px;';
+        panel.innerHTML =
+            '<div class="filter-dropdown-header">' + colLabel + ' 筛选</div>' +
+            '<div class="filter-dropdown-search" style="padding: 8px 12px; box-sizing: border-box;">' +
+                '<input type="text" placeholder="搜索..." oninput="GridColumnMenu.filterSearch(this)" style="width: 100%; padding: 5px 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 12px; box-sizing: border-box;">' +
+            '</div>' +
+            '<div class="filter-dropdown-list" style="max-height: 240px; overflow-y: auto;">' +
+                '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">正在加载...</div>' +
+            '</div>' +
+            '<div class="filter-dropdown-footer">' +
+                '<button onclick="GridColumnMenu.selectAll()">全选</button>' +
+                '<button onclick="GridColumnMenu.invert()">反选</button>' +
+                '<button class="btn-confirm" onclick="GridColumnMenu.applyColumnFilter(\'' + colId + '\', \'' + gridSelector + '\')">确定</button>' +
+                '<button onclick="GridColumnMenu.cancelColumnFilter()">取消</button>' +
+            '</div>';
+
+        var anchorRect = anchorMenu.getBoundingClientRect();
+        panel.style.left = (anchorRect.right + 4) + 'px';
+        panel.style.top = anchorRect.top + 'px';
+
+        document.body.appendChild(panel);
+        currentPanel = panel;
+        currentMode = 'columnFilter';
+        currentField = colId;
+        menuConfig.activeLevel2Panel = panel;
+
+        // 如果提供了异步取值的回调，优先使用；否则从 _originalRows 或当前行数据取
+        if (typeof gridInfo.getFilterValues === 'function') {
+            try {
+                gridInfo.getFilterValues(colId, function(values) {
+                    if (!currentPanel || currentPanel !== panel) return;
+                    renderFilterValueList(values, currentFilter, allValuesChecked);
+                });
+            } catch (e) {
+                console.error('[GridColumnMenu] getFilterValues 执行失败:', e);
+                renderFilterValueListFromRows(colId, gridInfo, currentFilter, allValuesChecked);
+            }
+        } else {
+            renderFilterValueListFromRows(colId, gridInfo, currentFilter, allValuesChecked);
+        }
+    }
+
+    // 从本地行数据渲染筛选列表（兼容旧逻辑）
+    function renderFilterValueListFromRows(colId, gridInfo, currentFilter, allValuesChecked) {
+        var api = gridInfo.api;
         var rowData = [];
         if (gridInfo._originalRows && gridInfo._originalRows.length > 0) {
             rowData = gridInfo._originalRows;
@@ -419,51 +472,35 @@ var GridColumnMenu = (function() {
             .map(function(v) { return { value: v, count: valueCount[v] }; })
             .sort(function(a, b) { return a.value.localeCompare(b.value); });
 
-        var hasActiveFilter = gridInfo.columnFilters &&
-            gridInfo.columnFilters[colId] && gridInfo.columnFilters[colId].length > 0;
-        var currentFilter = hasActiveFilter ? gridInfo.columnFilters[colId] : null;
-        var allValuesChecked = !hasActiveFilter;
+        renderFilterValueList(values, currentFilter, allValuesChecked);
+    }
+
+    // 渲染筛选值列表（values 为对象数组 {value, count} 或字符串数组）
+    function renderFilterValueList(values, currentFilter, allValuesChecked) {
+        if (!currentPanel) return;
+
+        var listContainer = currentPanel.querySelector('.filter-dropdown-list');
+        if (!listContainer) return;
 
         var listHtml = '';
-        values.forEach(function(item) {
-            var isChecked = '';
-            if (allValuesChecked) isChecked = 'checked';
-            else if (currentFilter && currentFilter.indexOf(item.value) !== -1) isChecked = 'checked';
-            listHtml += '<div class="filter-dropdown-item col-filter-item" data-value="' + item.value +
-                '" onclick="GridColumnMenu.toggleItemCheckbox(this)">' +
-                '<input type="checkbox" value="' + item.value + '" ' + isChecked + ' onclick="event.stopPropagation()">' +
-                '<label>' + item.value + ' <span class="count">(' + item.count + ')</span></label>' +
-            '</div>';
-        });
-        if (listHtml === '') {
+        if (values && values.length > 0) {
+            values.forEach(function(item) {
+                var value = typeof item === 'object' ? item.value : item;
+                var count = typeof item === 'object' ? item.count : 0;
+                var isChecked = '';
+                if (allValuesChecked) isChecked = 'checked';
+                else if (currentFilter && currentFilter.indexOf(value) !== -1) isChecked = 'checked';
+                var countHtml = count > 0 ? ' <span class="count">(' + count + ')</span>' : '';
+                listHtml += '<div class="filter-dropdown-item col-filter-item" data-value="' + value +
+                    '" onclick="GridColumnMenu.toggleItemCheckbox(this)">' +
+                    '<input type="checkbox" value="' + value + '" ' + isChecked + ' onclick="event.stopPropagation()">' +
+                    '<label>' + value + countHtml + '</label>' +
+                '</div>';
+            });
+        } else {
             listHtml = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">暂无数据</div>';
         }
-
-        var panel = document.createElement('div');
-        panel.className = 'filter-dropdown-panel show';
-        panel.style.cssText = 'position: fixed; display: block; min-width: 200px; z-index: 999999999; max-height: 400px;';
-        panel.innerHTML =
-            '<div class="filter-dropdown-header">' + colLabel + ' 筛选</div>' +
-            '<div class="filter-dropdown-search" style="padding: 8px 12px; box-sizing: border-box;">' +
-                '<input type="text" placeholder="搜索..." oninput="GridColumnMenu.filterSearch(this)" style="width: 100%; padding: 5px 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 12px; box-sizing: border-box;">' +
-            '</div>' +
-            '<div class="filter-dropdown-list" style="max-height: 240px; overflow-y: auto;">' + listHtml + '</div>' +
-            '<div class="filter-dropdown-footer">' +
-                '<button onclick="GridColumnMenu.selectAll()">全选</button>' +
-                '<button onclick="GridColumnMenu.invert()">反选</button>' +
-                '<button class="btn-confirm" onclick="GridColumnMenu.applyColumnFilter(\'' + colId + '\', \'' + gridSelector + '\')">确定</button>' +
-                '<button onclick="GridColumnMenu.cancelColumnFilter()">取消</button>' +
-            '</div>';
-
-        var anchorRect = anchorMenu.getBoundingClientRect();
-        panel.style.left = (anchorRect.right + 4) + 'px';
-        panel.style.top = anchorRect.top + 'px';
-
-        document.body.appendChild(panel);
-        currentPanel = panel;
-        currentMode = 'columnFilter';
-        currentField = colId;
-        menuConfig.activeLevel2Panel = panel;
+        listContainer.innerHTML = listHtml;
     }
 
     function toggleItemCheckbox(item) {

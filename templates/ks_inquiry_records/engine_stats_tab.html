@@ -173,11 +173,19 @@
                         onSort: function(colId, direction) {
                             // 排序改变，重新加载对应表格
                             const searchParams = getEngineSearchParams();
-                            if (searchParams.garage_name) {
-                                if (gridType === 'chassis') loadChassisStats(searchParams);
-                                else if (gridType === 'engine') loadEngineStats(searchParams);
-                                else if (gridType === 'oeNum') loadOeNumStats(searchParams);
-                            }
+                            if (gridType === 'chassis') loadChassisStats(searchParams);
+                            else if (gridType === 'engine') loadEngineStats(searchParams);
+                            else if (gridType === 'oeNum') loadOeNumStats(searchParams);
+                        },
+                        onDataRefresh: function(filterState) {
+                            // 列筛选改变，重新加载对应表格
+                            const searchParams = getEngineSearchParams();
+                            if (gridType === 'chassis') loadChassisStats(searchParams);
+                            else if (gridType === 'engine') loadEngineStats(searchParams);
+                            else if (gridType === 'oeNum') loadOeNumStats(searchParams);
+                        },
+                        getFilterValues: function(colId, callback) {
+                            fetchEngineColumnValues(gridType, colId, callback);
                         }
                     });
                 }
@@ -252,10 +260,6 @@
     // 搜索修理厂统计
     window.searchGarageStats = function() {
         const params = getEngineSearchParams();
-        if (!params.garage_name) {
-            layui.layer.msg('请输入客户名称', {icon: 0});
-            return;
-        }
 
         loadChassisStats(params);
         loadEngineStats(params);
@@ -272,24 +276,26 @@
         const sortParams = getSortParams('#chassisGrid');
         const finalParams = Object.assign({}, params, sortParams);
 
+        // 合并列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#chassisGrid');
+            if (filterState.active && filterState.filters) {
+                finalParams.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
         fetch('/new/api/ks_inquiry/records/garage_chassis_stats?' + new URLSearchParams(finalParams))
         .then(response => response.json())
         .then(data => {
             if (data.code === 0 || data.code === '0') {
                 const list = data.data?.list || [];
-                // 缓存原始数据并应用列筛选
+                // 缓存原始数据到 GridColumnMenu，供列筛选下拉选项使用
                 if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
                     GridColumnMenu.setOriginalRows('#chassisGrid', list);
                 }
-                let displayList = list;
-                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
-                    displayList = GridColumnMenu.filterRows(list, '#chassisGrid');
-                    if (displayList.length !== list.length) {
-                        console.log(`[loadChassisStats] 列筛选后: ${displayList.length}/${list.length} 条`);
-                    }
-                }
-                chassisGridApi.setRowData(displayList);
-                renderChart(chassisChartInstance, displayList, 'chassis', '底盘', '#5470c6');
+                // 列筛选已由后端完成，前端不再二次过滤
+                chassisGridApi.setRowData(list);
+                renderChart(chassisChartInstance, list, 'chassis', '底盘', '#5470c6');
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 chassisGridApi.setRowData([]);
@@ -314,6 +320,14 @@
         const sortParams = getSortParams('#engineGrid');
         const finalParams = Object.assign({}, params, sortParams);
 
+        // 合并列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#engineGrid');
+            if (filterState.active && filterState.filters) {
+                finalParams.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
         fetch('/new/api/ks_inquiry/records/garage_engine_stats?' + new URLSearchParams(finalParams))
         .then(response => response.json())
         .then(data => {
@@ -322,15 +336,9 @@
                 if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
                     GridColumnMenu.setOriginalRows('#engineGrid', list);
                 }
-                let displayList = list;
-                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
-                    displayList = GridColumnMenu.filterRows(list, '#engineGrid');
-                    if (displayList.length !== list.length) {
-                        console.log(`[loadEngineStats] 列筛选后: ${displayList.length}/${list.length} 条`);
-                    }
-                }
-                engineGridApi.setRowData(displayList);
-                renderChart(engineChartInstance, displayList, 'engine', '发动机', '#91cc75');
+                // 列筛选已由后端完成，前端不再二次过滤
+                engineGridApi.setRowData(list);
+                renderChart(engineChartInstance, list, 'engine', '发动机', '#91cc75');
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 engineGridApi.setRowData([]);
@@ -355,6 +363,14 @@
         const sortParams = getSortParams('#oeNumGrid');
         const finalParams = Object.assign({}, params, sortParams);
 
+        // 合并列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#oeNumGrid');
+            if (filterState.active && filterState.filters) {
+                finalParams.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
         fetch('/new/api/ks_inquiry/records/garage_oenum_stats?' + new URLSearchParams(finalParams))
         .then(response => response.json())
         .then(data => {
@@ -363,15 +379,9 @@
                 if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
                     GridColumnMenu.setOriginalRows('#oeNumGrid', list);
                 }
-                let displayList = list;
-                if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
-                    displayList = GridColumnMenu.filterRows(list, '#oeNumGrid');
-                    if (displayList.length !== list.length) {
-                        console.log(`[loadOeNumStats] 列筛选后: ${displayList.length}/${list.length} 条`);
-                    }
-                }
-                oeNumGridApi.setRowData(displayList);
-                renderChart(oeNumChartInstance, displayList, 'partsNum', 'OE号码', '#fac858');
+                // 列筛选已由后端完成，前端不再二次过滤
+                oeNumGridApi.setRowData(list);
+                renderChart(oeNumChartInstance, list, 'partsNum', 'OE号码', '#fac858');
             } else {
                 layui.layer.msg(data.message || '查询失败', {icon: 2});
                 oeNumGridApi.setRowData([]);
@@ -431,11 +441,52 @@
     // 刷新表格（供外部调用）
     window.refreshEngineChassis = function() {
         const params = getEngineSearchParams();
-        if (params.garage_name) {
-            loadChassisStats(params);
-            loadEngineStats(params);
-            loadOeNumStats(params);
-        }
+        loadChassisStats(params);
+        loadEngineStats(params);
+        loadOeNumStats(params);
     };
+
+    // 从后端获取发动机及底盘维度指定列的全量不重复值（用于列头下拉筛选）
+    function fetchEngineColumnValues(gridType, colId, callback) {
+        const params = getEngineSearchParams();
+        params.column = colId;
+        params.grid_type = gridType === 'chassis' ? 'garage_chassis'
+                         : gridType === 'engine' ? 'garage_engine'
+                         : 'garage_oenum';
+
+        const gridSelector = gridType === 'chassis' ? '#chassisGrid'
+                            : gridType === 'engine' ? '#engineGrid'
+                            : '#oeNumGrid';
+
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState(gridSelector);
+            if (filterState.active && filterState.filters) {
+                const otherFilters = {};
+                Object.keys(filterState.filters).forEach(function(key) {
+                    if (key !== colId) {
+                        otherFilters[key] = filterState.filters[key];
+                    }
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/column_values?' + new URLSearchParams(params))
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    callback(result.data?.values || []);
+                } else {
+                    console.error('[engine_stats_tab] 获取列值失败:', result.message);
+                    callback([]);
+                }
+            })
+            .catch(function(error) {
+                console.error('[engine_stats_tab] 获取列值请求失败:', error);
+                callback([]);
+            });
+    }
 })();
 </script>

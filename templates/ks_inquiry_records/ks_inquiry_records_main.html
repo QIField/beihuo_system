@@ -35,6 +35,10 @@
     <!-- AG Grid Loader 组件 -->
     <script src="/static/js/components/ag-grid-loader/ag-grid-loader.js"></script>
 
+    <!-- Grid Detail Panel 组件（主表-副表联动） -->
+    <link rel="stylesheet" href="/static/js/components/grid-detail-panel/grid-detail-panel.css">
+    <script src="/static/js/components/grid-detail-panel/grid-detail-panel.js"></script>
+
     <!-- AG Grid 合并单元格组件 -->
     <link rel="stylesheet" href="/static/js/components/merge-cell/merge-cell.css">
     <script src="/static/js/components/merge-cell/merge-cell.js"></script>
@@ -103,22 +107,24 @@
             width: 100%;
         }
 
-        /* 分页条数选择器 */
-        .ag-paging-panel {
-            position: relative;
+        /* 客户维度：左右分栏布局 */
+        #tab-customer .customer-layout {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 200px);
+            min-height: 500px;
+        }
+
+        #tab-customer .customer-layout > div {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
         }
 
         /* 分页条数选择器 */
-        .page-size-selector {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: #666;
+        .ag-paging-panel {
+            position: relative;
         }
 
         .page-size-selector select {
@@ -243,6 +249,10 @@
             garage_name: ''
         };
 
+        const customerSearchState = {
+            garage_name: ''
+        };
+
         // 字段与隐藏输入框 ID 映射
         const searchStateFieldMap = {
             inquiry_id: 'searchInquiryId',
@@ -283,6 +293,7 @@
             if (tabId === 'detail') return detailSearchState;
             if (tabId === 'oe') return oeSearchState;
             if (tabId === 'engine') return engineSearchState;
+            if (tabId === 'customer') return customerSearchState;
             return {};
         }
     </script>
@@ -295,6 +306,7 @@
             <button class="tab-btn active" data-tab="detail">明细列表</button>
             <button class="tab-btn" data-tab="oe">OE统计维度</button>
             <button class="tab-btn" data-tab="engine">发动机及底盘维度</button>
+            <button class="tab-btn" data-tab="customer">客户维度</button>
         </div>
 
         <!-- 搜索筛选区域 - 保持原样 -->
@@ -333,6 +345,7 @@
             {% include 'ks_inquiry_records/detail_tab.html' %}
             {% include 'ks_inquiry_records/oe_stats_tab.html' %}
             {% include 'ks_inquiry_records/engine_stats_tab.html' %}
+            {% include 'ks_inquiry_records/customer_stats_tab.html' %}
         </div>
     </div>
 
@@ -363,6 +376,8 @@
                 state = oeSearchState;
             } else if (tabId === 'engine') {
                 state = engineSearchState;
+            } else if (tabId === 'customer') {
+                state = customerSearchState;
             }
 
             return Object.assign({}, state, {
@@ -401,6 +416,10 @@
                 refreshOeStats();
             } else if (currentTab === 'engine') {
                 refreshEngineChassis();
+            } else if (currentTab === 'customer') {
+                if (typeof refreshCustomerStats === 'function') {
+                    refreshCustomerStats();
+                }
             }
         }
 
@@ -436,6 +455,10 @@
                 fields = [
                     { label: '客户名称', inputId: 'searchGarageName' }
                 ];
+            } else if (tabId === 'customer') {
+                fields = [
+                    { label: '客户名称', inputId: 'searchGarageName' }
+                ];
             }
 
             const labelToStateField = {
@@ -467,6 +490,10 @@
                         refreshOeStats();
                     } else if (currentTab === 'engine') {
                         refreshEngineChassis();
+                    } else if (currentTab === 'customer') {
+                        if (typeof refreshCustomerStats === 'function') {
+                            refreshCustomerStats();
+                        }
                     }
                 }
             });
@@ -488,6 +515,8 @@
                         initOeStatsGrid();
                     } else if (tabId === 'engine' && typeof initEngineChassisGrid === 'function') {
                         initEngineChassisGrid();
+                    } else if (tabId === 'customer' && typeof initCustomerStatsGrid === 'function') {
+                        initCustomerStatsGrid();
                     }
                 }
             });
@@ -523,6 +552,10 @@
                             refreshOeStats();
                         } else if (currentTab === 'engine') {
                             refreshEngineChassis();
+                        } else if (currentTab === 'customer') {
+                            if (typeof refreshCustomerStats === 'function') {
+                                refreshCustomerStats();
+                            }
                         }
                     },
                     change: function(value, date, endDate) {
