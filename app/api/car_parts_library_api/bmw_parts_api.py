@@ -11,6 +11,8 @@
 """
 
 from flask import Blueprint, request, jsonify
+from app.core.permission.decorators import require_authentication
+from app.exceptions.crawler_exceptions import CrawlerTokenError
 from app.services.car_parts_library_service.car_parts_library_bmw_service import (
     get_part_by_number,
     get_parts_list_page,
@@ -39,6 +41,7 @@ bmw_parts_bp = Blueprint('bmw_parts', __name__, url_prefix='/bmw')
 # 接口一：根据零件号查询单条配件详情（含库存信息）
 # ====================================================
 @bmw_parts_bp.route('/detail', methods=['GET'])
+@require_authentication()
 def get_part_detail():
     """
     根据零件号查询宝马配件详情（包含库存信息）
@@ -93,6 +96,7 @@ def get_part_detail():
 # 接口二：分页查询零件列表（支持按零件号筛选）
 # ====================================================
 @bmw_parts_bp.route('/list', methods=['GET'])
+@require_authentication()
 def get_parts_list():
     """
     获取宝马配件列表（分页 + 搜索）
@@ -142,6 +146,7 @@ def get_parts_list():
 # 接口三：批量刷新零件数据（爬虫 + 入库）
 # ====================================================
 @bmw_parts_bp.route('/batch-refresh', methods=['POST'])
+@require_authentication()
 def batch_refresh_parts_data():
     """
     批量刷新宝马零件数据
@@ -211,6 +216,7 @@ def batch_refresh_parts_data():
 # 接口四：新增配件
 # ====================================================
 @bmw_parts_bp.route('/add', methods=['POST'])
+@require_authentication()
 def add_part_api():
     """
     新增宝马配件
@@ -268,6 +274,7 @@ def add_part_api():
 # 接口五：更新配件
 # ====================================================
 @bmw_parts_bp.route('/update', methods=['POST'])
+@require_authentication()
 def update_part_api():
     """
     更新宝马配件信息
@@ -326,6 +333,7 @@ def update_part_api():
 # 接口六：删除配件
 # ====================================================
 @bmw_parts_bp.route('/delete', methods=['POST'])
+@require_authentication()
 def delete_part_api():
     """
     删除宝马配件（同时删除库存表中关联记录）
@@ -379,6 +387,7 @@ def delete_part_api():
 # 接口七：实时获取零件信息和库存信息（不入库）
 # ====================================================
 @bmw_parts_bp.route('/fetch-realtime', methods=['POST'])
+@require_authentication()
 def fetch_realtime_data():
     """
     实时获取宝马零件信息和库存信息（不入库）
@@ -465,6 +474,13 @@ def fetch_realtime_data():
         return jsonify({
             'code': 502,
             'msg': '数据解析(请查看是否cookie不正确)失败: {}'.format(str(e)),
+            'data': None,
+        })
+    except CrawlerTokenError as e:
+        # Token 失效/无效
+        return jsonify({
+            'code': 403,
+            'msg': 'Token 失效/无效: {}'.format(str(e)),
             'data': None,
         })
     except DataPersistenceError as e:

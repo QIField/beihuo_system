@@ -13,6 +13,7 @@
 
 from flask import Blueprint, request, jsonify, send_file, session
 import time
+from app.core.permission.decorators import require_authentication
 
 from app.services.car_parts_library_service.excel_import_bmw_service import (
     process_file_stream,
@@ -27,6 +28,7 @@ bmw_import_bp = Blueprint('bmw_import', __name__, url_prefix='/bmw')
 
 
 @bmw_import_bp.route('/import', methods=['POST'])
+@require_authentication()
 def import_parts_api():
     """
     批量导入宝马配件（插入更新模式）
@@ -100,6 +102,7 @@ def import_parts_api():
 
 
 @bmw_import_bp.route('/template', methods=['GET'])
+@require_authentication()
 def download_template_api():
     """
     下载宝马配件 Excel 导入模板

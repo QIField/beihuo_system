@@ -8,6 +8,7 @@
 
 from typing import Dict, List, Optional
 
+from app.exceptions.crawler_exceptions import CrawlerTokenError
 from app.utils.orm.session import orm_session
 from app.models.orm_models.car_parts_library_bmw import CarPartsLibraryBmw
 from app.models.orm_models.car_parts_library_bmw_stock import CarPartsLibraryBmwStock
@@ -199,7 +200,7 @@ def data_refresh(part_numbers: List[str]) -> Dict:
                     if result.get('stock_updated'):
                         stock_count += 1
                     print(f"[{idx + 1}/{len(part_numbers)}] 零件 {oe} 刷新成功: {result.get('msg')}")
-
+        
             except DataPersistenceError as persist_err:
                 # 数据库写入失败（专属异常类型）
                 failed.append({'part_number': oe, 'reason': str(persist_err), 'type': 'persistence'})

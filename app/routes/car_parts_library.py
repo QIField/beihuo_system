@@ -27,3 +27,25 @@ def bmw_main_page():
     页面路径: /car_parts_library/bmw
     """
     return render_template("car_parts_library/bmw_parts_main.html")
+
+
+@car_parts_library_bp.route("/bmw_detail")
+def bmw_detail_page():
+    """
+    宝马配件库详情页面（单页 Tab 结构：
+    - 基本信息 Tab（基本信息、多仓库库存、采购历史）
+    - 多仓库库存 Tab（多仓库库存详情）
+    - 采购历史 Tab（采购历史记录）
+    页面路径: /car_parts_library/bmw_detail
+    """
+    return render_template("car_parts_library/bmw_parts_detail.html")
+
+@car_parts_library_bp.route("/benz_detail")
+def benz_detail_page():
+    """
+    宝马配件库收藏页面（单页 Tab 结构：
+    - 收藏列表 Tab（显示所有收藏的配件）
+    - 收藏详情 Tab（点击收藏项打开详情 Tab）
+    页面路径: /car_parts_library/bmw_favorites
+    """
+    return render_template("car_parts_library/benz_parts_detail.html")

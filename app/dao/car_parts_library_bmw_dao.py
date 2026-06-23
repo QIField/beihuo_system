@@ -49,6 +49,7 @@ class CarPartsLibraryBmwDao:
                 'gross_weight', 'net_weight', 'volume', 'retail_price',
                 'discount_stock', 'discount_rush', 'dealer_net_stock',
                 'dealer_net_rush', 'available_stock', 'data_collect_time',
+                'data_source',
             ]
 
             # 获取第一条数据的字段作为参考

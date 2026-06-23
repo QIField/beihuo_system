@@ -55,3 +55,14 @@ class CrawlerCookieInvalidError(CrawlerError):
             raise CrawlerCookieInvalidError("Cookie 已失效，请重新登录")
     """
     pass
+
+#token方面的异常
+class CrawlerTokenError(CrawlerError):
+    """
+    Token 失效/无效 —— 专门用于 Token 相关的异常场景
+
+    用法：
+        if not token:
+            raise CrawlerTokenError("Token 为空，请重新获取")
+    """
+    pass

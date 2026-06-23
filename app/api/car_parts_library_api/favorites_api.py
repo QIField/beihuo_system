@@ -11,12 +11,14 @@
 """
 
 from flask import Blueprint, request, jsonify, session
+from app.core.permission.decorators import require_authentication, require_permission
 from app.services.car_parts_library_service.car_parts_favorite_service import add_to_favorites, get_user_favorites, remove_from_favorites, get_user_favorite_categories, move_to_main_category, copy_to_main_category, clear_category_favorites
 
 favorites_bp = Blueprint('favorites', __name__)
 
 
 @favorites_bp.route('/add-favorites', methods=['POST'])
+@require_authentication()
 def add_favorites_api():
     """
     批量添加配件到收藏夹 API（全局共享收藏）
@@ -72,6 +74,7 @@ def add_favorites_api():
 
 
 @favorites_bp.route('/get-favorites', methods=['GET'])
+@require_authentication()
 def get_favorites_api():
     """
     获取全局共享的收藏列表 API
@@ -110,6 +113,7 @@ def get_favorites_api():
 
 
 @favorites_bp.route('/remove-favorites', methods=['POST'])
+@require_permission('favorites:remove')
 def remove_favorites_api():
     """
     批量从收藏夹删除配件 API（全局共享收藏）
@@ -161,6 +165,7 @@ def remove_favorites_api():
 
 
 @favorites_bp.route('/get-categories', methods=['GET'])
+@require_authentication()
 def get_categories_api():
     """
     获取全局共享的所有收藏分类 API
@@ -182,6 +187,7 @@ def get_categories_api():
 
 
 @favorites_bp.route('/move-to-main', methods=['POST'])
+@require_authentication()
 def move_to_main_api():
     """
     批量将收藏移动到主收藏 API（全局共享收藏）
@@ -236,6 +242,7 @@ def move_to_main_api():
 
 
 @favorites_bp.route('/copy-to-main', methods=['POST'])
+@require_authentication()
 def copy_to_main_api():
     """
     批量复制收藏到主收藏 API（全局共享收藏）
@@ -288,6 +295,7 @@ def copy_to_main_api():
 
 
 @favorites_bp.route('/clear-category', methods=['POST'])
+@require_permission('favorites:clear')
 def clear_category_api():
     """
     清空指定分类下的所有收藏 API（全局共享收藏）
