@@ -382,6 +382,41 @@ def data_crawler(oe, cookie=None, is_unit=True):
 
 
 
+def external_data_crawler(oe, cookie=None, is_unit=True):
+    """
+    【接口三】一次性抓取零件的"库存信息 + 详细信息"，并返回合并后的字典。
+
+    该函数是 query_part_stock 与 query_part_detail 的简单组合，调用方可以通过
+    一次调用获得一个零件的完整快照。不执行任何数据库写入 / upsert 操作。
+
+    :param oe:           零件号，如 "51749879093"
+    :param cookie:       BMW Brilliance 的有效登录 Cookie（可选，不传或为空时从配置 bmw_car_parts_libray 中获取）
+    :param is_unit:      数值 / 单位处理开关（透传给 query_part_detail）
+    :return:             {'stock': stock_dict, 'detail': detail_dict}
+    :raises ParameterError: cookie 为空且配置中也没有设置时抛出
+    :raises:              子接口可能抛出的所有异常（ParameterError / CrawlerError / DataError 等）
+    """
+
+    if not cookie or not str(cookie).strip():
+        config = get_config_value('bmw_car_parts_libray')
+        if config and isinstance(config, dict):
+            cookie = config.get('cookie', '')
+    if not cookie or not str(cookie).strip():
+        raise ParameterError('未配置 BMW Brilliance 登录 Cookie，请在请求中传入 cookie 或在配置中设置')
+
+    stock = query_part_stock(oe, cookie)
+    detail = query_part_detail(oe, cookie, is_unit=is_unit)
+
+
+
+
+    return {
+        'stock': stock,
+        'detail': detail,
+        'is_zpy': False,
+    }
+
+
 
 # if __name__ == '__main__':
 #     data=data_crawler('51749879093')

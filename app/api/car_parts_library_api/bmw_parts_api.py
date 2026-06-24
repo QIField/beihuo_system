@@ -21,7 +21,7 @@ from app.services.car_parts_library_service.car_parts_library_bmw_service import
     update_part,
     delete_part,
 )
-from app.services.car_parts_library_service.bmw_crawler import data_crawler
+from app.services.car_parts_library_service.bmw_crawler import data_crawler, external_data_crawler
 from app.exceptions import (
     ParameterError,
     CrawlerError,
@@ -446,7 +446,7 @@ def fetch_realtime_data():
 
         # data_crawler 内部调用的清洗函数已改为直接抛异常，
         # 此处不再检查 detail/stock 中的 error 字段，失败时异常会直接向上传播
-        result = data_crawler(oe_clean, cookie, is_unit=True)
+        result = external_data_crawler(oe_clean, cookie, is_unit=True)
 
        
 
