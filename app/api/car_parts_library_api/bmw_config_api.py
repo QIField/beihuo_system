@@ -11,8 +11,12 @@
 """
 
 from flask import Blueprint, request, jsonify
+from app.core.permission.decorators import require_authentication
 
-from app.services.car_parts_library_service.bmw_config_service import set_bmw_config, get_bmw_config
+from app.services.car_parts_library_service.bmw_config_service import (
+    set_bmw_config, get_bmw_config,
+    set_bmw_column_config, get_bmw_column_config
+)
 
 
 # 创建宝马大库配置蓝图，与 bmw_parts_bp 共享 /bmw 前缀
@@ -20,6 +24,7 @@ bmw_config_bp = Blueprint('bmw_config', __name__, url_prefix='/bmw')
 
 
 @bmw_config_bp.route('/set-config', methods=['POST'])
+@require_authentication()
 def set_bmw_config_api():
     """
     设置宝马大库配置 API
@@ -75,6 +80,7 @@ def set_bmw_config_api():
 
 
 @bmw_config_bp.route('/get-config', methods=['GET'])
+@require_authentication()
 def get_bmw_config_api():
     """
     获取宝马大库配置 API
@@ -109,5 +115,98 @@ def get_bmw_config_api():
         return jsonify({
             'code': 500,
             'msg': f'查询配置失败: {str(e)}',
+            'data': None
+        })
+
+
+@bmw_config_bp.route('/set-column-config', methods=['POST'])
+@require_authentication()
+def set_bmw_column_config_api():
+    """
+    设置宝马配件列配置 API
+
+    请求参数:
+        {
+            "column_config": { "part_number": {"hide": false, "width": 200}, ... },
+            "favorite_column_config": { "part_number": {"hide": false, "width": 200}, ... },
+            "column_order": ["part_number", "part_name", ... ],
+            "favorite_column_order": ["part_number", "part_name", ... ]
+        }
+
+    返回:
+        { "code": 200, "msg": "设置成功", "data": null }
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                'code': 400,
+                'msg': '请求参数不能为空',
+                'data': None
+            })
+
+        column_config = data.get('column_config')
+        favorite_column_config = data.get('favorite_column_config')
+        column_order = data.get('column_order')
+        favorite_column_order = data.get('favorite_column_order')
+
+        result = set_bmw_column_config(
+            column_config=column_config,
+            favorite_column_config=favorite_column_config,
+            column_order=column_order,
+            favorite_column_order=favorite_column_order
+        )
+
+        if result.get('code') == 200:
+            return jsonify({
+                'code': 200,
+                'msg': result.get('message', '设置成功'),
+                'data': None
+            })
+        else:
+            return jsonify({
+                'code': 500,
+                'msg': result.get('message', '设置失败'),
+                'data': None
+            })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'设置列配置失败: {str(e)}',
+            'data': None
+        })
+
+
+@bmw_config_bp.route('/get-column-config', methods=['GET'])
+@require_authentication()
+def get_bmw_column_config_api():
+    """
+    获取宝马配件列配置 API
+
+    返回:
+    {
+        "code": 200,
+        "msg": "查询成功",
+        "data": {
+            "column_config": { ... },
+            "favorite_column_config": { ... },
+            "column_order": [ ... ],
+            "favorite_column_order": [ ... ]
+        }
+    }
+    """
+    try:
+        config = get_bmw_column_config()
+
+        return jsonify({
+            'code': 200,
+            'msg': '查询成功',
+            'data': config or {}
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'查询列配置失败: {str(e)}',
             'data': None
         })

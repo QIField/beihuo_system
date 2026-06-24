@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>BA配件库 - 配件详情查询</title>
+  <link rel="stylesheet" href="/static/layui/css/layui.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f0f2f5;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: #fff;
+      padding: 20px 24px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #262626;
+    }
+
+    .search-panel {
+      background: #fff;
+      padding: 20px 24px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .search-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .search-item label {
+      font-size: 14px;
+      color: #595959;
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .search-item input {
+      width: 300px;
+      padding: 8px 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .search-item input:focus {
+      outline: none;
+      border-color: #1890ff;
+      box-shadow: 0 0 0 2px rgba(24,144,255,0.2);
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: #1890ff;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #40a9ff;
+    }
+
+    .btn-success {
+      background: #52c41a;
+      color: #fff;
+    }
+
+    .btn-success:hover {
+      background: #73d13d;
+    }
+
+    .btn-default {
+      background: #fff;
+      color: #595959;
+      border: 1px solid #d9d9d9;
+    }
+
+    .btn-default:hover {
+      color: #40a9ff;
+      border-color: #40a9ff;
+    }
+
+    .detail-card {
+      background: #fff;
+      border: 1px solid #f0f0f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .detail-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #262626;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #1890ff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .detail-card-title i {
+      color: #1890ff;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .info-item {
+      display: flex;
+      padding: 8px 12px;
+      background: #fafafa;
+      border-radius: 4px;
+      border-left: 3px solid #1890ff;
+    }
+
+    .info-label {
+      color: #8c8c8c;
+      font-size: 13px;
+      white-space: nowrap;
+      min-width: 110px;
+    }
+
+    .info-value {
+      color: #262626;
+      font-size: 13px;
+      font-weight: 500;
+      word-break: break-all;
+    }
+
+    .price-value {
+      color: #ff5722;
+      font-weight: 600;
+    }
+
+    .detail-header {
+      background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+      color: #fff;
+      padding: 24px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(24,144,255,0.3);
+    }
+
+    .detail-header h2 {
+      font-size: 22px;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .detail-header .part-number {
+      font-size: 16px;
+      opacity: 0.95;
+      margin-bottom: 12px;
+      font-family: Consolas, Monaco, monospace;
+    }
+
+    .detail-header .meta {
+      display: flex;
+      gap: 20px;
+      font-size: 13px;
+      opacity: 0.9;
+      flex-wrap: wrap;
+    }
+
+    .detail-header .price-box {
+      display: flex;
+      gap: 40px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .price-item {
+      text-align: center;
+    }
+
+    .price-item-label {
+      font-size: 12px;
+      opacity: 0.85;
+      margin-bottom: 4px;
+    }
+
+    .price-item-value {
+      font-size: 20px;
+      font-weight: 700;
+      font-family: Consolas, Monaco, monospace;
+    }
+
+    .empty-state {
+      background: #fff;
+      border-radius: 8px;
+      padding: 80px 20px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .empty-state i {
+      font-size: 60px;
+      color: #d9d9d9;
+    }
+
+    .empty-state p {
+      margin-top: 20px;
+      color: #8c8c8c;
+      font-size: 16px;
+    }
+
+    .loading-state {
+      text-align: center;
+      padding: 80px;
+    }
+
+    .loading-state i {
+      font-size: 40px;
+      color: #1890ff;
+    }
+
+    .warehouse-table {
+      width: 100%;
+    }
+
+    .warehouse-table th {
+      background: #f0f7ff;
+      color: #1890ff;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .warehouse-table td {
+      text-align: center;
+    }
+
+    .stock-positive {
+      color: #52c41a;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <div class="header-title">BA配件库 - 配件详情查询</div>
+      </div>
+    </div>
+
+    <div class="search-panel">
+      <div class="search-row">
+        <div class="search-item">
+          <label>配件编号：</label>
+          <input type="text" id="partNumber" placeholder="请输入配件编号（精确匹配）" autocomplete="off" />
+        </div>
+        <div class="search-item">
+          <button class="btn btn-primary" id="searchBtn">
+            <i class="layui-icon layui-icon-search"></i> 查询
+          </button>
+          <button class="btn btn-success" id="addFavoriteBtn">
+            <i class="layui-icon layui-icon-star"></i> 添加收藏
+          </button>
+          <button class="btn btn-default" id="viewFavoritesBtn">
+            <i class="layui-icon layui-icon-star-fill"></i> 查看收藏
+          </button>
+          <button class="btn btn-default" id="resetBtn">
+            <i class="layui-icon layui-icon-refresh"></i> 重置
+          </button>
+           <button class="btn btn-default" id="backBtn">
+            <a href="/web/car_parts_library/cart" >返回列表</a>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="detailContainer">
+      <div class="empty-state">
+        <i class="layui-icon layui-icon-search"></i>
+        <p>请在上方输入配件编号后点击"查询"按钮</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 收藏列表弹窗模板 -->
+  <script type="text/html" id="favoritesTemplate">
+    <div style="padding: 20px;">
+      <div style="margin-bottom: 20px;">
+        <div class="layui-inline" style="margin-right: 10px;">
+          <label class="layui-form-label">分类筛选</label>
+          <div class="layui-input-inline" style="width: auto;">
+            <button class="layui-btn layui-btn-primary" id="favoritesCategoryBtn">
+              <span>奔驰主收藏</span>
+              <i class="layui-icon layui-icon-down layui-font-12"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <table id="favoritesTable" lay-filter="favoritesTable"></table>
+    </div>
+  </script>
+
+  <!-- 收藏列表头部工具栏模板 -->
+  <script type="text/html" id="favoritesTableToolBar">
+    <div class="layui-btn-container">
+      <button class="layui-btn layui-btn-sm layui-btn-normal" lay-event="batchMoveToMain">
+        <i class="layui-icon layui-icon-transfer"></i> 移动到奔驰BA主收藏
+      </button>
+      <button class="layui-btn layui-btn-sm layui-btn-primary" lay-event="batchCopyToMain">
+        <i class="layui-icon layui-icon-template"></i> 复制到奔驰BA主收藏
+      </button>
+      <button class="layui-btn layui-btn-sm layui-btn-warm" lay-event="batchRefreshFavorite">
+        <i class="layui-icon layui-icon-refresh"></i> 更新选中数据
+      </button>
+      <button class="layui-btn layui-btn-sm layui-btn-danger" lay-event="batchRemoveFavorite">
+        <i class="layui-icon layui-icon-close"></i> 批量删除
+      </button>
+      <button class="layui-btn layui-btn-sm layui-btn-danger" lay-event="clearCategoryFavorites">
+        <i class="layui-icon layui-icon-delete"></i> 清空当前分类
+      </button>
+    </div>
+  </script>
+
+  <!-- 收藏列表操作列模板 -->
+  <script type="text/html" id="favoritesRowToolBar">
+    <div class="action-btns">
+      <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="removeFavorite">
+        <i class="layui-icon layui-icon-close"></i> 删除
+      </a>
+    </div>
+  </script>
+
+  <script src="/static/layui/layui.js"></script>
+  <script>
+  layui.use(['jquery', 'layer', 'table', 'form', 'dropdown'], function() {
+    var $ = layui.jquery;
+    var layer = layui.layer;
+    var table = layui.table;
+    var form = layui.form;
+    var dropdown = layui.dropdown;
+
+    // 内部状态变量
+    var state = {
+      currentData: null,
+      favoriteTableIns: null,
+      favoriteCategory: '奔驰主收藏'
+    };
+
+    // 仓库代码映射
+    var warehouseMapping = {
+      '8918': '北京',
+      '8968': '昆山',
+      '8928': '杭州',
+      '8958': '成都',
+      '8938': '广州'
+    };
+
+    function getWarehouseName(code) {
+      return warehouseMapping[code] || code;
+    }
+
+    // ==================== 工具函数 ====================
+    function emptyVal(val) {
+      return val ? val : '-';
+    }
+
+    function formatPrice(val) {
+      if (val === undefined || val === null || val === '' || val === '-') return '-';
+      var num = Number(val);
+      if (isNaN(num)) return '-';
+      return num.toFixed(2);
+    }
+
+    function formatDimensions(length, width, height) {
+      var parts = [];
+      if (length) parts.push(parseFloat(length));
+      if (width) parts.push(parseFloat(width));
+      if (height) parts.push(parseFloat(height));
+      return parts.length > 0 ? parts.join(' × ') + ' mm' : '-';
+    }
+
+    function formatDateTime(val) {
+      if (!val) return '-';
+      var date = new Date(val);
+      if (isNaN(date.getTime())) return val;
+      return date.toLocaleString('zh-CN');
+    }
+
+    // ==================== 详情渲染 ====================
+    function renderDetail(data) {
+      var formattedData = {
+        part_number: emptyVal(data.part_number),
+        description_cn: emptyVal(data.description_cn),
+        descriptions: emptyVal(data.descriptions),
+        title: (data.description_cn || data.descriptions || '-'),
+        brand: emptyVal(data.brand),
+        category: emptyVal(data.category),
+        marketing_code: emptyVal(data.marketing_code),
+        marketing_code_description: emptyVal(data.marketing_code_description),
+        dealer_discount_group: emptyVal(data.dealer_discount_group),
+        dealer_fixed_nominal_margin: emptyVal(data.dealer_fixed_nominal_margin),
+        quantity_unit: emptyVal(data.quantity_unit),
+        sales_pack_size: emptyVal(data.sales_pack_size),
+        weight: data.weight ? parseFloat(data.weight) + ' KG' : '-',
+        length: emptyVal(data.length),
+        width: emptyVal(data.width),
+        height: emptyVal(data.height),
+        volume: data.volume ? parseFloat(data.volume) + ' CDM' : '-',
+        dimensions: formatDimensions(data.length, data.width, data.height),
+        ccc_mark: emptyVal(data.ccc_mark),
+        data_source: emptyVal(data.data_source),
+        l_model_zh: emptyVal(data.l_model_zh),
+        hazmat_code: emptyVal(data.hazmat_code),
+        origin_country: emptyVal(data.origin_country),
+        shelf_life: emptyVal(data.shelf_life),
+        is_hazmat: emptyVal(data.is_hazmat),
+        wholesale_price: formatPrice(data.wholesale_price),
+        price_4s_tax_in: formatPrice(data.price_4s_tax_in),
+        price_baborui: formatPrice(data.price_baborui),
+        msrp: formatPrice(data.msrp),
+        effective_date: emptyVal(data.effective_date),
+        updated_at: data.updated_at ? new Date(data.updated_at).toLocaleString('zh-CN') : '-',
+        stock_info: (data.stock_info || []).map(function(item) {
+          return {
+            ...item,
+            warehouse_name: getWarehouseName(item.warehouse),
+            created_at: formatDateTime(item.created_at),
+            updated_at: formatDateTime(item.updated_at)
+          };
+        })
+      };
+
+      var hasStock = formattedData.stock_info && formattedData.stock_info.length > 0;
+
+      var html =
+        '<div class="detail-header">' +
+          '<h2>' + formattedData.title + '</h2>' +
+          '<div class="part-number">配件编号：' + formattedData.part_number + '</div>' +
+          '<div class="meta">' +
+            '<span>品牌：' + formattedData.brand + '</span>' +
+            '<span>分类：' + formattedData.category + '</span>' +
+            '<span>营销代码：' + formattedData.marketing_code + '</span>' +
+            '<span>更新时间：' + formattedData.updated_at + '</span>' +
+          '</div>' +
+          '<div class="price-box">' +
+            '<div class="price-item">' +
+              '<div class="price-item-label">批发价</div>' +
+              '<div class="price-item-value">¥' + formattedData.wholesale_price + '</div>' +
+            '</div>' +
+            '<div class="price-item">' +
+              '<div class="price-item-label">4S含税进价</div>' +
+              '<div class="price-item-value">¥' + formattedData.price_4s_tax_in + '</div>' +
+            '</div>' +
+            '<div class="price-item">' +
+              '<div class="price-item-label">巴博瑞采购价</div>' +
+              '<div class="price-item-value">¥' + formattedData.price_baborui + '</div>' +
+            '</div>' +
+            '<div class="price-item">' +
+              '<div class="price-item-label">市场指导价</div>' +
+              '<div class="price-item-value">¥' + formattedData.msrp + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="detail-card">' +
+          '<div class="detail-card-title">' +
+            '<i class="layui-icon layui-icon-form"></i>基本信息' +
+          '</div>' +
+          '<div class="info-grid">' +
+            '<div class="info-item"><div class="info-label">配件编号：</div><div class="info-value">' + formattedData.part_number + '</div></div>' +
+            '<div class="info-item"><div class="info-label">中文描述：</div><div class="info-value">' + formattedData.description_cn + '</div></div>' +
+            '<div class="info-item"><div class="info-label">英文描述：</div><div class="info-value">' + formattedData.descriptions + '</div></div>' +
+            '<div class="info-item"><div class="info-label">品牌：</div><div class="info-value">' + formattedData.brand + '</div></div>' +
+            '<div class="info-item"><div class="info-label">分类：</div><div class="info-value">' + formattedData.category + '</div></div>' +
+            '<div class="info-item"><div class="info-label">营销代码：</div><div class="info-value">' + formattedData.marketing_code + '</div></div>' +
+            '<div class="info-item"><div class="info-label">营销代码描述：</div><div class="info-value">' + formattedData.marketing_code_description + '</div></div>' +
+            '<div class="info-item"><div class="info-label">经销商折扣组：</div><div class="info-value">' + formattedData.dealer_discount_group + '</div></div>' +
+            '<div class="info-item"><div class="info-label">经销商固定利润：</div><div class="info-value">' + formattedData.dealer_fixed_nominal_margin + '</div></div>' +
+            '<div class="info-item"><div class="info-label">数量单位：</div><div class="info-value">' + formattedData.quantity_unit + '</div></div>' +
+            '<div class="info-item"><div class="info-label">销售包装规格：</div><div class="info-value">' + formattedData.sales_pack_size + '</div></div>' +
+            '<div class="info-item"><div class="info-label">生效日期：</div><div class="info-value">' + formattedData.effective_date + '</div></div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="detail-card">' +
+          '<div class="detail-card-title">' +
+            '<i class="layui-icon layui-icon-rmb"></i>价格与折扣信息' +
+          '</div>' +
+          '<div class="info-grid">' +
+            '<div class="info-item"><div class="info-label">批发价：</div><div class="info-value price-value">¥' + formattedData.wholesale_price + '</div></div>' +
+            '<div class="info-item"><div class="info-label">4S含税进价：</div><div class="info-value price-value">¥' + formattedData.price_4s_tax_in + '</div></div>' +
+            '<div class="info-item"><div class="info-label">巴博瑞采购价：</div><div class="info-value price-value">¥' + formattedData.price_baborui + '</div></div>' +
+            '<div class="info-item"><div class="info-label">市场指导价：</div><div class="info-value price-value">¥' + formattedData.msrp + '</div></div>' +
+            '<div class="info-item"><div class="info-label">生效日期：</div><div class="info-value">' + formattedData.effective_date + '</div></div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="detail-card">' +
+          '<div class="detail-card-title">' +
+            '<i class="layui-icon layui-icon-edit"></i>规格与属性' +
+          '</div>' +
+          '<div class="info-grid">' +
+            '<div class="info-item"><div class="info-label">重量：</div><div class="info-value">' + formattedData.weight + '</div></div>' +
+            '<div class="info-item"><div class="info-label">体积：</div><div class="info-value">' + formattedData.volume + '</div></div>' +
+            '<div class="info-item"><div class="info-label">尺寸(长×宽×高)：</div><div class="info-value">' + formattedData.dimensions + '</div></div>' +
+            '<div class="info-item"><div class="info-label">车型中文名：</div><div class="info-value">' + formattedData.l_model_zh + '</div></div>' +
+            '<div class="info-item"><div class="info-label">CCC标识：</div><div class="info-value">' + formattedData.ccc_mark + '</div></div>' +
+            '<div class="info-item"><div class="info-label">危险货物代码：</div><div class="info-value">' + formattedData.hazmat_code + '</div></div>' +
+            '<div class="info-item"><div class="info-label">原产地：</div><div class="info-value">' + formattedData.origin_country + '</div></div>' +
+            '<div class="info-item"><div class="info-label">存储期限：</div><div class="info-value">' + formattedData.shelf_life + '</div></div>' +
+            '<div class="info-item"><div class="info-label">防盗/危险品：</div><div class="info-value">' + formattedData.is_hazmat + '</div></div>' +
+            '<div class="info-item"><div class="info-label">数据来源：</div><div class="info-value">' + formattedData.data_source + '</div></div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="detail-card">' +
+          '<div class="detail-card-title">' +
+            '<i class="layui-icon layui-icon-location"></i>多仓库库存详情' +
+          '</div>';
+
+      if (hasStock) {
+        html +=
+          '<table class="layui-table warehouse-table" lay-skin="line">' +
+            '<thead><tr><th>仓库</th><th>零件描述</th><th>可用数量</th><th>单位</th><th>更新时间</th></tr></thead>' +
+            '<tbody>';
+        formattedData.stock_info.forEach(function(item) {
+          html +=
+            '<tr>' +
+              '<td style="font-weight:600;color:#1890ff;">' + (item.warehouse_name && item.warehouse_name !== item.warehouse ? item.warehouse_name + ' (' + item.warehouse + ')' : (item.warehouse || '-')) + '</td>' +
+              '<td>' + (item.description || '-') + '</td>' +
+              '<td style="font-weight:600;color:#52c41a;">' + (item.quantity_available || 0) + '</td>' +
+              '<td>' + (item.unit || '-') + '</td>' +
+              '<td>' + (item.updated_at || '-') + '</td>' +
+            '</tr>';
+        });
+        html += '</tbody></table>';
+      } else {
+        html += '<div style="text-align:center;color:#999;padding:40px;font-size:14px;">暂无库存信息</div>';
+      }
+
+      html += '</div>';
+
+      $('#detailContainer').html(html);
+    }
+
+    function showEmpty(msg) {
+      $('#detailContainer').html(
+        '<div class="empty-state">' +
+          '<i class="layui-icon layui-icon-face-cry"></i>' +
+          '<p>' + msg + '</p>' +
+        '</div>'
+      );
+    }
+
+    function showLoading() {
+      $('#detailContainer').html(
+        '<div class="detail-card loading-state">' +
+          '<i class="layui-icon layui-icon-loading-1" style="animation:layui-anim-rotate 1s linear infinite;"></i>' +
+          '<p>正在查询中，请稍候...</p>' +
+        '</div>'
+      );
+    }
+
+    // ==================== 查询 ====================
+    function doSearch() {
+      var partNumber = $.trim($('#partNumber').val());
+      if (!partNumber) {
+        layer.msg('请输入配件编号', { icon: 0 });
+        $('#partNumber').focus();
+        return;
+      }
+
+      showLoading();
+
+      $.ajax({
+        url: '/new/api/car-parts/detail',
+        method: 'GET',
+        data: { part_number: partNumber },
+        success: function(res) {
+          if (res.code === 200 && res.data) {
+            state.currentData = res.data;
+            renderDetail(res.data);
+          } else if (res.code === 404) {
+            state.currentData = null;
+            showEmpty('未查询到编号为 "' + partNumber + '" 的配件');
+          } else {
+            state.currentData = null;
+            showEmpty(res.msg || '查询失败');
+          }
+        },
+        error: function(xhr, status, error) {
+          state.currentData = null;
+          showEmpty('网络请求失败：' + error);
+        }
+      });
+    }
+
+    // ==================== 添加收藏 ====================
+    function addToFavorites(partNumbers) {
+      if (!partNumbers || partNumbers.length === 0) {
+        layer.msg('没有可添加的配件编号', { icon: 0 });
+        return;
+      }
+      var category = '奔驰主收藏';
+      var countText = partNumbers.length + ' 个配件';
+
+      layer.confirm('确定要将 ' + countText + ' 添加到"' + category + '"吗？', {
+        btn: ['确定', '取消'],
+        icon: 3,
+        title: '添加到收藏'
+      }, function(index) {
+        layer.close(index);
+        var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在添加收藏...' });
+
+        $.ajax({
+          url: '/new/api/car-parts/add-favorites',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            part_numbers: partNumbers,
+            category: category
+          }),
+          success: function(res) {
+            layer.close(loadingIdx);
+            if (res.code === 200) {
+              layer.msg(res.msg || '添加收藏成功', { icon: 1 });
+            } else {
+              layer.msg(res.msg || '添加收藏失败', { icon: 2 });
+            }
+          },
+          error: function(xhr, status, error) {
+            layer.close(loadingIdx);
+            layer.msg('请求失败: ' + error, { icon: 2 });
+          }
+        });
+      });
+    }
+
+    // ==================== 查看收藏 ====================
+    function openFavorites() {
+      var getTpl = document.getElementById('favoritesTemplate').innerHTML;
+      layer.open({
+        type: 1,
+        title: '我的收藏 - ' + state.favoriteCategory,
+        area: ['1200px', '700px'],
+        content: getTpl,
+        success: function(layero, index) {
+          // 加载收藏分类列表
+          $.ajax({
+            url: '/new/api/car-parts/get-categories',
+            method: 'GET',
+            success: function(res) {
+              if (res.code === 200 && res.data && res.data.categories) {
+                var categories = res.data.categories;
+
+                var dropdownData = categories.map(function(cat) {
+                  return { title: cat, id: cat };
+                });
+
+                var defaultCategory = '奔驰主收藏';
+                // 确保奔驰主收藏在第一位
+                dropdownData = dropdownData.sort(function(a, b) {
+                  if (a.id === defaultCategory) return -1;
+                  if (b.id === defaultCategory) return 1;
+                  return 0;
+                });
+
+                dropdown.render({
+                  elem: layero.find('#favoritesCategoryBtn'),
+                  data: dropdownData,
+                  click: function(data) {
+                    state.favoriteCategory = data.id;
+                    layero.find('#favoritesCategoryBtn span').text(data.title);
+                    table.reload('favoritesTable', {
+                      where: { category: state.favoriteCategory },
+                      page: { curr: 1 }
+                    });
+                    layer.title('我的收藏 - ' + data.title, index);
+                  }
+                });
+              }
+              renderFavoriteTable();
+            },
+            error: function() {
+              renderFavoriteTable();
+            }
+          });
+
+          function renderFavoriteTable() {
+            var favoriteColumns = [
+              { type: 'checkbox', fixed: 'left', width: 50 },
+              { field: 'part_number', title: '配件编号', width: 200, fixed: 'left', templet: function(d) {
+                return '<a href="javascript:;" style="color:#1890ff;font-weight:600;" class="view-detail-link" data-part="' + d.part_number + '">' + d.part_number + '</a>';
+              }},
+              { field: 'description_cn', title: '中文描述', width: 250, templet: function(d) {
+                return emptyVal(d.description_cn);
+              }},
+              { field: 'descriptions', title: '英文描述', width: 250, templet: function(d) {
+                return emptyVal(d.descriptions);
+              }},
+              { field: 'wholesale_price', title: '批发价', width: 120, templet: function(d) {
+                return '<span style="color:#ff5722;font-weight:600;">' + formatPrice(d.wholesale_price) + '</span>';
+              }},
+              { field: 'price_4s_tax_in', title: '4S含税进价', width: 130, templet: function(d) {
+                return '<span style="color:#ff9800;font-weight:600;">' + formatPrice(d.price_4s_tax_in) + '</span>';
+              }},
+              { field: 'price_baborui', title: '巴博瑞采购价', width: 140, templet: function(d) {
+                return '<span style="color:#ff5722;font-weight:600;">' + formatPrice(d.price_baborui) + '</span>';
+              }},
+              { field: 'favorite_category', title: '收藏分类', width: 150 },
+              { field: 'favorite_created_at', title: '收藏时间', width: 180, templet: function(d) {
+                if (!d.favorite_created_at) return '-';
+                return new Date(d.favorite_created_at).toLocaleString('zh-CN');
+              }},
+              { title: '操作', width: 120, fixed: 'right', toolbar: '#favoritesRowToolBar', align: 'center' }
+            ];
+
+            state.favoriteTableIns = table.render({
+              elem: '#favoritesTable',
+              url: '/new/api/car-parts/get-favorites',
+              method: 'get',
+              where: { category: state.favoriteCategory },
+              page: true,
+              limit: 20,
+              limits: [10, 20, 50, 100],
+              height: 'full-220',
+              cols: [favoriteColumns],
+              toolbar: '#favoritesTableToolBar',
+              defaultToolbar: ['filter', 'exports'],
+              parseData: function(res) {
+                if (res.code === 200 && res.data && res.data.status) {
+                  return {
+                    code: 0,
+                    msg: res.data.msg,
+                    count: res.data.count,
+                    data: res.data.data || []
+                  };
+                } else {
+                  return {
+                    code: 0,
+                    msg: res.msg || '查询成功',
+                    count: 0,
+                    data: []
+                  };
+                }
+              }
+            });
+
+            // 收藏表格工具栏事件
+            table.on('toolbar(favoritesTable)', function(obj) {
+              var checkStatus = table.checkStatus(obj.config.id);
+              var selectedData = checkStatus.data;
+
+              switch(obj.event) {
+                case 'batchMoveToMain':
+                  if (selectedData.length === 0) {
+                    layer.msg('请先选择要移动的收藏', { icon: 0 });
+                    return;
+                  }
+                  var movePartNumbers = selectedData.map(function(item) { return item.part_number; });
+                  layer.confirm('确定要将选中的 ' + movePartNumbers.length + ' 个收藏移动到奔驰主收藏吗？', {
+                    icon: 3, title: '确认移动'
+                  }, function(confirmIndex) {
+                    layer.close(confirmIndex);
+                    var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在移动...' });
+                    var requestData = { part_numbers: movePartNumbers };
+                    if (state.favoriteCategory && state.favoriteCategory !== '奔驰主收藏') {
+                      requestData.source_category = state.favoriteCategory;
+                    }
+                    $.ajax({
+                      url: '/new/api/car-parts/move-to-main',
+                      method: 'POST',
+                      contentType: 'application/json',
+                      data: JSON.stringify(requestData),
+                      success: function(res) {
+                        layer.close(loadingIdx);
+                        if (res.code === 200) {
+                          layer.msg(res.msg || '移动成功', { icon: 1 });
+                          table.reload('favoritesTable');
+                        } else {
+                          layer.msg(res.msg || '移动失败', { icon: 2 });
+                        }
+                      },
+                      error: function(xhr, status, error) {
+                        layer.close(loadingIdx);
+                        layer.msg('请求失败: ' + error, { icon: 2 });
+                      }
+                    });
+                  });
+                  break;
+
+                case 'batchCopyToMain':
+                  if (selectedData.length === 0) {
+                    layer.msg('请先选择要复制的收藏', { icon: 0 });
+                    return;
+                  }
+                  var copyPartNumbers = selectedData.map(function(item) { return item.part_number; });
+                  layer.confirm('确定要将选中的 ' + copyPartNumbers.length + ' 个收藏复制到奔驰主收藏吗？（原分类保留）', {
+                    icon: 3, title: '确认复制'
+                  }, function(confirmIndex) {
+                    layer.close(confirmIndex);
+                    var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在复制...' });
+                    $.ajax({
+                      url: '/new/api/car-parts/copy-to-main',
+                      method: 'POST',
+                      contentType: 'application/json',
+                      data: JSON.stringify({ part_numbers: copyPartNumbers }),
+                      success: function(res) {
+                        layer.close(loadingIdx);
+                        if (res.code === 200) {
+                          layer.msg(res.msg || '复制成功', { icon: 1 });
+                          table.reload('favoritesTable');
+                        } else {
+                          layer.msg(res.msg || '复制失败', { icon: 2 });
+                        }
+                      },
+                      error: function(xhr, status, error) {
+                        layer.close(loadingIdx);
+                        layer.msg('请求失败: ' + error, { icon: 2 });
+                      }
+                    });
+                  });
+                  break;
+
+                case 'batchRefreshFavorite':
+                  if (selectedData.length === 0) {
+                    layer.msg('请先选择要更新的数据', { icon: 0 });
+                    return;
+                  }
+                  batchRefreshParts(selectedData);
+                  break;
+
+                case 'batchRemoveFavorite':
+                  if (selectedData.length === 0) {
+                    layer.msg('请先选择要删除的收藏', { icon: 0 });
+                    return;
+                  }
+                  var rmPartNumbers = selectedData.map(function(item) { return item.part_number; });
+                  layer.confirm('确定要删除选中的 ' + rmPartNumbers.length + ' 个收藏吗？', {
+                    icon: 3, title: '确认删除'
+                  }, function(confirmIndex) {
+                    layer.close(confirmIndex);
+                    var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在删除...' });
+                    $.ajax({
+                      url: '/new/api/car-parts/remove-favorites',
+                      method: 'POST',
+                      contentType: 'application/json',
+                      data: JSON.stringify({
+                        part_numbers: rmPartNumbers,
+                        category: state.favoriteCategory
+                      }),
+                      success: function(res) {
+                        layer.close(loadingIdx);
+                        if (res.code === 200) {
+                          layer.msg(res.msg || '删除成功', { icon: 1 });
+                          table.reload('favoritesTable');
+                        } else {
+                          layer.msg(res.msg || '删除失败', { icon: 2 });
+                        }
+                      },
+                      error: function(xhr, status, error) {
+                        layer.close(loadingIdx);
+                        layer.msg('请求失败: ' + error, { icon: 2 });
+                      }
+                    });
+                  });
+                  break;
+
+                case 'clearCategoryFavorites':
+                  layer.confirm('确定要清空"' + state.favoriteCategory + '"分类下的所有收藏吗？此操作不可恢复！', {
+                    icon: 3, title: '确认清空'
+                  }, function(confirmIndex) {
+                    layer.close(confirmIndex);
+                    var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在清空...' });
+                    $.ajax({
+                      url: '/new/api/car-parts/clear-category',
+                      method: 'POST',
+                      contentType: 'application/json',
+                      data: JSON.stringify({ category: state.favoriteCategory }),
+                      success: function(res) {
+                        layer.close(loadingIdx);
+                        if (res.code === 200) {
+                          layer.msg(res.msg || '清空成功', { icon: 1 });
+                          table.reload('favoritesTable');
+                        } else {
+                          layer.msg(res.msg || '清空失败', { icon: 2 });
+                        }
+                      },
+                      error: function(xhr, status, error) {
+                        layer.close(loadingIdx);
+                        layer.msg('请求失败: ' + error, { icon: 2 });
+                      }
+                    });
+                  });
+                  break;
+              }
+            });
+
+            // 收藏表格行事件
+            table.on('tool(favoritesTable)', function(obj) {
+              var data = obj.data;
+              if (obj.event === 'removeFavorite') {
+                layer.confirm('确定要从收藏中删除配件 ' + data.part_number + ' 吗？', {
+                  icon: 3, title: '确认删除'
+                }, function(confirmIndex) {
+                  layer.close(confirmIndex);
+                  var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在删除...' });
+                  $.ajax({
+                    url: '/new/api/car-parts/remove-favorites',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                      part_numbers: [data.part_number],
+                      category: state.favoriteCategory
+                    }),
+                    success: function(res) {
+                      layer.close(loadingIdx);
+                      if (res.code === 200) {
+                        layer.msg(res.msg || '删除成功', { icon: 1 });
+                        table.reload('favoritesTable');
+                      } else {
+                        layer.msg(res.msg || '删除失败', { icon: 2 });
+                      }
+                    },
+                    error: function(xhr, status, error) {
+                      layer.close(loadingIdx);
+                      layer.msg('请求失败: ' + error, { icon: 2 });
+                    }
+                  });
+                });
+              }
+            });
+
+            // 收藏表格配件编号点击事件
+            $(document).off('click', '#favoritesTable .view-detail-link').on('click', '#favoritesTable .view-detail-link', function() {
+              var partNumber = $(this).data('part');
+              if (partNumber) {
+                $('#partNumber').val(partNumber);
+                layer.closeAll();
+                doSearch();
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // ==================== 批量刷新数据 ====================
+    function batchRefreshParts(selectedData) {
+      var partNumbers = selectedData.map(function(item) {
+        return item.part_number;
+      });
+
+      layer.confirm('确定要更新以下 ' + partNumbers.length + ' 个配件数据吗？<br><br><span style="color:#1890ff;font-family:Consolas,monospace;">' +
+        partNumbers.slice(0, 5).join(', ') + (partNumbers.length > 5 ? '...' : '') + '</span>', {
+        icon: 3,
+        title: '确认更新'
+      }, function(index) {
+        layer.close(index);
+
+        var loadingIdx = layer.load(2, {
+          shade: [0.1, '#000'],
+          content: '正在爬取并更新数据...'
+        });
+
+        $.ajax({
+          url: '/new/api/car-parts/batch-refresh',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            part_numbers: partNumbers
+          }),
+          success: function(res) {
+            layer.close(loadingIdx);
+            if (res.code === 200) {
+              layer.msg('数据更新完成: ' + (res.data && res.data.msg ? res.data.msg : '成功'), { icon: 1 });
+              setTimeout(function() {
+                if (state.favoriteTableIns) {
+                  table.reload('favoritesTable');
+                }
+              }, 1000);
+            } else {
+              layer.msg('更新失败: ' + (res.msg || '未知错误'), { icon: 2 });
+            }
+          },
+          error: function(xhr, status, error) {
+            layer.close(loadingIdx);
+            layer.msg('请求失败: ' + error, { icon: 2 });
+          }
+        });
+      });
+    }
+
+    // ==================== DOM 事件绑定 ====================
+    $('#searchBtn').on('click', doSearch);
+
+    $('#partNumber').on('keydown', function(e) {
+      if (e.keyCode === 13) {
+        doSearch();
+      }
+    });
+
+    $('#addFavoriteBtn').on('click', function() {
+      var partNumber = $.trim($('#partNumber').val());
+      if (!partNumber) {
+        layer.msg('请先输入配件编号', { icon: 0 });
+        $('#partNumber').focus();
+        return;
+      }
+      if (!state.currentData) {
+        layer.msg('请先查询到配件数据后再添加收藏', { icon: 0 });
+        return;
+      }
+      addToFavorites([state.currentData.part_number]);
+    });
+
+    $('#viewFavoritesBtn').on('click', function() {
+      openFavorites();
+    });
+
+    $('#resetBtn').on('click', function() {
+      $('#partNumber').val('');
+      state.currentData = null;
+      $('#detailContainer').html(
+        '<div class="empty-state">' +
+          '<i class="layui-icon layui-icon-search"></i>' +
+          '<p>请在上方输入配件编号后点击"查询"按钮</p>' +
+        '</div>'
+      );
+      $('#partNumber').focus();
+    });
+  });
+  </script>
+</body>
+</html>

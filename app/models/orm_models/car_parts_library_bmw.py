@@ -42,6 +42,8 @@ class CarPartsLibraryBmw(BaseModels):
 
     # ===================== 时间字段 =====================
     data_collect_time = Column(String(50), nullable=True, comment='采集时间(原始字符串)')
+    # ===================== 数据来源 =====================
+    data_source = Column(String(50), nullable=True, comment='数据来源')
     created_at = Column(DateTime, nullable=False, default=datetime.now, comment='创建时间')
     updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now, comment='更新时间')
 
@@ -64,6 +66,7 @@ class CarPartsLibraryBmw(BaseModels):
             'dealer_net_rush': self.dealer_net_rush,
             'available_stock': self.available_stock,
             'data_collect_time': self.data_collect_time,
+            'data_source': self.data_source,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
         }

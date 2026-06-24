@@ -22,14 +22,10 @@ def set_mercedes_config(
     customer_id: Optional[str] = None,
     sales_organization_id: Optional[str] = None,
     tax_rate: Optional[float] = None,
-    discount_rate: Optional[float] = None,
-    column_config: Optional[Dict] = None,
-    favorite_column_config: Optional[Dict] = None,
-    column_order: Optional[List[str]] = None,
-    favorite_column_order: Optional[List[str]] = None
+    discount_rate: Optional[float] = None
 ) -> Dict:
     """
-    设置奔驰大库配置
+    设置奔驰大库配置（不含列配置）
     所有参数都是可选的，如果参数为 None，则保留原有配置不变
 
     :param username: 登录用户名（可选），默认保留原值
@@ -38,16 +34,10 @@ def set_mercedes_config(
     :param sales_organization_id: 销售组织ID（可选）
     :param tax_rate: 税率（可选），默认保留原值
     :param discount_rate: 折扣率（可选），默认保留原值
-    :param column_config: 配件列表列配置（可选），默认保留原值
-    :param favorite_column_config: 收藏列表列配置（可选），默认保留原值
-    :param column_order: 配件列表列顺序（可选），默认保留原值
-    :param favorite_column_order: 收藏列表列顺序（可选），默认保留原值
     :return: 设置结果
     """
-    # 构建要更新的字典
     update_dict = {}
 
-    # 只添加传入的参数（不是 None 的）
     if username is not None:
         update_dict['username'] = username
     if password is not None:
@@ -60,6 +50,33 @@ def set_mercedes_config(
         update_dict['tax_rate'] = tax_rate
     if discount_rate is not None:
         update_dict['discount_rate'] = discount_rate
+
+    return update_json_config(
+        'mercedes_benz',
+        update_dict,
+        config_group='car_parts',
+        label='奔驰大库配置',
+        remark='用于访问奔驰大库的配置信息'
+    )
+
+
+def set_benz_column_config(
+    column_config: Optional[Dict] = None,
+    favorite_column_config: Optional[Dict] = None,
+    column_order: Optional[List[str]] = None,
+    favorite_column_order: Optional[List[str]] = None
+) -> Dict:
+    """
+    设置奔驰配件列表列配置（独立配置项）
+
+    :param column_config: 配件列表列配置（可选），默认保留原值
+    :param favorite_column_config: 收藏列表列配置（可选），默认保留原值
+    :param column_order: 配件列表列顺序（可选），默认保留原值
+    :param favorite_column_order: 收藏列表列顺序（可选），默认保留原值
+    :return: 设置结果
+    """
+    update_dict = {}
+
     if column_config is not None:
         update_dict['column_config'] = column_config
     if favorite_column_config is not None:
@@ -69,14 +86,27 @@ def set_mercedes_config(
     if favorite_column_order is not None:
         update_dict['favorite_column_order'] = favorite_column_order
 
-    # 使用通用函数更新配置
     return update_json_config(
-        'mercedes_benz',
+        'benz_column_config',
         update_dict,
         config_group='car_parts',
-        label='奔驰大库配置',
-        remark='用于访问奔驰大库的配置信息'
+        label='奔驰配件列配置',
+        remark='用于奔驰配件库页面的列显示与顺序配置'
     )
+
+
+def get_benz_column_config() -> Optional[Dict]:
+    """
+    获取奔驰配件列表列配置
+
+    :return: 列配置字典，如果不存在则返回 None
+    """
+    try:
+        config = get_config_value('benz_column_config')
+        return config  # pyright: ignore[reportReturnType]
+    except Exception as e:
+        print(f"获取奔驰列配置失败: {str(e)}")
+        return None
 
 
 def get_mercedes_config() -> Optional[Dict]:

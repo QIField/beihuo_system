@@ -11,6 +11,7 @@
 """
 
 from flask import Blueprint, request, jsonify, send_file, session
+from app.core.permission.decorators import require_authentication
 from app.services.car_parts_library_service.car_parts_library_benz_service import get_part_by_number, get_parts_list_page, data_refresh, add_part, update_part, delete_part, import_parts, download_template
 from app.services.car_parts_library_service.car_parts_favorite_service import batch_add_to_favorites
 from app.services.car_parts_library_service.mercedes_dalfsc_service import by_part_number_get_data
@@ -20,6 +21,7 @@ benz_parts_bp = Blueprint('benz_parts', __name__)
 
 
 @benz_parts_bp.route('/list', methods=['GET'])
+@require_authentication()
 def get_parts_list():
     """
     获取配件列表（分页）
@@ -68,6 +70,7 @@ def get_parts_list():
 
 
 @benz_parts_bp.route('/detail', methods=['GET'])
+@require_authentication()
 def get_part_detail():
     """
     获取配件详情
@@ -113,6 +116,7 @@ def get_part_detail():
 
 
 @benz_parts_bp.route('/batch-refresh', methods=['POST'])
+@require_authentication()
 def batch_refresh_parts_data():
     """
     批量刷新配件数据 API
@@ -177,6 +181,7 @@ def batch_refresh_parts_data():
 
 
 @benz_parts_bp.route('/add', methods=['POST'])
+@require_authentication()
 def add_part_api():
     """
     添加配件
@@ -223,6 +228,7 @@ def add_part_api():
 
 
 @benz_parts_bp.route('/update', methods=['POST'])
+@require_authentication()
 def update_part_api():
     """
     更新配件
@@ -269,6 +275,7 @@ def update_part_api():
 
 
 @benz_parts_bp.route('/delete', methods=['POST'])
+@require_authentication()
 def delete_part_api():
     """
     删除配件
@@ -315,6 +322,7 @@ def delete_part_api():
 
 
 @benz_parts_bp.route('/import', methods=['POST'])
+@require_authentication()
 def import_parts_api():
     """
     批量导入配件（插入更新模式）
@@ -377,6 +385,7 @@ def import_parts_api():
 
 
 @benz_parts_bp.route('/template', methods=['GET'])
+@require_authentication()
 def download_template_api():
     """
     下载Excel导入模板
@@ -399,6 +408,7 @@ def download_template_api():
 
 
 @benz_parts_bp.route('/fetch-realtime', methods=['POST'])
+@require_authentication()
 def fetch_realtime_data():
     """
     实时获取零件信息和库存信息（不入库）

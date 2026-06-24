@@ -180,6 +180,140 @@ def get_bmw_favorite_categories() -> Dict:
         return {'status': False, 'msg': msg, 'categories': ['宝马主收藏']}
 
 
+def move_bmw_to_main_category(part_numbers: List[str], source_category: Optional[str] = None, operator_user_id: Optional[int] = None) -> Dict:
+    """
+    批量将收藏从指定分类移动到宝马主收藏
+
+    :param part_numbers: 配件编号列表
+    :param source_category: 来源分类，如果为None则从所有非宝马主收藏分类移动
+    :param operator_user_id: 操作人用户ID（可为None，仅作记录）
+    :return: 包含操作结果的字典
+    """
+    try:
+        if not part_numbers or len(part_numbers) == 0:
+            return {'status': False, 'msg': '配件编号列表不能为空', 'moved_count': 0, 'deleted_count': 0}
+
+        # 记录移动成功数与重复删除数
+        moved_count = 0
+        deleted_count = 0
+
+        with orm_session() as session:
+            try:
+                # 第一步：查出当前已存在于"宝马主收藏"中的配件编号
+                # 目的：如果这些配件同时还出现在其他分类里，其他分类的条目需要删除
+                # （否则同一 part_number 会在"宝马主收藏"和其他分类下同时出现）
+                existing_in_main = session.query(CarPartsFavorite.part_number).filter(
+                    CarPartsFavorite.part_number.in_(part_numbers),
+                    CarPartsFavorite.category == '宝马主收藏'
+                ).all()
+                existing_part_numbers = [item[0] for item in existing_in_main]
+
+                # 第二步：对于已存在于"宝马主收藏"的 part_number，
+                # 把它们在来源分类（或所有非宝马主收藏分类）中的条目删掉，
+                # 避免同一个配件既在主收藏里又在其他分类里出现
+                if existing_part_numbers:
+                    query = session.query(CarPartsFavorite).filter(
+                        CarPartsFavorite.part_number.in_(existing_part_numbers)
+                    )
+                    if source_category:
+                        # 若指定了来源分类，则只删该来源分类下的重复
+                        query = query.filter(CarPartsFavorite.category == source_category)
+                    else:
+                        # 否则删除所有非"宝马主收藏"分类下的相同 part_number 记录
+                        query = query.filter(CarPartsFavorite.category != '宝马主收藏')
+                    deleted_result = query.delete(synchronize_session=False)
+                    deleted_count = deleted_result
+
+                # 第三步：剩下的 part_number（当前还不存在于宝马主收藏）
+                # 直接把它们的 category 更新为"宝马主收藏"
+                parts_to_move = [pn for pn in part_numbers if pn not in existing_part_numbers]
+                if parts_to_move:
+                    query = session.query(CarPartsFavorite).filter(
+                        CarPartsFavorite.part_number.in_(parts_to_move)
+                    )
+                    if source_category:
+                        # 若指定了来源分类，只移动该分类下的条目
+                        query = query.filter(CarPartsFavorite.category == source_category)
+                    else:
+                        # 否则把所有非"宝马主收藏"分类下的对应条目都改为宝马主收藏
+                        query = query.filter(CarPartsFavorite.category != '宝马主收藏')
+                    # 更新 category 字段（同时刷新操作者 user_id）
+                    move_result = query.update(
+                        {'category': '宝马主收藏', 'user_id': operator_user_id},
+                        synchronize_session=False
+                    )
+                    moved_count = move_result
+
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
+
+        msg_parts = []
+        if moved_count > 0:
+            msg_parts.append(f'移动 {moved_count} 个')
+        if deleted_count > 0:
+            msg_parts.append(f'删除重复 {deleted_count} 个')
+
+        return {
+            'status': True,
+            'msg': f'移动成功！{", ".join(msg_parts)}收藏到宝马主收藏',
+            'moved_count': moved_count,
+            'deleted_count': deleted_count
+        }
+    except Exception as e:
+        msg = f'移动失败: {str(e)}'
+        print(msg)
+        return {'status': False, 'msg': msg, 'moved_count': 0, 'deleted_count': 0}
+
+
+def copy_bmw_to_main_category(part_numbers: List[str], operator_user_id: Optional[int] = None) -> Dict:
+    """
+    批量复制收藏到宝马主收藏（保持原分类不变）
+
+    :param part_numbers: 配件编号列表
+    :param operator_user_id: 操作人用户ID（可为None，仅作记录）
+    :return: 包含操作结果的字典
+    """
+    try:
+        if not part_numbers or len(part_numbers) == 0:
+            return {'status': False, 'msg': '配件编号列表不能为空', 'copied_count': 0, 'exists_count': 0}
+
+        copied_count = 0
+        exists_count = 0
+
+        with orm_session() as session:
+            for part_number in part_numbers:
+                existing = session.query(CarPartsFavorite).filter(
+                    CarPartsFavorite.part_number == part_number,
+                    CarPartsFavorite.category == '宝马主收藏'
+                ).first()
+
+                if existing:
+                    exists_count += 1
+                else:
+                    new_favorite = CarPartsFavorite(
+                        user_id=operator_user_id,
+                        part_number=part_number,
+                        category='宝马主收藏',
+                    )
+                    session.add(new_favorite)
+                    copied_count += 1
+
+            session.commit()
+
+        return {
+            'status': True,
+            'msg': f'复制成功！新增 {copied_count} 个，已存在 {exists_count} 个',
+            'copied_count': copied_count,
+            'exists_count': exists_count
+        }
+    except Exception as e:
+        msg = f'复制失败: {str(e)}'
+        print(msg)
+        return {'status': False, 'msg': msg, 'copied_count': 0, 'exists_count': 0}
+
+
 def clear_bmw_category_favorites(category: str) -> Dict:
     """
     清空指定宝马分类下的所有收藏

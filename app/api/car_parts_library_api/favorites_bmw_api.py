@@ -11,18 +11,22 @@
 """
 
 from flask import Blueprint, request, jsonify, session
+from app.core.permission.decorators import require_authentication, require_permission
 from app.services.car_parts_library_service.car_parts_favorite_bmw_service import (
     add_bmw_to_favorites,
     get_bmw_favorites,
     remove_bmw_from_favorites,
     get_bmw_favorite_categories,
     clear_bmw_category_favorites,
+    move_bmw_to_main_category,
+    copy_bmw_to_main_category,
 )
 
 favorites_bmw_bp = Blueprint('favorites_bmw', __name__)
 
 
 @favorites_bmw_bp.route('/add-bmw-favorites', methods=['POST'])
+@require_authentication()
 def add_bmw_favorites_api():
     """
     批量添加宝马配件到收藏夹 API
@@ -57,6 +61,7 @@ def add_bmw_favorites_api():
 
 
 @favorites_bmw_bp.route('/get-bmw-favorites', methods=['GET'])
+@require_authentication()
 def get_bmw_favorites_api():
     """
     获取宝马收藏列表 API
@@ -82,6 +87,7 @@ def get_bmw_favorites_api():
 
 
 @favorites_bmw_bp.route('/remove-bmw-favorites', methods=['POST'])
+@require_permission('favorites:remove')
 def remove_bmw_favorites_api():
     """
     批量从收藏夹删除宝马配件 API
@@ -113,6 +119,7 @@ def remove_bmw_favorites_api():
 
 
 @favorites_bmw_bp.route('/get-bmw-categories', methods=['GET'])
+@require_authentication()
 def get_bmw_categories_api():
     """
     获取所有宝马相关的收藏分类 API
@@ -125,6 +132,7 @@ def get_bmw_categories_api():
 
 
 @favorites_bmw_bp.route('/clear-bmw-category', methods=['POST'])
+@require_permission('favorites:clear')
 def clear_bmw_category_api():
     """
     清空指定宝马分类下的所有收藏 API
@@ -151,3 +159,69 @@ def clear_bmw_category_api():
             return jsonify({'code': 400, 'msg': result.get('msg'), 'data': result})
     except Exception as e:
         return jsonify({'code': 500, 'msg': f'清空收藏失败: {str(e)}', 'data': None})
+
+
+@favorites_bmw_bp.route('/move-bmw-to-main', methods=['POST'])
+@require_authentication()
+def move_bmw_to_main_api():
+    """
+    批量将宝马收藏移动到宝马主收藏 API
+
+    请求参数:
+    {
+        "part_numbers": ["配件编号1", "配件编号2", ...],
+        "source_category": "来源分类名称"（可选）
+    }
+    """
+    try:
+        operator_user_id = session.get('user_id') if 'logged_in' in session else None
+
+        data = request.get_json()
+        if not data:
+            return jsonify({'code': 400, 'msg': '请求参数不能为空', 'data': None})
+
+        part_numbers = data.get('part_numbers', [])
+        if not part_numbers or len(part_numbers) == 0:
+            return jsonify({'code': 400, 'msg': '配件编号列表不能为空', 'data': None})
+
+        source_category = data.get('source_category')
+        result = move_bmw_to_main_category(part_numbers, source_category, operator_user_id)
+
+        if result.get('status'):
+            return jsonify({'code': 200, 'msg': result.get('msg'), 'data': result})
+        else:
+            return jsonify({'code': 400, 'msg': result.get('msg'), 'data': result})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'移动收藏失败: {str(e)}', 'data': None})
+
+
+@favorites_bmw_bp.route('/copy-bmw-to-main', methods=['POST'])
+@require_authentication()
+def copy_bmw_to_main_api():
+    """
+    批量复制宝马收藏到宝马主收藏 API
+
+    请求参数:
+    {
+        "part_numbers": ["配件编号1", "配件编号2", ...]
+    }
+    """
+    try:
+        operator_user_id = session.get('user_id') if 'logged_in' in session else None
+
+        data = request.get_json()
+        if not data:
+            return jsonify({'code': 400, 'msg': '请求参数不能为空', 'data': None})
+
+        part_numbers = data.get('part_numbers', [])
+        if not part_numbers or len(part_numbers) == 0:
+            return jsonify({'code': 400, 'msg': '配件编号列表不能为空', 'data': None})
+
+        result = copy_bmw_to_main_category(part_numbers, operator_user_id)
+
+        if result.get('status'):
+            return jsonify({'code': 200, 'msg': result.get('msg'), 'data': result})
+        else:
+            return jsonify({'code': 400, 'msg': result.get('msg'), 'data': result})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'复制收藏失败: {str(e)}', 'data': None})

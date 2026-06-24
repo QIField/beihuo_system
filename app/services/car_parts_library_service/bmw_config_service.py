@@ -10,7 +10,7 @@
 负责处理宝马配件库的配置管理业务逻辑
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from app.services.system_setting_service.beihuo_system_config_service import update_json_config
 from config.config_list_manager.config_cache import get_config_value
@@ -58,4 +58,53 @@ def get_bmw_config() -> Optional[Dict]:
         return config  # pyright: ignore[reportReturnType]
     except Exception as e:
         print(f"获取宝马配置失败: {str(e)}")
+        return None
+
+
+def set_bmw_column_config(
+    column_config: Optional[Dict] = None,
+    favorite_column_config: Optional[Dict] = None,
+    column_order: Optional[List[str]] = None,
+    favorite_column_order: Optional[List[str]] = None
+) -> Dict:
+    """
+    设置宝马配件列表列配置（独立配置项）
+
+    :param column_config: 配件列表列配置（可选），默认保留原值
+    :param favorite_column_config: 收藏列表列配置（可选），默认保留原值
+    :param column_order: 配件列表列顺序（可选），默认保留原值
+    :param favorite_column_order: 收藏列表列顺序（可选），默认保留原值
+    :return: 设置结果
+    """
+    update_dict = {}
+
+    if column_config is not None:
+        update_dict['column_config'] = column_config
+    if favorite_column_config is not None:
+        update_dict['favorite_column_config'] = favorite_column_config
+    if column_order is not None:
+        update_dict['column_order'] = column_order
+    if favorite_column_order is not None:
+        update_dict['favorite_column_order'] = favorite_column_order
+
+    return update_json_config(
+        'bmw_column_config',
+        update_dict,
+        config_group='car_parts',
+        label='宝马配件列配置',
+        remark='用于宝马配件库页面的列显示与顺序配置'
+    )
+
+
+def get_bmw_column_config() -> Optional[Dict]:
+    """
+    获取宝马配件列表列配置
+
+    :return: 列配置字典，如果不存在则返回 None
+    """
+    try:
+        config = get_config_value('bmw_column_config')
+        return config  # pyright: ignore[reportReturnType]
+    except Exception as e:
+        print(f"获取宝马列配置失败: {str(e)}")
         return None
