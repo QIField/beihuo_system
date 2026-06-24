@@ -42,6 +42,7 @@
                 persistGridKey: null,
                 rowKeyField: null,
                 showPagination: true,
+                getRowClass: null,
                 onBeforeLoad: null,
                 onLoad: null,
                 onClose: null
@@ -160,13 +161,14 @@
                 animateRows: true,
                 overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
                 overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
+                getRowClass: this.options.getRowClass || null,
                 onGridReady: function(event) {
                     self.detailGridApi = event.api;
                     self.detailGridColumnApi = event.columnApi;
                     self.detailGridLoader = new AgGridLoader(self.detailGridApi);
 
                     if (typeof GridColumnMenu !== 'undefined') {
-                        GridColumnMenu.init(self.detailGridApi, '#' + gridId, self.options.columnDefs, {
+                        var menuOptions = {
                             columnApi: self.detailGridColumnApi,
                             gridOptions: gridOptions,
                             persist: true,
@@ -178,7 +180,13 @@
                             onDataRefresh: function() {
                                 self.loadDetailData(1, self.currentPageSize);
                             }
-                        });
+                        };
+                        if (typeof self.options.getFilterValues === 'function') {
+                            menuOptions.getFilterValues = function(colId, callback) {
+                                self.options.getFilterValues(colId, callback, self.currentRowData);
+                            };
+                        }
+                        GridColumnMenu.init(self.detailGridApi, '#' + gridId, self.options.columnDefs, menuOptions);
                     }
 
                     self.detailGridApi.sizeColumnsToFit();
@@ -304,6 +312,9 @@
             if (this.detailGridApi) {
                 setTimeout(function() {
                     self.detailGridApi.sizeColumnsToFit();
+                    if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.addMenuButtonsToHeaders) {
+                        GridColumnMenu.addMenuButtonsToHeaders('#' + self.gridId);
+                    }
                 }, 0);
             }
 
@@ -339,6 +350,19 @@
             if (this.options.showPagination) {
                 params.page = page;
                 params.page_size = pageSize;
+            }
+
+            // 副表列头排序/筛选状态透传到后端
+            if (typeof GridColumnMenu !== 'undefined') {
+                var sortState = GridColumnMenu.getSortState('#' + self.gridId);
+                if (sortState.sortColumn) {
+                    params.sort_column = sortState.sortColumn;
+                    params.sort_dir = sortState.sortDir;
+                }
+                var filterState = GridColumnMenu.getFilterState('#' + self.gridId);
+                if (filterState.active && filterState.filters) {
+                    params.column_filters = JSON.stringify(filterState.filters);
+                }
             }
 
             if (this.detailGridLoader) {

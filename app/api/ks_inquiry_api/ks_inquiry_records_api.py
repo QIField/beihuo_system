@@ -113,6 +113,92 @@ def get_ks_inquiry_records():
         }), 500
 
 
+@bp.route('/records/master', methods=['GET'])
+def get_ks_inquiry_master_records():
+    """
+    获取询价单维度主表（按 inquiryId 去重）
+
+    Query Parameters:
+        inquiry_id: 询价单号
+        garage_name: 客户名称
+        car_brand_name: 车辆品牌
+        seller_status: 订单状态（订单包含该状态即显示）
+        begin_date: 开始日期
+        end_date: 结束日期
+        sort_column: 排序列名
+        sort_dir: 排序方向
+        page: 页码
+        page_size: 每页条数
+
+    Returns:
+        JSON: {code: 0, data: {list: [...], total, page, page_size}, message}
+    """
+    try:
+        inquiry_id = request.args.get('inquiry_id', '').strip()
+        garage_name = request.args.get('garage_name', '').strip()
+        car_brand_name = request.args.get('car_brand_name', '').strip()
+        seller_status = request.args.get('seller_status', '').strip()
+        begin_date = request.args.get('begin_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        company = request.args.get('company', '').strip()
+        sort_column = request.args.get('sort_column', '').strip()
+        sort_dir = request.args.get('sort_dir', '').strip()
+
+        column_filters = request.args.get('column_filters', '').strip()
+        if column_filters:
+            try:
+                column_filters = json.loads(column_filters)
+            except Exception:
+                column_filters = None
+        else:
+            column_filters = None
+
+        try:
+            page = int(request.args.get('page', 1))
+            page_size = int(request.args.get('page_size', 200))
+        except ValueError:
+            page = 1
+            page_size = 200
+
+        if page_size > 1000:
+            page_size = 1000
+        if page_size < 1:
+            page_size = 200
+        if page < 1:
+            page = 1
+
+        result = KsInquiryRecordsService.get_master_records(
+            inquiry_id=inquiry_id,
+            garage_name=garage_name,
+            car_brand_name=car_brand_name,
+            seller_status=seller_status,
+            begin_date=begin_date,
+            end_date=end_date,
+            company=company,
+            sort_column=sort_column,
+            sort_dir=sort_dir,
+            page=page,
+            page_size=page_size,
+            column_filters=column_filters
+        )
+
+        return jsonify({
+            'code': 0,
+            'message': 'success',
+            'data': result
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"[KsInquiryRecordsAPI] 主表查询错误: {str(e)}")
+        print(f"[KsInquiryRecordsAPI] 堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'code': 500,
+            'message': f'查询失败: {str(e)}',
+            'data': {'list': [], 'total': 0, 'page': 1, 'page_size': 200}
+        }), 500
+
+
 @bp.route('/seller_status', methods=['GET'])
 def get_seller_status_options():
     """
@@ -682,7 +768,7 @@ def get_column_values():
 
     Query Parameters:
         column: 前端列名（必填）
-        grid_type: 网格类型：detail / oe_stats / garage_chassis / garage_engine / garage_oenum（默认 detail）
+        grid_type: 网格类型：detail / master / oe_stats / garage_chassis / garage_engine / garage_oenum（默认 detail）
         其他查询条件与 /records 接口一致
         column_filters: 当前已激活的列筛选（JSON 字符串），查询时会排除当前列本身
 
