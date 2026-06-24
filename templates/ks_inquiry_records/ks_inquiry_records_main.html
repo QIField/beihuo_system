@@ -35,9 +35,9 @@
     <!-- AG Grid Loader 组件 -->
     <script src="/static/js/components/ag-grid-loader/ag-grid-loader.js"></script>
 
-    <!-- AG Grid 合并单元格组件 -->
-    <link rel="stylesheet" href="/static/js/components/merge-cell/merge-cell.css">
-    <script src="/static/js/components/merge-cell/merge-cell.js"></script>
+    <!-- Grid Detail Panel 组件（主表-副表联动） -->
+    <link rel="stylesheet" href="/static/js/components/grid-detail-panel/grid-detail-panel.css">
+    <script src="/static/js/components/grid-detail-panel/grid-detail-panel.js"></script>
 
     <!-- TabNav 标签导航组件 -->
     <link rel="stylesheet" href="/static/js/components/tab-nav/tab-nav.css">
@@ -83,6 +83,40 @@
             margin: 0 4px !important;
         }
 
+        /* 订单状态筛选 */
+        .order-status-wrapper {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 6px;
+        }
+        .order-status-label {
+            font-size: 13px;
+            color: #666;
+            margin-right: 4px;
+            white-space: nowrap;
+        }
+        .order-status-select {
+            height: 30px;
+            width: 90px;
+            padding: 0 20px 0 6px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #333;
+            background: #fff;
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+        .order-status-select:hover {
+            border-color: #1890ff;
+        }
+        .order-status-select:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
         /* FilterPanel容器样式 */
         .search-panel #ksInquiryFilterButtons {
             display: inline-flex;
@@ -103,22 +137,24 @@
             width: 100%;
         }
 
-        /* 分页条数选择器 */
-        .ag-paging-panel {
-            position: relative;
+        /* 客户维度：左右分栏布局 */
+        #tab-customer .customer-layout {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 200px);
+            min-height: 500px;
+        }
+
+        #tab-customer .customer-layout > div {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
         }
 
         /* 分页条数选择器 */
-        .page-size-selector {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: #666;
+        .ag-paging-panel {
+            position: relative;
         }
 
         .page-size-selector select {
@@ -222,12 +258,8 @@
         // 各标签页独立搜索状态
         const detailSearchState = {
             inquiry_id: '',
-            parts_num: '',
-            parts_name: '',
-            brand: '',
-            seller_status: '',
-            car_brand_name: '',
-            garage_name: ''
+            garage_name: '',
+            seller_status: ''
         };
 
         const oeSearchState = {
@@ -240,6 +272,10 @@
         };
 
         const engineSearchState = {
+            garage_name: ''
+        };
+
+        const customerSearchState = {
             garage_name: ''
         };
 
@@ -283,6 +319,7 @@
             if (tabId === 'detail') return detailSearchState;
             if (tabId === 'oe') return oeSearchState;
             if (tabId === 'engine') return engineSearchState;
+            if (tabId === 'customer') return customerSearchState;
             return {};
         }
     </script>
@@ -295,6 +332,7 @@
             <button class="tab-btn active" data-tab="detail">明细列表</button>
             <button class="tab-btn" data-tab="oe">OE统计维度</button>
             <button class="tab-btn" data-tab="engine">发动机及底盘维度</button>
+            <button class="tab-btn" data-tab="customer">客户维度</button>
         </div>
 
         <!-- 搜索筛选区域 - 保持原样 -->
@@ -308,6 +346,18 @@
 
             <!-- 筛选按钮 -->
             <div id="ksInquiryFilterButtons"></div>
+
+            <!-- 订单状态筛选（仅明细列表标签显示） -->
+            <span id="orderStatusWrapper" class="order-status-wrapper" style="display: none;">
+                <span class="order-status-label">订单状态：</span>
+                <select id="orderStatusSelect" class="order-status-select" title="订单状态">
+                    <option value="__prompt__" disabled>选择后，主表将展示包含该订单状态的询价单</option>
+                    <option value="" selected>全部</option>
+                    <option value="未下单">未下单</option>
+                    <option value="非本店下单">非本店下单</option>
+                    <option value="本店下单">本店下单</option>
+                </select>
+            </span>
 
             <!-- 分隔符（重置前，始终显示） -->
             <span style="color: #999;">|</span>
@@ -333,6 +383,7 @@
             {% include 'ks_inquiry_records/detail_tab.html' %}
             {% include 'ks_inquiry_records/oe_stats_tab.html' %}
             {% include 'ks_inquiry_records/engine_stats_tab.html' %}
+            {% include 'ks_inquiry_records/customer_stats_tab.html' %}
         </div>
     </div>
 
@@ -363,6 +414,8 @@
                 state = oeSearchState;
             } else if (tabId === 'engine') {
                 state = engineSearchState;
+            } else if (tabId === 'customer') {
+                state = customerSearchState;
             }
 
             return Object.assign({}, state, {
@@ -374,8 +427,8 @@
 
         // 重置所有筛选条件
         function resetAll() {
-            // 清空日期范围
-            document.getElementById('dateRange').value = '';
+            // 重置日期范围为近三天
+            document.getElementById('dateRange').value = getDefaultDateRange();
 
             // 只重置当前 tab 对应的 state
             const state = getCurrentSearchState(currentTab);
@@ -391,6 +444,9 @@
             document.getElementById('searchVin').value = '';
             document.getElementById('searchGarageName').value = '';
 
+            const orderStatusSelect = document.getElementById('orderStatusSelect');
+            if (orderStatusSelect) orderStatusSelect.value = '';
+
             if (typeof FilterPanel !== 'undefined' && FilterPanel.clearAll) {
                 FilterPanel.clearAll();
             }
@@ -401,6 +457,10 @@
                 refreshOeStats();
             } else if (currentTab === 'engine') {
                 refreshEngineChassis();
+            } else if (currentTab === 'customer') {
+                if (typeof refreshCustomerStats === 'function') {
+                    refreshCustomerStats();
+                }
             }
         }
 
@@ -410,6 +470,16 @@
             syncHiddenInputsToState(getCurrentSearchState(currentTab));
 
             currentTab = tabId;
+
+            // 控制订单状态筛选只在明细列表标签显示
+            const orderStatusWrapper = document.getElementById('orderStatusWrapper');
+            const orderStatusSelect = document.getElementById('orderStatusSelect');
+            if (orderStatusWrapper) {
+                orderStatusWrapper.style.display = (tabId === 'detail') ? 'inline-flex' : 'none';
+                if (tabId === 'detail' && orderStatusSelect) {
+                    orderStatusSelect.value = detailSearchState.seller_status || '';
+                }
+            }
 
             // 重新初始化 FilterPanel
             const filterContainer = document.getElementById('ksInquiryFilterButtons');
@@ -424,8 +494,7 @@
             if (tabId === 'detail') {
                 fields = [
                     { label: '询价单号', inputId: 'searchInquiryId' },
-                    { label: 'OE号', inputId: 'searchPartsNum' },
-                    { label: '配件名称', inputId: 'searchPartsName' }
+                    { label: '客户名称', inputId: 'searchGarageName' }
                 ];
             } else if (tabId === 'oe') {
                 fields = [
@@ -433,6 +502,10 @@
                     { label: '配件名称', inputId: 'searchPartsName' }
                 ];
             } else if (tabId === 'engine') {
+                fields = [
+                    { label: '客户名称', inputId: 'searchGarageName' }
+                ];
+            } else if (tabId === 'customer') {
                 fields = [
                     { label: '客户名称', inputId: 'searchGarageName' }
                 ];
@@ -451,9 +524,11 @@
                 onApply: function(field, value) {
                     const state = getCurrentSearchState(currentTab);
                     const stateField = labelToStateField[field];
+                    console.log('[main] FilterPanel onApply:', currentTab, field, value, 'stateField:', stateField);
                     if (stateField && stateField in state) {
                         state[stateField] = value || '';
                     }
+                    console.log('[main] after update state:', JSON.stringify(state));
 
                     const fieldConfig = fields.find(function(f) { return f.label === field; });
                     if (fieldConfig) {
@@ -467,9 +542,29 @@
                         refreshOeStats();
                     } else if (currentTab === 'engine') {
                         refreshEngineChassis();
+                    } else if (currentTab === 'customer') {
+                        if (typeof refreshCustomerStats === 'function') {
+                            refreshCustomerStats();
+                        }
                     }
                 }
             });
+        }
+
+        // 获取默认日期范围字符串（近三天）
+        function getDefaultDateRange() {
+            const today = new Date();
+            const todayStr = today.getFullYear() + '-' +
+                String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                String(today.getDate()).padStart(2, '0');
+
+            const threeDaysAgo = new Date(today);
+            threeDaysAgo.setDate(today.getDate() - 2);
+            const threeDaysAgoStr = threeDaysAgo.getFullYear() + '-' +
+                String(threeDaysAgo.getMonth() + 1).padStart(2, '0') + '-' +
+                String(threeDaysAgo.getDate()).padStart(2, '0');
+
+            return threeDaysAgoStr + ' - ' + todayStr;
         }
 
         // 初始化 Grid
@@ -488,6 +583,8 @@
                         initOeStatsGrid();
                     } else if (tabId === 'engine' && typeof initEngineChassisGrid === 'function') {
                         initEngineChassisGrid();
+                    } else if (tabId === 'customer' && typeof initCustomerStatsGrid === 'function') {
+                        initCustomerStatsGrid();
                     }
                 }
             });
@@ -495,18 +592,13 @@
             // 初始化筛选面板（根据当前标签动态显示）
             updateSearchPanelForTab('detail');
 
+            // 先同步设置默认日期，确保后续 Grid 初始化时能读到日期
+            const defaultDateRange = getDefaultDateRange();
+            document.getElementById('dateRange').value = defaultDateRange;
+
             // 初始化layui日期组件
             layui.use(['laydate'], function() {
                 const laydate = layui.laydate;
-
-                // 获取今天的日期字符串
-                const today = new Date();
-                const todayStr = today.getFullYear() + '-' +
-                    String(today.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(today.getDate()).padStart(2, '0');
-
-                // 设置默认日期范围（今天）
-                document.getElementById('dateRange').value = todayStr + ' - ' + todayStr;
 
                 laydate.render({
                     elem: '#dateRange',
@@ -514,7 +606,7 @@
                     format: 'yyyy-MM-dd',
                     range: true,
                     max: 0,
-                    value: todayStr + ' - ' + todayStr,
+                    value: defaultDateRange,
                     done: function(value, date, endDate) {
                         console.log('日期选择完成:', value);
                         if (currentTab === 'detail') {
@@ -523,6 +615,10 @@
                             refreshOeStats();
                         } else if (currentTab === 'engine') {
                             refreshEngineChassis();
+                        } else if (currentTab === 'customer') {
+                            if (typeof refreshCustomerStats === 'function') {
+                                refreshCustomerStats();
+                            }
                         }
                     },
                     change: function(value, date, endDate) {
@@ -531,12 +627,24 @@
                 });
             });
 
+            // 绑定订单状态变更事件
+            const orderStatusSelect = document.getElementById('orderStatusSelect');
+            if (orderStatusSelect) {
+                orderStatusSelect.addEventListener('change', function() {
+                    detailSearchState.seller_status = this.value || '';
+                    if (currentTab === 'detail') {
+                        refreshGrid();
+                    }
+                });
+            }
+
             // 初始化明细列表 AG Grid
             const gridDiv = document.querySelector('#ksInquiryGrid');
             if (gridDiv && typeof gridOptions !== 'undefined') {
                 new agGrid.Grid(gridDiv, gridOptions);
             }
         });
+
     </script>
 </body>
 </html>

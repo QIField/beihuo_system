@@ -424,6 +424,8 @@ def _send_notification(company, sku_total, special_sku_total):
     """
     查询当天变动记录，导出 Excel，并发送微信通知（简短摘要 + 下载链接）
 
+    若当天无任何变动记录，则不生成 Excel，也不附带下载链接。
+
     :param company: 门店代码
     :param sku_total: getProductList 全部产品的总数
     :param special_sku_total: 特殊库位产品的总数
@@ -446,6 +448,22 @@ def _send_notification(company, sku_total, special_sku_total):
             InventoryRecordLatest.workdate < tomorrow,
             InventoryRecordLatest.kw_no.in_(SPECIAL_KW_NOS),
         ).order_by(InventoryRecordLatest.workdate.desc()).all()
+
+    # 无变动时不生成 Excel、不带下载链接
+    if not records and not special_records:
+        message = (
+            f"===【crm特殊仓位库存变化业务汇报】===\n"
+            f"日期：{today_str}\n"
+            f"门店：{company}\n"
+            f"今日无库存变动记录\n"
+            f"sku：{sku_total}（常规）/ {special_sku_total}（特殊）"
+        )
+        try:
+            message_push("crm", message)
+            print(f"[通知] 已发送 {company} 的业务汇报，今日无变动")
+        except Exception as e:
+            print(f"[通知] 发送失败: {e}")
+        return
 
     # 导出 Excel
     data = []

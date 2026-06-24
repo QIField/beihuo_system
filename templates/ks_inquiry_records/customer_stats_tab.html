@@ -1,0 +1,455 @@
+<!-- 客户维度 -->
+<div id="tab-customer" class="tab-pane">
+    <div class="customer-layout">
+        <!-- 左侧主表：客户列表 -->
+        <div style="flex: 1; min-width: 0;">
+            <div id="customerStatsGrid" class="ag-theme-alpine" style="height: 100%; width: 100%;"></div>
+        </div>
+
+        <!-- 右侧副表区域：发动机、底盘、OE -->
+        <div style="flex: 1.5; min-width: 0; display: flex; flex-direction: column; gap: 12px; background: transparent; box-shadow: none; overflow: visible;">
+            <!-- 发动机统计 -->
+            <div style="flex: 1; min-height: 0; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); overflow: hidden; display: flex; flex-direction: column;">
+                <div style="padding: 10px 15px; font-size: 14px; font-weight: 600; color: #333; border-bottom: 1px solid #f0f0f0;">发动机统计</div>
+                <div id="customerEngineGrid" class="ag-theme-alpine" style="flex: 1; width: 100%;"></div>
+            </div>
+
+            <!-- 底盘统计 -->
+            <div style="flex: 1; min-height: 0; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); overflow: hidden; display: flex; flex-direction: column;">
+                <div style="padding: 10px 15px; font-size: 14px; font-weight: 600; color: #333; border-bottom: 1px solid #f0f0f0;">底盘统计</div>
+                <div id="customerChassisGrid" class="ag-theme-alpine" style="flex: 1; width: 100%;"></div>
+            </div>
+
+            <!-- OE统计 -->
+            <div style="flex: 1; min-height: 0; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); overflow: hidden; display: flex; flex-direction: column;">
+                <div style="padding: 10px 15px; font-size: 14px; font-weight: 600; color: #333; border-bottom: 1px solid #f0f0f0;">OE统计</div>
+                <div id="customerOeGrid" class="ag-theme-alpine" style="flex: 1; width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var customerStatsGridApi = null;
+    var customerStatsGridColumnApi = null;
+    var customerStatsCurrentPage = 1;
+    var customerStatsCurrentPageSize = 200;
+    var customerStatsTotalRecords = 0;
+    var customerStatsCustomPagination = null;
+    var customerStatsGridLoader = null;
+
+    var customerEngineGridApi = null;
+    var customerChassisGridApi = null;
+    var customerOeGridApi = null;
+
+    var currentSelectedCustomer = '';
+
+    // 主表列定义
+    const customerStatsColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 70, sortable: false, filter: false, lockPosition: 'left' },
+        { field: 'customerName', headerName: '客户', width: 200, pinned: 'left', sortable: false, filter: true },
+        { field: 'count', headerName: '询价次数', width: 120, sortable: false, filter: true }
+    ];
+
+    // 副表列定义
+    const customerEngineColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
+        { field: 'engine', headerName: '发动机', width: 140, sortable: false, suppressMenu: true },
+        { field: 'count', headerName: '次数', width: 100, sortable: false, suppressMenu: true }
+    ];
+
+    const customerChassisColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
+        { field: 'chassis', headerName: '底盘代码', width: 140, sortable: false, suppressMenu: true },
+        { field: 'count', headerName: '次数', width: 100, sortable: false, suppressMenu: true }
+    ];
+
+    const customerOeColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
+        { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
+        { field: 'partsNum', headerName: 'OE', width: 180, sortable: false, suppressMenu: true },
+        { field: 'partsName', headerName: '配件名称', width: 200, sortable: false, suppressMenu: true },
+        { field: 'count', headerName: '次数', width: 100, sortable: false, suppressMenu: true }
+    ];
+
+    const customerStatsGridOptions = {
+        columnDefs: customerStatsColumnDefs,
+        rowData: [],
+        defaultColDef: {
+            sortable: false,
+            filter: true,
+            resizable: true,
+            suppressMenu: true
+        },
+        rowHeight: 36,
+        headerHeight: 36,
+        pagination: false,
+        animateRows: true,
+        overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
+        overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
+        onGridReady: function(event) {
+            customerStatsGridApi = event.api;
+            customerStatsGridColumnApi = event.columnApi;
+
+            // 初始化数据加载器
+            customerStatsGridLoader = new AgGridLoader(customerStatsGridApi);
+
+            customerStatsGridApi.sizeColumnsToFit();
+
+            // 初始化列菜单功能（含持久化）
+            if (typeof GridColumnMenu !== 'undefined') {
+                GridColumnMenu.init(customerStatsGridApi, '#customerStatsGrid', customerStatsColumnDefs, {
+                    columnApi: customerStatsGridColumnApi,
+                    gridOptions: customerStatsGridOptions,
+                    persist: true,
+                    pageKey: 'ks_inquiry_records',
+                    gridKey: 'customer_grid',
+                    onSort: function(colId, direction) {
+                        refreshCustomerStats(1, customerStatsCurrentPageSize);
+                    },
+                    onDataRefresh: function(filterState) {
+                        refreshCustomerStats(1, customerStatsCurrentPageSize);
+                    },
+                    getFilterValues: function(colId, callback) {
+                        fetchCustomerStatsColumnValues(colId, callback);
+                    }
+                });
+            }
+
+            refreshCustomerStats();
+        },
+        rowSelection: 'single',
+        onRowClicked: function(event) {
+            if (event.data && event.data.customerName) {
+                currentSelectedCustomer = event.data.customerName;
+                loadCustomerSubGrids();
+            }
+        }
+    };
+
+    // 通用副表配置
+    function createSubGridOptions(columnDefs, gridType) {
+        return {
+            columnDefs: columnDefs,
+            rowData: [],
+            defaultColDef: {
+                sortable: false,
+                resizable: true,
+                suppressMenu: true
+            },
+            rowHeight: 32,
+            headerHeight: 34,
+            pagination: false,
+            animateRows: true,
+            overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
+            overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
+            onGridReady: function(params) {
+                if (gridType === 'engine') customerEngineGridApi = params.api;
+                else if (gridType === 'chassis') customerChassisGridApi = params.api;
+                else if (gridType === 'oe') customerOeGridApi = params.api;
+
+                params.api.sizeColumnsToFit();
+                setupSubGridDoubleClickCopy(params.api, gridType);
+            }
+        };
+    }
+
+    function initCustomerStatsGrid() {
+        if (customerStatsGridApi) {
+            refreshCustomerStats();
+            return;
+        }
+
+        const gridDiv = document.querySelector('#customerStatsGrid');
+        if (!gridDiv) return;
+
+        new agGrid.Grid(gridDiv, customerStatsGridOptions);
+
+        // 初始化双击复制功能
+        gridDiv.addEventListener('dblclick', function(e) {
+            const cellElement = e.target.closest('.ag-cell');
+            if (!cellElement) return;
+
+            const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
+            const colId = cellElement.getAttribute('col-id');
+
+            if (rowId && colId && customerStatsGridApi) {
+                const rowNode = customerStatsGridApi.getRowNode(rowId);
+                if (rowNode && rowNode.data) {
+                    const value = rowNode.data[colId];
+                    if (value !== undefined && value !== null) {
+                        const textToCopy = String(value);
+                        copyToClipboardUniversal(textToCopy, function() {
+                            layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+                        }, function() {
+                            layui.layer.msg('复制失败', {icon: 2});
+                        });
+                    }
+                }
+            }
+        });
+
+        // 初始化自定义分页组件
+        if (typeof CustomPagination !== 'undefined') {
+            customerStatsCustomPagination = CustomPagination.init({
+                gridSelector: '#customerStatsGrid',
+                pageSizeOptions: [50, 100, 200, 500],
+                defaultPageSize: 200,
+                showScrollToTop: true,
+                onPageChange: function(page, pageSize) {
+                    customerStatsCurrentPage = page;
+                    customerStatsCurrentPageSize = pageSize;
+                    refreshCustomerStats(page, pageSize);
+                },
+                onPageSizeChange: function(pageSize) {
+                    customerStatsCurrentPageSize = pageSize;
+                }
+            });
+        }
+
+        // 初始化右侧三个副表
+        initSubGrids();
+    }
+
+    function initSubGrids() {
+        const engineDiv = document.querySelector('#customerEngineGrid');
+        const chassisDiv = document.querySelector('#customerChassisGrid');
+        const oeDiv = document.querySelector('#customerOeGrid');
+
+        if (engineDiv && !customerEngineGridApi) {
+            new agGrid.Grid(engineDiv, createSubGridOptions(customerEngineColumnDefs, 'engine'));
+        }
+        if (chassisDiv && !customerChassisGridApi) {
+            new agGrid.Grid(chassisDiv, createSubGridOptions(customerChassisColumnDefs, 'chassis'));
+        }
+        if (oeDiv && !customerOeGridApi) {
+            new agGrid.Grid(oeDiv, createSubGridOptions(customerOeColumnDefs, 'oe'));
+        }
+    }
+
+    function setupSubGridDoubleClickCopy(gridApi, gridType) {
+        const gridId = gridType === 'engine' ? 'customerEngineGrid' :
+                       gridType === 'chassis' ? 'customerChassisGrid' : 'customerOeGrid';
+        const gridDiv = document.querySelector('#' + gridId);
+        if (!gridDiv) return;
+
+        gridDiv.addEventListener('dblclick', function(e) {
+            const cellElement = e.target.closest('.ag-cell');
+            if (!cellElement) return;
+
+            const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
+            const colId = cellElement.getAttribute('col-id');
+
+            if (rowId && colId && gridApi) {
+                const rowNode = gridApi.getRowNode(rowId);
+                if (rowNode && rowNode.data) {
+                    const value = rowNode.data[colId];
+                    if (value !== undefined && value !== null) {
+                        const textToCopy = String(value);
+                        copyToClipboardUniversal(textToCopy, function() {
+                            layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
+                        }, function() {
+                            layui.layer.msg('复制失败', {icon: 2});
+                        });
+                    }
+                }
+            }
+        });
+    }
+
+    function updateCustomerStatsPaginationInfo() {
+        if (customerStatsCustomPagination) {
+            customerStatsCustomPagination.update(customerStatsTotalRecords, customerStatsCurrentPage, customerStatsCurrentPageSize);
+        }
+    }
+
+    function refreshCustomerStats(page, pageSize) {
+        page = page || customerStatsCurrentPage || 1;
+        pageSize = pageSize || customerStatsCurrentPageSize || 200;
+        customerStatsCurrentPage = page;
+        customerStatsCurrentPageSize = pageSize;
+
+        console.log('[customer_stats] refreshCustomerStats state:', JSON.stringify(customerSearchState));
+        const params = getSearchParams('customer');
+        console.log('[customer_stats] getSearchParams result:', JSON.stringify(params));
+        params.page = page;
+        params.page_size = pageSize;
+
+        // 添加排序参数
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getSortState) {
+            const sortState = GridColumnMenu.getSortState('#customerStatsGrid');
+            if (sortState.sortColumn) {
+                params.sort_column = sortState.sortColumn;
+                params.sort_dir = sortState.sortDir;
+            }
+        }
+
+        // 添加列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#customerStatsGrid');
+            if (filterState.active && filterState.filters) {
+                params.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
+        customerStatsGridLoader.load('/new/api/ks_inquiry/records/customer_stats', params, (data) => {
+            customerStatsTotalRecords = data.total;
+            updateCustomerStatsPaginationInfo();
+
+            // 缓存原始数据到 GridColumnMenu，供列筛选下拉选项使用
+            const list = data.list || [];
+            if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                GridColumnMenu.setOriginalRows('#customerStatsGrid', list);
+            }
+
+            customerStatsGridApi.setRowData(list);
+
+            // 默认选中第一行并加载副表
+            if (list.length > 0) {
+                currentSelectedCustomer = list[0].customerName || '';
+                loadCustomerSubGrids();
+            } else {
+                currentSelectedCustomer = '';
+                clearSubGrids();
+            }
+        }, (error) => {
+            console.error('客户统计请求失败:', error);
+        });
+    }
+
+    function clearSubGrids() {
+        if (customerEngineGridApi) customerEngineGridApi.setRowData([]);
+        if (customerChassisGridApi) customerChassisGridApi.setRowData([]);
+        if (customerOeGridApi) customerOeGridApi.setRowData([]);
+    }
+
+    function loadCustomerSubGrids() {
+        if (!currentSelectedCustomer) {
+            clearSubGrids();
+            return;
+        }
+
+        const baseParams = getCustomerSubSearchParams();
+        baseParams.garage_name = currentSelectedCustomer;
+
+        loadCustomerEngineStats(baseParams);
+        loadCustomerChassisStats(baseParams);
+        loadCustomerOeStats(baseParams);
+    }
+
+    function getCustomerSubSearchParams() {
+        let beginDate = '', endDate = '';
+        const dateRangeValue = document.getElementById('dateRange').value;
+        if (dateRangeValue) {
+            const dates = dateRangeValue.split(' - ');
+            beginDate = dates[0] || '';
+            endDate = dates[1] || '';
+        }
+
+        return {
+            garage_name: currentSelectedCustomer,
+            begin_date: beginDate,
+            end_date: endDate,
+            company: userCompany
+        };
+    }
+
+    function loadCustomerEngineStats(params) {
+        if (!customerEngineGridApi) return;
+        customerEngineGridApi.showLoadingOverlay();
+
+        fetch('/new/api/ks_inquiry/records/garage_engine_stats?' + new URLSearchParams(params))
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 0 || data.code === '0') {
+                    customerEngineGridApi.setRowData(data.data?.list || []);
+                } else {
+                    layui.layer.msg(data.message || '查询失败', {icon: 2});
+                    customerEngineGridApi.setRowData([]);
+                }
+            })
+            .catch(error => {
+                console.error('客户发动机统计查询失败:', error);
+                customerEngineGridApi.setRowData([]);
+            });
+    }
+
+    function loadCustomerChassisStats(params) {
+        if (!customerChassisGridApi) return;
+        customerChassisGridApi.showLoadingOverlay();
+
+        fetch('/new/api/ks_inquiry/records/garage_chassis_stats?' + new URLSearchParams(params))
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 0 || data.code === '0') {
+                    customerChassisGridApi.setRowData(data.data?.list || []);
+                } else {
+                    layui.layer.msg(data.message || '查询失败', {icon: 2});
+                    customerChassisGridApi.setRowData([]);
+                }
+            })
+            .catch(error => {
+                console.error('客户底盘统计查询失败:', error);
+                customerChassisGridApi.setRowData([]);
+            });
+    }
+
+    function loadCustomerOeStats(params) {
+        if (!customerOeGridApi) return;
+        customerOeGridApi.showLoadingOverlay();
+
+        fetch('/new/api/ks_inquiry/records/customer_oenum_stats?' + new URLSearchParams(params))
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 0 || data.code === '0') {
+                    customerOeGridApi.setRowData(data.data?.list || []);
+                } else {
+                    layui.layer.msg(data.message || '查询失败', {icon: 2});
+                    customerOeGridApi.setRowData([]);
+                }
+            })
+            .catch(error => {
+                console.error('客户OE统计查询失败:', error);
+                customerOeGridApi.setRowData([]);
+            });
+    }
+
+    // 从后端获取客户统计指定列的全量不重复值（用于列头下拉筛选）
+    function fetchCustomerStatsColumnValues(colId, callback) {
+        const params = getSearchParams('customer');
+        params.column = colId;
+        params.grid_type = 'customer_stats';
+
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#customerStatsGrid');
+            if (filterState.active && filterState.filters) {
+                const otherFilters = {};
+                Object.keys(filterState.filters).forEach(function(key) {
+                    if (key !== colId) {
+                        otherFilters[key] = filterState.filters[key];
+                    }
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/column_values?' + new URLSearchParams(params))
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    callback(result.data?.values || []);
+                } else {
+                    console.error('[customer_stats_tab] 获取列值失败:', result.message);
+                    callback([]);
+                }
+            })
+            .catch(function(error) {
+                console.error('[customer_stats_tab] 获取列值请求失败:', error);
+                callback([]);
+            });
+    }
+</script>

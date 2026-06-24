@@ -1,47 +1,46 @@
-<!-- 明细列表 -->
+<!-- 询价单维度主表 -->
 <div id="tab-detail" class="tab-pane active">
     <div class="table-container">
         <div id="ksInquiryGrid" class="ag-theme-alpine"></div>
     </div>
 </div>
 
+<style>
+    .ag-row.resolve-group-even { background-color: #e8f5e9 !important; }
+    .ag-row.resolve-group-odd { background-color: #ffffff !important; }
+</style>
+
 <script>
-    // AG Grid 列定义（使用 MergeCellHelper 给指定列加跨行合并）
-    let columnDefs = [
-        MergeCellHelper.createRowNumberColumn({ width: 80, pinned: 'left' }),
-        { field: 'inquiryId', headerName: '询价单号', width: 150, pinned: 'left', sortable: false, filter: true },
-        { field: 'customerName', headerName: '客户名称', width: 150, sortable: false, filter: true },
-        { field: 'partsNum', headerName: 'OE号', width: 150, sortable: false, filter: true },
-        { field: 'partsName', headerName: '配件名称', width: 200, sortable: false, filter: true },
+    // 主表列定义
+    const columnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 80, sortable: false, filter: false, lockPosition: 'left' },
+        { field: 'inquiryId', headerName: '询价单号', width: 150, sortable: false, filter: true },
+        { field: 'customerName', headerName: '客户名称', width: 180, sortable: false, filter: true },
         { field: 'carBrandName', headerName: '车辆品牌', width: 120, sortable: false, filter: true },
-        { field: 'brandName', headerName: '品牌', width: 120, sortable: false, filter: true },
-        { field: 'brandNormalized', headerName: '标准化品牌', width: 120, sortable: false, filter: true },
-        { field: 'brandId', headerName: '品牌ID', width: 100, sortable: false, filter: true },
-        { field: 'sellerPrice', headerName: '含税价', width: 120, sortable: false, filter: true },
-        { field: 'sellerBtPrice', headerName: '不含税价', width: 120, sortable: false, filter: true },
-        {
-            field: 'displaySellerStatus',
-            headerName: '下单状态',
-            width: 120,
-            sortable: false,
-            filter: true
-        },
-        { field: 'locationName', headerName: '发货地', width: 140, sortable: false, filter: true },
-        { field: 'arrivalTime', headerName: '备货时间', width: 140, sortable: false, filter: true },
-        { field: 'remark', headerName: '备注', width: 200, sortable: false, filter: true },
         { field: 'vin', headerName: '车架号', width: 150, sortable: false, filter: true },
         { field: 'engine', headerName: '发动机', width: 120, sortable: false, filter: true },
         { field: 'productionDate', headerName: '车辆生产日期', width: 140, sortable: false, filter: true },
         { field: 'chassis', headerName: '底盘', width: 120, sortable: false, filter: true }
     ];
 
-    // 给需要合并的列应用 rowSpan 和 merged-cell 样式
-    columnDefs = MergeCellHelper.applyMergeColumns(columnDefs, ['inquiryId', 'customerName'], {
-        wrapTextFields: ['customerName']
-    });
+    // 副表列定义
+    const detailColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, filter: false, lockPosition: 'left' },
+        { field: 'resolve_parts_name', headerName: '配件名称', width: 200, sortable: false, filter: true },
+        { field: 'partsNum', headerName: 'OE号', width: 150, sortable: false, filter: true },
+        { field: 'brandName', headerName: '品牌', width: 120, sortable: false, filter: true },
+        { field: 'brandNormalized', headerName: '标准化品牌', width: 120, sortable: false, filter: true },
+        { field: 'brandId', headerName: '品牌ID', width: 100, sortable: false, filter: true },
+        { field: 'sellerPrice', headerName: '含税价', width: 120, sortable: false, filter: true },
+        { field: 'sellerBtPrice', headerName: '不含税价', width: 120, sortable: false, filter: true },
+        { field: 'displaySellerStatus', headerName: '订单状态', width: 120, sortable: false, filter: true },
+        { field: 'locationName', headerName: '发货地', width: 140, sortable: false, filter: true },
+        { field: 'arrivalTime', headerName: '备货时间', width: 140, sortable: false, filter: true },
+        { field: 'remark', headerName: '备注', width: 200, sortable: false, filter: true }
+    ];
 
-    // Grid 配置（合并必需配置通过 MergeCellHelper 获取）
-    const gridOptions = Object.assign({
+    // Grid 配置
+    const gridOptions = {
         columnDefs: columnDefs,
         rowData: [],
         defaultColDef: {
@@ -52,52 +51,112 @@
         },
         rowHeight: 36,
         headerHeight: 36,
-        // 禁用 AG Grid 自带分页栏，使用自定义分页组件
         pagination: false,
         overlayLoadingTemplate: '<span class="ag-overlay-loading-center">正在加载数据...</span>',
         overlayNoRowsTemplate: '<span class="ag-overlay-no-rows-center">暂无数据</span>',
+        rowSelection: 'single',
 
         onGridReady: function(event) {
             gridApi = event.api;
             gridColumnApi = event.columnApi;
 
-            // 初始化数据加载器
             gridLoader = new AgGridLoader(gridApi);
 
             gridApi.sizeColumnsToFit();
 
-            // 初始化双击复制功能
             initDoubleClickCopy();
 
-            // 初始化列菜单功能（含持久化）
             if (typeof GridColumnMenu !== 'undefined') {
                 GridColumnMenu.init(gridApi, '#ksInquiryGrid', columnDefs, {
                     columnApi: gridColumnApi,
                     gridOptions: gridOptions,
                     persist: true,
                     pageKey: 'ks_inquiry_records',
-                    gridKey: 'detail_grid',
+                    gridKey: 'master_grid',
                     onSort: function(colId, direction) {
                         refreshGrid(1, currentPageSize);
                     },
                     onDataRefresh: function(filterState) {
-                        console.log('[detail_tab] 列筛选触发:', filterState);
-                        refreshGrid(currentPage, currentPageSize);
+                        refreshGrid(1, currentPageSize);
+                    },
+                    getFilterValues: function(colId, callback) {
+                        fetchMasterColumnValues(colId, callback);
                     }
                 });
             }
 
-            // 初始化自定义分页组件
             initCustomPagination();
 
-            // 加载初始数据
-            refreshGrid();
-        }
-    }, MergeCellHelper.getGridOptions());
+            window.ksDetailPanel = GridDetailPanel.init({
+                containerSelector: '#tab-detail',
+                masterGridSelector: '#ksInquiryGrid',
+                masterGridApi: gridApi,
+                position: 'right',
+                title: '询价明细',
+                splitRatio: 0.5,
+                showPagination: true,
+                rowKeyField: 'inquiryId',
+                columnDefs: detailColumnDefs,
+                loadUrl: '/new/api/ks_inquiry/records',
+                persistPageKey: 'ks_inquiry_records',
+                persistGridKey: 'detail_panel_grid',
+                buildParams: function(rowData) {
+                    const params = getSearchParams('detail');
+                    params.inquiry_id = rowData.inquiryId || '';
+                    return params;
+                },
+                getRowClass: function(params) {
+                    return params.data && params.data._resolveGroupClass ? params.data._resolveGroupClass : '';
+                },
+                onLoad: function(data) {
+                    const list = data.list || [];
+                    console.log('[detail_panel] raw rows:', list.length, list.map(r => r.resolve_parts_num));
+                    // 按 resolve_parts_num 排序，使相同 OE 相邻
+                    list.sort(function(a, b) {
+                        return (a.resolve_parts_num || '').localeCompare(b.resolve_parts_num || '');
+                    });
+                    // 为相邻的 resolve_parts_num 组分配交替背景色
+                    let currentGroup = null;
+                    let groupIndex = -1;
+                    list.forEach(function(row) {
+                        const val = row.resolve_parts_num || '';
+                        if (val !== currentGroup) {
+                            currentGroup = val;
+                            groupIndex++;
+                        }
+                        row._resolveGroupClass = (groupIndex % 2 === 0) ? 'resolve-group-even' : 'resolve-group-odd';
+                        console.log('[detail_panel] row:', row.resolve_parts_num, 'class:', row._resolveGroupClass);
+                    });
 
-    // 初始化双击复制功能
+                    if (window.ksDetailPanel && window.ksDetailPanel.detailGridApi) {
+                        window.ksDetailPanel.detailGridApi.setRowData(list);
+                    }
+                    if (window.ksDetailPanel && typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                        GridColumnMenu.setOriginalRows('#' + window.ksDetailPanel.gridId, list);
+                    }
+                    if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.addMenuButtonsToHeaders) {
+                        GridColumnMenu.addMenuButtonsToHeaders('#' + window.ksDetailPanel.gridId);
+                    }
+                },
+                getFilterValues: function(colId, callback, rowData) {
+                    fetchDetailColumnValues(colId, callback, rowData);
+                }
+            });
+
+            refreshGrid();
+        },
+
+        onRowClicked: function(event) {
+            if (window.ksDetailPanel) {
+                window.ksDetailPanel.open(event.data);
+            }
+        }
+    };
+
+    // 初始化双击复制功能（主表）
     function initDoubleClickCopy() {
         const gridDiv = document.querySelector('#ksInquiryGrid');
+        if (!gridDiv) return;
 
         gridDiv.addEventListener('dblclick', function(e) {
             const cellElement = e.target.closest('.ag-cell');
@@ -106,13 +165,12 @@
             const rowId = cellElement.closest('.ag-row')?.getAttribute('row-id');
             const colId = cellElement.getAttribute('col-id');
 
-            if (rowId && colId) {
+            if (rowId && colId && gridApi) {
                 const rowNode = gridApi.getRowNode(rowId);
                 if (rowNode && rowNode.data) {
                     const value = rowNode.data[colId];
                     if (value !== undefined && value !== null) {
-                        const textToCopy = String(value);
-                        copyToClipboardUniversal(textToCopy, function() {
+                        copyToClipboardUniversal(String(value), function() {
                             layui.layer.msg('已复制到剪贴板', {icon: 1, time: 1000});
                         }, function() {
                             layui.layer.msg('复制失败', {icon: 2});
@@ -144,27 +202,24 @@
                 currentPageSize = pageSize;
             }
         });
-
-        console.log('[KsInquiryRecords] 自定义分页组件已初始化');
     }
 
-    // 更新分页信息（在 refreshGrid 中调用）
+    // 更新分页信息
     function updatePaginationInfo() {
         if (customPagination) {
             customPagination.update(totalRecords, currentPage, currentPageSize);
         }
     }
 
-    // 刷新表格数据
-    function refreshGrid(page = 1, pageSize = currentPageSize) {
-        currentPage = page;
-        currentPageSize = pageSize;
+    // 刷新主表数据
+    function refreshGrid(page, pageSize) {
+        currentPage = page || currentPage || 1;
+        currentPageSize = pageSize || currentPageSize || 200;
 
-        const params = getSearchParams(currentTab);
-        params.page = page;
-        params.page_size = pageSize;
+        const params = getSearchParams('detail');
+        params.page = currentPage;
+        params.page_size = currentPageSize;
 
-        // 添加排序参数
         if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getSortState) {
             const sortState = GridColumnMenu.getSortState('#ksInquiryGrid');
             if (sortState.sortColumn) {
@@ -173,68 +228,102 @@
             }
         }
 
-        console.log(`[refreshGrid] 请求第 ${page} 页, 每页 ${pageSize} 条`);
-        console.log(`[refreshGrid] 请求参数 params:`, params);
-
-        gridLoader.load('/new/api/ks_inquiry/records', params, (data) => {
-
-            // 判断当前是否有活跃的自定义排序（通过 FilterPanel）
-            const hasActiveSort = params.sort_column && params.sort_column.length > 0;
-
-            let sortedList;
-            if (hasActiveSort) {
-                // 有排序列时：尊重后端 ORDER BY 结果，不再按 inquiryId 覆盖重排
-                sortedList = data.list || [];
-            } else {
-                // 默认：按 inquiryId 排序，确保相同单号相邻以便合并单元格
-                sortedList = (data.list || []).slice().sort((a, b) => {
-                    const aId = a.inquiryId || '';
-                    const bId = b.inquiryId || '';
-                    return aId.localeCompare(bId);
-                });
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#ksInquiryGrid');
+            if (filterState.active && filterState.filters) {
+                params.column_filters = JSON.stringify(filterState.filters);
             }
+        }
 
-            // 合并调试：统计多行单号组
-            const mergeGroups = {};
-            sortedList.forEach(item => {
-                const id = item.inquiryId || 'null';
-                mergeGroups[id] = (mergeGroups[id] || 0) + 1;
-            });
-            const multiRowGroups = Object.entries(mergeGroups).filter(([k, v]) => v > 1);
-            console.log(`[Merge Debug] 数据条数: ${sortedList.length}, 多行组个数: ${multiRowGroups.length}`);
-            if (multiRowGroups.length > 0) {
-                console.log(`[Merge Debug] 前5个多行组:`, multiRowGroups.slice(0, 5));
-            }
-
-            currentData = sortedList;
+        gridLoader.load('/new/api/ks_inquiry/records/master', params, (data) => {
+            currentData = data.list || [];
             totalRecords = data.total;
 
-            console.log(`[refreshGrid] 总条数: ${totalRecords}, 当前页: ${data.page}, 返回 ${sortedList.length} 条`);
-
-            // 缓存原始数据到 GridColumnMenu，供列筛选使用
             if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
-                GridColumnMenu.setOriginalRows('#ksInquiryGrid', sortedList);
+                GridColumnMenu.setOriginalRows('#ksInquiryGrid', currentData);
+            }
+            if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.addMenuButtonsToHeaders) {
+                GridColumnMenu.addMenuButtonsToHeaders('#ksInquiryGrid');
             }
 
-            // 应用列筛选（如果有活跃的筛选条件）
-            let displayData = sortedList;
-            if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
-                displayData = GridColumnMenu.filterRows(sortedList, '#ksInquiryGrid');
-                if (displayData.length !== sortedList.length) {
-                    console.log(`[refreshGrid] 列筛选后: ${displayData.length}/${sortedList.length} 条`);
-                }
-            }
-
-            // 预处理：给 displayData 按 inquiryId 计算 rowSpan 值（跨列合并）
-            MergeCellHelper.computeRowSpans(displayData, 'inquiryId');
-
-            // 手动设置数据到 grid（AG Grid 原生 rowSpan 会自动处理合并渲染）
-            gridApi.setRowData(displayData);
-
-            // 更新分页信息
             updatePaginationInfo();
         }, (error) => {
-            console.error('请求失败:', error);
+            console.error('主表请求失败:', error);
         });
+    }
+
+    // 从后端获取副表指定列的全量不重复值（限定在当前订单）
+    function fetchDetailColumnValues(colId, callback, rowData) {
+        const params = getSearchParams('detail');
+        params.inquiry_id = rowData && rowData.inquiryId ? rowData.inquiryId : '';
+        params.column = colId;
+        params.grid_type = 'detail';
+
+        if (window.ksDetailPanel && typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#' + window.ksDetailPanel.gridId);
+            if (filterState.active && filterState.filters) {
+                const otherFilters = {};
+                Object.keys(filterState.filters).forEach(function(key) {
+                    if (key !== colId) {
+                        otherFilters[key] = filterState.filters[key];
+                    }
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/column_values?' + new URLSearchParams(params))
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    callback(result.data?.values || []);
+                } else {
+                    console.error('[detail_panel] 获取列值失败:', result.message);
+                    callback([]);
+                }
+            })
+            .catch(function(error) {
+                console.error('[detail_panel] 获取列值请求失败:', error);
+                callback([]);
+            });
+    }
+
+    // 从后端获取主表指定列的全量不重复值
+    function fetchMasterColumnValues(colId, callback) {
+        const params = getSearchParams('detail');
+        params.column = colId;
+        params.grid_type = 'master';
+
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#ksInquiryGrid');
+            if (filterState.active && filterState.filters) {
+                const otherFilters = {};
+                Object.keys(filterState.filters).forEach(function(key) {
+                    if (key !== colId) {
+                        otherFilters[key] = filterState.filters[key];
+                    }
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/column_values?' + new URLSearchParams(params))
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    callback(result.data?.values || []);
+                } else {
+                    console.error('[master] 获取列值失败:', result.message);
+                    callback([]);
+                }
+            })
+            .catch(function(error) {
+                console.error('[master] 获取列值请求失败:', error);
+                callback([]);
+            });
     }
 </script>

@@ -15,10 +15,10 @@
     var oeStatsGridLoader = null;
 
     const oeStatsColumnDefs = [
-        { field: 'partsNum', headerName: 'OE号', width: 150, pinned: 'left', sortable: false, filter: true },
-        { field: 'count', headerName: '出现次数', width: 120, pinned: 'left', sortable: false, filter: true },
-        { field: 'partsName', headerName: '配件名称', width: 300, sortable: false, filter: true },
-        { field: 'unquotedProducts', headerName: '未报价产品', width: 420, sortable: false, filter: true }
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 80, sortable: false, filter: false, lockPosition: 'left' },
+        { field: 'partsNum', headerName: 'OE号', width: 150, sortable: false, filter: true },
+        { field: 'count', headerName: '出现次数', width: 120, sortable: false, filter: true },
+        { field: 'partsName', headerName: '配件名称', width: 300, sortable: false, filter: true }
     ];
 
     const oeStatsGridOptions = {
@@ -55,11 +55,23 @@
                     gridKey: 'oe_grid',
                     onSort: function(colId, direction) {
                         refreshOeStats(1, oeStatsCurrentPageSize);
+                    },
+                    onDataRefresh: function(filterState) {
+                        refreshOeStats(1, oeStatsCurrentPageSize);
+                    },
+                    getFilterValues: function(colId, callback) {
+                        fetchOeStatsColumnValues(colId, callback);
                     }
                 });
             }
 
             refreshOeStats();
+        },
+        rowSelection: 'single',
+        onRowClicked: function(event) {
+            if (window.oeDetailPanel) {
+                window.oeDetailPanel.open(event.data);
+            }
         }
     };
 
@@ -115,6 +127,28 @@
                 }
             });
         }
+
+        // 初始化右侧副表面板
+        window.oeDetailPanel = GridDetailPanel.init({
+            containerSelector: '#tab-oe',
+            masterGridSelector: '#oeStatsGrid',
+            masterGridApi: oeStatsGridApi,
+            position: 'right',
+            title: 'OE号客户统计',
+            splitRatio: 0.5,
+            showPagination: true,
+            columnDefs: [
+                { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, lockPosition: 'left' },
+                { field: 'customerName', headerName: '客户名称', width: 220 },
+                { field: 'count', headerName: '出现次数', width: 120 }
+            ],
+            loadUrl: '/new/api/ks_inquiry/records/customer_stats_by_oe',
+            buildParams: function(rowData) {
+                var params = getSearchParams(currentTab);
+                params.parts_num = rowData.partsNum;
+                return params;
+            }
+        });
     }
 
     function updateOeStatsPaginationInfo() {
@@ -142,25 +176,65 @@
             }
         }
 
+        // 添加列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#oeStatsGrid');
+            if (filterState.active && filterState.filters) {
+                params.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
         oeStatsGridLoader.load('/new/api/ks_inquiry/records/oe_stats', params, (data) => {
             oeStatsTotalRecords = data.total;
             updateOeStatsPaginationInfo();
 
-            // 缓存原始数据 + 应用列筛选
+            // 缓存原始数据到 GridColumnMenu，供列筛选下拉选项使用
             const list = data.list || [];
             if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
                 GridColumnMenu.setOriginalRows('#oeStatsGrid', list);
             }
-            let displayList = list;
-            if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.filterRows) {
-                displayList = GridColumnMenu.filterRows(list, '#oeStatsGrid');
-                if (displayList.length !== list.length) {
-                    console.log(`[refreshOeStats] 列筛选后: ${displayList.length}/${list.length} 条`);
-                    oeStatsGridApi.setRowData(displayList);
-                }
-            }
+
+            // 列筛选已由后端完成，前端不再二次过滤
+            oeStatsGridApi.setRowData(list);
         }, (error) => {
             console.error('OE统计请求失败:', error);
         });
+    }
+
+    // 从后端获取 OE 统计指定列的全量不重复值（用于列头下拉筛选）
+    function fetchOeStatsColumnValues(colId, callback) {
+        const params = getSearchParams(currentTab);
+        params.column = colId;
+        params.grid_type = 'oe_stats';
+
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#oeStatsGrid');
+            if (filterState.active && filterState.filters) {
+                const otherFilters = {};
+                Object.keys(filterState.filters).forEach(function(key) {
+                    if (key !== colId) {
+                        otherFilters[key] = filterState.filters[key];
+                    }
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/column_values?' + new URLSearchParams(params))
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    callback(result.data?.values || []);
+                } else {
+                    console.error('[oe_stats_tab] 获取列值失败:', result.message);
+                    callback([]);
+                }
+            })
+            .catch(function(error) {
+                console.error('[oe_stats_tab] 获取列值请求失败:', error);
+                callback([]);
+            });
     }
 </script>

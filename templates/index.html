@@ -4523,13 +4523,13 @@ function showCartPanel(table) {
                 // 初始化搜索事件
                 layero.find('#cartSearchBtn').on('click', function() {
                     var searchParams = {};
-                    searchParams.cart_oe = layero.find('input[name="cart_oe"]').val();
-                    searchParams.cart_barcode = layero.find('input[name="cart_barcode"]').val();
-                    searchParams.cart_material_name = layero.find('input[name="cart_material_name"]').val();
-                    searchParams.cart_brand = layero.find('input[name="cart_brand"]').val();
-                    searchParams.cart_tag = layero.find('input[name="cart_tag"]').val();
-                    searchParams.cart_car_model = layero.find('input[name="cart_car_model"]').val();
-                    searchParams.cart_car_brand = layero.find('input[name="cart_car_brand"]').val();
+                    searchParams.cart_oe = document.getElementById('cartSearchOe').value;
+                    searchParams.cart_barcode = document.getElementById('cartSearchBarcode').value;
+                    searchParams.cart_material_name = document.getElementById('cartSearchMaterialName').value;
+                    searchParams.cart_brand = document.getElementById('cartSearchBrand').value;
+                    searchParams.cart_tag = document.getElementById('cartSearchTag').value;
+                    searchParams.cart_car_model = document.getElementById('cartSearchCarModel').value;
+                    searchParams.cart_car_brand = document.getElementById('cartSearchCarBrand').value;
 
                     // 过滤空值
                     for (var key in searchParams) {
@@ -4555,13 +4555,13 @@ function showCartPanel(table) {
                 
                 // 重置搜索条件
                 layero.find('#cartResetBtn').on('click', function() {
-                    layero.find('input[name="cart_oe"]').val('');
-                    layero.find('input[name="cart_barcode"]').val('');
-                    layero.find('input[name="cart_material_name"]').val('');
-                    layero.find('input[name="cart_brand"]').val('');
-                    layero.find('input[name="cart_tag"]').val('');
-                    layero.find('input[name="cart_car_model"]').val('');
-                    layero.find('input[name="cart_car_brand"]').val('');
+                    document.getElementById('cartSearchOe').value = '';
+                    document.getElementById('cartSearchBarcode').value = '';
+                    document.getElementById('cartSearchMaterialName').value = '';
+                    document.getElementById('cartSearchBrand').value = '';
+                    document.getElementById('cartSearchTag').value = '';
+                    document.getElementById('cartSearchCarModel').value = '';
+                    document.getElementById('cartSearchCarBrand').value = '';
                     
                     // 重新加载购物车表格，不带搜索条件
                     cartTable.reload({
@@ -5665,16 +5665,23 @@ function exportCartData(cartTable) {
     var searchParams = new URLSearchParams();
     searchParams.append('dimension', currentDimension);
 
-    // 获取购物车搜索框的值（使用layero上下文）
-    var layero = window.currentCartLayero;
-    if (layero) {
-        var cartOe = layero.find('input[name="cart_oe"]').val().trim();
-        var cartBarcode = layero.find('input[name="cart_barcode"]').val().trim();
-        var cartMaterialName = layero.find('input[name="cart_material_name"]').val().trim();
-        var cartBrand = layero.find('input[name="cart_brand"]').val().trim();
-        var cartTag = layero.find('input[name="cart_tag"]').val().trim();
-        var cartCarModel = layero.find('input[name="cart_car_model"]').val().trim();
-        var cartCarBrand = layero.find('input[name="cart_car_brand"]').val().trim();
+    // 获取购物车搜索框的值
+    var cartSearchOe = document.getElementById('cartSearchOe');
+    var cartSearchBarcode = document.getElementById('cartSearchBarcode');
+    var cartSearchMaterialName = document.getElementById('cartSearchMaterialName');
+    var cartSearchBrand = document.getElementById('cartSearchBrand');
+    var cartSearchTag = document.getElementById('cartSearchTag');
+    var cartSearchCarModel = document.getElementById('cartSearchCarModel');
+    var cartSearchCarBrand = document.getElementById('cartSearchCarBrand');
+
+    if (cartSearchOe) {
+        var cartOe = (cartSearchOe.value || '').trim();
+        var cartBarcode = (cartSearchBarcode.value || '').trim();
+        var cartMaterialName = (cartSearchMaterialName.value || '').trim();
+        var cartBrand = (cartSearchBrand.value || '').trim();
+        var cartTag = (cartSearchTag.value || '').trim();
+        var cartCarModel = (cartSearchCarModel.value || '').trim();
+        var cartCarBrand = (cartSearchCarBrand.value || '').trim();
 
         if (cartOe) searchParams.append('oe', cartOe);
         if (cartBarcode) searchParams.append('barcode', cartBarcode);

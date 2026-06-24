@@ -63,6 +63,9 @@ def init_ks_inquiry_detail_table():
                 chassis VARCHAR(100) DEFAULT NULL COMMENT '底盘',
                 location_name VARCHAR(255) DEFAULT NULL COMMENT '仓库位置名称（来自storeQuoteItemResults.locationName）',
                 arrival_time VARCHAR(50) DEFAULT NULL COMMENT '到货时间（arrivalTime=0为"现货"，>0为"调货+N天"）',
+                content_item_index VARCHAR(20) DEFAULT NULL COMMENT 'content与storeQuoteItemResults序号，格式contentIdx_itemIdx',
+                resolve_parts_num VARCHAR(100) DEFAULT NULL COMMENT 'resolveitems/detail返回的OE号/零件号',
+                resolve_parts_name VARCHAR(255) DEFAULT NULL COMMENT 'resolveitems/detail返回的零件名称',
                 unquoted_products TEXT DEFAULT NULL COMMENT '未报价产品，格式：oe+品牌，oe+品牌',
                 company VARCHAR(50) NOT NULL COMMENT '公司标识',
                 quote_date DATE NOT NULL COMMENT '询价日期',
@@ -77,6 +80,29 @@ def init_ks_inquiry_detail_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开思询价明细表';
             """
             cursor.execute(create_table_sql)
+
+            # 检查并添加列（兼容旧表）
+            try:
+                cursor.execute("""
+                    ALTER TABLE crmapp_ks_inquiry_detail
+                    ADD COLUMN resolve_parts_num VARCHAR(100) DEFAULT NULL COMMENT 'resolveitems/detail返回的OE号/零件号'
+                """)
+                print("  ✓ 已添加列 resolve_parts_num")
+            except Exception as e:
+                if "Duplicate column name" not in str(e):
+                    print(f"  ! 添加列 resolve_parts_num 时出错: {str(e)}")
+
+            try:
+                cursor.execute("""
+                    ALTER TABLE crmapp_ks_inquiry_detail
+                    ADD COLUMN resolve_parts_name VARCHAR(255) DEFAULT NULL COMMENT 'resolveitems/detail返回的零件名称'
+                """)
+                print("  ✓ 已添加列 resolve_parts_name")
+            except Exception as e:
+                if "Duplicate column name" not in str(e):
+                    print(f"  ! 添加列 resolve_parts_name 时出错: {str(e)}")
+
+            print("  ✓ 开思询价明细表")
     except Exception as e:
         print(f"  ✗ 开思询价明细表: {e}")
     finally:

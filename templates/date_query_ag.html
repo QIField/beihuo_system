@@ -206,10 +206,6 @@
 
         /* 分页条数选择器 */
         .page-size-selector {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -1307,13 +1303,21 @@
             layui.use(['laydate', 'layer'], function() {
                 const laydate = layui.laydate;
 
+                // 默认当天
+                const today = new Date();
+                const todayStr = today.getFullYear() + '-' +
+                    String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(today.getDate()).padStart(2, '0');
+                const defaultRange = todayStr + ' - ' + todayStr;
+                document.getElementById('dateRange').value = defaultRange;
+
                 laydate.render({
                     elem: '#dateRange',
                     trigger: 'click',
                     format: 'yyyy-MM-dd',
                     range: true,
                     max: 0, // 限制最大日期不能超过今天
-                    value: '', // 默认值为空，不自动选择日期
+                    value: defaultRange, // 默认当天
                     done: function(value, date, endDate) {
                         // 日期选择后自动触发查询
                         if (value) {
@@ -1322,7 +1326,8 @@
                     }
                 });
 
-                // 只加载购物车数据，不自动加载表格数据
+                // 页面首次打开自动加载当天数据
+                loadData();
                 loadCartCache();
             });
         }

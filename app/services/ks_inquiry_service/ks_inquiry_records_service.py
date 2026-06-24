@@ -6,6 +6,7 @@
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import json
 import time
 from app.utils.database_connection import db_cursor, db_query_one
 from app.utils.common_util_module.sql_builder import build_order_by
@@ -15,6 +16,54 @@ class KsInquiryRecordsService:
     """
     开思询价明细查询服务
     """
+
+    # 前端列名 -> 数据库列名
+    _DETAIL_FILTER_MAP = {
+        'inquiryId': 'inquiryId',
+        'customerName': 'garage_company_name',
+        'partsNum': 'partsNum',
+        'resolve_parts_name': 'resolve_parts_name',
+        'carBrandName': 'car_brand_name',
+        'brandName': 'brandName',
+        'brandNormalized': 'brandNormalized',
+        'brandId': 'brandId',
+        'sellerPrice': 'sellerPrice',
+        'sellerBtPrice': 'sellerBtPrice',
+        'displaySellerStatus': 'display_seller_status',
+        'locationName': 'location_name',
+        'arrivalTime': 'arrival_time',
+        'remark': 'remark',
+        'vin': 'vin',
+        'engine': 'engine',
+        'productionDate': 'production_date',
+        'chassis': 'chassis'
+    }
+
+    # 主表（询价单维度）列名映射
+    _MASTER_FILTER_MAP = {
+        'inquiryId': 'inquiryId',
+        'customerName': 'garage_company_name',
+        'carBrandName': 'car_brand_name',
+        'vin': 'vin',
+        'engine': 'engine',
+        'productionDate': 'production_date',
+        'chassis': 'chassis'
+    }
+
+    _MASTER_GROUP_BY_FIELDS = (
+        "inquiryId, garage_company_name, car_brand_name, vin, engine, production_date, chassis"
+    )
+
+    @staticmethod
+    def _apply_filters(column_filters, filter_map, conditions, params):
+        """将列头下拉筛选条件追加到 WHERE 中，不防御空值或无效列"""
+        if not column_filters:
+            return
+        for col_id, values in column_filters.items():
+            db_col = filter_map[col_id]
+            placeholders = ', '.join(['%s'] * len(values))
+            conditions.append(f"{db_col} IN ({placeholders})")
+            params.extend(values)
 
     @staticmethod
     def get_records(
@@ -32,7 +81,8 @@ class KsInquiryRecordsService:
         page: int = 1,
         page_size: int = 200,
         sort_column: str = '',
-        sort_dir: str = ''
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
     ) -> Dict[str, Any]:
         """
         获取开思询价明细列表（支持分页）
@@ -53,63 +103,31 @@ class KsInquiryRecordsService:
             page_size: 每页条数
             sort_column: 排序列名
             sort_dir: 排序方向 (asc/desc)
+            column_filters: 列头下拉多选筛选，格式 {前端列名: [选中值列表]}
 
         Returns:
             Dict: {list: 数据列表, total: 总条数, page: 当前页, page_size: 每页条数}
         """
         start_time = time.time()
 
-        conditions = []
-        params = []
+        conditions, params = [], []
 
-        # 构建查询条件
-        if inquiry_id:
-            conditions.append("inquiryId LIKE %s")
-            params.append(f"%{inquiry_id}%")
+        # 基础查询条件
+        if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
+        if parts_num:     conditions.append("partsNum LIKE %s");            params.append(f"%{parts_num}%")
+        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
+        if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
+        if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
+        if seller_status: conditions.append("display_seller_status = %s"); params.append(seller_status)
+        if car_brand_name: conditions.append("car_brand_name = %s");        params.append(car_brand_name)
+        if garage_name:   conditions.append("garage_company_name LIKE %s");  params.append(f"%{garage_name}%")
+        if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
+        if end_date:      conditions.append("quote_date <= %s");            params.append(end_date)
+        if company:       conditions.append("company = %s");                params.append(company)
 
-        if parts_num:
-            conditions.append("partsNum LIKE %s")
-            params.append(f"%{parts_num}%")
+        # 列头下拉全量筛选
+        KsInquiryRecordsService._apply_filters(column_filters, KsInquiryRecordsService._DETAIL_FILTER_MAP, conditions, params)
 
-        if parts_name:
-            conditions.append("partsName LIKE %s")
-            params.append(f"%{parts_name}%")
-
-        if brand_name:
-            conditions.append("brandName LIKE %s")
-            params.append(f"%{brand_name}%")
-
-        if brand:
-            # 品牌筛选（brandNormalized，精准匹配）
-            conditions.append("brandNormalized = %s")
-            params.append(brand)
-
-        if seller_status:
-            conditions.append("display_seller_status LIKE %s")
-            params.append(f"%{seller_status}%")
-
-        if car_brand_name:
-            conditions.append("car_brand_name = %s")
-            params.append(car_brand_name)
-
-        if garage_name:
-            conditions.append("garage_company_name LIKE %s")
-            params.append(f"%{garage_name}%")
-
-        if begin_date:
-            conditions.append("quote_date >= %s")
-            params.append(begin_date)
-
-        if end_date:
-            conditions.append("quote_date <= %s")
-            params.append(end_date)
-
-        # 添加门店/组织筛选（只展示用户对应门店的数据）
-        if company:
-            conditions.append("company = %s")
-            params.append(company)
-
-        # 构建 SQL
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
         # 先查询总条数
@@ -122,7 +140,7 @@ class KsInquiryRecordsService:
         records_column_map = {
             'inquiryId': 'inquiryId',
             'partsNum': 'partsNum',
-            'partsName': 'partsName',
+            'resolve_parts_name': 'resolve_parts_name',
             'brandName': 'brandName',
             'brandNormalized': 'brandNormalized',
             'brandId': 'brandId',
@@ -141,7 +159,7 @@ class KsInquiryRecordsService:
         order_by = build_order_by(
             sort_column, sort_dir, records_column_map,
             numeric_columns={'sellerBtPrice', 'sellerPrice'},
-            default='quote_date DESC, created_at DESC'
+            default='inquiryId ASC, content_item_index ASC'
         )
 
         # 查询数据（带分页）
@@ -150,7 +168,8 @@ class KsInquiryRecordsService:
                 inquiryId,
                 garage_company_name AS customerName,
                 partsNum,
-                partsName,
+                resolve_parts_num,
+                resolve_parts_name,
                 brandName,
                 brandNormalized,
                 brandId,
@@ -164,7 +183,8 @@ class KsInquiryRecordsService:
                 chassis,
                 car_brand_name AS carBrandName,
                 location_name AS locationName,
-                arrival_time AS arrivalTime
+                arrival_time AS arrivalTime,
+                content_item_index
             FROM crmapp_ks_inquiry_detail
             WHERE {where_clause}
             ORDER BY {order_by}
@@ -192,10 +212,10 @@ class KsInquiryRecordsService:
 
             # 硬编码列名（确保与 SQL 一致）- 已删除：quote_date, partType, partsBrandQuality, company, created_at, updated_at
             columns = [
-                'inquiryId', 'partsNum', 'partsName', 'brandName', 'brandNormalized',
+                'inquiryId', 'customerName', 'partsNum', 'resolve_parts_num', 'resolve_parts_name', 'brandName', 'brandNormalized',
                 'brandId', 'sellerBtPrice', 'sellerPrice', 'displaySellerStatus', 'remark',
                 'vin', 'engine', 'productionDate', 'chassis', 'carBrandName',
-                'locationName', 'arrivalTime'
+                'locationName', 'arrivalTime', 'content_item_index'
             ]
             result = []
             for row in rows:
@@ -218,12 +238,10 @@ class KsInquiryRecordsService:
             }
 
     @staticmethod
-    def get_oe_stats(
+    def get_master_records(
         inquiry_id: str = '',
-        parts_num: str = '',
-        parts_name: str = '',
-        brand_name: str = '',
-        brand: str = '',
+        garage_name: str = '',
+        car_brand_name: str = '',
         seller_status: str = '',
         begin_date: str = '',
         end_date: str = '',
@@ -231,566 +249,163 @@ class KsInquiryRecordsService:
         page: int = 1,
         page_size: int = 200,
         sort_column: str = '',
-        sort_dir: str = ''
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
     ) -> Dict[str, Any]:
-        """
-        获取OE号统计维度（按partsNum分组聚合）
+        """获取询价单维度主表（按 inquiryId 去重）"""
+        conditions, params = [], []
 
-        Args:
-            sort_column: 排序列名
-            sort_dir: 排序方向 (asc/desc)
+        if inquiry_id:     conditions.append("inquiryId LIKE %s");          params.append(f"%{inquiry_id}%")
+        if garage_name:    conditions.append("garage_company_name LIKE %s"); params.append(f"%{garage_name}%")
+        if car_brand_name: conditions.append("car_brand_name = %s");        params.append(car_brand_name)
+        if company:        conditions.append("company = %s");               params.append(company)
+        if begin_date:     conditions.append("quote_date >= %s");           params.append(begin_date)
+        if end_date:       conditions.append("quote_date <= %s");           params.append(end_date)
 
-        Returns:
-            Dict: {list: 数据列表, total: 总条数, page: 当前页, page_size: 每页条数}
-        """
-        start_time = time.time()
-
-        conditions = []
-        params = []
-
-        # 构建查询条件（与get_records一致）
-        if inquiry_id:
-            conditions.append("inquiryId LIKE %s")
-            params.append(f"%{inquiry_id}%")
-
-        if parts_num:
-            conditions.append("partsNum LIKE %s")
-            params.append(f"%{parts_num}%")
-
-        if parts_name:
-            conditions.append("partsName LIKE %s")
-            params.append(f"%{parts_name}%")
-
-        if brand_name:
-            conditions.append("brandName LIKE %s")
-            params.append(f"%{brand_name}%")
-
-        if brand:
-            conditions.append("brandNormalized = %s")
-            params.append(brand)
-
+        # 按订单状态过滤：只保留包含该状态的订单
         if seller_status:
-            conditions.append("display_seller_status LIKE %s")
-            params.append(f"%{seller_status}%")
+            conditions.append("inquiryId IN (SELECT DISTINCT inquiryId FROM crmapp_ks_inquiry_detail WHERE display_seller_status = %s)")
+            params.append(seller_status)
 
-        if begin_date:
-            conditions.append("quote_date >= %s")
-            params.append(begin_date)
+        KsInquiryRecordsService._apply_filters(column_filters, KsInquiryRecordsService._MASTER_FILTER_MAP, conditions, params)
+        where = " AND ".join(conditions) if conditions else "1=1"
+        group_by = KsInquiryRecordsService._MASTER_GROUP_BY_FIELDS
+        order_by = build_order_by(sort_column, sort_dir, KsInquiryRecordsService._MASTER_FILTER_MAP, default="inquiryId ASC")
 
-        if end_date:
-            conditions.append("quote_date <= %s")
-            params.append(end_date)
+        count_sql = f"SELECT COUNT(*) FROM (SELECT 1 FROM crmapp_ks_inquiry_detail WHERE {where} GROUP BY {group_by}) t"
+        data_sql = f"""
+            SELECT inquiryId, garage_company_name AS customerName, car_brand_name AS carBrandName,
+                   vin, engine, production_date AS productionDate, chassis
+            FROM crmapp_ks_inquiry_detail
+            WHERE {where} GROUP BY {group_by} ORDER BY {order_by} LIMIT %s OFFSET %s
+        """
 
-        if company:
-            conditions.append("company = %s")
-            params.append(company)
+        count_result = db_query_one(count_sql, tuple(params), dict_cursor=True)
+        total = (count_result.get('COUNT(*)') or 0) if isinstance(count_result, dict) else (count_result[0] if count_result else 0)
+
+        with db_cursor(dict_cursor=True) as cursor:
+            cursor.execute(data_sql, tuple(params + [page_size, (page - 1) * page_size]))
+            return {'list': cursor.fetchall(), 'total': total, 'page': page, 'page_size': page_size}
+
+    @staticmethod
+    def get_column_values(
+        column: str,
+        grid_type: str = 'detail',
+        inquiry_id: str = '',
+        parts_num: str = '',
+        parts_name: str = '',
+        brand_name: str = '',
+        brand: str = '',
+        seller_status: str = '',
+        car_brand_name: str = '',
+        garage_name: str = '',
+        begin_date: str = '',
+        end_date: str = '',
+        company: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        获取指定列的全量不重复值（用于列头下拉筛选）
+
+        Args:
+            column: 前端列名
+            grid_type: 网格类型：detail / master / oe_stats / garage_chassis / garage_engine / garage_oenum
+            column_filters: 当前已激活的列筛选，查询时会排除 column 本身
+
+        Returns:
+            List[Dict]: 不重复值列表（已排序），每项 {value, count}
+        """
+        start_time = time.time()
+
+        conditions, params = [], []
+
+        # 基础查询条件
+        if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
+        if parts_num:     conditions.append("partsNum LIKE %s");            params.append(f"%{parts_num}%")
+        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
+        if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
+        if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
+        if seller_status: conditions.append("display_seller_status = %s"); params.append(seller_status)
+        if car_brand_name: conditions.append("car_brand_name LIKE %s");     params.append(f"%{car_brand_name}%")
+        if garage_name:   conditions.append("garage_company_name LIKE %s");  params.append(f"%{garage_name}%")
+        if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
+        if end_date:      conditions.append("quote_date <= %s");            params.append(end_date)
+        if company:       conditions.append("company = %s");                params.append(company)
+
+        # 不同网格的列映射与聚合配置
+        grid_configs = {
+            'detail':       {'columns': KsInquiryRecordsService._DETAIL_FILTER_MAP, 'aggregated': set()},
+            'master':       {'columns': KsInquiryRecordsService._MASTER_FILTER_MAP, 'aggregated': set()},
+            'oe_stats':     {'columns': {'partsNum': 'partsNum', 'partsName': 'resolve_parts_name', 'count': 'count', 'unquotedProducts': 'unquotedProducts'}, 'aggregated': {'count', 'unquotedProducts'}, 'group_by': 'partsNum'},
+            'garage_chassis': {'columns': {'carBrandName': 'car_brand_name', 'chassis': 'chassis', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, chassis'},
+            'garage_engine':  {'columns': {'carBrandName': 'car_brand_name', 'engine': 'engine', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, engine'},
+            'garage_oenum':   {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'partsNum', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, partsNum'},
+            'customer_stats': {'columns': {'customerName': 'garage_company_name', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'garage_company_name'},
+            'customer_oenum': {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'resolve_parts_num', 'partsName': 'resolve_parts_name', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, resolve_parts_num'}
+        }
+
+        config = grid_configs.get(grid_type)
+        if not config or column not in config['columns']:
+            return []
+
+        # 应用已激活的列筛选（排除当前列本身）
+        if column_filters:
+            for col_id, values in column_filters.items():
+                if col_id == column:
+                    continue
+                db_col = config['columns'].get(col_id)
+                if not db_col:
+                    continue
+                placeholders = ', '.join(['%s'] * len(values))
+                conditions.append(f"{db_col} IN ({placeholders})")
+                params.extend(values)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
-        # 查询不同OE号的总数量
-        count_sql = f"""
-            SELECT COUNT(*) FROM (
-                SELECT partsNum FROM crmapp_ks_inquiry_detail
-                WHERE {where_clause}
-                GROUP BY partsNum
-            ) t
-        """
+        db_col = config['columns'][column]
 
-        # OE统计排序：白名单映射（前端列名 -> SQL列名）
-        oe_column_map = {
-            'partsNum': 'a.partsNum',
-            'count': 'a.count',
-            'partsName': 'partsName',
-            'unquotedProducts': 'a.unquotedProducts'
-        }
-        order_by = build_order_by(
-            sort_column, sort_dir, oe_column_map,
-            numeric_columns={'count', 'unquotedProducts'},
-            default='a.count DESC'
-        )
-
-        # 查询分组聚合数据
-        # 配件名称优先取：原厂 > 原厂国内4S件 > 其他
-        data_sql = f"""
-            SELECT
-                a.partsNum,
-                a.count,
-                COALESCE(b.partsName, c.partsName, d.partsName) as partsName,
-                a.unquotedProducts
-            FROM (
-                SELECT
-                    partsNum,
-                    COUNT(DISTINCT inquiryId) as count,
-                    MAX(unquoted_products) as unquotedProducts
+        if grid_type == 'master':
+            # 主表按 inquiryId 去重，下拉计数应为“订单数”
+            sql = f"""
+                SELECT {db_col} AS value, COUNT(DISTINCT inquiryId) AS count
                 FROM crmapp_ks_inquiry_detail
-                WHERE {where_clause}
-                GROUP BY partsNum
-            ) a
-            LEFT JOIN (
-                SELECT partsNum, partsName
-                FROM crmapp_ks_inquiry_detail
-                WHERE brandNormalized = '原厂'
-                  AND ({where_clause})
-                GROUP BY partsNum
-            ) b ON a.partsNum = b.partsNum
-            LEFT JOIN (
-                SELECT partsNum, partsName
-                FROM crmapp_ks_inquiry_detail
-                WHERE brandNormalized = '原厂国内4S件'
-                  AND ({where_clause})
-                GROUP BY partsNum
-            ) c ON a.partsNum = c.partsNum
-            LEFT JOIN (
-                SELECT partsNum, partsName
+                WHERE {where_clause} AND {db_col} IS NOT NULL AND TRIM({db_col}) != ''
+                GROUP BY {db_col} ORDER BY {db_col} LIMIT 1000
+            """
+        elif column in config['aggregated']:
+            group_by = config['group_by']
+            sql = f"""
+                SELECT {db_col} AS value, COUNT(*) AS count
                 FROM (
-                    SELECT partsNum, partsName, COUNT(*) as name_count
-                    FROM crmapp_ks_inquiry_detail
-                    WHERE ({where_clause})
-                    GROUP BY partsNum, partsName
-                    ORDER BY name_count DESC
-                    LIMIT 1
+                    SELECT {group_by}, COUNT(DISTINCT inquiryId) AS count, MAX(unquoted_products) AS unquotedProducts
+                    FROM crmapp_ks_inquiry_detail WHERE {where_clause} GROUP BY {group_by}
                 ) t
-                GROUP BY partsNum
-            ) d ON a.partsNum = d.partsNum
-            ORDER BY {order_by}
-            LIMIT %s OFFSET %s
-        """
-
-        # 查询总条数
-        count_result = db_query_one(count_sql, tuple(params), dict_cursor=False)
-        if count_result is None:
-            total = 0
-        elif isinstance(count_result, dict):
-            total = count_result.get('COUNT(*)', 0) or count_result.get('count', 0)
+                WHERE {db_col} IS NOT NULL
+                GROUP BY {db_col} ORDER BY {db_col} LIMIT 1000
+            """
         else:
-            total = count_result[0] if count_result else 0
-
-        # 查询分页数据
-        # 注意：data_sql 中 where_clause 出现了 4 次，参数需要重复 4 次
-        offset = (page - 1) * page_size
-        data_params = params.copy() * 4  # 4个子查询都使用相同的where条件
-        data_params.append(page_size)
-        data_params.append(offset)
-
-        with db_cursor() as cursor:
-            cursor.execute(data_sql, data_params)
-            rows = cursor.fetchall()
-
-            columns = ['partsNum', 'count', 'partsName', 'unquotedProducts']
-            result = []
-            for row in rows:
-                if isinstance(row, dict):
-                    record = row
-                else:
-                    record = dict(zip(columns, row))
-                result.append(record)
-
-            end_time = time.time()
-            elapsed_time = (end_time - start_time) * 1000
-            print(f"[KsInquiryRecordsService] OE统计查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
-
-            return {
-                'list': result,
-                'total': total,
-                'page': page,
-                'page_size': page_size
-            }
-
-    @staticmethod
-    def get_engine_chassis_list(
-        engine: str = '',
-        chassis: str = '',
-        vin: str = '',
-        begin_date: str = '',
-        end_date: str = '',
-        company: str = '',
-        page: int = 1,
-        page_size: int = 200
-    ) -> Dict[str, Any]:
-        """
-        获取发动机及底盘维度列表（按engine+chassis组合展示，不去重）
-
-        Returns:
-            Dict: {list: 数据列表, total: 总条数, page: 当前页, page_size: 每页条数}
-        """
-        start_time = time.time()
-
-        conditions = []
-        params = []
-
-        if engine:
-            conditions.append("engine LIKE %s")
-            params.append(f"%{engine}%")
-
-        if chassis:
-            conditions.append("chassis LIKE %s")
-            params.append(f"%{chassis}%")
-
-        if vin:
-            conditions.append("vin LIKE %s")
-            params.append(f"%{vin}%")
-
-        if begin_date:
-            conditions.append("quote_date >= %s")
-            params.append(begin_date)
-
-        if end_date:
-            conditions.append("quote_date <= %s")
-            params.append(end_date)
-
-        if company:
-            conditions.append("company = %s")
-            params.append(company)
-
-        conditions.append("""
-            (
-                COALESCE(TRIM(engine), '') != ''
-                OR COALESCE(TRIM(chassis), '') != ''
-                OR COALESCE(TRIM(vin), '') != ''
-                OR COALESCE(TRIM(production_date), '') != ''
-            )
-        """)
-
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-
-        count_sql = f"""
-            SELECT COUNT(*) FROM crmapp_ks_inquiry_detail
-            WHERE {where_clause}
-        """
-
-        data_sql = f"""
-            SELECT
-                engine,
-                chassis,
-                vin,
-                production_date AS vehicleProductionDate
-            FROM crmapp_ks_inquiry_detail
-            WHERE {where_clause}
-            ORDER BY engine, chassis, vin
-            LIMIT %s OFFSET %s
-        """
-
-        count_result = db_query_one(count_sql, tuple(params), dict_cursor=False)
-        if count_result is None:
-            total = 0
-        elif isinstance(count_result, dict):
-            total = count_result.get('COUNT(*)', 0) or count_result.get('count', 0)
-        else:
-            total = count_result[0] if count_result else 0
-
-        offset = (page - 1) * page_size
-        data_params = params.copy()
-        data_params.append(page_size)
-        data_params.append(offset)
-
-        with db_cursor() as cursor:
-            cursor.execute(data_sql, data_params)
-            rows = cursor.fetchall()
-
-            columns = ['engine', 'chassis', 'vin', 'vehicleProductionDate']
-            result = []
-            for row in rows:
-                if isinstance(row, dict):
-                    record = row
-                else:
-                    record = dict(zip(columns, row))
-                result.append(record)
-
-            end_time = time.time()
-            elapsed_time = (end_time - start_time) * 1000
-            print(f"[KsInquiryRecordsService] 发动机底盘查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
-
-            return {
-                'list': result,
-                'total': total,
-                'page': page,
-                'page_size': page_size
-            }
-
-    @staticmethod
-    def get_garage_chassis_stats(
-        garage_name: str = '',
-        company: str = '',
-        begin_date: str = '',
-        end_date: str = '',
-        sort_column: str = '',
-        sort_dir: str = ''
-    ) -> Dict[str, Any]:
-        """
-        按修理厂统计底盘出现次数
-
-        Args:
-            garage_name: 修理厂名称
-            company: 用户门店/组织
-            begin_date: 开始日期
-            end_date: 结束日期
-            sort_column: 排序列名
-            sort_dir: 排序方向 (asc/desc)
-
-        Returns:
-            Dict: {list: 统计列表}
-        """
-        start_time = time.time()
-
-        conditions = ["COALESCE(TRIM(garage_company_name), '') != ''"]
-        params = []
-
-        if garage_name:
-            conditions.append("garage_company_name LIKE %s")
-            params.append(f"%{garage_name}%")
-
-        if company:
-            conditions.append("company = %s")
-            params.append(company)
-
-        if begin_date:
-            conditions.append("quote_date >= %s")
-            params.append(begin_date)
-
-        if end_date:
-            conditions.append("quote_date <= %s")
-            params.append(end_date)
-
-        conditions.append("COALESCE(TRIM(chassis), '') != ''")
-
-        where_clause = " AND ".join(conditions)
-
-        chassis_column_map = {
-            'carBrandName': 'car_brand_name',
-            'chassis': 'chassis',
-            'count': 'count'
-        }
-        order_by = build_order_by(
-            sort_column, sort_dir, chassis_column_map,
-            numeric_columns={'count'},
-            default='count DESC, car_brand_name, chassis'
-        )
-
-        sql = f"""
-            SELECT
-                car_brand_name AS carBrandName,
-                chassis,
-                COUNT(DISTINCT inquiryId) AS count
-            FROM crmapp_ks_inquiry_detail
-            WHERE {where_clause}
-            GROUP BY car_brand_name, chassis
-            ORDER BY {order_by}
-        """
+            sql = f"""
+                SELECT {db_col} AS value, COUNT(*) AS count
+                FROM crmapp_ks_inquiry_detail
+                WHERE {where_clause} AND {db_col} IS NOT NULL AND TRIM({db_col}) != ''
+                GROUP BY {db_col} ORDER BY {db_col} LIMIT 1000
+            """
 
         with db_cursor() as cursor:
             cursor.execute(sql, tuple(params))
             rows = cursor.fetchall()
-
-            result = []
-            for row in rows:
-                if isinstance(row, dict):
-                    result.append({
-                        'carBrandName': row.get('carBrandName') or '',
-                        'chassis': row.get('chassis') or '',
-                        'count': row.get('count') or 0
-                    })
+            values = []
+            for r in rows:
+                if isinstance(r, dict):
+                    values.append({'value': str(r.get('value', '')), 'count': int(r.get('count', 0))})
                 else:
-                    result.append({
-                        'carBrandName': row[0] or '',
-                        'chassis': row[1] or '',
-                        'count': row[2] or 0
-                    })
+                    values.append({'value': str(r[0]), 'count': int(r[1])})
 
             end_time = time.time()
             elapsed_time = (end_time - start_time) * 1000
-            print(f"[KsInquiryRecordsService] 修理厂底盘统计完成: 耗时 {elapsed_time:.2f} ms, 返回 {len(result)} 条记录")
-
-            return {'list': result}
-
-    @staticmethod
-    def get_garage_engine_stats(
-        garage_name: str = '',
-        company: str = '',
-        begin_date: str = '',
-        end_date: str = '',
-        sort_column: str = '',
-        sort_dir: str = ''
-    ) -> Dict[str, Any]:
-        """
-        按修理厂统计发动机出现次数
-
-        Args:
-            garage_name: 修理厂名称
-            company: 用户门店/组织
-            begin_date: 开始日期
-            end_date: 结束日期
-            sort_column: 排序列名
-            sort_dir: 排序方向 (asc/desc)
-
-        Returns:
-            Dict: {list: 统计列表}
-        """
-        start_time = time.time()
-
-        conditions = ["COALESCE(TRIM(garage_company_name), '') != ''"]
-        params = []
-
-        if garage_name:
-            conditions.append("garage_company_name LIKE %s")
-            params.append(f"%{garage_name}%")
-
-        if company:
-            conditions.append("company = %s")
-            params.append(company)
-
-        if begin_date:
-            conditions.append("quote_date >= %s")
-            params.append(begin_date)
-
-        if end_date:
-            conditions.append("quote_date <= %s")
-            params.append(end_date)
-
-        conditions.append("COALESCE(TRIM(engine), '') != ''")
-
-        where_clause = " AND ".join(conditions)
-
-        engine_column_map = {
-            'carBrandName': 'car_brand_name',
-            'engine': 'engine',
-            'count': 'count'
-        }
-        order_by = build_order_by(
-            sort_column, sort_dir, engine_column_map,
-            numeric_columns={'count'},
-            default='count DESC, car_brand_name, engine'
-        )
-
-        sql = f"""
-            SELECT
-                car_brand_name AS carBrandName,
-                engine,
-                COUNT(DISTINCT inquiryId) AS count
-            FROM crmapp_ks_inquiry_detail
-            WHERE {where_clause}
-            GROUP BY car_brand_name, engine
-            ORDER BY {order_by}
-        """
-
-        with db_cursor() as cursor:
-            cursor.execute(sql, tuple(params))
-            rows = cursor.fetchall()
-
-            result = []
-            for row in rows:
-                if isinstance(row, dict):
-                    result.append({
-                        'carBrandName': row.get('carBrandName') or '',
-                        'engine': row.get('engine') or '',
-                        'count': row.get('count') or 0
-                    })
-                else:
-                    result.append({
-                        'carBrandName': row[0] or '',
-                        'engine': row[1] or '',
-                        'count': row[2] or 0
-                    })
-
-            end_time = time.time()
-            elapsed_time = (end_time - start_time) * 1000
-            print(f"[KsInquiryRecordsService] 修理厂发动机统计完成: 耗时 {elapsed_time:.2f} ms, 返回 {len(result)} 条记录")
-
-            return {'list': result}
-
-    @staticmethod
-    def get_garage_oenum_stats(
-        garage_name: str = '',
-        company: str = '',
-        begin_date: str = '',
-        end_date: str = '',
-        sort_column: str = '',
-        sort_dir: str = ''
-    ) -> Dict[str, Any]:
-        """
-        按修理厂统计OE号码出现次数
-
-        Args:
-            garage_name: 修理厂名称
-            company: 用户门店/组织
-            begin_date: 开始日期
-            end_date: 结束日期
-            sort_column: 排序列名
-            sort_dir: 排序方向 (asc/desc)
-
-        Returns:
-            Dict: {list: 统计列表}
-        """
-        start_time = time.time()
-
-        conditions = ["COALESCE(TRIM(garage_company_name), '') != ''"]
-        params = []
-
-        if garage_name:
-            conditions.append("garage_company_name LIKE %s")
-            params.append(f"%{garage_name}%")
-
-        if company:
-            conditions.append("company = %s")
-            params.append(company)
-
-        if begin_date:
-            conditions.append("quote_date >= %s")
-            params.append(begin_date)
-
-        if end_date:
-            conditions.append("quote_date <= %s")
-            params.append(end_date)
-
-        conditions.append("COALESCE(TRIM(partsNum), '') != ''")
-
-        where_clause = " AND ".join(conditions)
-
-        oenum_column_map = {
-            'carBrandName': 'car_brand_name',
-            'partsNum': 'partsNum',
-            'count': 'count'
-        }
-        order_by = build_order_by(
-            sort_column, sort_dir, oenum_column_map,
-            numeric_columns={'count'},
-            default='count DESC, car_brand_name, partsNum'
-        )
-
-        sql = f"""
-            SELECT
-                car_brand_name AS carBrandName,
-                partsNum,
-                COUNT(DISTINCT inquiryId) AS count
-            FROM crmapp_ks_inquiry_detail
-            WHERE {where_clause}
-            GROUP BY car_brand_name, partsNum
-            ORDER BY {order_by}
-        """
-
-        with db_cursor() as cursor:
-            cursor.execute(sql, tuple(params))
-            rows = cursor.fetchall()
-
-            result = []
-            for row in rows:
-                if isinstance(row, dict):
-                    result.append({
-                        'carBrandName': row.get('carBrandName') or '',
-                        'partsNum': row.get('partsNum') or '',
-                        'count': row.get('count') or 0
-                    })
-                else:
-                    result.append({
-                        'carBrandName': row[0] or '',
-                        'partsNum': row[1] or '',
-                        'count': row[2] or 0
-                    })
-
-            end_time = time.time()
-            elapsed_time = (end_time - start_time) * 1000
-            print(f"[KsInquiryRecordsService] 修理厂OE号码统计完成: 耗时 {elapsed_time:.2f} ms, 返回 {len(result)} 条记录")
-
-            return {'list': result}
+            print(f"[KsInquiryRecordsService] 列 {grid_type}.{column} 全量不重复值查询完成: "
+                  f"耗时 {elapsed_time:.2f} ms, 返回 {len(values)} 条")
+            return values
 
     @staticmethod
     def get_distinct_seller_status() -> List[str]:
@@ -810,7 +425,15 @@ class KsInquiryRecordsService:
         with db_cursor() as cursor:
             cursor.execute(sql)
             rows = cursor.fetchall()
-            return [row[0] for row in rows if row[0]]
+            values = []
+            for row in rows:
+                if isinstance(row, dict):
+                    val = row.get('display_seller_status')
+                else:
+                    val = row[0]
+                if val:
+                    values.append(val)
+            return values
 
     @staticmethod
     def get_distinct_brands(company: str = '') -> List[str]:
