@@ -46,24 +46,28 @@
 
     // 主表列定义
     const customerStatsColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 70, sortable: false, filter: false, lockPosition: 'left' },
         { field: 'customerName', headerName: '客户', width: 200, pinned: 'left', sortable: false, filter: true },
-        { field: 'count', headerName: '询价次数', width: 120, pinned: 'left', sortable: false, filter: true }
+        { field: 'count', headerName: '询价次数', width: 120, sortable: false, filter: true }
     ];
 
     // 副表列定义
     const customerEngineColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
         { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
         { field: 'engine', headerName: '发动机', width: 140, sortable: false, suppressMenu: true },
         { field: 'count', headerName: '次数', width: 100, sortable: false, suppressMenu: true }
     ];
 
     const customerChassisColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
         { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
         { field: 'chassis', headerName: '底盘代码', width: 140, sortable: false, suppressMenu: true },
         { field: 'count', headerName: '次数', width: 100, sortable: false, suppressMenu: true }
     ];
 
     const customerOeColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
         { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
         { field: 'partsNum', headerName: 'OE', width: 180, sortable: false, suppressMenu: true },
         { field: 'partsName', headerName: '配件名称', width: 200, sortable: false, suppressMenu: true },
@@ -267,7 +271,9 @@
         customerStatsCurrentPage = page;
         customerStatsCurrentPageSize = pageSize;
 
-        const params = getSearchParams(currentTab);
+        console.log('[customer_stats] refreshCustomerStats state:', JSON.stringify(customerSearchState));
+        const params = getSearchParams('customer');
+        console.log('[customer_stats] getSearchParams result:', JSON.stringify(params));
         params.page = page;
         params.page_size = pageSize;
 
@@ -412,7 +418,7 @@
 
     // 从后端获取客户统计指定列的全量不重复值（用于列头下拉筛选）
     function fetchCustomerStatsColumnValues(colId, callback) {
-        const params = getSearchParams(currentTab);
+        const params = getSearchParams('customer');
         params.column = colId;
         params.grid_type = 'customer_stats';
 

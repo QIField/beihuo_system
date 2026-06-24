@@ -24,7 +24,7 @@
                 return params.value;
             }
         },
-        { field: 'partsName', headerName: '配件名称', width: 200, sortable: false, filter: true },
+        { field: 'resolve_parts_name', headerName: '配件名称', width: 200, sortable: false, filter: true },
         { field: 'carBrandName', headerName: '车辆品牌', width: 120, sortable: false, filter: true },
         { field: 'brandName', headerName: '品牌', width: 120, sortable: false, filter: true },
         { field: 'brandNormalized', headerName: '标准化品牌', width: 120, sortable: false, filter: true },
@@ -101,7 +101,6 @@
                         refreshGrid(1, currentPageSize);
                     },
                     onDataRefresh: function(filterState) {
-                        console.log('[detail_tab] 列筛选触发:', filterState);
                         refreshGrid(currentPage, currentPageSize);
                     },
                     getFilterValues: function(colId, callback) {
@@ -167,8 +166,6 @@
                 currentPageSize = pageSize;
             }
         });
-
-        console.log('[KsInquiryRecords] 自定义分页组件已初始化');
     }
 
     // 更新分页信息（在 refreshGrid 中调用）
@@ -203,9 +200,6 @@
                 params.column_filters = JSON.stringify(filterState.filters);
             }
         }
-
-        console.log(`[refreshGrid] 请求第 ${page} 页, 每页 ${pageSize} 条`);
-        console.log(`[refreshGrid] 请求参数 params:`, params);
 
         gridLoader.load('/new/api/ks_inquiry/records', params, (data) => {
 
@@ -246,42 +240,22 @@
                 });
             }
 
-            // 合并调试：统计多行单号组
-            const mergeGroups = {};
-            sortedList.forEach(item => {
-                const id = item.inquiryId || 'null';
-                mergeGroups[id] = (mergeGroups[id] || 0) + 1;
-            });
-            const multiRowGroups = Object.entries(mergeGroups).filter(([k, v]) => v > 1);
-            console.log(`[Merge Debug] 数据条数: ${sortedList.length}, 多行组个数: ${multiRowGroups.length}`);
-            if (multiRowGroups.length > 0) {
-                console.log(`[Merge Debug] 前5个多行组:`, multiRowGroups.slice(0, 5));
-            }
-
             currentData = sortedList;
             totalRecords = data.total;
-
-            console.log(`[refreshGrid] 总条数: ${totalRecords}, 当前页: ${data.page}, 返回 ${sortedList.length} 条`);
 
             // 缓存原始数据到 GridColumnMenu，供列筛选下拉选项使用
             if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
                 GridColumnMenu.setOriginalRows('#ksInquiryGrid', sortedList);
             }
 
-            // 列筛选已由后端完成，前端不再二次过滤
-            let displayData = sortedList;
-
-            // 预处理：给 displayData 按 inquiryId 计算 rowSpan 值（跨列合并）
-            MergeCellHelper.computeRowSpans(displayData, 'inquiryId');
-
-            // 预处理：给 displayData 按 content + 下单状态合并下单状态列
-            MergeCellHelper.computeRowSpans(displayData, '_contentStatusGroupKey', {
+            // 计算合并单元格所需 rowSpan
+            MergeCellHelper.computeRowSpans(sortedList, 'inquiryId');
+            MergeCellHelper.computeRowSpans(sortedList, '_contentStatusGroupKey', {
                 spanField: '_contentRowSpan',
                 indexField: '_contentStatusGroupIndex'
             });
 
-            // 手动设置数据到 grid（AG Grid 原生 rowSpan 会自动处理合并渲染）
-            gridApi.setRowData(displayData);
+            gridApi.setRowData(sortedList);
 
             // 更新分页信息
             updatePaginationInfo();

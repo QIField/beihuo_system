@@ -42,6 +42,17 @@
     let engineGridApi = null;
     let oeNumGridApi = null;
 
+    // 标记初始化后是否需要自动加载
+    let autoLoadAfterReady = false;
+
+    // 检查三个表格是否都就绪，若已标记自动加载则刷新
+    function checkAllGridsReady() {
+        if (autoLoadAfterReady && chassisGridApi && engineGridApi && oeNumGridApi) {
+            autoLoadAfterReady = false;
+            refreshEngineChassis();
+        }
+    }
+
     // ECharts 实例
     let chassisChartInstance = null;
     let engineChartInstance = null;
@@ -115,6 +126,7 @@
 
     // 底盘表格列定义
     const chassisColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
         { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
         { field: 'chassis', headerName: '底盘', width: 140, sortable: false, suppressMenu: true },
         { field: 'count', headerName: '出现次数', width: 100, sortable: false, suppressMenu: true }
@@ -122,6 +134,7 @@
 
     // 发动机表格列定义
     const engineColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
         { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
         { field: 'engine', headerName: '发动机代码', width: 140, sortable: false, suppressMenu: true },
         { field: 'count', headerName: '出现次数', width: 100, sortable: false, suppressMenu: true }
@@ -129,6 +142,7 @@
 
     // OE号码表格列定义
     const oeNumColumnDefs = [
+        { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, sortable: false, suppressMenu: true, lockPosition: 'left' },
         { field: 'carBrandName', headerName: '车辆品牌', width: 140, sortable: false, suppressMenu: true },
         { field: 'partsNum', headerName: 'OE号码', width: 140, sortable: false, suppressMenu: true },
         { field: 'count', headerName: '出现次数', width: 100, sortable: false, suppressMenu: true }
@@ -150,6 +164,9 @@
                 if (gridType === 'chassis') chassisGridApi = params.api;
                 else if (gridType === 'engine') engineGridApi = params.api;
                 else if (gridType === 'oeNum') oeNumGridApi = params.api;
+
+                // 三个表格都就绪后，若已标记自动加载则刷新
+                checkAllGridsReady();
 
                 var columnApi = params.columnApi;
 
@@ -398,6 +415,9 @@
 
     // 初始化表格
     window.initEngineChassisGrid = function() {
+        // 标记需要在三个表格都就绪后自动加载一次
+        autoLoadAfterReady = true;
+
         // 初始化底盘表格
         if (!chassisGridApi) {
             const chassisDiv = document.querySelector('#chassisGrid');
@@ -427,6 +447,9 @@
         } else {
             setTimeout(() => oeNumGridApi.sizeColumnsToFit(), 0);
         }
+
+        // 若表格之前已初始化，直接刷新
+        checkAllGridsReady();
 
         // 初始化柱状图
         initCharts();

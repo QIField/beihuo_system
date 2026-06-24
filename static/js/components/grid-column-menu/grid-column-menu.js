@@ -229,7 +229,7 @@ var GridColumnMenu = (function() {
             menuBtn.setAttribute('data-col-id', colId);
             menuBtn.setAttribute('data-grid-selector', gridSelector);
             menuBtn.innerHTML = '▾';
-            menuBtn.style.cssText = 'cursor: pointer; padding: 0 6px; opacity: 0.5; font-size: 12px; margin-left: 4px; user-select: none;';
+            menuBtn.style.cssText = 'cursor: pointer; padding: 0 6px; opacity: 0.5; font-size: 14px; margin-left: 2px; user-select: none;';
 
             menuBtn.addEventListener('mouseenter', function() { this.style.opacity = '1'; });
             menuBtn.addEventListener('mouseleave', function() { this.style.opacity = '0.5'; });
@@ -242,6 +242,31 @@ var GridColumnMenu = (function() {
             });
 
             headerTextDiv.appendChild(menuBtn);
+        });
+
+        // 刷新表头按钮高亮状态
+        refreshMenuButtonStates(gridSelector);
+    }
+
+    /**
+     * 刷新表头菜单按钮状态（排序/筛选后高亮提醒）
+     * @param {string} gridSelector - 网格选择器
+     */
+    function refreshMenuButtonStates(gridSelector) {
+        var info = menuConfig.grids[gridSelector];
+        if (!info) return;
+
+        var buttons = document.querySelectorAll('.ag-col-menu-btn[data-grid-selector="' + gridSelector + '"]');
+        buttons.forEach(function(btn) {
+            var colId = btn.getAttribute('data-col-id');
+            var hasSort = info.sortColumn === colId;
+            var hasFilter = info.columnFilters[colId] && info.columnFilters[colId].length > 0;
+
+            if (hasSort || hasFilter) {
+                btn.classList.add('has-condition');
+            } else {
+                btn.classList.remove('has-condition');
+            }
         });
     }
 
@@ -565,6 +590,7 @@ var GridColumnMenu = (function() {
             try {
                 info.onDataRefresh(filterState);
                 closeAll();
+                refreshMenuButtonStates(gridSelector);
                 return;
             } catch (e) {}
         }
@@ -575,6 +601,7 @@ var GridColumnMenu = (function() {
                 if (typeof info.api.onFilterChanged === 'function') {
                     info.api.onFilterChanged();
                     closeAll();
+                    refreshMenuButtonStates(gridSelector);
                     return;
                 }
             } catch (e) {}
@@ -597,6 +624,7 @@ var GridColumnMenu = (function() {
         } catch (e) {}
 
         closeAll();
+        refreshMenuButtonStates(gridSelector);
     }
 
     // ==================== 排序 ====================
@@ -616,6 +644,9 @@ var GridColumnMenu = (function() {
         if (typeof info.onSort === 'function') {
             info.onSort(info.sortColumn, info.sortDir);
         }
+
+        // 刷新表头按钮高亮
+        refreshMenuButtonStates(gridSelector);
     }
 
     function getSortState(gridSelector) {
@@ -629,6 +660,9 @@ var GridColumnMenu = (function() {
         if (!info) return;
         info.sortColumn = sortColumn || null;
         info.sortDir = sortDir || null;
+
+        // 刷新表头按钮高亮
+        refreshMenuButtonStates(gridSelector);
     }
 
     // ==================== 数据缓存（供列筛选使用）====================

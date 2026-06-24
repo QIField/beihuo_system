@@ -389,8 +389,8 @@
 
         // 重置所有筛选条件
         function resetAll() {
-            // 清空日期范围
-            document.getElementById('dateRange').value = '';
+            // 重置日期范围为近三天
+            document.getElementById('dateRange').value = getDefaultDateRange();
 
             // 只重置当前 tab 对应的 state
             const state = getCurrentSearchState(currentTab);
@@ -474,9 +474,11 @@
                 onApply: function(field, value) {
                     const state = getCurrentSearchState(currentTab);
                     const stateField = labelToStateField[field];
+                    console.log('[main] FilterPanel onApply:', currentTab, field, value, 'stateField:', stateField);
                     if (stateField && stateField in state) {
                         state[stateField] = value || '';
                     }
+                    console.log('[main] after update state:', JSON.stringify(state));
 
                     const fieldConfig = fields.find(function(f) { return f.label === field; });
                     if (fieldConfig) {
@@ -497,6 +499,22 @@
                     }
                 }
             });
+        }
+
+        // 获取默认日期范围字符串（近三天）
+        function getDefaultDateRange() {
+            const today = new Date();
+            const todayStr = today.getFullYear() + '-' +
+                String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                String(today.getDate()).padStart(2, '0');
+
+            const threeDaysAgo = new Date(today);
+            threeDaysAgo.setDate(today.getDate() - 2);
+            const threeDaysAgoStr = threeDaysAgo.getFullYear() + '-' +
+                String(threeDaysAgo.getMonth() + 1).padStart(2, '0') + '-' +
+                String(threeDaysAgo.getDate()).padStart(2, '0');
+
+            return threeDaysAgoStr + ' - ' + todayStr;
         }
 
         // 初始化 Grid
@@ -524,18 +542,13 @@
             // 初始化筛选面板（根据当前标签动态显示）
             updateSearchPanelForTab('detail');
 
+            // 先同步设置默认日期，确保后续 Grid 初始化时能读到日期
+            const defaultDateRange = getDefaultDateRange();
+            document.getElementById('dateRange').value = defaultDateRange;
+
             // 初始化layui日期组件
             layui.use(['laydate'], function() {
                 const laydate = layui.laydate;
-
-                // 获取今天的日期字符串
-                const today = new Date();
-                const todayStr = today.getFullYear() + '-' +
-                    String(today.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(today.getDate()).padStart(2, '0');
-
-                // 设置默认日期范围（今天）
-                document.getElementById('dateRange').value = todayStr + ' - ' + todayStr;
 
                 laydate.render({
                     elem: '#dateRange',
@@ -543,7 +556,7 @@
                     format: 'yyyy-MM-dd',
                     range: true,
                     max: 0,
-                    value: todayStr + ' - ' + todayStr,
+                    value: defaultDateRange,
                     done: function(value, date, endDate) {
                         console.log('日期选择完成:', value);
                         if (currentTab === 'detail') {

@@ -405,6 +405,9 @@ var FilterPanel = (function() {
         var originalInput = document.getElementById(currentInputId);
         if (originalInput) originalInput.value = value;
 
+        // closeAll 会清空 currentField，需先保存
+        var appliedField = currentField;
+
         closeAll();
 
         // 刷新按钮状态
@@ -412,7 +415,7 @@ var FilterPanel = (function() {
 
         // 触发回调
         if (typeof searchConfig.onApply === 'function') {
-            searchConfig.onApply(currentField, value);
+            searchConfig.onApply(appliedField, value);
         }
     }
 

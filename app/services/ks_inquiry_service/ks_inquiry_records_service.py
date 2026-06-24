@@ -22,7 +22,7 @@ class KsInquiryRecordsService:
         'inquiryId': 'inquiryId',
         'customerName': 'garage_company_name',
         'partsNum': 'partsNum',
-        'partsName': 'partsName',
+        'resolve_parts_name': 'resolve_parts_name',
         'carBrandName': 'car_brand_name',
         'brandName': 'brandName',
         'brandNormalized': 'brandNormalized',
@@ -100,7 +100,7 @@ class KsInquiryRecordsService:
         # 基础查询条件
         if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
         if parts_num:     conditions.append("partsNum LIKE %s");            params.append(f"%{parts_num}%")
-        if parts_name:    conditions.append("partsName LIKE %s");           params.append(f"%{parts_name}%")
+        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
         if seller_status: conditions.append("display_seller_status LIKE %s"); params.append(f"%{seller_status}%")
@@ -125,7 +125,7 @@ class KsInquiryRecordsService:
         records_column_map = {
             'inquiryId': 'inquiryId',
             'partsNum': 'partsNum',
-            'partsName': 'partsName',
+            'resolve_parts_name': 'resolve_parts_name',
             'brandName': 'brandName',
             'brandNormalized': 'brandNormalized',
             'brandId': 'brandId',
@@ -153,7 +153,7 @@ class KsInquiryRecordsService:
                 inquiryId,
                 garage_company_name AS customerName,
                 partsNum,
-                partsName,
+                resolve_parts_name,
                 brandName,
                 brandNormalized,
                 brandId,
@@ -196,7 +196,7 @@ class KsInquiryRecordsService:
 
             # 硬编码列名（确保与 SQL 一致）- 已删除：quote_date, partType, partsBrandQuality, company, created_at, updated_at
             columns = [
-                'inquiryId', 'customerName', 'partsNum', 'partsName', 'brandName', 'brandNormalized',
+                'inquiryId', 'customerName', 'partsNum', 'resolve_parts_name', 'brandName', 'brandNormalized',
                 'brandId', 'sellerBtPrice', 'sellerPrice', 'displaySellerStatus', 'remark',
                 'vin', 'engine', 'productionDate', 'chassis', 'carBrandName',
                 'locationName', 'arrivalTime', 'content_item_index'
@@ -256,7 +256,7 @@ class KsInquiryRecordsService:
         # 基础查询条件
         if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
         if parts_num:     conditions.append("partsNum LIKE %s");            params.append(f"%{parts_num}%")
-        if parts_name:    conditions.append("partsName LIKE %s");           params.append(f"%{parts_name}%")
+        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
         if seller_status: conditions.append("display_seller_status LIKE %s"); params.append(f"%{seller_status}%")
@@ -269,7 +269,7 @@ class KsInquiryRecordsService:
         # 不同网格的列映射与聚合配置
         grid_configs = {
             'detail':       {'columns': KsInquiryRecordsService._DETAIL_FILTER_MAP, 'aggregated': set()},
-            'oe_stats':     {'columns': {'partsNum': 'partsNum', 'partsName': 'partsName', 'count': 'count', 'unquotedProducts': 'unquotedProducts'}, 'aggregated': {'count', 'unquotedProducts'}, 'group_by': 'partsNum'},
+            'oe_stats':     {'columns': {'partsNum': 'partsNum', 'partsName': 'resolve_parts_name', 'count': 'count', 'unquotedProducts': 'unquotedProducts'}, 'aggregated': {'count', 'unquotedProducts'}, 'group_by': 'partsNum'},
             'garage_chassis': {'columns': {'carBrandName': 'car_brand_name', 'chassis': 'chassis', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, chassis'},
             'garage_engine':  {'columns': {'carBrandName': 'car_brand_name', 'engine': 'engine', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, engine'},
             'garage_oenum':   {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'partsNum', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, partsNum'},

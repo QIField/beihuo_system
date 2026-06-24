@@ -58,7 +58,7 @@ class KsInquiryStatsService:
         # 基础查询条件
         if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
         if parts_num:     conditions.append("partsNum LIKE %s");            params.append(f"%{parts_num}%")
-        if parts_name:    conditions.append("partsName LIKE %s");           params.append(f"%{parts_name}%")
+        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
         if seller_status: conditions.append("display_seller_status LIKE %s"); params.append(f"%{seller_status}%")
@@ -74,8 +74,11 @@ class KsInquiryStatsService:
         if column_filters:
             for col_id, values in column_filters.items():
                 placeholders = ', '.join(['%s'] * len(values))
-                if col_id in ('partsNum', 'partsName'):
-                    conditions.append(f"{col_id} IN ({placeholders})")
+                if col_id == 'partsNum':
+                    conditions.append(f"partsNum IN ({placeholders})")
+                    params.extend(values)
+                elif col_id == 'partsName':
+                    conditions.append(f"resolve_parts_name IN ({placeholders})")
                     params.extend(values)
                 elif col_id in ('count', 'unquotedProducts'):
                     having_conditions.append(f"{col_id} IN ({placeholders})")
@@ -100,61 +103,30 @@ class KsInquiryStatsService:
 
         # OE统计排序：白名单映射（前端列名 -> SQL列名）
         oe_column_map = {
-            'partsNum': 'a.partsNum',
-            'count': 'a.count',
+            'partsNum': 'partsNum',
+            'count': 'count',
             'partsName': 'partsName',
-            'unquotedProducts': 'a.unquotedProducts'
+            'unquotedProducts': 'unquotedProducts'
         }
         order_by = build_order_by(
             sort_column, sort_dir, oe_column_map,
             numeric_columns={'count', 'unquotedProducts'},
-            default='a.count DESC'
+            default='count DESC'
         )
 
         # 查询分组聚合数据
-        # 配件名称优先取：原厂 > 原厂国内4S件 > 其他
         data_sql = f"""
-            SELECT
-                a.partsNum,
-                a.count,
-                COALESCE(b.partsName, c.partsName, d.partsName) as partsName,
-                a.unquotedProducts
-            FROM (
+            SELECT * FROM (
                 SELECT
                     partsNum,
                     COUNT(DISTINCT inquiryId) as count,
+                    MAX(resolve_parts_name) as partsName,
                     MAX(unquoted_products) as unquotedProducts
                 FROM crmapp_ks_inquiry_detail
                 WHERE {where_clause}
                 GROUP BY partsNum
                 {having_clause}
-            ) a
-            LEFT JOIN (
-                SELECT partsNum, partsName
-                FROM crmapp_ks_inquiry_detail
-                WHERE brandNormalized = '原厂'
-                  AND ({where_clause})
-                GROUP BY partsNum
-            ) b ON a.partsNum = b.partsNum
-            LEFT JOIN (
-                SELECT partsNum, partsName
-                FROM crmapp_ks_inquiry_detail
-                WHERE brandNormalized = '原厂国内4S件'
-                  AND ({where_clause})
-                GROUP BY partsNum
-            ) c ON a.partsNum = c.partsNum
-            LEFT JOIN (
-                SELECT partsNum, partsName
-                FROM (
-                    SELECT partsNum, partsName, COUNT(*) as name_count
-                    FROM crmapp_ks_inquiry_detail
-                    WHERE ({where_clause})
-                    GROUP BY partsNum, partsName
-                    ORDER BY name_count DESC
-                    LIMIT 1
-                ) t
-                GROUP BY partsNum
-            ) d ON a.partsNum = d.partsNum
+            ) t
             ORDER BY {order_by}
             LIMIT %s OFFSET %s
         """
@@ -171,12 +143,9 @@ class KsInquiryStatsService:
             total = count_result[0] if count_result else 0
 
         # 查询分页数据
-        # 注意：data_sql 中 where_clause 出现了 4 次（a、b、c、d 子查询），参数重复 4 次；
-        # having_clause 仅在子查询 a 中出现一次，放在第 1 次 where 参数之后
         offset = (page - 1) * page_size
         data_params = params.copy()
         data_params.extend(having_params)
-        data_params.extend(params.copy() * 3)
         data_params.append(page_size)
         data_params.append(offset)
 
@@ -231,7 +200,7 @@ class KsInquiryStatsService:
         # 基础查询条件
         if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
         if parts_num:     conditions.append("partsNum = %s");               params.append(parts_num)
-        if parts_name:    conditions.append("partsName LIKE %s");           params.append(f"%{parts_name}%")
+        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
         if seller_status: conditions.append("display_seller_status LIKE %s"); params.append(f"%{seller_status}%")
@@ -260,7 +229,7 @@ class KsInquiryStatsService:
             FROM crmapp_ks_inquiry_detail
             WHERE {where_clause}
             GROUP BY garage_company_name
-            ORDER BY count DESC, customerName ASC
+            ORDER BY COUNT(DISTINCT inquiryId) DESC, customerName ASC
             LIMIT %s OFFSET %s
         """
 
@@ -374,12 +343,12 @@ class KsInquiryStatsService:
         # 排序列映射
         customer_column_map = {
             'customerName': 'customerName',
-            'count': 'count'
+            'count': 'COUNT(DISTINCT inquiryId)'
         }
         order_by = build_order_by(
             sort_column, sort_dir, customer_column_map,
             numeric_columns={'count'},
-            default='count DESC, customerName ASC'
+            default='COUNT(DISTINCT inquiryId) DESC, customerName ASC'
         )
 
         data_sql = f"""
@@ -594,12 +563,12 @@ class KsInquiryStatsService:
         chassis_column_map = {
             'carBrandName': 'car_brand_name',
             'chassis': 'chassis',
-            'count': 'count'
+            'count': 'COUNT(DISTINCT inquiryId)'
         }
         order_by = build_order_by(
             sort_column, sort_dir, chassis_column_map,
             numeric_columns={'count'},
-            default='count DESC, car_brand_name, chassis'
+            default='COUNT(DISTINCT inquiryId) DESC, car_brand_name, chassis'
         )
 
         sql = f"""
@@ -691,12 +660,12 @@ class KsInquiryStatsService:
         engine_column_map = {
             'carBrandName': 'car_brand_name',
             'engine': 'engine',
-            'count': 'count'
+            'count': 'COUNT(DISTINCT inquiryId)'
         }
         order_by = build_order_by(
             sort_column, sort_dir, engine_column_map,
             numeric_columns={'count'},
-            default='count DESC, car_brand_name, engine'
+            default='COUNT(DISTINCT inquiryId) DESC, car_brand_name, engine'
         )
 
         sql = f"""
@@ -785,12 +754,12 @@ class KsInquiryStatsService:
         oenum_column_map = {
             'carBrandName': 'car_brand_name',
             'partsNum': 'partsNum',
-            'count': 'count'
+            'count': 'COUNT(DISTINCT inquiryId)'
         }
         order_by = build_order_by(
             sort_column, sort_dir, oenum_column_map,
             numeric_columns={'count'},
-            default='count DESC, car_brand_name, partsNum'
+            default='COUNT(DISTINCT inquiryId) DESC, car_brand_name, partsNum'
         )
 
         sql = f"""
@@ -887,12 +856,12 @@ class KsInquiryStatsService:
             'carBrandName': 'car_brand_name',
             'partsNum': 'resolve_parts_num',
             'partsName': 'resolve_parts_name',
-            'count': 'count'
+            'count': 'COUNT(DISTINCT inquiryId)'
         }
         order_by = build_order_by(
             sort_column, sort_dir, oenum_column_map,
             numeric_columns={'count'},
-            default='count DESC, car_brand_name, resolve_parts_num'
+            default='COUNT(DISTINCT inquiryId) DESC, car_brand_name, resolve_parts_num'
         )
 
         sql = f"""
