@@ -15,18 +15,16 @@ from app.utils.orm import orm_session
 from config.config_list_manager.config_cache import get_config_value
 
 
-def wms_get_status_orders_type(token, type_param=None, status_param=None, page_num=None, is_data_returned=False):
+def wms_get_status_orders_type(type_param=None, status_param=None, page_num=None, is_data_returned=False):
     """
     获取 WMS 状态订单数据
-    
-    :param token: 认证 token
     :param type_param: 类型参数
     :param status_param: 状态参数
     :param page_num: 指定页数，None 表示爬取全部
     :param is_data_returned: 是否返回爬取的数据
     :return: 当 is_data_returned=True 时返回清洗后的订单数据列表，否则返回 None
     """
-    spider = WmsGzbbrSpider(token)
+    spider = WmsGzbbrSpider()
     data_total_count = 0  # 存储所有订单数据总计
     current_page = 1
     data_returned = [] if is_data_returned else None
@@ -37,7 +35,7 @@ def wms_get_status_orders_type(token, type_param=None, status_param=None, page_n
             type=type_param, 
             status=status_param,
             page=current_page
-        ).json()
+        ).json()  # pyright: ignore[reportOptionalMemberAccess]
 
         # 获取订单数据
         data_node = json_data.get('data', {}).get('data', {})
@@ -56,7 +54,7 @@ def wms_get_status_orders_type(token, type_param=None, status_param=None, page_n
 
         # 如果需要返回数据，收集到列表中
         if is_data_returned:
-            data_returned.extend(filtered_data_list)
+            data_returned.extend(filtered_data_list)  # pyright: ignore[reportOptionalMemberAccess]
 
         # 进行入库操作（插入或更新）
         if filtered_data_list:
@@ -81,17 +79,15 @@ def wms_get_status_orders_type(token, type_param=None, status_param=None, page_n
     # 如果需要返回数据，返回收集到的数据
     return data_returned if is_data_returned else None
 
-def wms_get_return_items(token, orders_no_list=None,type_param=None,status_param=None):
+def wms_get_return_items(orders_no_list=None,type_param=None,status_param=None):
     """
     获取采购入库单列表
-    
-    :param token: 认证 token
     :param orders_no_list: 订单号列表
     :param type_param: 类型参数
     :param status_param: 状态参数
     :return: 采购入库单列表（所有订单的合并结果）
     """
-    spider = WmsGzbbrSpider(token)
+    spider = WmsGzbbrSpider()
     all_return_items = []
     data_total_count = 0
     
@@ -105,7 +101,7 @@ def wms_get_return_items(token, orders_no_list=None,type_param=None,status_param
     for orders_no in orders_no_list:
         try:
             print(f"正在查询订单 {orders_no} 的采购入库单...")
-            json_data = spider.get_return_items(orders_no).json()
+            json_data = spider.get_return_items(orders_no).json()  # pyright: ignore[reportOptionalMemberAccess]
             
             # 获取退货商品数据
             return_items = json_data.get('data', {}).get('data', {}).get(orders_no, [])
@@ -159,20 +155,20 @@ def wms_get_return_items_service(type_param=None, status_param=None, page_num=No
     """
     print("=" * 100)
     print("wms_get_status_orders_type_service 执行开始")
-    token = get_config_value("main_wms_token")
+    #token = get_config_value("main_wms_token")
     
     # 获取订单列表数据
-    json_data = wms_get_status_orders_type(token, type_param=type_param, status_param=status_param, page_num=page_num, is_data_returned=True)
+    json_data = wms_get_status_orders_type(type_param=type_param, status_param=status_param, page_num=page_num, is_data_returned=True)
     
     # 提取订单号列表
-    orders_no_list = [item.get('orders_no') for item in json_data if item.get('orders_no')]
+    orders_no_list = [item.get('orders_no') for item in json_data if item.get('orders_no')]  # pyright: ignore[reportOptionalIterable]
     print(f"提取到 {len(orders_no_list)} 个订单号")
 
     # 获取采购入库单数据
     if orders_no_list:
         print("\n" + "=" * 50)
         print("开始查询采购入库单...")
-        return_items = wms_get_return_items(token, orders_no_list=orders_no_list, type_param=type_param, status_param=status_param)
+        return_items = wms_get_return_items(orders_no_list=orders_no_list, type_param=type_param, status_param=status_param)
         print(f"总共获取到 {len(return_items)} 条采购入库单数据")
         print("=" * 50)
         print("wms_get_status_orders_type_service 执行结束")
@@ -187,5 +183,5 @@ def wms_get_return_items_service(type_param=None, status_param=None, page_num=No
 
 
 
-if __name__ == '__main__':
-    wms_get_return_items_service(type_param=5,status_param=0)
+# if __name__ == '__main__':
+#     wms_get_return_items_service(type_param=5,status_param=0)

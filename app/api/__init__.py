@@ -28,6 +28,7 @@ from .ks_inquiry_api import ks_inquiry_records_bp
 from .user_preference_api import column_preference_bp
 
 
+
 # 注册比价数据对比蓝图（设置正确的 url_prefix）
 api_bp.register_blueprint(compare_bp, url_prefix='/compare')
 api_bp.register_blueprint(qpl_quote_bp)

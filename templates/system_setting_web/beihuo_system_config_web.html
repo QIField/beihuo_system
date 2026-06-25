@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>系统配置管理</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+   <link rel="stylesheet" href="/static/layui/css/layui.css">
     <style>
         .container {
             padding: 20px;
@@ -106,7 +106,7 @@
         </form>
     </script>
 
-    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+     <script src="/static/layui/layui.js"></script>
     <script>
         layui.use(['table', 'layer', 'form', 'jquery'], function(){
             var table = layui.table;
@@ -121,7 +121,15 @@
             elem: '#configTable',
             url: '/new/api/system_setting/get_paged_configs_api',
             method: 'get',
-            page: true,
+            page: {
+                limits: [10, 20, 30, 50, 100],
+                layout: ['count', 'prev', 'page', 'next', 'limit', 'refresh', 'skip'],
+                prev: '上一页',
+                next: '下一页',
+                first: '首页',
+                last: '尾页'
+            },
+            limit: 10,
             request: {
                 pageName: 'page',
                 limitName: 'limit'
@@ -130,8 +138,8 @@
                 return {
                     "code": res.code === 200 ? 0 : res.code,
                     "msg": res.msg,
-                    "count": res.data.total,
-                    "data": res.data.data_list
+                    "count": res.data ? res.data.total : 0,
+                    "data": res.data ? res.data.data_list : []
                 };
             },
             toolbar: false,
@@ -219,7 +227,7 @@
                     layero.find('input[name="label"]').val(data.label);
                     layero.find('input[name="config_value"]').val(data.config_value);
                     layero.find('select[name="config_type"]').val(data.config_type);
-                    layero.find('select[name="config_group"]').val(data.config_group);
+                    layero.find('input[name="config_group"]').val(data.config_group);
                     layero.find('select[name="env"]').val(data.env);
                     layero.find('input[name="sort"]').val(data.sort);
                     layero.find('textarea[name="remark"]').val(data.remark);

@@ -1,9 +1,3 @@
-8918=PDC BJ 北京
-8968=PDC KS 昆山
-8928=PDC SH (HZ) 宝湾
-8958=成都PDC CD
-8938=广州PDC
-8978=PDC JN 济南
 
 
 
