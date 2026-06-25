@@ -2,24 +2,15 @@
 # @Time    : 2026/4/10 13:38
 # @Author  : xingkongtub
 # @Project : beihuo_system
-# @File    : __init__.py
+# @File    : __init__.py.py
 # @Software: PyCharm
-
-
-
 
 
 def expansion_tasks(task_manager):
 
 
-    from app.core.task_enhancer import set_task_manager, install_enhancements
-    set_task_manager(task_manager)
-    install_enhancements()
-    
-    # 注册测试定时任务
-    # from app.scripts.tasks.tasks_test import test
-    # test()
-    
+
+
     # 导入接口
     #注册定时业务
     from app.scripts.tasks.wms_get_status_orders_tasks import two_minutes_register

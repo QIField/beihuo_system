@@ -4,11 +4,9 @@
 # @Project : beihuo_system
 # @File    : wms_inbound_push.py
 # @Software: PyCharm
-from app.exceptions.base import BusinessError
-from app.scripts.spiders.spider_entities.cassmall import CassmallSpider
-from app.services.wms_upload_site_service.cassmall_product_list import cassmall_product_list_search,cassmall_update_inventory_batch, cassmall_get_inventorys, on_shelf
-
-from app.services.wms_upload_site_service.wms_get_status_orders_type import wms_get_return_items_service
+from app.scripts.spiders.spiders_services.cassmall_product_list import cassmall_product_list_search, \
+    cassmall_update_inventory_batch, cassmall_get_inventorys
+from app.scripts.spiders.spiders_services.wms_get_status_orders_type import wms_get_return_items_service
 from app.utils.orm.session import orm_session
 from app.models.orm_models.wms_return_items import WmsReturnItems
 from app.services.system_setting_service.beihuo_system_config_service import set_config_by_key
@@ -61,8 +59,8 @@ def wms_get_return_items_from_db(page=1, limit=20, has_pushed_ks=''):
 
 
 def get_cassmall_product_list_search(internal_name):
-    spider = CassmallSpider()
-    ks_json_data=cassmall_product_list_search(internal_name,spider=spider)
+    
+    ks_json_data=cassmall_product_list_search(internal_name)
     if ks_json_data.get('data'):
         # 获取数据列表
         data_list = ks_json_data.get('data', [])
@@ -78,22 +76,17 @@ def get_cassmall_product_list_search(internal_name):
             ks_json_data['message'] = f"搜索成功，匹配到 {len(matched_list)} 条数据"
         else:
             ks_json_data['message'] = f"{internal_name}没有搜索到对应的商家编码，请创建商家编码"
-        spider.close()
         return ks_json_data
     else:
         print(ks_json_data)
-        spider.close()
         return ks_json_data
 
 
-def inventory_sync(product_id, availableToPromiseTotal, record_id=None,spider=None,flag=True):
+def inventory_sync(product_id, availableToPromiseTotal, record_id=None):
     # 查询库存
     print("=== 查询库存...")
-    if spider is None:
-        spider = CassmallSpider()
 
-    
-    inventory_result = cassmall_get_inventorys([product_id],spider)
+    inventory_result = cassmall_get_inventorys([product_id])
     print("查询结果:", inventory_result)
 
     # 直接从查询结果中提取数据并组合
@@ -122,17 +115,10 @@ def inventory_sync(product_id, availableToPromiseTotal, record_id=None,spider=No
     print("组合后的格式:", inventory_list)
 
     print("\n=== 更新库存...")
-    update_result = cassmall_update_inventory_batch(inventory_list,spider)
+    update_result = cassmall_update_inventory_batch(inventory_list)
     
-    
-    message = update_result.get('message', '')
-
-    if '更新库存成功' in message and record_id:
-        is_on_shelf=on_shelf([product_id],spider)
-        if not is_on_shelf:
-            raise BusinessError("产品不在货架上")
-
     # 如果推送成功，更新数据库中的 has_pushed_ks 字段
+    message = update_result.get('message', '')
     if '更新库存成功' in message and record_id:
         try:
             with orm_session() as session:
@@ -145,10 +131,7 @@ def inventory_sync(product_id, availableToPromiseTotal, record_id=None,spider=No
                 session.commit()
                 print(f"已更新 id={record_id} 的 has_pushed_ks 为 1")
         except Exception as e:
-            print(f"更新 has_pushed_ks 失败: {str(e)}")  
-    
-    if flag:
-        spider.close()
+            print(f"更新 has_pushed_ks 失败: {str(e)}")
     
     return update_result
 
@@ -168,7 +151,6 @@ def inventory_sync_batch(items):
     success_count = 0
     failed_count = 0
     results = []
-    spider = CassmallSpider()
     
     for idx, item in enumerate(items, 1):
         product_id = item['product_id']
@@ -180,7 +162,7 @@ def inventory_sync_batch(items):
         
         try:
             # 调用单个更新函数
-            result = inventory_sync(product_id, availableToPromiseTotal, record_id,spider,flag=False)
+            result = inventory_sync(product_id, availableToPromiseTotal, record_id)
             results.append({
                 'product_id': product_id,
                 'result': result

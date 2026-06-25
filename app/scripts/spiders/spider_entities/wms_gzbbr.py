@@ -5,7 +5,6 @@
 # @File    : wms_gzbbr.py
 # @Software: PyCharm
 
-from app.scripts.spiders.spider_entities.wms_gzbbr_login import WmsGzbbrLoginService
 from app.scripts.spiders.spider_tool import SpiderTool
 
 
@@ -18,14 +17,11 @@ class WmsGzbbrSpider:
     # 网站固定配置
     BASE_URL = "https://wms.gzbbr.com"
 
-    def __init__(self, token=None, timeout=10, retry_count=3):
+    def __init__(self, token, timeout=10, retry_count=3):
         # 核心：实例化独立爬虫工具（组合模式）
         self.spider_tool = SpiderTool(timeout, retry_count)
         # 必传Token（业务私有属性）
-        if token is None:
-            self.token = WmsGzbbrLoginService.get_valid_config()
-        else:
-            self.token = token
+        self.token = token
 
     def _get_auth_header(self):
         """私有方法：统一生成认证请求头（复用）"""
