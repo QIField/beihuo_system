@@ -44,7 +44,7 @@ class SpiderTool:
         :param verify: 是否验证SSL证书，默认False（CRM接口需要跳过验证）
         """
         # 合并请求头（公共头 + 临时头）
-        req_headers = self.session.headers.copy()
+        req_headers = self.session.headers.copy()  # pyright: ignore[reportAttributeAccessIssue]
         if headers:
             req_headers.update(headers)
 
