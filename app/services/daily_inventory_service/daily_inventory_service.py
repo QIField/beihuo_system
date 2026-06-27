@@ -15,7 +15,7 @@ from app.models.orm_models.crm_purchase_order_details import CrmPurchaseOrderDet
 from app.models.orm_models.system_models.crmapp_users import CrmappUsers
 from app.utils.orm.session import orm_session
 from sqlalchemy import func
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 
 def mark_order_detail_viewed(purchase_order_line_id: int, user_id: int) -> Optional[Dict]:
@@ -68,6 +68,73 @@ def mark_order_detail_viewed(purchase_order_line_id: int, user_id: int) -> Optio
             }
     except Exception as e:
         error_msg = f'标记查看失败: {str(e)}'
+        print(error_msg)
+        return {'status': False, 'msg': error_msg, 'data': None}
+
+
+def batch_mark_order_detail_viewed(purchase_order_line_ids: List[int], user_id: int) -> Optional[Dict]:
+    """
+    批量标记订单明细为已查看，更新操作人字段
+
+    :param purchase_order_line_ids: 订单明细ID列表
+    :param user_id: 当前登录用户ID，用于查询用户名写入操作人字段
+    :return: 包含状态和消息的字典，失败时返回None
+    """
+    try:
+        with orm_session() as session:
+            # 1. 通过用户ID查询用户名
+            user = session.query(CrmappUsers).filter(
+                CrmappUsers.id == user_id
+            ).first()
+
+            if not user:
+                return {
+                    'status': False,
+                    'msg': '用户不存在，请重新登录',
+                    'data': None
+                }
+
+            operator = user.username
+
+            # 2. 参数验证
+            if not purchase_order_line_ids or not isinstance(purchase_order_line_ids, list):
+                return {
+                    'status': False,
+                    'msg': '订单明细ID列表不能为空',
+                    'data': None
+                }
+
+            # 3. 批量查询并更新订单明细记录
+            details = session.query(CrmPurchaseOrderDetails).filter(
+                CrmPurchaseOrderDetails.purchase_order_line_id.in_(purchase_order_line_ids)
+            ).all()
+
+            if not details:
+                return {
+                    'status': False,
+                    'msg': '未找到可更新的订单明细',
+                    'data': None
+                }
+
+            # 4. 更新所有找到的记录的操作人字段
+            updated_ids = []
+            for detail in details:
+                detail.operator = operator  # pyright: ignore[reportAttributeAccessIssue]
+                updated_ids.append(detail.purchase_order_line_id)
+
+            session.commit()
+
+            return {
+                'status': True,
+                'msg': f'批量确认查看成功，共更新 {len(updated_ids)} 条记录',
+                'data': {
+                    'purchase_order_line_ids': updated_ids,
+                    'operator': operator,
+                    'count': len(updated_ids)
+                }
+            }
+    except Exception as e:
+        error_msg = f'批量标记查看失败: {str(e)}'
         print(error_msg)
         return {'status': False, 'msg': error_msg, 'data': None}
 

@@ -176,6 +176,13 @@
         .layui-table tbody tr:hover {
             background-color: #f5f7fa;
         }
+
+        /* 工具栏按钮样式 */
+        .toolbar-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -236,8 +243,13 @@
         </div>
     </div>
     
-    <!-- 空的工具栏模板 -->
-    <script type="text/html" id="emptyToolbar">
+    <!-- 工具栏模板 -->
+    <script type="text/html" id="toolbarTemplate">
+      <div class="toolbar-btn">
+        <button class="layui-btn layui-btn-sm" id="batchViewBtn" lay-event="batchView">
+          <i class="layui-icon layui-icon-ok"></i> 批量查看确认
+        </button>
+      </div>
     </script>
 
     <!-- 表格行操作列模板 -->
@@ -287,7 +299,7 @@
                 limit: 10,
                 limits: [10, 20, 50, 100],
                 height: 'full-260',
-                toolbar: '#emptyToolbar',
+                toolbar: '#toolbarTemplate',
                 defaultToolbar: ['filter', 'exports'],
                 where: {
                   date: todayStr,
@@ -304,6 +316,7 @@
                   };
                 },
                 cols: [[
+                    {type: 'checkbox', fixed: 'left'},
                     {field: 'list_purchase_order_id', title: '订单ID', width: 100, merge: 'list_purchase_order_id', hide: true},
                     {field: 'list_create_date', title: '订单日期', width: 180, merge: 'list_purchase_order_id',hide: true},
                     {field: 'list_pono', title: '采购单号', width: 180, merge: 'list_purchase_order_id'},
@@ -420,7 +433,63 @@
                     });
                 }
             });
-            
+
+            // 表格头工具栏事件
+            table.on('toolbar(dailyInventoryTable)', function(obj) {
+                var checkStatus = table.checkStatus('dailyInventoryTable');
+                var data = checkStatus.data;
+                if (obj.event === 'batchView') {
+                    if (data.length === 0) {
+                        layer.msg('请至少选择一条记录', { icon: 2 });
+                        return;
+                    }
+                    // 提取选中记录的订单明细ID
+                    var purchase_order_line_ids = [];
+                    for (var i = 0; i < data.length; i++) {
+                        if (data[i].detail_purchase_order_line_id) {
+                            purchase_order_line_ids.push(data[i].detail_purchase_order_line_id);
+                        }
+                    }
+                    if (purchase_order_line_ids.length === 0) {
+                        layer.msg('选中的记录中没有有效的订单明细ID', { icon: 2 });
+                        return;
+                    }
+                    // 确认对话框
+                    layer.confirm('确定要批量确认查看选中的 ' + purchase_order_line_ids.length + ' 条记录吗？', { icon: 3, title: '提示' }, function(index) {
+                        // 调用批量确认查看API
+                        $.ajax({
+                            url: '/new/api/daily_inventory/batch-mark-viewed',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({
+                                purchase_order_line_ids: purchase_order_line_ids
+                            }),
+                            success: function(res) {
+                                if (res.code === 200) {
+                                    layer.msg(res.msg || '批量确认查看成功', { icon: 1 });
+                                    // 刷新表格以更新操作人字段
+                                    tableIns.reload();
+                                    layer.close(index);
+                                } else {
+                                    layer.msg(res.msg || '批量确认查看失败', { icon: 2 });
+                                }
+                            },
+                            error: function (xhr) {
+                                var errMsg = '网络错误，请稍后重试';
+                                try {
+                                    var errData = JSON.parse(xhr.responseText);
+                                    if (errData && errData.msg) {
+                                        errMsg = errData.msg;
+                                    }
+                                } catch (e) {
+                                }
+                                layer.msg(errMsg, { icon: 2 });
+                            },
+                        });
+                    });
+                }
+            });
+
             // 搜索按钮点击事件
             $('#searchBtn').on('click', function() {
                 var date = $('#datePicker').val();

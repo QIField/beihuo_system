@@ -14,7 +14,7 @@ from flask import Blueprint, request, jsonify, session
 from app.core.permission.decorators import require_authentication, require_permission
 from app.services.daily_inventory_service.daily_inventory_service import get_purchase_order_list_with_details
 from app.services.daily_inventory_service.daily_inventory_crawler import daily_inventory_crawler_service
-from app.services.daily_inventory_service.daily_inventory_service import mark_order_detail_viewed
+from app.services.daily_inventory_service.daily_inventory_service import mark_order_detail_viewed, batch_mark_order_detail_viewed
 
 
 
@@ -261,6 +261,115 @@ def api_mark_order_detail_viewed():
         return jsonify({
             'code': 500,
             'msg': f'确认查看失败: {str(e)}',
+            'data': None
+        }), 500
+
+
+@daily_inventory_bp.route('/batch-mark-viewed', methods=['POST'])
+@require_permission('daily_inventory:tag_view')
+def api_batch_mark_order_detail_viewed():
+    """
+    批量标记订单明细为已查看，更新操作人字段为当前登录用户
+
+    请求参数 (JSON body):
+        - purchase_order_line_ids: 订单明细ID列表（必需，数组类型）
+
+    返回:
+        {
+            "code": 200,
+            "msg": "批量确认查看成功，共更新 N 条记录",
+            "data": {
+                "purchase_order_line_ids": [123, 456, ...],
+                "operator": "username",
+                "count": N
+            }
+        }
+    """
+    try:
+        # 检查用户是否登录
+        if 'logged_in' not in session:
+            return jsonify({
+                'code': 401,
+                'msg': '未登录，请先登录',
+                'data': None
+            }), 401
+
+        # 获取当前登录用户ID
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({
+                'code': 401,
+                'msg': '用户信息异常，请重新登录',
+                'data': None
+            }), 401
+
+        # 将user_id转换为整数
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            return jsonify({
+                'code': 401,
+                'msg': '用户ID格式异常，请重新登录',
+                'data': None
+            }), 401
+
+        # 获取请求参数
+        data = request.get_json() or {}
+        purchase_order_line_ids = data.get('purchase_order_line_ids')
+
+        # 参数验证
+        if not purchase_order_line_ids:
+            return jsonify({
+                'code': 400,
+                'msg': '订单明细ID列表不能为空',
+                'data': None
+            }), 400
+
+        if not isinstance(purchase_order_line_ids, list):
+            return jsonify({
+                'code': 400,
+                'msg': '订单明细ID必须是数组类型',
+                'data': None
+            }), 400
+
+        if len(purchase_order_line_ids) == 0:
+            return jsonify({
+                'code': 400,
+                'msg': '请至少选择一条记录',
+                'data': None
+            }), 400
+
+        # 转换所有ID为整数
+        try:
+            purchase_order_line_ids = [int(pid) for pid in purchase_order_line_ids]
+        except (ValueError, TypeError):
+            return jsonify({
+                'code': 400,
+                'msg': '订单明细ID列表中包含无效的ID',
+                'data': None
+            }), 400
+
+        # 调用服务层批量更新操作人（传入user_id，服务层会查询用户名）
+        result = batch_mark_order_detail_viewed(purchase_order_line_ids, user_id)
+
+        if result and result.get('status'):
+            return jsonify({
+                'code': 200,
+                'msg': result.get('msg', '批量确认查看成功'),
+                'data': result.get('data')
+            })
+        else:
+            return jsonify({
+                'code': 500,
+                'msg': result.get('msg', '批量确认查看失败') if result else '批量确认查看失败',
+                'data': None
+            }), 500
+
+    except Exception as e:
+        print(f'[daily_inventory_api] 批量标记查看异常: {str(e)}')
+        return jsonify({
+            'code': 500,
+            'msg': f'批量确认查看失败: {str(e)}',
             'data': None
         }), 500
 
