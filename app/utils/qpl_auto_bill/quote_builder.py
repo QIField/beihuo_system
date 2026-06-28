@@ -90,9 +90,9 @@ WAREHOUSE_MAP = {
 }
 
 
-def construct_mercedes_quote_item(brand, product, all_products, item_sell_price, prepare_good_timespan, price_check_snapshot=None, category_id="/5/"):
+def construct_adapter_quote_item(brand, product, all_products, item_sell_price, prepare_good_timespan, price_check_snapshot=None, category_id="/5/"):
     """
-    从适配品牌构造奔驰报价项（待报价项目用）
+    从适配品牌构造第三方报价项（奔驰/宝马等待报价项目用）
 
     Args:
         brand: 原厂品牌信息
@@ -189,11 +189,11 @@ def select_warehouse_and_days(stock_info):
     return available_warehouses[0], 7
 
 
-def construct_quote_request(detail_data, mercedes_quote_items=None):
+def construct_quote_request(detail_data, extra_quote_items=None):
     """
     构造报价请求体
     """
-    mercedes_quote_items = mercedes_quote_items or {}
+    extra_quote_items = extra_quote_items or {}
     
     demand_list = detail_data.get('supplierEnquiryDemandList', [])
     constructed_demand_list = []
@@ -215,13 +215,13 @@ def construct_quote_request(detail_data, mercedes_quote_items=None):
                     quote_item = construct_quote_item(quote_info)
                     quote_item_list.append(quote_item)
 
-            # WAITING_QUOTE + 奔驰车: 从适配列表构造奔驰报价（支持一到多个报价项）
-            elif quote_status == 'WAITING_QUOTE' and enquiry_item_id in mercedes_quote_items:
-                mercedes_quote = mercedes_quote_items[enquiry_item_id]
-                if isinstance(mercedes_quote, list):
-                    quote_item_list.extend(mercedes_quote)
+            # WAITING_QUOTE + 奔驰/宝马车: 从适配列表构造报价（支持一到多个报价项）
+            elif quote_status == 'WAITING_QUOTE' and enquiry_item_id in extra_quote_items:
+                adapter_quote = extra_quote_items[enquiry_item_id]
+                if isinstance(adapter_quote, list):
+                    quote_item_list.extend(adapter_quote)
                 else:
-                    quote_item_list.append(mercedes_quote)
+                    quote_item_list.append(adapter_quote)
             
             enquiry_item = {
                 "addItemOe": item.get('addItemOe', ''),

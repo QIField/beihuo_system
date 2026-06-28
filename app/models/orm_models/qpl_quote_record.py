@@ -30,6 +30,9 @@ class QplQuoteRecord(BaseModels):
     submit_result = Column(String(255), comment='提交结果')
     submit_time = Column(DateTime, comment='提交时间')
     company = Column(String(100), comment='组织代码')
+    created_time = Column(DateTime, comment='询价单创建时间')
+    vin_code = Column(String(100), comment='VIN码')
+    car_type = Column(Text, comment='车型信息')
     created_at = Column(DateTime, server_default='CURRENT_TIMESTAMP', comment='创建时间')
 
     __table_args__ = {

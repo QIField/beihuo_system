@@ -371,6 +371,16 @@
                     if (self.detailPagination) {
                         self.detailPagination.update(self.totalRecords, page, pageSize);
                     }
+
+                    // 数据加载完成后，缓存原始行并刷新列菜单按钮（防止副表初始隐藏时按钮未挂上）
+                    var list = data.list || [];
+                    if (typeof GridColumnMenu !== 'undefined') {
+                        GridColumnMenu.setOriginalRows('#' + self.gridId, list);
+                        setTimeout(function() {
+                            GridColumnMenu.addMenuButtonsToHeaders('#' + self.gridId);
+                        }, 50);
+                    }
+
                     if (self.options.onLoad) {
                         self.options.onLoad(data);
                     }

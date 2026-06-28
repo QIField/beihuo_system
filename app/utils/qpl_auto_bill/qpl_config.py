@@ -14,6 +14,34 @@ _token_cache = {}
 # 支持的组织列表
 SUPPORTED_COMPANIES = ['fsbbr']
 
+# 宝马自动报价价格系数（后续可改为配置表/前端按钮调整）
+BMW_TAX_RATE = 1.13   # 税率
+BMW_DISCOUNT = 0.9    # 折扣
+BMW_PRICE_FORMULA = lambda net_price: net_price * BMW_TAX_RATE * BMW_DISCOUNT
+
+
+def qpl_log(message, order_no=None, detail=False, debug=False):
+    """
+    统一汽配龙自动报价日志格式
+
+    输出格式:
+        [2026-06-25 10:17:46] [QPL-QUOTE] [SIQRxxx] [明细] 消息内容
+        [2026-06-25 10:17:46] [QPL-QUOTE] [调试] [SIQRxxx] 消息内容
+
+    这样即使多任务日志穿插，也能通过 grep [QPL-QUOTE] 或 [SIQRxxx] 提取。
+    """
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    parts = [f"[{timestamp}] [QPL-QUOTE]"]
+    if debug:
+        parts.append("[调试]")
+    if order_no:
+        parts.append(f"[{order_no}]")
+    if detail:
+        parts.append("[明细]")
+    parts.append(str(message))
+    print(" ".join(parts))
+
+
 # 组织代码到配置键名的映射
 COMPANY_TOKEN_KEY_MAP = {
     'fsbbr': 'QPL_AUTH_TOKEN_fs',

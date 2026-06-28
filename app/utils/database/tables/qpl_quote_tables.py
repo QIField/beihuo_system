@@ -32,6 +32,9 @@ def init_qpl_quote_record_table():
                 submit_result VARCHAR(255) COMMENT '提交结果',
                 submit_time DATETIME COMMENT '提交时间',
                 company VARCHAR(100) COMMENT '组织代码',
+                created_time DATETIME COMMENT '询价单创建时间',
+                vin_code VARCHAR(100) COMMENT 'VIN码',
+                car_type TEXT COMMENT '车型信息',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 INDEX idx_supplier_enquiry_no (supplier_enquiry_no),
                 INDEX idx_item_oe (item_oe),
@@ -42,6 +45,16 @@ def init_qpl_quote_record_table():
             """
             cursor.execute(create_table_sql)
             conn.commit()
+
+            # 检查并添加可能缺失的字段
+            from app.utils.database.table_manager import check_and_add_fields
+            qpl_fields = [
+                {'name': 'created_time', 'definition': "DATETIME COMMENT '询价单创建时间'"},
+                {'name': 'vin_code', 'definition': "VARCHAR(100) COMMENT 'VIN码'"},
+                {'name': 'car_type', 'definition': "TEXT COMMENT '车型信息'"}
+            ]
+            check_and_add_fields('qpl_quote_record', qpl_fields)
+
             print("[数据库] qpl_quote_record 表初始化完成")
     finally:
         conn.close()

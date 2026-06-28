@@ -14,6 +14,7 @@ sys.path.insert(0, str(project_root))
 
 from app.utils.audio_player import play_notification_sound
 from app.utils.database_connection import get_db_connection
+from app.ks_auto_bill.log import ks_log
 
 
 def _get_date_range():
@@ -46,9 +47,9 @@ def print_date_range():
     start_date, end_date = _get_date_range()
     current_path = os.getcwd().replace('\\', '/')
     if "/www/wwwroot/beihuo_system" in current_path:
-        print(f"【生产环境】查询日期范围: {start_date} 至 {end_date}")
+        ks_log(f"查询日期: {start_date} 至 {end_date}", module="订单")
     else:
-        print(f"【测试环境】使用固定日期: {start_date[:10]}")
+        ks_log(f"固定日期: {start_date[:10]}", module="订单")
 
 def get_orders(session, status="", page_num=1, page_size=20):
     """
@@ -69,7 +70,7 @@ def get_orders(session, status="", page_num=1, page_size=20):
         - 其他环境使用最近一周的日期
     """
     if session is None:
-        print("✗ session 为空，请先登录")
+        ks_log("session 为空，请先登录", module="订单")
         return None
     
     # 获取缓存的日期范围（只在第一次调用时打印）
@@ -82,93 +83,90 @@ def get_orders(session, status="", page_num=1, page_size=20):
     )
     
     if resp.status_code != 200:
-        print(f"✗ 请求失败，状态码: {resp.status_code}")
-        print(f"响应内容: {resp.text[:500]}")  # 打印响应内容前500个字符
+        ks_log(f"请求失败，状态码: {resp.status_code}", module="订单")
+        ks_log(f"响应内容: {resp.text}", module="订单")  # 完整暴露响应，便于定位问题
         return None
-    
+
     try:
         return resp.json()
     except Exception as e:
-        print(f"✗ JSON 解析失败: {e}")
-        print(f"响应内容: {resp.text}")
+        ks_log(f"JSON 解析失败: {e}", module="订单")
+        ks_log(f"响应内容: {resp.text}", module="订单")  # 完整暴露响应，便于定位问题
         raise
 
 
 def get_all_orders(session, status="", page_size=100):
     """
     获取所有页面的订单（自动分页）- 单线程循环版本
-    
+
     参数:
         session: 登录后的会话对象
         status: 订单状态ID，默认为空（获取所有状态的订单）
         page_size: 每页数量，默认 100
-    
+
     返回:
-        list: 所有订单的列表
-    
+        tuple: (all_orders, total) 所有订单的列表和开思返回的总数
+
     流程:
         1. 获取第1页，得到总订单数和总页数
         2. 循环获取剩余页面
         3. 合并所有订单返回
     """
     if session is None:
-        print("✗ session 为空，请先登录")
-        return []
-    
+        ks_log("session 为空，请先登录", module="订单")
+        return [], 0
+
     all_orders = []
-    
+
     # 获取第1页
-    print("【订单】获取第 1 页...")
     first_result = get_orders(session, status=status, page_num=1, page_size=page_size)
-    
+
     if first_result is None:
-        return []
-    
+        return [], 0
+
     data = first_result.get("data", {})
     total = data.get("total", 0)
     total_pages = (total + page_size - 1) // page_size  # 向上取整
-    
-    print(f"【订单】总共 {total} 条订单，共 {total_pages} 页")
-    
+
     all_orders.extend(data.get("list", []))
-    
+
     # 只有1页，直接返回
     if total_pages <= 1:
-        print("【订单】✓ 只有1页，获取完成")
-        return all_orders
-    
+        return all_orders, total
+
+    ks_log(f"订单列表: {total} 条，共 {total_pages} 页", module="订单")
+
     # 单线程循环获取剩余页面
     failed_pages = []
-    
+
     for page in range(2, total_pages + 1):
-        print(f"【订单】获取第 {page}/{total_pages} 页...")
+        ks_log(f"获取第 {page}/{total_pages} 页...", module="订单")
         try:
             result = get_orders(session, status=status, page_num=page, page_size=page_size)
             if result is None:
-                print(f"【订单】第 {page} 页获取失败，加入重试列表")
+                ks_log(f"第 {page} 页获取失败，加入重试列表", module="订单")
                 failed_pages.append(page)
                 continue
             orders_list = result.get("data", {}).get("list", [])
             all_orders.extend(orders_list)
         except Exception as e:
-            print(f"【订单】第 {page} 页获取异常: {e}，加入重试列表")
+            ks_log(f"第 {page} 页获取异常: {e}，加入重试列表", module="订单")
             failed_pages.append(page)
-    
+
     # 重试失败的页面
     if failed_pages:
-        print(f"【订单】正在重试 {len(failed_pages)} 个失败的页面...")
+        ks_log(f"正在重试 {len(failed_pages)} 个失败的页面...", module="订单")
         for page in failed_pages[:]:
             result = get_orders(session, status=status, page_num=page, page_size=page_size)
             if result is not None:
                 orders_list = result.get("data", {}).get("list", [])
                 all_orders.extend(orders_list)
                 failed_pages.remove(page)
-    
+
     if failed_pages:
-        print(f"✗ 最终仍有 {len(failed_pages)} 个页面获取失败: {failed_pages}")
-    
-    print(f"【订单】✓ 全部获取完成，共 {len(all_orders)} 条订单")
-    return all_orders
+        ks_log(f"最终仍有 {len(failed_pages)} 个页面获取失败: {failed_pages}", module="订单")
+
+    return all_orders, total
 
 def extract_order_info(session, status=""):
     """
@@ -185,7 +183,7 @@ def extract_order_info(session, status=""):
         - 自动调用 get_all_orders 获取所有订单
         - 提取每个订单的 orderId、orderStatusDesc、orderStatusId 和 orderDate 字段
     """
-    orders = get_all_orders(session, status=status)
+    orders, _ = get_all_orders(session, status=status)
     order_info_list = []
     
     for order in orders:
@@ -210,12 +208,15 @@ def extract_order_info(session, status=""):
 def save_order_info_to_db(order_info_list, order_details_map=None, company='fsbbr'):
     """
     将订单信息保存到数据库，如果订单号已存在则检查其他字段是否不同，不同则更新，相同则跳过；不存在的订单则插入新数据
-    
+
     参数:
         order_info_list: 订单信息列表，每个元素包含 'orderId', 'orderStatusDesc', 'orderDate'
         order_details_map: 订单详情映射，key为订单号，value为包含数量和金额的字典（可选）
         company: 公司代码，默认为 'fsbbr'
-    
+
+    返回:
+        tuple: (inserted_count, updated_count, skipped_count)
+
     优化说明:
         - 批量查询现有记录，减少数据库交互次数
         - 分类处理：收集需要插入和更新的记录
@@ -223,8 +224,7 @@ def save_order_info_to_db(order_info_list, order_details_map=None, company='fsbb
         - 统一提交事务，提高性能
     """
     if not order_info_list:
-        print("没有订单信息需要保存")
-        return
+        return 0, 0, 0
     
     connection = get_db_connection()
     try:
@@ -332,17 +332,17 @@ def save_order_info_to_db(order_info_list, order_details_map=None, company='fsbb
             
             total_processed = len(order_info_list)
             skipped_count = total_processed - inserted_count - updated_count
-            
-            print(f"✓ 数据库批量操作完成: {inserted_count} 条新增, {updated_count} 条更新, {skipped_count} 条跳过")
-            
+
             # 如果有新订单插入，播放提示音
             if inserted_count > 0:
-                print(f"检测到 {inserted_count} 个新订单，播放提示音...")
                 play_notification_sound("new_order_sound.wav")
-                
+
+            return inserted_count, updated_count, skipped_count
+
     except Exception as e:
-        print(f"✗ 保存订单信息到数据库时出错: {str(e)}")
+        ks_log(f"保存订单信息到数据库时出错: {str(e)}", module="订单")
         connection.rollback()
+        return 0, 0, len(order_info_list)
     finally:
         connection.close()
 
@@ -360,7 +360,7 @@ def get_order_details(session, order_id):
               {'total_quantity': int, 'total_amount': float}
     """
     if session is None:
-        print("✗ session 为空，请先登录")
+        ks_log("session 为空，请先登录", module="订单")
         return None
 
     url = f"https://www.cassmall.com/orders/seller/order/{order_id}/shipgroups"
@@ -374,7 +374,7 @@ def get_order_details(session, order_id):
     try:
         response = session.get(url, headers=headers)
         if response.status_code != 200:
-            print(f"✗ 请求失败，状态码: {response.status_code}, 订单号: {order_id}")
+            ks_log(f"请求失败，状态码: {response.status_code}, 订单号: {order_id}", module="订单")
             return None
 
         data = response.json()
@@ -400,18 +400,16 @@ def get_order_details(session, order_id):
         # 格式化金额为两位小数
         total_amount = round(total_amount, 2)
 
-        print(f"订单 {order_id} 详情: 总数量={total_quantity}, 总金额={total_amount}")
-
         return {
             'total_quantity': total_quantity,
             'total_amount': total_amount
         }
 
     except requests.exceptions.RequestException as e:
-        print(f"✗ 获取订单详情时网络请求异常: {str(e)}, 订单号: {order_id}")
+        ks_log(f"获取订单详情时网络请求异常: {str(e)}, 订单号: {order_id}", module="订单")
         return None
     except Exception as e:
-        print(f"✗ 解析订单详情时发生错误: {str(e)}, 订单号: {order_id}")
+        ks_log(f"解析订单详情时发生错误: {str(e)}, 订单号: {order_id}", module="订单")
         return None
 
 
@@ -439,35 +437,39 @@ def extract_and_save_order_info(session, status="", company='fsbbr'):
             existing_records = cursor.fetchall()
             existing_order_ids = {record['开思订单号'] for record in existing_records}
     except Exception as e:
-        print(f"✗ 查询现有订单号时出错: {str(e)}")
+        ks_log(f"查询现有订单号时出错: {str(e)}", module="订单")
     finally:
         connection.close()
     
     # 筛选新增的订单
     new_order_info_list = [info for info in order_info_list if info['orderId'] not in existing_order_ids]
-    print(f"发现 {len(new_order_info_list)} 个新订单需要获取详情")
-    
+    if new_order_info_list:
+        ks_log(f"发现 {len(new_order_info_list)} 个新订单需要获取详情", module="订单")
+
     # 获取新订单的详细信息
     order_details_map = {}
     for order_info in new_order_info_list:
         order_id = order_info['orderId']
-        print(f"正在获取新订单 {order_id} 的详细信息...")
         order_details = get_order_details(session, order_id)
         if order_details:
             order_details_map[order_id] = order_details
-            print(f"订单 {order_id} 详情获取成功: 数量={order_details['total_quantity']}, 金额={order_details['total_amount']}")
         else:
-            print(f"订单 {order_id} 详情获取失败")
+            ks_log(f"订单 {order_id} 详情获取失败", module="订单")
     
     # 保存订单信息到数据库（包括新订单的详情）
-    save_order_info_to_db(order_info_list, order_details_map, company)
-    
+    inserted_count, updated_count, skipped_count = save_order_info_to_db(order_info_list, order_details_map, company)
+
     # 筛选出需要开单的订单ID
     # ORDER_APPROVED 和 ORDER_CANCELLING 状态的订单不开单，其余全部开单
     EXCLUDED_STATUS_IDS = {'ORDER_APPROVED', 'ORDER_CANCELLING'}
     pending_confirmation_orders = [
-        info['orderId'] for info in order_info_list 
+        info['orderId'] for info in order_info_list
         if info.get('orderStatusId') not in EXCLUDED_STATUS_IDS
     ]
-    
+
+    # 一句话汇总订单列表、入库和待处理情况
+    total = len(order_info_list)
+    pending_count = len(pending_confirmation_orders)
+    ks_log(f"列表 {total} 条 | 入库 {inserted_count}/{updated_count}/{skipped_count} | 待处理 {pending_count} 条", module="订单")
+
     return order_info_list, pending_confirmation_orders
