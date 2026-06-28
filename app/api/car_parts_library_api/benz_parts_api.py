@@ -408,7 +408,7 @@ def download_template_api():
 
 
 @benz_parts_bp.route('/fetch-realtime', methods=['POST'])
-@require_authentication()
+#@require_authentication()
 def fetch_realtime_data():
     """
     实时获取零件信息和库存信息（不入库）

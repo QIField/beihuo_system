@@ -5,6 +5,8 @@
 # @File    : cassmall.py
 # @Software: PyCharm
 
+
+from app.scripts.spiders.spider_entities.cassmall_login import get_cookie_dict
 from app.scripts.spiders.spider_tool import SpiderTool
 
 
@@ -17,12 +19,30 @@ class CassmallSpider:
     # 网站固定配置
     BASE_URL = "https://www.cassmall.com"
 
-    def __init__(self, cookie, timeout=10, retry_count=3):
+    def __init__(self, cookie=None, key="fs", timeout=10, retry_count=3):
         # 核心：实例化独立爬虫工具（组合模式）
         self.spider_tool = SpiderTool(timeout, retry_count)
         # 必传Cookie（业务私有属性）
-        self.cookie = cookie
+        if cookie is None:
+            self.cookie = self._set_cookie(key)
+        else:
+            self.cookie = cookie
 
+
+
+    def _set_cookie(self,key):
+        """
+        设置Cookie
+        :param cookie: Cookie字符串
+        """
+        cookie_dict = get_cookie_dict(key)
+
+        # 按Cookie键名的字母顺序排序，模拟浏览器发送Cookie的顺序
+        # 使用sorted()对字典项按key排序，确保生成的Cookie字符串顺序一致
+        cookie = "; ".join([f"{k}={v}" for k, v in sorted(cookie_dict.items(), key=lambda x: x[0])])    # pyright: ignore[reportOptionalMemberAccess]
+        return cookie
+        
+        
     def _get_auth_header(self):
         """私有方法：统一生成认证请求头（复用）"""
         return {"Cookie": self.cookie}
@@ -166,6 +186,30 @@ class CassmallSpider:
             url=url,
             method="POST",
             json=inventory_list,
+            headers=self._get_auth_header()
+        )
+
+ 
+
+
+    def update_product_status(self, product_ids):
+        """
+        批量上架产品
+        :param product_ids: 产品ID列表，如 ["21600375463843921950"]
+        :return: 响应对象
+        """
+        url = f"{self.BASE_URL}/sellerMgr/product/status/PRODUCT_ADDED"
+        
+        # ========== 打印请求信息 ==========
+        print("【请求API地址】", url)
+        print("【请求方法】", "POST")
+        print("【请求负载】", product_ids)
+        # ==================================
+        
+        return self.spider_tool.fetch(
+            url=url,
+            method="POST",
+            json=product_ids,
             headers=self._get_auth_header()
         )
 
