@@ -39,105 +39,196 @@ var GridColumnMenu = (function() {
     var currentMode = null;   // 'columnVisibility' | 'columnFilter'
     var currentField = null;
 
+    // ==================== Handsontable 检测 ====================
+
+    function _isHandsontable(api) {
+        return api && typeof api.updateSettings === 'function' && typeof api.getPlugin === 'function';
+    }
+
     // ==================== 初始化 ====================
 
     function init(gridApi, gridSelector, columnDefs, options) {
         if (!gridApi) return;
         options = options || {};
 
+        var isHandsontable = _isHandsontable(gridApi);
+
         // 解析 columnApi / gridOptions
         var columnApi = options.columnApi || null;
         var gridOptions = options.gridOptions || null;
-        try {
-            if (!columnApi && gridApi.gridOptionsWrapper && gridApi.gridOptionsWrapper.columnApi) {
-                columnApi = gridApi.gridOptionsWrapper.columnApi;
-            }
-        } catch (e) {}
-        try {
-            if (!columnApi && gridApi.columnApi) columnApi = gridApi.columnApi;
-        } catch (e) {}
-        try {
-            if (!columnApi && typeof gridApi.getColumnDef === 'function') columnApi = gridApi;
-        } catch (e) {}
+        if (!isHandsontable) {
+            try {
+                if (!columnApi && gridApi.gridOptionsWrapper && gridApi.gridOptionsWrapper.columnApi) {
+                    columnApi = gridApi.gridOptionsWrapper.columnApi;
+                }
+            } catch (e) {}
+            try {
+                if (!columnApi && gridApi.columnApi) columnApi = gridApi.columnApi;
+            } catch (e) {}
+            try {
+                if (!columnApi && typeof gridApi.getColumnDef === 'function') columnApi = gridApi;
+            } catch (e) {}
+        }
 
         // 收集初始隐藏列
         var hiddenCols = new Set();
-        try {
-            var states = null;
-            if (columnApi && typeof columnApi.getColumnState === 'function') {
-                states = columnApi.getColumnState();
-            } else if (typeof gridApi.getColumnState === 'function') {
-                states = gridApi.getColumnState();
-            }
-            if (states) {
-                states.forEach(function(s) { if (s.hide) hiddenCols.add(s.colId); });
-            }
-        } catch (e) {
+        if (isHandsontable) {
             columnDefs.forEach(function(col) {
-                if (col.hide) hiddenCols.add(col.field || col.colId);
+                if (col.hide) hiddenCols.add(col.field || col.colId || col.data);
             });
+        } else {
+            try {
+                var states = null;
+                if (columnApi && typeof columnApi.getColumnState === 'function') {
+                    states = columnApi.getColumnState();
+                } else if (typeof gridApi.getColumnState === 'function') {
+                    states = gridApi.getColumnState();
+                }
+                if (states) {
+                    states.forEach(function(s) { if (s.hide) hiddenCols.add(s.colId); });
+                }
+            } catch (e) {
+                columnDefs.forEach(function(col) {
+                    if (col.hide) hiddenCols.add(col.field || col.colId);
+                });
+            }
         }
+
+        // 若该表格已初始化过，保留之前的筛选、排序、列显隐状态，避免表格重绘后状态丢失
+        var existingInfo = menuConfig.grids[gridSelector] || null;
+        var preservedHiddenColumns = existingInfo ? existingInfo.hiddenColumns : null;
+        var preservedColumnFilters = existingInfo ? existingInfo.columnFilters : null;
+        var preservedSortColumn = existingInfo ? existingInfo.sortColumn : null;
+        var preservedSortDir = existingInfo ? existingInfo.sortDir : null;
 
         menuConfig.grids[gridSelector] = {
             api: gridApi,
             columnApi: columnApi,
             gridOptions: gridOptions,
             columnDefs: columnDefs,
-            hiddenColumns: hiddenCols,
-            columnFilters: {},
+            hiddenColumns: preservedHiddenColumns || hiddenCols,
+            columnFilters: preservedColumnFilters || {},
             _originalRows: null,
             hasExternalFilter: false,
-            sortColumn: null,
-            sortDir: null,
+            isHandsontable: isHandsontable,
+            sortColumn: preservedSortColumn || null,
+            sortDir: preservedSortDir || null,
             onSort: options.onSort || null,
             onDataRefresh: options.onDataRefresh || null,
             getFilterValues: options.getFilterValues || null,
+            onColumnVisibilityChange: options.onColumnVisibilityChange || null,
             persist: !!options.persist,
             pageKey: options.pageKey || '',
-            gridKey: options.gridKey || ''
+            gridKey: options.gridKey || '',
+            skipInitialLoad: !!options.skipInitialLoad
         };
 
-        // 注册外部筛选器（用于 AG Grid 内部 onFilterChanged 触发筛选时回调到我们）
-        _registerExternalFilter(gridApi, gridSelector);
+        if (!isHandsontable) {
+            // 注册外部筛选器（用于 AG Grid 内部 onFilterChanged 触发筛选时回调到我们）
+            _registerExternalFilter(gridApi, gridSelector);
 
-        // 禁用 AG Grid 内部 sort 状态：sort 由本组件统一接管。
-        // 否则 setRowData 后 AG Grid 会按它自己缓存的 sort 状态再排一次，
-        // 覆盖调用方在 onSort 回调里做的前端排序结果。
-        try {
-            var sortApi = columnApi || gridApi;
-            if (sortApi && typeof sortApi.applyColumnState === 'function') {
-                sortApi.applyColumnState({ defaultState: { sort: null, sortIndex: null } });
-            } else if (typeof gridApi.setSortModel === 'function') {
-                gridApi.setSortModel(null);
-            }
-        } catch (e) {}
-
-        // 接入持久化组件
-        if (options.persist && typeof ColumnPreference !== 'undefined' &&
-            options.pageKey && options.gridKey) {
-            ColumnPreference.init(gridApi, {
-                columnApi: columnApi,
-                pageKey: options.pageKey,
-                gridKey: options.gridKey,
-                onApplied: function(state) {
-                    // 列状态恢复后，同步内部 hiddenColumns，并刷新表头按钮
-                    var info = menuConfig.grids[gridSelector];
-                    if (!info) return;
-                    info.hiddenColumns = new Set();
-                    state.forEach(function(s) {
-                        if (s.hide) info.hiddenColumns.add(s.colId);
-                    });
-                    setTimeout(function() {
-                        addMenuButtonsToHeaders(gridSelector);
-                    }, 50);
+            // 禁用 AG Grid 内部 sort 状态：sort 由本组件统一接管。
+            // 否则 setRowData 后 AG Grid 会按它自己缓存的 sort 状态再排一次，
+            // 覆盖调用方在 onSort 回调里做的前端排序结果。
+            try {
+                var sortApi = columnApi || gridApi;
+                if (sortApi && typeof sortApi.applyColumnState === 'function') {
+                    sortApi.applyColumnState({ defaultState: { sort: null, sortIndex: null } });
+                } else if (typeof gridApi.setSortModel === 'function') {
+                    gridApi.setSortModel(null);
                 }
-            });
+            } catch (e) {}
+
+            // 接入持久化组件
+            if (options.persist && typeof ColumnPreference !== 'undefined' &&
+                options.pageKey && options.gridKey) {
+                ColumnPreference.init(gridApi, {
+                    columnApi: columnApi,
+                    pageKey: options.pageKey,
+                    gridKey: options.gridKey,
+                    onApplied: function(state) {
+                        // 列状态恢复后，同步内部 hiddenColumns，并刷新表头按钮
+                        var info = menuConfig.grids[gridSelector];
+                        if (!info) return;
+                        info.hiddenColumns = new Set();
+                        state.forEach(function(s) {
+                            if (s.hide) info.hiddenColumns.add(s.colId);
+                        });
+                        setTimeout(function() {
+                            addMenuButtonsToHeaders(gridSelector);
+                        }, 50);
+                    }
+                });
+            }
         }
 
-        // 延迟添加菜单按钮（等 AG Grid 渲染表头）
+        // Handsontable 持久化：默认加载列状态；若外部已预加载，则跳过
+        if (isHandsontable && options.persist && options.pageKey && options.gridKey && !options.skipInitialLoad) {
+            _loadHandsontableColumnPreference(gridApi, gridSelector, options.pageKey, options.gridKey);
+        }
+
+        // 延迟添加菜单按钮（等表格渲染表头，作为兜底）
         setTimeout(function() {
             addMenuButtonsToHeaders(gridSelector);
         }, 100);
+    }
+
+    function _loadHandsontableColumnPreference(hot, gridSelector, pageKey, gridKey) {
+        var url = '/new/api/column_preference?page_key=' + encodeURIComponent(pageKey) +
+                  '&grid_key=' + encodeURIComponent(gridKey);
+        fetch(url, { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if (resp.code !== 0 || !resp.data) return;
+                var state = resp.data;
+                if (!Array.isArray(state) || state.length === 0) return;
+
+                var info = menuConfig.grids[gridSelector];
+                if (!info) return;
+
+                info.hiddenColumns = new Set();
+                state.forEach(function(s) {
+                    if (s && s.hide) info.hiddenColumns.add(s.colId);
+                });
+
+                // 应用显隐
+                var visibleColumns = info.columnDefs.filter(function(col) {
+                    var f = col.field || col.colId || col.data;
+                    return !info.hiddenColumns.has(f);
+                });
+                hot.updateSettings({ columns: visibleColumns });
+
+                // 表头重建后重新挂按钮
+                setTimeout(function() {
+                    addMenuButtonsToHeaders(gridSelector);
+                }, 100);
+            })
+            .catch(function(e) {
+                console.error('[GridColumnMenu] Handsontable 加载列偏好失败:', e);
+            });
+    }
+
+    function _saveHandsontableColumnPreference(hot, gridSelector, pageKey, gridKey) {
+        var info = menuConfig.grids[gridSelector];
+        if (!info || !info.columnDefs) return;
+
+        var state = info.columnDefs.map(function(col) {
+            var f = col.field || col.colId || col.data;
+            return { colId: f, hide: info.hiddenColumns.has(f) };
+        });
+
+        fetch('/new/api/column_preference', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                page_key: pageKey,
+                grid_key: gridKey,
+                column_state: state
+            })
+        }).catch(function(e) {
+            console.error('[GridColumnMenu] Handsontable 保存列偏好失败:', e);
+        });
     }
 
     function _registerExternalFilter(gridApi, gridSelector) {
@@ -209,6 +300,17 @@ var GridColumnMenu = (function() {
         var gridDiv = document.querySelector(gridSelector);
         if (!gridDiv) return;
 
+        var info = menuConfig.grids[gridSelector];
+        if (!info) return;
+
+        if (info.isHandsontable) {
+            _addMenuButtonsToHandsontableHeaders(gridDiv, gridSelector, info);
+        } else {
+            _addMenuButtonsToAgGridHeaders(gridDiv, gridSelector, info);
+        }
+    }
+
+    function _addMenuButtonsToAgGridHeaders(gridDiv, gridSelector, info) {
         var headerCells = gridDiv.querySelectorAll('.ag-header-cell');
         if (headerCells.length === 0) {
             setTimeout(function() { addMenuButtonsToHeaders(gridSelector); }, 200);
@@ -224,28 +326,89 @@ var GridColumnMenu = (function() {
             var colId = cell.getAttribute('col-id') || cell.getAttribute('data-col-id');
             if (!colId) return;
 
-            var menuBtn = document.createElement('span');
-            menuBtn.className = 'ag-col-menu-btn';
-            menuBtn.setAttribute('data-col-id', colId);
-            menuBtn.setAttribute('data-grid-selector', gridSelector);
-            menuBtn.innerHTML = '▾';
-            menuBtn.style.cssText = 'cursor: pointer; padding: 0 6px; opacity: 0.5; font-size: 14px; margin-left: 2px; user-select: none;';
-
-            menuBtn.addEventListener('mouseenter', function() { this.style.opacity = '1'; });
-            menuBtn.addEventListener('mouseleave', function() { this.style.opacity = '0.5'; });
-            menuBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                var targetColId = this.getAttribute('data-col-id');
-                var targetGridSelector = this.getAttribute('data-grid-selector');
-                var info = menuConfig.grids[targetGridSelector];
-                if (info) showLevel1Menu(this, targetColId, info, targetGridSelector);
-            });
-
+            var menuBtn = _createMenuBtn(colId, gridSelector);
             headerTextDiv.appendChild(menuBtn);
         });
 
         // 刷新表头按钮高亮状态
         refreshMenuButtonStates(gridSelector);
+    }
+
+    function _addMenuButtonsToHandsontableHeaders(gridDiv, gridSelector, info) {
+        // 通过 afterGetColHeader 钩子稳定挂载按钮，这里仅做兜底重试
+        var headerCells = gridDiv.querySelectorAll('.ht_clone_top .htCore thead th');
+        if (headerCells.length === 0) {
+            setTimeout(function() { addMenuButtonsToHeaders(gridSelector); }, 200);
+            return;
+        }
+
+        headerCells.forEach(function(cell, index) {
+            var colDef = info.columnDefs[index];
+            _addButtonToHandsontableHeaderCell(cell, colDef, gridSelector);
+        });
+
+        // 刷新表头按钮高亮状态
+        refreshMenuButtonStates(gridSelector);
+    }
+
+
+
+    function _addButtonToHandsontableHeaderCell(TH, colDef, gridSelector) {
+        if (!TH) return;
+        var colHeader = TH.querySelector('.colHeader') || TH;
+        if (colHeader.querySelector('.ag-col-menu-btn')) return;
+        // 跳过角标单元格
+        if (TH.classList.contains('ht__corner')) return;
+
+        if (!colDef) return;
+        var colId = colDef.field || colDef.colId || colDef.data || String(index);
+
+        var menuBtn = _createMenuBtn(colId, gridSelector, { noHover: true });
+        // Handsontable 表头：按钮绝对定位到标题右方，默认显示，大小与 AG Grid 一致
+        colHeader.style.position = 'relative';
+        colHeader.style.paddingRight = '22px';
+        menuBtn.style.position = 'absolute';
+        menuBtn.style.right = '0px';
+        menuBtn.style.top = '50%';
+        menuBtn.style.transform = 'translateY(-50%)';
+        menuBtn.style.padding = '0 6px';
+        menuBtn.style.fontSize = '14px';
+        colHeader.appendChild(menuBtn);
+        refreshMenuButtonStates(gridSelector);
+    }
+
+    function _createMenuBtn(colId, gridSelector, options) {
+        options = options || {};
+        var menuBtn = document.createElement('span');
+        menuBtn.className = 'ag-col-menu-btn';
+        menuBtn.setAttribute('data-col-id', colId);
+        menuBtn.setAttribute('data-grid-selector', gridSelector);
+        menuBtn.innerHTML = '▾';
+        menuBtn.style.cssText = 'cursor: pointer; padding: 0 6px; margin-left: 2px; user-select: none;';
+
+        if (!options.noHover) {
+            menuBtn.addEventListener('mouseenter', function() { this.style.opacity = '1'; });
+            menuBtn.addEventListener('mouseleave', function() { this.style.opacity = ''; });
+        } else {
+            menuBtn.style.opacity = '1';
+        }
+
+        function onMenuBtnActivate(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            var targetColId = this.getAttribute('data-col-id');
+            var targetGridSelector = this.getAttribute('data-grid-selector');
+            var targetInfo = menuConfig.grids[targetGridSelector];
+            if (targetInfo) showLevel1Menu(this, targetColId, targetInfo, targetGridSelector);
+        }
+
+        menuBtn.addEventListener('mousedown', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+        });
+        menuBtn.addEventListener('click', onMenuBtnActivate);
+
+        return menuBtn;
     }
 
     /**
@@ -353,8 +516,8 @@ var GridColumnMenu = (function() {
 
         var listHtml = '';
         allColumns.forEach(function(col) {
-            var colField = col.field || col.colId;
-            var colLabel = col.headerName || col.field;
+            var colField = col.field || col.colId || col.data;
+            var colLabel = col.headerName || col.title || col.field || col.data || String(colField);
             var isVisible = !hiddenCols.has(colField);
             var checkedAttr = isVisible ? 'checked' : '';
             listHtml += '<div class="filter-dropdown-item col-visibility-item" data-field="' + colField +
@@ -698,42 +861,79 @@ var GridColumnMenu = (function() {
             var info = menuConfig.grids[currentField];
             pendingGridSelector = currentField;
             if (info && info.columnDefs) {
-                try {
-                    var targetApi = (info.columnApi && typeof info.columnApi.applyColumnState === 'function')
-                        ? info.columnApi
-                        : ((typeof info.api.applyColumnState === 'function') ? info.api : null);
-                    if (targetApi) {
-                        var states = [];
-                        info.columnDefs.forEach(function(col) {
-                            var f = col.field || col.colId;
-                            states.push({ colId: f, hide: info.hiddenColumns.has(f) });
+                if (info.isHandsontable) {
+                    // Handsontable：通过 updateSettings({ columns }) 更新可见列
+                    try {
+                        var visibleColumns = info.columnDefs.filter(function(col) {
+                            var f = col.field || col.colId || col.data;
+                            return !info.hiddenColumns.has(f);
                         });
-                        targetApi.applyColumnState({ state: states, applyOrder: false });
-                    } else {
-                        var visApi = (info.columnApi && typeof info.columnApi.setColumnVisible === 'function')
+                        info.api.updateSettings({ columns: visibleColumns });
+
+                        // 通知调用方当前可见列已变更
+                        if (typeof info.onColumnVisibilityChange === 'function') {
+                            info.onColumnVisibilityChange(visibleColumns);
+                        }
+
+                        // 列重新可见后，header DOM 被重建，重新挂菜单按钮
+                        setTimeout(function() {
+                            addMenuButtonsToHeaders(pendingGridSelector);
+                        }, 100);
+
+                        // 保存列偏好
+                        if (info.persist && info.pageKey && info.gridKey) {
+                            _saveHandsontableColumnPreference(info.api, pendingGridSelector, info.pageKey, info.gridKey);
+                        }
+                    } catch (e) {
+                        console.error('[GridColumnMenu] Handsontable 列显隐失败:', e);
+                    }
+                } else {
+                    try {
+                        var targetApi = (info.columnApi && typeof info.columnApi.applyColumnState === 'function')
                             ? info.columnApi
-                            : ((typeof info.api.setColumnVisible === 'function') ? info.api : null);
-                        if (visApi) {
+                            : ((typeof info.api.applyColumnState === 'function') ? info.api : null);
+                        if (targetApi) {
+                            var states = [];
                             info.columnDefs.forEach(function(col) {
                                 var f = col.field || col.colId;
-                                visApi.setColumnVisible(f, !info.hiddenColumns.has(f));
+                                states.push({ colId: f, hide: info.hiddenColumns.has(f) });
                             });
+                            targetApi.applyColumnState({ state: states, applyOrder: false });
+                        } else {
+                            var visApi = (info.columnApi && typeof info.columnApi.setColumnVisible === 'function')
+                                ? info.columnApi
+                                : ((typeof info.api.setColumnVisible === 'function') ? info.api : null);
+                            if (visApi) {
+                                info.columnDefs.forEach(function(col) {
+                                    var f = col.field || col.colId;
+                                    visApi.setColumnVisible(f, !info.hiddenColumns.has(f));
+                                });
+                            }
                         }
-                    }
-                } catch (e) {}
+                    } catch (e) {}
 
-                // 列重新可见后，header DOM 被重建，重新挂菜单按钮
-                setTimeout(function() {
-                    addMenuButtonsToHeaders(pendingGridSelector);
-                }, 50);
-
-                // 持久化：手动触发保存（applyColumnState 已被 ColumnPreference 监听到 columnVisible，
-                // 但批量提交在某些 AG Grid 版本中不会逐个触发，故主动 flush 一次）
-                if (info.persist && typeof ColumnPreference !== 'undefined' &&
-                    info.pageKey && info.gridKey) {
+                    // 列重新可见后，header DOM 被重建，重新挂菜单按钮
                     setTimeout(function() {
-                        ColumnPreference.flush(info.pageKey, info.gridKey);
-                    }, 100);
+                        addMenuButtonsToHeaders(pendingGridSelector);
+                    }, 50);
+
+                    // 持久化：手动触发保存（applyColumnState 已被 ColumnPreference 监听到 columnVisible，
+                    // 但批量提交在某些 AG Grid 版本中不会逐个触发，故主动 flush 一次）
+                    if (info.persist && typeof ColumnPreference !== 'undefined' &&
+                        info.pageKey && info.gridKey) {
+                        setTimeout(function() {
+                            ColumnPreference.flush(info.pageKey, info.gridKey);
+                        }, 100);
+                    }
+
+                    // 通知调用方当前可见列已变更
+                    if (typeof info.onColumnVisibilityChange === 'function') {
+                        var visibleColumns = info.columnDefs.filter(function(col) {
+                            var f = col.field || col.colId || col.data;
+                            return !info.hiddenColumns.has(f);
+                        });
+                        info.onColumnVisibilityChange(visibleColumns);
+                    }
                 }
             }
         }
@@ -765,6 +965,7 @@ var GridColumnMenu = (function() {
     return {
         init: init,
         addMenuButtonsToHeaders: addMenuButtonsToHeaders,
+        addButtonToHandsontableHeaderCell: _addButtonToHandsontableHeaderCell,
         toggleColVisibilityCheckbox: toggleColVisibilityCheckbox,
         colVisibilitySelectAll: colVisibilitySelectAll,
         toggleItemCheckbox: toggleItemCheckbox,

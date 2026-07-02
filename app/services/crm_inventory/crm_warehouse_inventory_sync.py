@@ -449,8 +449,25 @@ def _send_notification(company, sku_total, special_sku_total):
             InventoryRecordLatest.kw_no.in_(SPECIAL_KW_NOS),
         ).order_by(InventoryRecordLatest.workdate.desc()).all()
 
+        # 在 Session 内把 ORM 对象转成普通字典，避免 Session 关闭后访问属性触发刷新报错
+        record_dicts = [
+            {
+                'OE号': r.number or '',
+                '品牌': r.brand_name or '',
+                '变动数量': r.change_number or 0,
+                '库位号': r.kw_no or '',
+                '操作人': r.operator_name or '',
+                '操作时间': r.workdate.strftime('%Y-%m-%d %H:%M') if r.workdate else '',
+                '产品名称': r.product_name or '',
+                '仓库名称': r.warehouse_name or '',
+                '备注': r.note or '',
+            }
+            for r in records
+        ]
+        special_count = len(special_records)
+
     # 无变动时不生成 Excel、不带下载链接
-    if not records and not special_records:
+    if not record_dicts and special_count == 0:
         message = (
             f"===【crm特殊仓位库存变化业务汇报】===\n"
             f"日期：{today_str}\n"
@@ -466,21 +483,7 @@ def _send_notification(company, sku_total, special_sku_total):
         return
 
     # 导出 Excel
-    data = []
-    for r in records:
-        data.append({
-            'OE号': r.number or '',
-            '品牌': r.brand_name or '',
-            '变动数量': r.change_number or 0,
-            '库位号': r.kw_no or '',
-            '操作人': r.operator_name or '',
-            '操作时间': r.workdate.strftime('%Y-%m-%d %H:%M') if r.workdate else '',
-            '产品名称': r.product_name or '',
-            '仓库名称': r.warehouse_name or '',
-            '备注': r.note or '',
-        })
-
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(record_dicts)
     export_dir = os.path.join('static', 'exports')
     os.makedirs(export_dir, exist_ok=True)
     file_path = os.path.join(export_dir, f'inventory_{company}_{today_str}.xlsx')
@@ -491,15 +494,15 @@ def _send_notification(company, sku_total, special_sku_total):
         f"===【crm特殊仓位库存变化业务汇报】===\n"
         f"日期：{today_str}\n"
         f"门店：{company}\n"
-        f"常规变动：{len(records)} 条\n"
-        f"特殊仓位变动：{len(special_records)} 条\n"
+        f"常规变动：{len(record_dicts)} 条\n"
+        f"特殊仓位变动：{special_count} 条\n"
         f"sku：{sku_total}（常规）/ {special_sku_total}（特殊）\n"
         f"详细记录下载：http://x.fsbbr.net/web/download_inventory/{company}/{today_str}"
     )
 
     try:
         message_push("crm", message)
-        print(f"[通知] 已发送 {company} 的业务汇报，常规 {len(records)} 条，特殊 {len(special_records)} 条")
+        print(f"[通知] 已发送 {company} 的业务汇报，常规 {len(record_dicts)} 条，特殊 {special_count} 条")
     except Exception as e:
         print(f"[通知] 发送失败: {e}")
 

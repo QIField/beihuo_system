@@ -18,6 +18,15 @@
     opacity: 1;
 }
 
+/* Handsontable 表头按钮默认颜色 */
+.handsontable .colHeader .ag-col-menu-btn {
+    color: #666;
+}
+
+.handsontable .colHeader .ag-col-menu-btn.has-condition {
+    color: #2196f3;
+}
+
 /* 一级菜单选项 */
 .col-menu-item {
     padding: 8px 16px;

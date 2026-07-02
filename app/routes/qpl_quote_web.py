@@ -18,4 +18,4 @@ qpl_quote_web_bp = Blueprint(
 @qpl_quote_web_bp.route("/qpl_quote_records")
 def qpl_quote_records():
     """汽配龙自动报价记录页面"""
-    return render_template("qpl_quote_record.html")
+    return render_template("qpl_quote_records/qpl_quote_records_main.html")

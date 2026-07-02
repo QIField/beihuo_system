@@ -136,6 +136,31 @@ def get_pickup_way_and_distance(shop_uid, supplier_enquiry_no, tuhu_supplier_id=
     return handle_qpl_response(resp, company)
 
 
+def cannot_quote(supplier_enquiry_no, item_id_list, close_reason=16, close_remarks='', company='fsbbr'):
+    """
+    标记询价单项目为无法报价
+
+    Args:
+        supplier_enquiry_no: 询价单号
+        item_id_list: 询价项目ID列表
+        close_reason: 关闭原因，默认16
+        close_remarks: 关闭备注，默认空字符串
+        company: 组织代码
+
+    Returns:
+        dict: API响应结果
+    """
+    url = f'{BASE_URL}/qpl-supplier-enquiry/supplierEnquiryEdit/cannotQuote'
+    payload = {
+        "supplierEnquireNo": supplier_enquiry_no,
+        "supplierEnquiryItemIdList": item_id_list,
+        "closeRemarks": close_remarks,
+        "closeReason": close_reason
+    }
+    resp = requests.post(url, headers=get_headers(company), json=payload, timeout=30)
+    return handle_qpl_response(resp, company)
+
+
 def extract_pickup_info(pickup_api_result):
     """
     从取货方式接口响应中提取报价体需要的字段

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>汽配龙自动报价记录</title>
+
+    <!-- LayUI -->
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <script src="/static/layui/layui.js"></script>
+
+    <!-- Handsontable -->
+    <link rel="stylesheet" href="/static/js/handsontable/handsontable.full.min.css">
+    <script src="/static/js/handsontable/handsontable.full.min.js"></script>
+
+    <!-- 原汽配龙页面公共样式 -->
+    <link rel="stylesheet" href="/static/css/purchase_plan/common.css">
+
+    <!-- Filter Panel Component -->
+    <link rel="stylesheet" href="/static/js/components/filter_panel/filter-panel.css">
+    <script src="/static/js/components/filter_panel/filter-panel.js"></script>
+
+    <!-- TabNav 标签导航组件 -->
+    <link rel="stylesheet" href="/static/js/components/tab-nav/tab-nav.css">
+
+    <!-- 自定义分页组件 -->
+    <script src="/static/js/components/custom-pagination/custom-pagination.js"></script>
+
+    <!-- Grid Column Menu Component（表头列菜单：升降序、列勾选、值筛选）-->
+    <link rel="stylesheet" href="/static/js/components/grid-column-menu/grid-column-menu.css">
+    <script src="/static/js/components/grid-column-menu/grid-column-menu.js"></script>
+
+    <!-- Handsontable Builder（配置化 Handsontable 构建器）-->
+    <script src="/static/js/components/handsontable-builder/handsontable-builder.js"></script>
+
+    <!-- qpl_quote_records 统一表格配置 -->
+    <script src="/static/js/page-configs/qpl_quote_grid_config.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container { max-width: 100%; margin: 0 auto; }
+
+        /* 搜索筛选区域 */
+        .search-panel {
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        /* 日期输入框样式 */
+        .search-panel .layui-input {
+            height: 36px;
+            line-height: 34px;
+            padding: 0 12px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        /* 筛选按钮样式 */
+        .search-panel .filter-btn {
+            height: 36px !important;
+            line-height: 34px !important;
+            padding: 0 12px !important;
+            box-sizing: border-box !important;
+            margin: 0 4px !important;
+        }
+
+        /* FilterPanel容器样式 */
+        .search-panel #qplQuoteFilterButtons {
+            display: inline-flex;
+            align-items: center;
+            height: 36px;
+        }
+
+        .tab-content {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            min-height: 500px;
+            height: calc(100vh - 170px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-pane {
+            display: none;
+            padding: 15px;
+            flex: 1;
+            min-height: 0;
+            flex-direction: column;
+        }
+
+        .tab-pane.active {
+            display: flex;
+        }
+    </style>
+
+    <!-- 全局变量声明（需在子模板脚本之前） -->
+    <script>
+        let currentTab = 'detail';
+        const userCompany = '{{ session.get("store", "") }}';
+
+        // 各标签页独立搜索状态
+        const detailSearchState = {
+            supplier_enquiry_no: '',
+            item_oe: '',
+            item_name: '',
+            brand_name: ''
+        };
+
+        const oeSearchState = {
+            item_oe: '',
+            item_name: ''
+        };
+
+        const vinSearchState = {};
+
+        // 字段与隐藏输入框 ID 映射
+        const searchStateFieldMap = {
+            supplier_enquiry_no: 'searchSupplierEnquiryNo',
+            item_oe: 'searchItemOe',
+            item_name: 'searchItemName',
+            brand_name: 'searchBrandName'
+        };
+
+        // 将隐藏输入框的值同步到指定 state
+        function syncHiddenInputsToState(state) {
+            Object.keys(searchStateFieldMap).forEach(function(field) {
+                if (field in state) {
+                    const input = document.getElementById(searchStateFieldMap[field]);
+                    state[field] = input ? (input.value || '') : '';
+                }
+            });
+        }
+
+        // 用指定 state 回填隐藏输入框
+        function syncStateToHiddenInputs(state) {
+            Object.keys(searchStateFieldMap).forEach(function(field) {
+                if (field in state) {
+                    const input = document.getElementById(searchStateFieldMap[field]);
+                    if (input) input.value = state[field] || '';
+                }
+            });
+        }
+
+        // 清空指定 state 的所有字段
+        function clearSearchState(state) {
+            Object.keys(state).forEach(function(key) {
+                state[key] = '';
+            });
+        }
+
+        // 获取当前 tab 对应的 state
+        function getCurrentSearchState(tabId) {
+            if (tabId === 'detail') return detailSearchState;
+            if (tabId === 'oe') return oeSearchState;
+            if (tabId === 'vin') return vinSearchState;
+            return {};
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <!-- 标签导航 -->
+        <div class="tab-nav">
+            <div class="tab-title">汽配龙自动报价记录</div>
+            <button class="tab-btn active" data-tab="detail">明细列表</button>
+            <button class="tab-btn" data-tab="oe">OE统计维度</button>
+            <button class="tab-btn" data-tab="vin">VIN码维度</button>
+        </div>
+
+        <!-- 搜索筛选区域 -->
+        <div class="search-panel">
+            <!-- 日期选择器 -->
+            <span style="font-size: 14px; color: #666;">日期范围：</span>
+            <input type="text" id="dateRange" placeholder="请选择日期范围" class="layui-input" style="width: 220px;" readonly>
+
+            <!-- 分隔符 -->
+            <span style="color: #999;">|</span>
+
+            <!-- 筛选按钮 -->
+            <div id="qplQuoteFilterButtons"></div>
+
+            <!-- 分隔符（重置前，始终显示） -->
+            <span style="color: #999;">|</span>
+
+            <!-- 重置按钮 -->
+            <button class="filter-btn" onclick="resetAll()">重置</button>
+
+            <input type="hidden" id="searchSupplierEnquiryNo">
+            <input type="hidden" id="searchItemOe">
+            <input type="hidden" id="searchItemName">
+            <input type="hidden" id="searchBrandName">
+        </div>
+
+        <!-- 标签内容 -->
+        <div class="tab-content">
+            {% include 'qpl_quote_records/detail_tab.html' %}
+            {% include 'qpl_quote_records/oe_stats_tab.html' %}
+            {% include 'qpl_quote_records/vin_stats_tab.html' %}
+        </div>
+    </div>
+
+    <!-- TabNav 标签导航组件 -->
+    <script src="/static/js/components/tab-nav/tab-nav.js"></script>
+
+    <script>
+        // 获取查询参数
+        function getSearchParams(tabId) {
+            let beginDate = '', endDate = '';
+            const dateRangeValue = document.getElementById('dateRange').value;
+            if (dateRangeValue) {
+                const dates = dateRangeValue.split(' - ');
+                beginDate = dates[0] || '';
+                endDate = dates[1] || '';
+            }
+
+            let state = {};
+            if (tabId === 'detail') {
+                state = detailSearchState;
+            } else if (tabId === 'oe') {
+                state = oeSearchState;
+            } else if (tabId === 'vin') {
+                state = vinSearchState;
+            }
+
+            return Object.assign({}, state, {
+                begin_date: beginDate,
+                end_date: endDate,
+                company: userCompany
+            });
+        }
+
+        // 获取当天日期范围字符串
+        function getTodayDateRange() {
+            const today = new Date();
+            const todayStr = today.getFullYear() + '-' +
+                String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                String(today.getDate()).padStart(2, '0');
+            return todayStr + ' - ' + todayStr;
+        }
+
+        // 重置所有筛选条件
+        function resetAll() {
+            // 重置日期范围为当天
+            document.getElementById('dateRange').value = getTodayDateRange();
+
+            // 只重置当前 tab 对应的 state
+            const state = getCurrentSearchState(currentTab);
+            clearSearchState(state);
+
+            // 同步清空隐藏输入框
+            document.getElementById('searchSupplierEnquiryNo').value = '';
+            document.getElementById('searchItemOe').value = '';
+            document.getElementById('searchItemName').value = '';
+            const searchBrandNameInput = document.getElementById('searchBrandName');
+            if (searchBrandNameInput) searchBrandNameInput.value = '';
+
+            if (typeof FilterPanel !== 'undefined' && FilterPanel.clearAll) {
+                FilterPanel.clearAll();
+            }
+
+            // 明细标签重置后刷新表格
+            if (currentTab === 'detail' && window.qplDetailBuilder) {
+                window.qplDetailBuilder.reset();
+            }
+
+            // OE统计标签重置后刷新表格
+            if (currentTab === 'oe' && window.qplOeBuilder) {
+                window.qplOeBuilder.reset();
+            }
+
+            // VIN码维度标签重置后刷新表格和图表
+            if (currentTab === 'vin' && typeof window.refreshVinAll === 'function') {
+                window.refreshVinAll();
+                if (typeof window.resizeVinCharts === 'function') {
+                    window.resizeVinCharts();
+                }
+            }
+
+        }
+
+        // 根据当前标签更新搜索栏显示
+        function updateSearchPanelForTab(tabId) {
+            // 切换标签前，先把当前隐藏输入框的值同步到当前 state
+            syncHiddenInputsToState(getCurrentSearchState(currentTab));
+
+            currentTab = tabId;
+
+            // 重新初始化 FilterPanel
+            const filterContainer = document.getElementById('qplQuoteFilterButtons');
+            if (filterContainer) {
+                filterContainer.innerHTML = '';
+            }
+
+            // 用目标 tab 的 state 回填隐藏输入框
+            syncStateToHiddenInputs(getCurrentSearchState(currentTab));
+
+            let fields = [];
+            if (tabId === 'detail') {
+                fields = [
+                    { label: '询价单号', inputId: 'searchSupplierEnquiryNo' },
+                    { label: 'OE号', inputId: 'searchItemOe' },
+                    { label: '产品名称', inputId: 'searchItemName' },
+                    { label: '品牌', inputId: 'searchBrandName' }
+                ];
+            } else if (tabId === 'oe') {
+                fields = [
+                    { label: 'OE号', inputId: 'searchItemOe' },
+                    { label: '产品名称', inputId: 'searchItemName' }
+                ];
+            } else if (tabId === 'vin') {
+                fields = [];
+            }
+
+            const labelToStateField = {
+                '询价单号': 'supplier_enquiry_no',
+                'OE号': 'item_oe',
+                '产品名称': 'item_name',
+                '品牌': 'brand_name'
+            };
+
+            FilterPanel.initSearch({
+                container: '#qplQuoteFilterButtons',
+                fields: fields,
+                onApply: function(field, value) {
+                    const state = getCurrentSearchState(currentTab);
+                    const stateField = labelToStateField[field];
+                    if (stateField && stateField in state) {
+                        state[stateField] = value || '';
+                    }
+
+                    const fieldConfig = fields.find(function(f) { return f.label === field; });
+                    if (fieldConfig) {
+                        const input = document.getElementById(fieldConfig.inputId);
+                        if (input) input.value = value || '';
+                    }
+
+                    // 明细标签筛选条件变化后刷新表格
+                    if (currentTab === 'detail' && window.qplDetailBuilder) {
+                        window.qplDetailBuilder.refresh(1);
+                    }
+
+                    // OE统计标签筛选条件变化后刷新表格
+                    if (currentTab === 'oe' && window.qplOeBuilder) {
+                        window.qplOeBuilder.refresh(1);
+                    }
+                }
+            });
+        }
+
+        // 初始化标签导航和日期组件
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化标签导航组件
+            TabNav.init({
+                navSelector: '.tab-nav',
+                contentSelector: '.tab-content',
+                onSwitch: function(tabId) {
+                    updateSearchPanelForTab(tabId);
+                    // 切换到OE统计标签时刷新表格
+                    if (tabId === 'oe' && window.qplOeBuilder) {
+                        window.qplOeBuilder.refresh();
+                    }
+                    // 切换到VIN码维度标签时刷新表格并重绘图表
+                    if (tabId === 'vin') {
+                        if (typeof window.refreshVinAll === 'function') {
+                            window.refreshVinAll();
+                        }
+                        if (typeof window.resizeVinCharts === 'function') {
+                            setTimeout(function() {
+                                window.resizeVinCharts();
+                            }, 50);
+                        }
+                    }
+                }
+            });
+
+            // 初始化筛选面板（根据当前标签动态显示）
+            updateSearchPanelForTab('detail');
+
+            // 先同步设置默认日期为当天，确保后续 Grid 初始化时能读到日期
+            const todayDateRange = getTodayDateRange();
+            document.getElementById('dateRange').value = todayDateRange;
+
+            // 初始化layui日期组件
+            layui.use(['laydate'], function() {
+                const laydate = layui.laydate;
+
+                laydate.render({
+                    elem: '#dateRange',
+                    trigger: 'focus',
+                    format: 'yyyy-MM-dd',
+                    range: true,
+                    max: 0,
+                    value: todayDateRange,
+                    done: function(value, date, endDate) {
+                        console.log('日期选择完成:', value);
+                        // 日期变化后刷新明细表格
+                        if (currentTab === 'detail' && window.qplDetailBuilder) {
+                            window.qplDetailBuilder.refresh(1);
+                        }
+                        // 日期变化后刷新OE统计表格
+                        if (currentTab === 'oe' && window.qplOeBuilder) {
+                            window.qplOeBuilder.refresh(1);
+                        }
+                        // 日期变化后刷新VIN码维度表格
+                        if (currentTab === 'vin' && typeof window.refreshVinAll === 'function') {
+                            window.refreshVinAll();
+                        }
+                    },
+                    change: function(value, date, endDate) {
+                        // 日期变化中，无需额外处理
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

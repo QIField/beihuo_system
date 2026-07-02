@@ -75,8 +75,8 @@ def construct_quote_item(quote_info):
     }
 
 
-# 仓库映射
-WAREHOUSE_MAP = {
+# 奔驰仓库映射
+MERCEDES_WAREHOUSE_MAP = {
     '8918': 'PDC BJ 北京',
     '8928': 'PDC SH (HZ) 宝湾',
     '8938': '广州PDC',
@@ -90,28 +90,30 @@ WAREHOUSE_MAP = {
 }
 
 
-def construct_mercedes_quote_item(brand, product, all_products, item_sell_price, prepare_good_timespan, price_check_snapshot=None, category_id="/5/"):
+def _build_quote_item_base(brand, product, all_products, item_sell_price,
+                           delivery_aging, prepare_good_timespan, prepare_good_timespan_unit,
+                           price_check_snapshot=None, category_id="/5/"):
     """
-    从适配品牌构造奔驰报价项（待报价项目用）
+    构造适配品牌报价项基础结构
 
     Args:
-        brand: 原厂品牌信息
-        product: 当前报价项对应的产品（用于 pid/standardName/itemPerhapsReplaceOe 等自身字段）
-        all_products: 该 item 下所有原厂产品列表（用于 productList 填充）
+        brand: 品牌信息
+        product: 当前报价项对应的产品
+        all_products: 该 item 下所有产品列表（用于 productList 填充）
         item_sell_price: 报价价格
-        prepare_good_timespan: 备货天数
+        delivery_aging: 发货时效
+        prepare_good_timespan: 备货时效
+        prepare_good_timespan_unit: 备货时效单位
         price_check_snapshot: priceCheck 校验快照
         category_id: 品类ID
     """
     product_pid = product.get('pid', '')
     product_name = product.get('displaceProductName', '')
 
-    # productList：包含该 item 下所有原厂产品（每个报价项的 productList 都一样）
     product_list = []
     for p in all_products:
         p_pid = p.get('pid', '')
         p_name = p.get('displaceProductName', '')
-        p_images = p.get('quoteImageList', [])
         product_list.append({
             "adaptStrategyList": p.get('adaptStrategyList', ['OE']),
             "productName": p_name,
@@ -125,9 +127,9 @@ def construct_mercedes_quote_item(brand, product, all_products, item_sell_price,
     return {
         "brandId": brand.get('brandId'),
         "brandName": brand.get('brandName'),
-        "deliveryAging": 2,
+        "deliveryAging": delivery_aging,
         "prepareGoodTimespan": prepare_good_timespan,
-        "prepareGoodTimespanUnit": "DAY",
+        "prepareGoodTimespanUnit": prepare_good_timespan_unit,
         "itemQuality": product.get('quality'),
         "itemRemark": "",
         "itemSellPrice": item_sell_price,
@@ -163,6 +165,36 @@ def construct_mercedes_quote_item(brand, product, all_products, item_sell_price,
     }
 
 
+def construct_adapter_quote_item(brand, product, all_products, item_sell_price, prepare_good_timespan,
+                                 price_check_snapshot=None, category_id="/5/"):
+    """
+    从适配品牌构造第三方报价项（奔驰/宝马等待报价项目用）
+    """
+    return _build_quote_item_base(
+        brand, product, all_products, item_sell_price,
+        delivery_aging=2,
+        prepare_good_timespan=prepare_good_timespan,
+        prepare_good_timespan_unit="DAY",
+        price_check_snapshot=price_check_snapshot,
+        category_id=category_id
+    )
+
+
+def construct_crm_quote_item(brand, product, all_products, item_sell_price,
+                             price_check_snapshot=None, category_id="/5/"):
+    """
+    从适配品牌构造 CRM 现货报价项
+    """
+    return _build_quote_item_base(
+        brand, product, all_products, item_sell_price,
+        delivery_aging=1,
+        prepare_good_timespan=None,
+        prepare_good_timespan_unit=None,
+        price_check_snapshot=price_check_snapshot,
+        category_id=category_id
+    )
+
+
 def select_warehouse_and_days(stock_info):
     """
     选择仓库并确定备货时效
@@ -189,11 +221,11 @@ def select_warehouse_and_days(stock_info):
     return available_warehouses[0], 7
 
 
-def construct_quote_request(detail_data, mercedes_quote_items=None):
+def construct_quote_request(detail_data, extra_quote_items=None):
     """
     构造报价请求体
     """
-    mercedes_quote_items = mercedes_quote_items or {}
+    extra_quote_items = extra_quote_items or {}
     
     demand_list = detail_data.get('supplierEnquiryDemandList', [])
     constructed_demand_list = []
@@ -215,13 +247,13 @@ def construct_quote_request(detail_data, mercedes_quote_items=None):
                     quote_item = construct_quote_item(quote_info)
                     quote_item_list.append(quote_item)
 
-            # WAITING_QUOTE + 奔驰车: 从适配列表构造奔驰报价（支持一到多个报价项）
-            elif quote_status == 'WAITING_QUOTE' and enquiry_item_id in mercedes_quote_items:
-                mercedes_quote = mercedes_quote_items[enquiry_item_id]
-                if isinstance(mercedes_quote, list):
-                    quote_item_list.extend(mercedes_quote)
+            # WAITING_QUOTE + 奔驰/宝马车: 从适配列表构造报价（支持一到多个报价项）
+            elif quote_status == 'WAITING_QUOTE' and enquiry_item_id in extra_quote_items:
+                adapter_quote = extra_quote_items[enquiry_item_id]
+                if isinstance(adapter_quote, list):
+                    quote_item_list.extend(adapter_quote)
                 else:
-                    quote_item_list.append(mercedes_quote)
+                    quote_item_list.append(adapter_quote)
             
             enquiry_item = {
                 "addItemOe": item.get('addItemOe', ''),

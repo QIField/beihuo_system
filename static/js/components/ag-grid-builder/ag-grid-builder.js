@@ -208,8 +208,16 @@ var AgGridBuilder = (function() {
                 if (typeof config.onSort === 'function') {
                     menuOptions.onSort = config.onSort;
                 }
-                if (typeof config.onFilter === 'function') {
+                if (typeof config.onDataRefresh === 'function') {
+                    menuOptions.onDataRefresh = config.onDataRefresh;
+                } else if (typeof config.onFilter === 'function') {
                     menuOptions.onDataRefresh = config.onFilter;
+                }
+                if (typeof config.getFilterValues === 'function') {
+                    menuOptions.getFilterValues = config.getFilterValues;
+                }
+                if (typeof config.onColumnVisibilityChange === 'function') {
+                    menuOptions.onColumnVisibilityChange = config.onColumnVisibilityChange;
                 }
 
                 GridColumnMenu.init(api, selector, config.columnDefs || [], menuOptions);

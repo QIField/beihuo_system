@@ -19,8 +19,9 @@ from typing import Optional, Tuple, List
 
 # 导入开思自动对单的核心模块
 from app.ks_auto_bill.ks_login import login, COMPANIES
-from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info, print_date_range
+from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info, _get_date_range
 from app.ks_auto_bill.crm_auto_bill import send_orders_to_crm
+from app.ks_auto_bill.log import ks_log, set_ks_log_company, clear_ks_log_company
 from app.utils.ks_auto_bill_model import COMPANY_CONFIG
 from app.utils.common_util_module.server_push import message_push
 
@@ -89,25 +90,25 @@ class SimpleFileLock:
             
             # 情况1: 锁是我们自己持有的（当前进程）
             if lock_pid == current_pid:
-                print(f"[SimpleFileLock] 检测到本进程持有的旧锁，清理中...")
+                ks_log("检测到本进程持有的旧锁，清理中...", module="SimpleFileLock")
                 os.unlink(self.lock_path)
                 return True
             
             # 情况2: 持有锁的进程已不存在
             if lock_pid > 0 and not self._is_process_running(lock_pid):
-                print(f"[SimpleFileLock] 检测到僵尸锁 (PID {lock_pid} 已不存在)，清理中...")
+                ks_log(f"检测到僵尸锁 (PID {lock_pid} 已不存在)，清理中...", module="SimpleFileLock")
                 os.unlink(self.lock_path)
                 return True
             
             # 情况3: 锁已超时
             if self._is_lock_expired():
-                print(f"[SimpleFileLock] 检测到超时锁，清理中...")
+                ks_log("检测到超时锁，清理中...", module="SimpleFileLock")
                 os.unlink(self.lock_path)
                 return True
             
             return False
         except Exception as e:
-            print(f"[SimpleFileLock] 清理僵尸锁失败: {e}")
+            ks_log(f"清理僵尸锁失败: {e}", module="SimpleFileLock")
             return False
     
     def acquire(self) -> bool:
@@ -234,9 +235,9 @@ def push_cookie_invalid_warning(company):
     )
     try:
         message_push("开思", message)
-        print(f"[开思自动对单][{company}] 已推送 cookie 失效预警")
+        ks_log("已推送 cookie 失效预警")
     except Exception as e:
-        print(f"[开思自动对单][{company}] 推送 cookie 失效预警失败: {e}")
+        ks_log(f"推送 cookie 失效预警失败: {e}")
 
 
 def is_running_time():
@@ -255,17 +256,14 @@ def process_company_once(company):
     返回:
         tuple: (success: bool, message: str, total_count: int, success_count: int, fail_count: int)
     """
-    print(f"\n{'='*60}")
-    print(f"[开思自动对单][{company}] 开始处理")
-    print(f"{'='*60}")
+    set_ks_log_company(company)
 
     # 检查登录状态
     session = get_session(company)
     had_session = session is not None
-    print(f"\n[开思自动对单][{company}] 检查登录状态...")
 
     if not check_login_status(session):
-        print(f"[开思自动对单][{company}] 登录已过期或未登录，重新登录...")
+        ks_log("登录已过期或未登录，重新登录...")
         session = login(company)
 
         if not check_login_status(session):
@@ -273,44 +271,43 @@ def process_company_once(company):
             if had_session:
                 push_cookie_invalid_warning(company)
             error_msg = "登录失败或 cookie 已失效"
-            print(f"[开思自动对单][{company}] {error_msg}")
+            ks_log(error_msg)
+            clear_ks_log_company()
             return False, error_msg, 0, 0, 0
 
         set_session(session, company)
-        print(f"[开思自动对单][{company}] 登录成功")
-    else:
-        print(f"[开思自动对单][{company}] 登录状态有效")
+        ks_log("登录成功")
+    # 登录状态有效时不输出，避免冗余日志
 
-    # 获取订单并保存到数据库
-    print(f"\n[开思自动对单][{company}] 获取开思订单并保存到数据库...")
-    # 打印本次爬取的时间范围（只打印一次）
-    print_date_range()
-
+    # 获取订单并保存到数据库（订单列表/入库/待处理情况在 extract_and_save_order_info 中统一输出）
     try:
         all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session, company=company)
-        print(f"[开思自动对单][{company}] 成功获取并保存 {len(all_order_info_list)} 条订单信息")
-        print(f"[开思自动对单][{company}] 找到 {len(pending_confirmation_orders)} 条待处理订单")
     except Exception as e:
         error_msg = f"获取订单信息失败: {str(e)}"
-        print(f"[开思自动对单][{company}] {error_msg}")
+        ks_log(error_msg)
+        clear_ks_log_company()
         return False, error_msg, 0, 0, 0
 
     # 发送订单到 CRM
-    if pending_confirmation_orders:
-        print(f"\n[开思自动对单][{company}] 开始处理 {len(pending_confirmation_orders)} 条待处理订单...")
+    pending_count = len(pending_confirmation_orders)
+    if pending_count:
         try:
             results = send_orders_to_crm(pending_confirmation_orders, company=company)
             success_count = sum(1 for r in results if r.get("result") is not None)
             fail_count = len(results) - success_count
             total_count = len(results)
-            print(f"[开思自动对单][{company}] 处理完成: {success_count}/{len(results)} 成功")
-            return True, f"成功 {success_count}/{len(results)}", total_count, success_count, fail_count
+            ks_log(f"处理完成: 成功 {success_count} 条，失败 {fail_count} 条")
+            clear_ks_log_company()
+            return True, f"成功 {success_count}/{total_count}", total_count, success_count, fail_count
         except Exception as e:
             error_msg = f"发送订单到 CRM 失败: {str(e)}"
-            print(f"[开思自动对单][{company}] {error_msg}")
-            return False, error_msg, 0, 0, 0
+            ks_log(error_msg)
+            clear_ks_log_company()
+            # 批量发送整体异常时，把全部待处理订单计为失败
+            return False, error_msg, pending_count, 0, pending_count
     else:
-        print(f"\n[开思自动对单][{company}] 没有待处理订单，跳过 CRM 开单")
+        ks_log("没有待处理订单，跳过 CRM 开单")
+        clear_ks_log_company()
         return True, "没有待处理订单", 0, 0, 0
 
 
@@ -323,14 +320,18 @@ def process_orders_once():
     current_time = datetime.now()
     set_last_run_time(current_time)
 
-    print(f"\n{'=' * 60}")
-    print(f"[开思自动对单] 开始执行: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"[开思自动对单] 处理公司: {', '.join(COMPANIES)}")
-    print(f"{'=' * 60}")
+    clear_ks_log_company()
+    # 在开始执行时统一展示处理日期，避免每个公司重复打印
+    start_date, end_date = _get_date_range()
+    if "/www/wwwroot/beihuo_system" in os.getcwd().replace('\\', '/'):
+        date_str = f"{start_date} 至 {end_date}"
+    else:
+        date_str = start_date[:10]
+    ks_log(f"开始执行: {current_time.strftime('%Y-%m-%d %H:%M:%S')} | 处理日期: {date_str}")
 
     # 1. 检查是否在运行时间内（早上7点到晚上24点）
     if not is_running_time():
-        print(f"[开思自动对单] 当前时间 {current_time.hour} 点，不在运行时间段内，跳过")
+        ks_log(f"当前时间 {current_time.hour} 点，不在运行时间段内，跳过")
         return True, "不在运行时间段", {}
 
     # 2. 处理所有公司
@@ -358,14 +359,10 @@ def process_orders_once():
         # 短暂休眠，避免请求过于频繁
         time.sleep(2)
 
-    print(f"\n{'='*60}")
-    print("[开思自动对单] 汇总结果:")
-    for company, result in results.items():
-        print(f"  [{company}] 成功 {result['success_count']} 条，失败 {result['fail_count']} 条")
-    print(f"{'='*60}")
-    
-    print(f"\n[开思自动对单] 执行完成: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"{'=' * 60}\n")
+    clear_ks_log_company()
+    summary_parts = [f"{company} {result['success_count']}/{result['fail_count']}" for company, result in results.items()]
+    ks_log(f"汇总: {' | '.join(summary_parts)}")
+    ks_log(f"执行完成: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 成功 {total_success}/{len(COMPANIES)} 家公司，共 {total_count} 条订单")
     
     all_success = total_success == len(COMPANIES)
     return all_success, f"成功 {total_success}/{len(COMPANIES)} 家公司，共 {total_count} 条订单", results
@@ -379,9 +376,10 @@ def ks_auto_bill_task():
     1. 单次执行，不循环（由调度器负责每分钟调用）
     2. 自带单实例锁，防止重复执行
     """
+    clear_ks_log_company()
     # 1. 获取单实例锁
     if not _task_lock.acquire():
-        print("[开思自动对单] 任务已在运行中，跳过本次执行")
+        ks_log("任务已在运行中，跳过本次执行")
         return
 
     try:
@@ -389,9 +387,9 @@ def ks_auto_bill_task():
         success, message, details = process_orders_once()
 
         if not success:
-            print(f"[开思自动对单] 任务执行失败: {message}")
+            ks_log(f"任务执行失败: {message}")
         else:
-            print(f"[开思自动对单] 任务执行成功: {message}")
+            ks_log(f"任务执行成功: {message}")
 
     finally:
         # 3. 释放锁

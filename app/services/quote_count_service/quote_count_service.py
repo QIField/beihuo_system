@@ -827,13 +827,13 @@ class QuoteCountSyncService:
                     INSERT INTO crmapp_quote_count_ks
                     (`year_month`, brand, oe, quote_count, company, created_at, updated_at)
                     SELECT
-                        %s as year_month,
+                        %s as `year_month`,
                         brand,
                         oe,
-                        SUM(quote_count) as quote_count,
+                        SUM(quote_count) as `quote_count`,
                         company,
-                        NOW() as created_at,
-                        NOW() as updated_at
+                        NOW() as `created_at`,
+                        NOW() as `updated_at`
                     FROM (
                         -- 开思询价数据
                         SELECT
@@ -925,5 +925,102 @@ class QuoteCountSyncService:
             'unquoted_products': unquoted_result,
             'stats': stats_result
         }
+
+    def sync_date_range(self, begin_date: str, end_date: str) -> Dict[str, Any]:
+        """
+        爬取指定日期范围的开思询价明细，按天分天爬取
+
+        Args:
+            begin_date: 开始日期 (yyyy-MM-dd)
+            end_date: 结束日期 (yyyy-MM-dd)
+
+        Returns:
+            dict: 包含处理结果的字典
+        """
+        from datetime import date
+
+        start_date = date.fromisoformat(begin_date)
+        end_date = date.fromisoformat(end_date)
+
+        if start_date > end_date:
+            raise ValueError(f"开始日期 {begin_date} 不能晚于结束日期 {end_date}")
+
+        all_results = {
+            'dates': [],
+            'total_orders': 0,
+            'total_items': 0,
+            'saved': 0
+        }
+
+        print(f"\n{'='*70}")
+        print(f"开思询价明细日期范围爬取服务")
+        print(f"开始时间: {datetime.now()}")
+        print(f"爬取范围: {begin_date} ~ {end_date}")
+        print(f"{'='*70}")
+
+        current = start_date
+        day_count = 0
+        while current <= end_date:
+            date_str = current.strftime('%Y-%m-%d')
+            day_count += 1
+
+            start_ts = int(datetime.combine(current, datetime.min.time()).timestamp() * 1000)
+            end_ts = int(datetime.combine(current, datetime.max.time()).timestamp() * 1000)
+
+            print(f"\n{'='*60}")
+            print(f"[每日爬取] 处理日期: {date_str}")
+            print(f"{'='*60}")
+
+            orders = self._fetch_quotation_list(start_ts, end_ts)
+            if not orders:
+                print(f"[每日爬取] {date_str} 无订单数据")
+                current += timedelta(days=1)
+                continue
+
+            print(f"[每日爬取] 获取 {len(orders)} 个订单")
+
+            all_items = []
+            for idx, order in enumerate(orders, 1):
+                order_id = order.get('order_id')
+                show_address = order.get('show_address', '')
+                garage_company_name = order.get('garage_company_name', '')
+                car_brand_name = order.get('car_brand_name', '')
+                items = self._fetch_quotation_detail(order_id, show_address, garage_company_name, car_brand_name)
+
+                for item in items:
+                    item['quote_date'] = date_str
+                    item['company'] = self.COMPANY
+
+                all_items.extend(items)
+
+                if idx % 50 == 0:
+                    print(f"[进度] 已处理 {idx}/{len(orders)} 个订单，获取 {len(all_items)} 条明细")
+
+                time.sleep(0.2)
+
+            if all_items:
+                saved = self._save_inquiry_details(all_items)
+                print(f"[保存] {date_str} 完成: 保存 {saved} 条明细")
+
+                all_results['dates'].append(date_str)
+                all_results['total_orders'] += len(orders)
+                all_results['total_items'] += len(all_items)
+                all_results['saved'] += saved
+
+            if current < end_date:
+                print(f"[暂停] 等待1秒后继续下一天...")
+                time.sleep(1)
+
+            current += timedelta(days=1)
+
+        print(f"\n{'='*70}")
+        print(f"询价明细日期范围爬取完成!")
+        print(f"处理日期: {', '.join(all_results['dates'])}")
+        print(f"总订单数: {all_results['total_orders']}")
+        print(f"总明细数: {all_results['total_items']}")
+        print(f"保存记录: {all_results['saved']}")
+        print(f"{'='*70}")
+
+        return all_results
 
 

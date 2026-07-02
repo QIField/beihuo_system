@@ -364,8 +364,9 @@ def clear_all_tables():
 def remove_trailing_numbers(code):
     """
     如果编码最后两位是特定序号（01-09），则去除这些序号
+    仅对 12 位或 13 位的编码执行此清理
     """
-    if not code or len(code) < 3:
+    if not code or len(code) not in (12, 13):
         return code
 
     # 定义9个特定序号
@@ -446,8 +447,8 @@ def process_supplier_data(all_data, valid_brands=None):
         processed_code = remove_trailing_numbers(original_code)
         item['code'] = processed_code
 
-        # 按处理后的编码和品牌分组
-        key = (processed_code, item['brand'])
+        # 按处理后的编码、品牌和供应商分组
+        key = (processed_code, item['brand'], item['supplier'])
         grouped_data[key].append(item)
 
     # 对每组数据进行处理：去重取中间值，但保留原始供应商名称
@@ -491,12 +492,7 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
         # 执行查询 - 统一查询三家供应商数据
         cursor.execute("""
             SELECT 
-                CASE 
-                    WHEN LEN(REPLACE(bianma, ' ', '')) = 13 
-                         AND RIGHT(REPLACE(bianma, ' ', ''), 2) IN ('01', '02', '03', '04', '05', '06', '07', '08', '09') 
-                    THEN LEFT(REPLACE(bianma, ' ', ''), LEN(REPLACE(bianma, ' ', '')) - 2) 
-                    ELSE REPLACE(bianma, ' ', '') 
-                END AS bianma, 
+                REPLACE(bianma, ' ', '') AS bianma, 
                 CASE 
                     WHEN mingcheng LIKE '%下线%' THEN 'XX' 
                     WHEN REPLACE(fenleima, ' ', '') = '正厂' THEN '原厂' 
@@ -1763,6 +1759,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
 
         record_groups = split_array_by_500_loop(serializable_records)
         original_row_groups = split_array_by_500_loop(original_rows)
+        total_groups = len(record_groups)
 
         # 预构造 id -> 品牌 / temp_brand 字典，避免后续在循环里对 DataFrame 做 O(N) 的 boolean 索引
         # 原实现每条结果都跑一次 original_df.loc[original_df['id'] == record_id, '...']
@@ -1847,7 +1844,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                     all_results = succes_data + error_data
                     all_results.sort(key=lambda x: x['no'])
 
-                    print(f'[{company}] 批次 {i+1}: 成功上传 {result["data"]["succes_num"]} 条, 失败 {result["data"]["error_num"]} 条')
+                    print(f'[{company}] 批次 {i+1}/{total_groups}: 成功上传 {result["data"]["succes_num"]} 条, 失败 {result["data"]["error_num"]} 条')
 
                     # 根据公司确定要更新的表
                     table_map = {

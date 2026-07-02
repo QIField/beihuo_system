@@ -15,6 +15,7 @@ from app.utils.database_connection import db_cursor, get_db_connection
 
 # 从 model 导入配置
 from app.utils.ks_auto_bill_model import get_company_key
+from app.ks_auto_bill.log import ks_log
 
 # CRM开单接口地址
 CRM_API_URL = "http://113.45.176.129:8001/ks_kaidan_api"
@@ -71,7 +72,7 @@ def filter_unprocessed_orders(order_ids, company='fsbbr'):
             return unprocessed_orders
             
     except Exception as e:
-        print(f"         ✗ 数据库操作出错: {str(e)}")
+        ks_log(f"数据库操作出错: {str(e)}", module="CRM")
         return []
 
 
@@ -114,10 +115,9 @@ def save_order_result_to_db(order_id, result_data, company='fsbbr', connection=N
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """
                 cursor.execute(insert_sql, (order_id, crm_order_number, crm_order_url, status, current_time, company))
-                
-        print(f"         ✓ 订单 {order_id} 信息已保存到数据库")
+
     except Exception as e:
-        print(f"         ✗ 保存订单 {order_id} 到数据库失败: {str(e)}")
+        ks_log(f"保存订单 {order_id} 到数据库失败: {str(e)}", module="CRM")
 
 
 def send_order_to_crm(order_id, company='fsbbr', connection=None):
@@ -133,25 +133,27 @@ def send_order_to_crm(order_id, company='fsbbr', connection=None):
         dict: 接口返回的响应数据
         None: 请求失败
     """
-    # 由于订单是从数据库查询出来的（满足特定条件），直接发送请求，不再检查状态
-    print(f"         ✓ 订单 {order_id} 符合处理条件，发送到CRM系统")
-    
     key = get_company_key(company)
     payload = {
         'orders_no': order_id,
         'key': key  # 新增参数：公司key
     }
     headers = {}
-    
+
     response = requests.request("POST", CRM_API_URL, headers=headers, data=payload)
-    
-    # 尝试解析JSON
-    data = json.loads(response.text)
-    print(f"         响应: {json.dumps(data, ensure_ascii=False)}")
-    
+
+    # 尝试解析JSON，失败时完整暴露原始响应
+    try:
+        data = json.loads(response.text)
+    except Exception as e:
+        ks_log(f"订单 {order_id} CRM 响应解析失败: {e}", module="CRM")
+        ks_log(f"订单 {order_id} CRM 原始响应: {response.text}", module="CRM")
+        save_order_result_to_db(order_id, None, company, connection, status='开单失败')
+        return None
+
     # 保存订单结果到数据库
     save_order_result_to_db(order_id, data, company, connection)
-    
+
     return data
 
 
@@ -168,45 +170,43 @@ def send_orders_to_crm(order_ids, company='fsbbr', connection=None):
         list: 每个订单的响应结果列表
     """
     if not order_ids:
-        print("⚠️ 订单号列表为空")
+        ks_log("订单号列表为空", module="CRM")
         return []
     
     # 过滤出需要处理的订单
-    print(f"\n【过滤】正在过滤需要处理的订单...")
     unprocessed_orders = filter_unprocessed_orders(order_ids, company)
-    
+
     if not unprocessed_orders:
-        print("【过滤】所有订单都已处理过，无需发送请求")
+        ks_log("所有订单都已处理过，无需发送请求", module="CRM")
         return []
-    
+
     unprocessed_count = len(unprocessed_orders)
     skipped_count = len(order_ids) - unprocessed_count
-    print(f"【过滤】发现 {skipped_count} 个已处理订单，{unprocessed_count} 个待处理订单")
-    
+    if skipped_count:
+        ks_log(f"已过滤 {skipped_count} 个已处理订单，待处理 {unprocessed_count} 个", module="CRM")
+
     # 如果没有提供连接，则创建一个
     local_connection = connection is None
     conn = connection or get_db_connection()
-    
+
     results = []
-    print(f"\n【CRM】开始发送 {len(unprocessed_orders)} 条订单到CRM系统\n")
-    
+
     try:
         for i, order_id in enumerate(unprocessed_orders, 1):
-            print(f"【CRM】[{i}/{len(unprocessed_orders)}] 发送订单: {order_id}")
+            ks_log(f"[{i}/{len(unprocessed_orders)}] 发送订单: {order_id}", module="CRM")
             result = send_order_to_crm(order_id, company, conn)
-            
+
             if result and not (isinstance(result, dict) and result.get("skipped")):
                 results.append({"order_id": order_id, "result": result})
             elif isinstance(result, dict) and result.get("skipped"):
-                print(f"         ⚠ 跳过订单 {order_id}，不计入结果")
+                ks_log(f"跳过订单 {order_id}，不计入结果", module="CRM")
             else:
-                print(f"         ✗ 请求失败")
                 results.append({"order_id": order_id, "result": None})
-        
-        print(f"\n【CRM】✓ 全部发送完成")
+
+        ks_log("全部发送完成", module="CRM")
     finally:
         # 如果是本地创建的连接，则关闭它
         if local_connection:
             conn.close()
-    
+
     return results

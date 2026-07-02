@@ -10,6 +10,7 @@ sys.path.insert(0, str(project_root))
 
 # 从 model 导入配置
 from app.utils.ks_auto_bill_model import COMPANY_CONFIG, COMPANIES, get_company_key
+from app.ks_auto_bill.log import ks_log
 
 
 def login_with_cookie_api(company='fsbbr'):
@@ -18,17 +19,17 @@ def login_with_cookie_api(company='fsbbr'):
     cookie_api_url = f"http://113.45.176.129:8001/md_ks.get_cookies?md={key}"
 
     try:
-        print(f"[开思登录][{company}] 尝试使用 Cookie 接口登录...")
+        ks_log("尝试使用 Cookie 接口登录...", module="登录")
         response = requests.get(cookie_api_url, timeout=10)
         if response.status_code != 200:
-            print(f"[开思登录][{company}] Cookie 接口请求失败，状态码: {response.status_code}")
+            ks_log(f"Cookie 接口请求失败，状态码: {response.status_code}", module="登录")
             return None
 
         data = response.json()
         cookie_dict = data.get("cookie", {})
 
         if not cookie_dict:
-            print(f"[开思登录][{company}] Cookie 接口返回空 cookie")
+            ks_log("Cookie 接口返回空 cookie", module="登录")
             return None
 
         session = requests.Session()
@@ -43,10 +44,10 @@ def login_with_cookie_api(company='fsbbr'):
         session.cookies.set("_seller_active_menu_id_", "myOrder", domain=".cassmall.com")
         session.cookies.set("_seller_active_menu_url_", "/orders/seller/order/list", domain=".cassmall.com")
 
-        print(f"[开思登录][{company}] Cookie 接口登录成功")
+        ks_log("Cookie 接口登录成功", module="登录")
         return session
     except Exception as e:
-        print(f"[开思登录][{company}] Cookie 接口登录失败: {e}")
+        ks_log(f"Cookie 接口登录失败: {e}", module="登录")
         return None
 
 

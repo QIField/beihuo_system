@@ -321,7 +321,13 @@ class KsInquiryRecordsService:
 
         # 基础查询条件
         if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
-        if parts_num:     conditions.append("partsNum LIKE %s");            params.append(f"%{parts_num}%")
+        # customer_stats_by_oe 限定单个 OE，使用精确匹配
+        if grid_type == 'customer_stats_by_oe' and parts_num:
+            conditions.append("partsNum = %s")
+            params.append(parts_num)
+        elif parts_num:
+            conditions.append("partsNum LIKE %s")
+            params.append(f"%{parts_num}%")
         if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
@@ -341,6 +347,7 @@ class KsInquiryRecordsService:
             'garage_engine':  {'columns': {'carBrandName': 'car_brand_name', 'engine': 'engine', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, engine'},
             'garage_oenum':   {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'partsNum', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, partsNum'},
             'customer_stats': {'columns': {'customerName': 'garage_company_name', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'garage_company_name'},
+            'customer_stats_by_oe': {'columns': {'customerName': 'garage_company_name', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'garage_company_name'},
             'customer_oenum': {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'resolve_parts_num', 'partsName': 'resolve_parts_name', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, resolve_parts_num'}
         }
 

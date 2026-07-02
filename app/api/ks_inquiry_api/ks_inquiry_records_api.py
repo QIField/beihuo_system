@@ -329,6 +329,17 @@ def get_customer_stats_by_oe():
         begin_date = request.args.get('begin_date', '').strip()
         end_date = request.args.get('end_date', '').strip()
         company = request.args.get('company', '').strip()
+        sort_column = request.args.get('sort_column', '').strip()
+        sort_dir = request.args.get('sort_dir', '').strip()
+
+        column_filters = request.args.get('column_filters', '').strip()
+        if column_filters:
+            try:
+                column_filters = json.loads(column_filters)
+            except Exception:
+                column_filters = None
+        else:
+            column_filters = None
 
         try:
             page = int(request.args.get('page', 1))
@@ -355,7 +366,10 @@ def get_customer_stats_by_oe():
             end_date=end_date,
             company=company,
             page=page,
-            page_size=page_size
+            page_size=page_size,
+            sort_column=sort_column,
+            sort_dir=sort_dir,
+            column_filters=column_filters
         )
 
         return jsonify({

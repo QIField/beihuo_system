@@ -1,0 +1,57 @@
+<!-- OE统计维度 -->
+<div id="tab-oe" class="tab-pane">
+    <style>
+        /* 单元格文本超出显示省略号，且禁止换行以固定行高 */
+        #handsontable-oe-container .handsontable .htCore td {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            vertical-align: middle !important;
+        }
+
+        /* 统一所有行高度为 24px */
+        #handsontable-oe-container .handsontable .htCore tbody tr {
+            height: 24px !important;
+            min-height: 24px !important;
+            max-height: 24px !important;
+        }
+
+        #handsontable-oe-container {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+    </style>
+
+    <div id="handsontable-oe-container"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var oeConfig = Object.assign({}, QplQuoteGridConfig.oeStats, {
+                pageKey: QplQuoteGridConfig.pageKey,
+                components: {
+                    pagination: {
+                        pageSizeOptions: [50, 100, 200, 500],
+                        defaultPageSize: 100,
+                        showScrollToTop: true
+                    },
+                    columnMenu: { persist: true },
+                    doubleClickCopy: true,
+                    contextMenu: false,
+                    shortcuts: true
+                }
+            });
+
+            window.qplOeBuilder = HandsontableBuilder.create(
+                oeConfig.containerSelector,
+                oeConfig
+            );
+
+            window.refreshOeData = function(page, pageSize) {
+                if (window.qplOeBuilder) {
+                    window.qplOeBuilder.refresh(page, pageSize);
+                }
+            };
+        });
+    </script>
+</div>

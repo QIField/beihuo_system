@@ -137,6 +137,8 @@
             title: 'OE号客户统计',
             splitRatio: 0.5,
             showPagination: true,
+            persistPageKey: 'ks_inquiry_records',
+            persistGridKey: 'oe_detail_panel_grid',
             columnDefs: [
                 { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 60, lockPosition: 'left' },
                 { field: 'customerName', headerName: '客户名称', width: 220 },
@@ -147,6 +149,16 @@
                 var params = getSearchParams(currentTab);
                 params.parts_num = rowData.partsNum;
                 return params;
+            },
+            onLoad: function(data) {
+                var list = data.list || [];
+                if (window.oeDetailPanel && typeof GridColumnMenu !== 'undefined') {
+                    GridColumnMenu.setOriginalRows('#' + window.oeDetailPanel.gridId, list);
+                    GridColumnMenu.addMenuButtonsToHeaders('#' + window.oeDetailPanel.gridId);
+                }
+            },
+            getFilterValues: function(colId, callback, rowData) {
+                fetchOeDetailColumnValues(colId, callback, rowData);
             }
         });
     }
@@ -234,6 +246,44 @@
             })
             .catch(function(error) {
                 console.error('[oe_stats_tab] 获取列值请求失败:', error);
+                callback([]);
+            });
+    }
+
+    // 从后端获取 OE 客户统计副表指定列的全量不重复值（限定当前 OE 号）
+    function fetchOeDetailColumnValues(colId, callback, rowData) {
+        const params = getSearchParams(currentTab);
+        params.parts_num = rowData && rowData.partsNum ? rowData.partsNum : '';
+        params.column = colId;
+        params.grid_type = 'customer_stats_by_oe';
+
+        if (window.oeDetailPanel && typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#' + window.oeDetailPanel.gridId);
+            if (filterState.active && filterState.filters) {
+                const otherFilters = {};
+                Object.keys(filterState.filters).forEach(function(key) {
+                    if (key !== colId) {
+                        otherFilters[key] = filterState.filters[key];
+                    }
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/column_values?' + new URLSearchParams(params))
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    callback(result.data?.values || []);
+                } else {
+                    console.error('[oe_stats_tab] 获取副表列值失败:', result.message);
+                    callback([]);
+                }
+            })
+            .catch(function(error) {
+                console.error('[oe_stats_tab] 获取副表列值请求失败:', error);
                 callback([]);
             });
     }

@@ -185,7 +185,10 @@ class KsInquiryStatsService:
         end_date: str = '',
         company: str = '',
         page: int = 1,
-        page_size: int = 200
+        page_size: int = 200,
+        sort_column: str = '',
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
     ) -> Dict[str, Any]:
         """
         获取指定OE号在日期范围内各客户的出现次数（按次数降序）
@@ -211,14 +214,41 @@ class KsInquiryStatsService:
         # 客户名称不能为空
         conditions.append("COALESCE(TRIM(garage_company_name), '') != ''")
 
+        # 列头下拉全量筛选（非聚合列进 WHERE，聚合列进 HAVING）
+        having_conditions = []
+        having_params = []
+        if column_filters:
+            for col_id, values in column_filters.items():
+                placeholders = ', '.join(['%s'] * len(values))
+                if col_id == 'customerName':
+                    conditions.append(f"garage_company_name IN ({placeholders})")
+                    params.extend(values)
+                elif col_id == 'count':
+                    having_conditions.append(f"count IN ({placeholders})")
+                    having_params.extend(values)
+
         where_clause = " AND ".join(conditions) if conditions else "1=1"
+        having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
+
+        # 排序白名单（前端列名 -> SQL列名）
+        customer_column_map = {
+            'customerName': 'customerName',
+            'count': 'count'
+        }
+        order_by = build_order_by(
+            sort_column, sort_dir, customer_column_map,
+            numeric_columns={'count'},
+            default='count DESC, customerName ASC'
+        )
 
         count_sql = f"""
             SELECT COUNT(*) FROM (
-                SELECT garage_company_name
+                SELECT garage_company_name,
+                       COUNT(DISTINCT inquiryId) as count
                 FROM crmapp_ks_inquiry_detail
                 WHERE {where_clause}
                 GROUP BY garage_company_name
+                {having_clause}
             ) t
         """
 
@@ -229,11 +259,14 @@ class KsInquiryStatsService:
             FROM crmapp_ks_inquiry_detail
             WHERE {where_clause}
             GROUP BY garage_company_name
-            ORDER BY COUNT(DISTINCT inquiryId) DESC, customerName ASC
+            {having_clause}
+            ORDER BY {order_by}
             LIMIT %s OFFSET %s
         """
 
-        count_result = db_query_one(count_sql, tuple(params), dict_cursor=False)
+        count_params = params.copy()
+        count_params.extend(having_params)
+        count_result = db_query_one(count_sql, tuple(count_params), dict_cursor=False)
         if count_result is None:
             total = 0
         elif isinstance(count_result, dict):
@@ -243,6 +276,7 @@ class KsInquiryStatsService:
 
         offset = (page - 1) * page_size
         data_params = params.copy()
+        data_params.extend(having_params)
         data_params.append(page_size)
         data_params.append(offset)
 

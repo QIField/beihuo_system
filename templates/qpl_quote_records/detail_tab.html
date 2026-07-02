@@ -1,0 +1,57 @@
+<!-- 明细列表 -->
+<div id="tab-detail" class="tab-pane active">
+    <style>
+        /* 单元格文本超出显示省略号，且禁止换行以固定行高 */
+        #handsontable-container .handsontable .htCore td {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            vertical-align: middle !important;
+        }
+
+        /* 统一所有行高度为 24px */
+        #handsontable-container .handsontable .htCore tbody tr {
+            height: 24px !important;
+            min-height: 24px !important;
+            max-height: 24px !important;
+        }
+
+        #handsontable-container {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+    </style>
+
+    <div id="handsontable-container"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var detailConfig = Object.assign({}, QplQuoteGridConfig.detail, {
+                pageKey: QplQuoteGridConfig.pageKey,
+                components: {
+                    pagination: {
+                        pageSizeOptions: [50, 100, 200, 500],
+                        defaultPageSize: 100,
+                        showScrollToTop: true
+                    },
+                    columnMenu: { persist: true },
+                    doubleClickCopy: true,
+                    contextMenu: false,
+                    shortcuts: true
+                }
+            });
+
+            window.qplDetailBuilder = HandsontableBuilder.create(
+                detailConfig.containerSelector,
+                detailConfig
+            );
+
+            window.refreshData = function(page, pageSize) {
+                if (window.qplDetailBuilder) {
+                    window.qplDetailBuilder.refresh(page, pageSize);
+                }
+            };
+        });
+    </script>
+</div>
