@@ -54,6 +54,14 @@ COMPANY_NAME_MAP = {
     'fsbbr': '佛山巴博瑞',
 }
 
+# 组织代码到 CRM cookies_key 的映射
+# CRM 可选值：fs, zs, zh, hf, by
+COMPANY_CRM_COOKIES_KEY_MAP = {
+    'fsbbr': 'fs',
+    # 未来可添加更多组织映射
+    # 'gzbbr': 'gz',
+}
+
 
 def get_qpl_token(company='fsbbr'):
     """

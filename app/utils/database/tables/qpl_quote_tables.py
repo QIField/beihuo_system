@@ -9,7 +9,7 @@
 def init_qpl_quote_record_table():
     """初始化报价记录表"""
     from app.utils.database_connection import get_db_connection
-    
+
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -30,6 +30,7 @@ def init_qpl_quote_record_table():
                 parts_no VARCHAR(100) COMMENT '零件号',
                 quote_status VARCHAR(50) COMMENT '报价状态',
                 submit_result VARCHAR(255) COMMENT '提交结果',
+                result_source VARCHAR(50) COMMENT '报价来源/结果分类',
                 submit_time DATETIME COMMENT '提交时间',
                 company VARCHAR(100) COMMENT '组织代码',
                 created_time DATETIME COMMENT '询价单创建时间',
@@ -51,7 +52,8 @@ def init_qpl_quote_record_table():
             qpl_fields = [
                 {'name': 'created_time', 'definition': "DATETIME COMMENT '询价单创建时间'"},
                 {'name': 'vin_code', 'definition': "VARCHAR(100) COMMENT 'VIN码'"},
-                {'name': 'car_type', 'definition': "TEXT COMMENT '车型信息'"}
+                {'name': 'car_type', 'definition': "TEXT COMMENT '车型信息'"},
+                {'name': 'result_source', 'definition': "VARCHAR(50) COMMENT '报价来源/结果分类'"}
             ]
             check_and_add_fields('qpl_quote_record', qpl_fields)
 

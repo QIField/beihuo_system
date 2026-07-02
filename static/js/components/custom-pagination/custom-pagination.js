@@ -43,9 +43,25 @@
                 this.container = document.createElement('div');
                 this.container.className = 'custom-pagination-bar';
 
-                const agGrid = document.querySelector(this.options.gridSelector || '.ag-root-wrapper');
-                if (agGrid && agGrid.parentNode) {
-                    agGrid.parentNode.insertBefore(this.container, agGrid.nextSibling);
+                let gridWrapper = null;
+                const gridSelector = this.options.gridSelector;
+
+                if (gridSelector) {
+                    gridWrapper = document.querySelector(gridSelector);
+                }
+
+                // 兼容 AG Grid
+                if (!gridWrapper) {
+                    gridWrapper = document.querySelector('.ag-root-wrapper');
+                }
+
+                // 兼容 Handsontable
+                if (!gridWrapper) {
+                    gridWrapper = document.querySelector('.handsontable');
+                }
+
+                if (gridWrapper && gridWrapper.parentNode) {
+                    gridWrapper.parentNode.insertBefore(this.container, gridWrapper.nextSibling);
                 } else {
                     document.body.appendChild(this.container);
                 }
@@ -173,10 +189,33 @@
                     this.style.boxShadow = '0 2px 6px rgba(24, 144, 255, 0.3)';
                 });
                 scrollTopBtn.addEventListener('click', function() {
-                    const agGridViewport = document.querySelector(self.options.gridSelector + ' .ag-body-viewport') ||
-                                          document.querySelector('.ag-body-viewport');
-                    if (agGridViewport) {
-                        agGridViewport.scrollTo({ top: 0, behavior: 'smooth' });
+                    let scrollTarget = null;
+                    const gridSelector = self.options.gridSelector;
+
+                    if (gridSelector) {
+                        // 先尝试 AG Grid viewport
+                        scrollTarget = document.querySelector(gridSelector + ' .ag-body-viewport');
+                        // 再尝试 Handsontable 滚动容器
+                        if (!scrollTarget) {
+                            const gridEl = document.querySelector(gridSelector);
+                            if (gridEl) {
+                                scrollTarget = gridEl.querySelector('.ht_master .wtHolder');
+                            }
+                        }
+                    }
+
+                    // 全局查找 AG Grid viewport
+                    if (!scrollTarget) {
+                        scrollTarget = document.querySelector('.ag-body-viewport');
+                    }
+
+                    // 全局查找 Handsontable 滚动容器
+                    if (!scrollTarget) {
+                        scrollTarget = document.querySelector('.ht_master .wtHolder');
+                    }
+
+                    if (scrollTarget) {
+                        scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
                     } else {
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                     }

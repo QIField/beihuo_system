@@ -28,6 +28,7 @@ class QplQuoteRecord(BaseModels):
     parts_no = Column(String(100), comment='零件号')
     quote_status = Column(String(50), comment='报价状态')
     submit_result = Column(String(255), comment='提交结果')
+    result_source = Column(String(50), comment='报价来源/结果分类')
     submit_time = Column(DateTime, comment='提交时间')
     company = Column(String(100), comment='组织代码')
     created_time = Column(DateTime, comment='询价单创建时间')

@@ -283,6 +283,55 @@ class CrmGzbbrSpider:
         print("【请求参数】", params)
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
 
+    # https://crm.gzbbr.com/api/Product.Product/list
+    # number 单个OE号/配件编码（GET方式）
+    # numberlist 编码列表或字符串（POST方式）
+    # page 分页页码
+    # limit 分页每页数量
+    def get_product_product_list(self, number=None, numberlist=None, page=1, limit=200, method="POST", is_stock=None):
+        """
+        通用调用 Product.Product/list 接口
+
+        :param number: 单个OE号/配件编码
+        :param numberlist: 编码列表或字符串
+        :param page: 分页页码，默认1
+        :param limit: 分页每页数量，默认200
+        :param method: 强制指定请求方法，"GET"或"POST"，默认POST
+        :param is_stock: 是否只返回有库存，传 "1" 表示只返回有库存商品
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/Product.Product/list"
+
+        if method.upper() == "GET":
+            params = {}
+            if number is not None:
+                params["number"] = number
+            if page is not None:
+                params["page"] = page
+            if limit is not None:
+                params["limit"] = limit
+            if is_stock is not None:
+                params["is_stock"] = is_stock
+
+            print("【请求API地址】", url)
+            print("【请求参数】", params)
+            return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+        else:
+            data = {
+                "page": page,
+                "limit": limit,
+            }
+            if number is not None:
+                data["number"] = number
+            if numberlist is not None:
+                data["numberlist"] = numberlist
+            if is_stock is not None:
+                data["is_stock"] = is_stock
+
+            print("【请求API地址】", url)
+            print("【请求参数】", data)
+            return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
+
     def close(self):
         """
         关闭会话连接，释放资源

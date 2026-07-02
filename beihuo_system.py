@@ -3666,8 +3666,8 @@ def date_ordercount():
         if not start_date or not end_date:
             return jsonify({'code': 1, 'msg': '缺少日期参数'}), 400
         
-        # 获取当前用户公司
-        company = session.get('store', 'fsbbr')
+        # 获取当前用户公司（支持管理员切换组织）
+        company = get_user_store()
         username = session.get('username', 'default_user')
         
         # 保存查询参数到session，以便其他函数可以使用
