@@ -13,6 +13,28 @@ from datetime import datetime
 qpl_quote_bp = Blueprint('qpl_quote', __name__, url_prefix='/qpl_quote')
 
 
+# result_source 英文值到中文展示名的映射
+_RESULT_SOURCE_CN_MAP = {
+    'existing_quote': '已有报价',
+    'crm': 'CRM现货',
+    'mercedes': '奔驰接口',
+    'bmw': '宝马接口',
+    'no_original_product': '无原厂产品',
+    'crm_part_no_mismatch': 'CRM-partNo未匹配',
+    'crm_no_price': 'CRM无有效价格',
+    'crm_price_check_failed': 'CRM价格校验失败',
+    'oe_data_missing': 'OE数据缺失',
+    'no_stock': '无可用库存',
+    'invalid_price': '价格无效',
+    'no_valid_oe_for_product': '当前产品无可用OE',
+    'price_check_failed': '价格校验失败',
+    'exception': '处理异常',
+    'unknown': '未知',
+}
+
+_RESULT_SOURCE_EN_MAP = {v: k for k, v in _RESULT_SOURCE_CN_MAP.items()}
+
+
 def login_required(f):
     """登录验证装饰器"""
     @wraps(f)
@@ -64,6 +86,9 @@ def _build_conditions(current_store, supplier_enquiry_no='', item_oe='', item_na
         conditions.append('submit_time <= %s')
         params.append(f'{end_date} 23:59:59')
     if filter_column and allowed_filter_columns and filter_column in allowed_filter_columns and filter_values:
+        # result_source 前端传中文，查库前转英文
+        if filter_column == 'result_source':
+            filter_values = [_RESULT_SOURCE_EN_MAP.get(v, v) for v in filter_values]
         placeholders = ', '.join(['%s'] * len(filter_values))
         conditions.append(f'{filter_column} IN ({placeholders})')
         params.extend(filter_values)
@@ -184,6 +209,10 @@ def get_records():
                         record['submit_time'] = record['submit_time'].strftime('%Y-%m-%d %H:%M:%S')
                     if record.get('created_at') and hasattr(record['created_at'], 'strftime'):
                         record['created_at'] = record['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    # result_source 英文值转中文展示
+                    record['result_source'] = _RESULT_SOURCE_CN_MAP.get(
+                        record.get('result_source'), record.get('result_source', '未知')
+                    )
                     result.append(record)
             
             return jsonify({
@@ -265,6 +294,9 @@ def get_filter_values():
                         cnt = int(row[1]) if len(row) > 1 else 0
                     if val is None:
                         val = '(空)'
+                    # result_source 英文值转中文展示
+                    if column == 'result_source':
+                        val = _RESULT_SOURCE_CN_MAP.get(val, val)
                     values.append({'value': str(val), 'count': cnt})
                 return jsonify({'code': 0, 'msg': 'success', 'data': values})
         finally:

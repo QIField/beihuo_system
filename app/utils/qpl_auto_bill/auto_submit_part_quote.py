@@ -1387,8 +1387,9 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
         qpl_log(f"[{company}] 收集到 BMW 原厂 OE: {bmw_oe_set}")
         if bmw_oe_set:
             from app.utils.qpl_auto_bill.bmw_quote_local_db import check_bmw_oes_in_local_db
-            _, missing_oes = check_bmw_oes_in_local_db(list(bmw_oe_set))
-            qpl_log(f"[{company}] 本地库缺失 BMW OE: {missing_oes}")
+            _, status = check_bmw_oes_in_local_db(list(bmw_oe_set))
+            qpl_log(f"[{company}] 本地库缺失 BMW OE: {status}")
+            missing_oes = status.get('missing', [])
             if missing_oes:
                 qpl_log(f"[{company}] 发现 {len(missing_oes)} 个 BMW OE 需要补齐本地库")
                 _ensure_bmw_oes_in_local_db(missing_oes, company)
