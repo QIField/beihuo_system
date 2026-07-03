@@ -37,7 +37,7 @@ class SpiderTool:
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
-    def fetch(self, url, method="GET", params=None, json=None, headers=None, verify=False):
+    def fetch(self, url, method="GET", params=None, data=None, json=None, headers=None, verify=False):
         """
         统一请求入口（业务类只调用这个方法）
         :param headers: 临时请求头（如Authorization）
@@ -53,6 +53,7 @@ class SpiderTool:
                 method=method.upper(),
                 url=url,
                 params=params,
+                data=data,
                 json=json,
                 headers=req_headers,
                 timeout=self.timeout,
