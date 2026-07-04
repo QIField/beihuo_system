@@ -16,7 +16,7 @@
 
     const oeStatsColumnDefs = [
         { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 80, sortable: false, filter: false, lockPosition: 'left' },
-        { field: 'partsNum', headerName: 'OE号', width: 150, sortable: false, filter: true },
+        { field: 'resolve_parts_num', headerName: 'OE号', width: 150, sortable: false, filter: true },
         { field: 'count', headerName: '出现次数', width: 120, sortable: false, filter: true },
         { field: 'partsName', headerName: '配件名称', width: 300, sortable: false, filter: true }
     ];
@@ -147,7 +147,7 @@
             loadUrl: '/new/api/ks_inquiry/records/customer_stats_by_oe',
             buildParams: function(rowData) {
                 var params = getSearchParams(currentTab);
-                params.parts_num = rowData.partsNum;
+                params.resolve_parts_num = rowData.resolve_parts_num;
                 return params;
             },
             onLoad: function(data) {
@@ -253,7 +253,7 @@
     // 从后端获取 OE 客户统计副表指定列的全量不重复值（限定当前 OE 号）
     function fetchOeDetailColumnValues(colId, callback, rowData) {
         const params = getSearchParams(currentTab);
-        params.parts_num = rowData && rowData.partsNum ? rowData.partsNum : '';
+        params.resolve_parts_num = rowData && rowData.resolve_parts_num ? rowData.resolve_parts_num : '';
         params.column = colId;
         params.grid_type = 'customer_stats_by_oe';
 

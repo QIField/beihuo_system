@@ -225,17 +225,17 @@ def get_seller_status_options():
 @bp.route('/records/oe_stats', methods=['GET'])
 def get_oe_stats():
     """
-    获取OE号统计维度（按partsNum分组聚合）
+    获取OE号统计维度（按resolve_parts_num分组聚合）
 
     Query Parameters:
         与 /records 接口一致
 
     Returns:
-        JSON: {code: 0, data: {list: [{partsNum, count, partsName}], total, page, page_size}, message}
+        JSON: {code: 0, data: {list: [{resolve_parts_num, count, partsName}], total, page, page_size}, message}
     """
     try:
         inquiry_id = request.args.get('inquiry_id', '').strip()
-        parts_num = request.args.get('parts_num', '').strip()
+        resolve_parts_num = request.args.get('resolve_parts_num', '').strip()
         parts_name = request.args.get('parts_name', '').strip()
         brand_name = request.args.get('brand_name', '').strip()
         brand = request.args.get('brand', '').strip()
@@ -272,7 +272,7 @@ def get_oe_stats():
 
         result = KsInquiryStatsService.get_oe_stats(
             inquiry_id=inquiry_id,
-            parts_num=parts_num,
+            resolve_parts_num=resolve_parts_num,
             parts_name=parts_name,
             brand_name=brand_name,
             brand=brand,
@@ -310,7 +310,7 @@ def get_customer_stats_by_oe():
     获取指定OE号在日期范围内各客户的出现次数（按次数降序）
 
     Query Parameters:
-        parts_num: OE号（必填）
+        resolve_parts_num: OE号（必填）
         begin_date: 开始日期 (yyyy-MM-dd)
         end_date: 结束日期 (yyyy-MM-dd)
         page: 页码（默认1）
@@ -320,7 +320,7 @@ def get_customer_stats_by_oe():
         JSON: {code: 0, data: {list: [{customerName, count}], total, page, page_size}, message}
     """
     try:
-        parts_num = request.args.get('parts_num', '').strip()
+        resolve_parts_num = request.args.get('resolve_parts_num', '').strip()
         inquiry_id = request.args.get('inquiry_id', '').strip()
         parts_name = request.args.get('parts_name', '').strip()
         brand_name = request.args.get('brand_name', '').strip()
@@ -356,7 +356,7 @@ def get_customer_stats_by_oe():
             page = 1
 
         result = KsInquiryStatsService.get_customer_stats_by_oe(
-            parts_num=parts_num,
+            resolve_parts_num=resolve_parts_num,
             inquiry_id=inquiry_id,
             parts_name=parts_name,
             brand_name=brand_name,
@@ -797,7 +797,7 @@ def get_column_values():
             return jsonify({'code': 400, 'message': '缺少 column 参数', 'data': {'values': []}})
 
         inquiry_id = request.args.get('inquiry_id', '').strip()
-        parts_num = request.args.get('parts_num', '').strip()
+        resolve_parts_num = request.args.get('resolve_parts_num', '').strip()
         parts_name = request.args.get('parts_name', '').strip()
         brand_name = request.args.get('brand_name', '').strip()
         brand = request.args.get('brand', '').strip()
@@ -821,7 +821,7 @@ def get_column_values():
             column=column,
             grid_type=grid_type,
             inquiry_id=inquiry_id,
-            parts_num=parts_num,
+            resolve_parts_num=resolve_parts_num,
             parts_name=parts_name,
             brand_name=brand_name,
             brand=brand,

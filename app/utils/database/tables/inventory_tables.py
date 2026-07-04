@@ -91,7 +91,7 @@ def init_inventory_detail_table():
 def init_warehouse_inventory_latest_table():
     """
     初始化仓库库存最新表
-    存储 CRM getProductList 接口爬取的产品数据，覆盖更新
+    存储 CRM getProductList 接口爬取的产品数据，按 sync_date 每天覆盖、跨天保留
     """
     conn = get_db_connection()
     try:
@@ -110,14 +110,15 @@ def init_warehouse_inventory_latest_table():
                 cost_price DECIMAL(10,2) DEFAULT 0.00 COMMENT '成本价',
                 stock_quantity INT DEFAULT 0 COMMENT '库存数量',
                 cost_price_total DECIMAL(10,2) DEFAULT 0.00 COMMENT '成本总价',
-                kw_nos VARCHAR(500) COMMENT '库位信息',
+                kw_nos VARCHAR(500) NOT NULL COMMENT '库位号（单条记录只存一个仓位）',
                 warehouse_name VARCHAR(100) COMMENT '仓库名称',
                 company VARCHAR(50) NOT NULL COMMENT '门店代码',
+                sync_date DATE NOT NULL COMMENT '同步日期',
                 sync_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '同步时间',
-                PRIMARY KEY (product_id, company),
-                INDEX idx_company (company),
+                PRIMARY KEY (product_id, company, sync_date, kw_nos),
+                INDEX idx_company_sync_date_kw (company, sync_date, kw_nos),
                 INDEX idx_brand_company_number (brand_name, company, number)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='仓库库存最新表';
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='仓库库存按天按仓位快照表';
             """
             cursor.execute(create_table_sql)
     except Exception as e:
@@ -166,6 +167,7 @@ def init_inventory_record_latest_table():
                 company VARCHAR(50) COMMENT '门店代码',
                 sync_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '同步时间',
                 UNIQUE KEY uk_stock_log_company (stock_log_id, company),
+                INDEX idx_product_kw_type_company (product_id, kw_no, record_type, company),
                 INDEX idx_product_type_company (product_id, record_type, company),
                 INDEX idx_company (company)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='库存变动记录表';

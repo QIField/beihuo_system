@@ -263,7 +263,7 @@
         };
 
         const oeSearchState = {
-            parts_num: '',
+            resolve_parts_num: '',
             parts_name: '',
             brand: '',
             seller_status: '',
@@ -282,7 +282,7 @@
         // 字段与隐藏输入框 ID 映射
         const searchStateFieldMap = {
             inquiry_id: 'searchInquiryId',
-            parts_num: 'searchPartsNum',
+            resolve_parts_num: 'searchResolvePartsNum',
             parts_name: 'searchPartsName',
             garage_name: 'searchGarageName'
         };
@@ -366,7 +366,7 @@
             <button class="filter-btn" onclick="resetAll()">重置</button>
 
             <input type="hidden" id="searchInquiryId">
-            <input type="hidden" id="searchPartsNum">
+            <input type="hidden" id="searchResolvePartsNum">
             <input type="hidden" id="searchPartsName">
             <input type="hidden" id="searchBrandName">
             <input type="hidden" id="searchSellerStatus">
@@ -436,7 +436,7 @@
 
             // 同步清空隐藏输入框
             document.getElementById('searchInquiryId').value = '';
-            document.getElementById('searchPartsNum').value = '';
+            document.getElementById('searchResolvePartsNum').value = '';
             document.getElementById('searchPartsName').value = '';
             document.getElementById('searchBrandName').value = '';
             document.getElementById('searchEngine').value = '';
@@ -498,7 +498,7 @@
                 ];
             } else if (tabId === 'oe') {
                 fields = [
-                    { label: 'OE号', inputId: 'searchPartsNum' },
+                    { label: 'OE号', inputId: 'searchResolvePartsNum' },
                     { label: '配件名称', inputId: 'searchPartsName' }
                 ];
             } else if (tabId === 'engine') {
@@ -513,7 +513,7 @@
 
             const labelToStateField = {
                 '询价单号': 'inquiry_id',
-                'OE号': 'parts_num',
+                'OE号': 'resolve_parts_num',
                 '配件名称': 'parts_name',
                 '客户名称': 'garage_name'
             };

@@ -546,6 +546,7 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                 max_failure_stage = 0  # 0=品牌, 1=partNo, 2=价格, 3=价格校验
                 matched_brand_name = None  # 推进最远的候选品牌名（用于失败展示）
                 matched_sell_price = None  # 推进最远时的尝试价格
+                last_price_check_error = None  # 价格校验失败时的响应信息
 
                 for candidate in candidates:
                     brand = candidate['brand']
@@ -555,12 +556,19 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                     part_no = candidate['part_no']
 
                     crm_brand_names = get_crm_brand_names(brand_name, brand_type_desc)
+                    is_original_factory = brand_type_desc == '原厂'
 
                     brand_matched_products = []
                     for crm_product in crm_products:
                         crm_brand_name = str(crm_product.get('brand_name', '')).strip()
-                        if crm_brand_name in crm_brand_names:
-                            brand_matched_products.append(crm_product)
+                        if crm_brand_name not in crm_brand_names:
+                            continue
+                        # 原厂国内4s件必须校验 itemOe 与 CRM 返回的 number 完全一致
+                        if is_original_factory:
+                            crm_number = str(crm_product.get('number', '') or '').strip()
+                            if crm_number != item_oe:
+                                continue
+                        brand_matched_products.append(crm_product)
 
                     if not brand_matched_products:
                         continue
@@ -628,6 +636,7 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                     )
 
                     if error:
+                        last_price_check_error = error
                         continue
 
                     all_brand_products = brand.get('productList', [])
@@ -652,6 +661,8 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                         3: FAIL_PRICE_CHECK_FAILED,
                     }
                     reason = reason_map.get(max_failure_stage, "CRM未匹配")
+                    if max_failure_stage == 3 and last_price_check_error:
+                        reason = f"{FAIL_PRICE_CHECK_FAILED}: {last_price_check_error}"
                     crm_failed_items[enquiry_item_id] = (reason, item_has_original_candidate)
                     if matched_brand_name:
                         crm_failed_brand_names[enquiry_item_id] = matched_brand_name
@@ -748,6 +759,7 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
 
             # priceCheck校验
             last_failed_sell_price = None
+            last_price_check_error = None
             passed_products = []
 
             for vp in valid_products:
@@ -761,6 +773,7 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
 
                 if error:
                     last_failed_sell_price = product_info.get('sell_price')
+                    last_price_check_error = error
                 else:
                     passed_products.append({
                         'product': product,
@@ -769,7 +782,10 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
                     })
 
             if not passed_products:
-                failed_items[enquiry_item_id] = FAIL_PRICE_CHECK_FAILED
+                fail_reason = FAIL_PRICE_CHECK_FAILED
+                if last_price_check_error:
+                    fail_reason = f"{FAIL_PRICE_CHECK_FAILED}: {last_price_check_error}"
+                failed_items[enquiry_item_id] = fail_reason
                 if factory_brand_name:
                     failed_brand_names[enquiry_item_id] = factory_brand_name
                 if last_failed_sell_price is not None:
@@ -885,6 +901,7 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
 
             # priceCheck校验
             last_failed_sell_price = None
+            last_price_check_error = None
             passed_products = []
 
             for vp in valid_products:
@@ -898,6 +915,7 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
 
                 if error:
                     last_failed_sell_price = product_info.get('sell_price')
+                    last_price_check_error = error
                 else:
                     passed_products.append({
                         'product': product,
@@ -906,7 +924,10 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
                     })
 
             if not passed_products:
-                failed_items[enquiry_item_id] = FAIL_PRICE_CHECK_FAILED
+                fail_reason = FAIL_PRICE_CHECK_FAILED
+                if last_price_check_error:
+                    fail_reason = f"{FAIL_PRICE_CHECK_FAILED}: {last_price_check_error}"
+                failed_items[enquiry_item_id] = fail_reason
                 if factory_brand_name:
                     failed_brand_names[enquiry_item_id] = factory_brand_name
                 if last_failed_sell_price is not None:
