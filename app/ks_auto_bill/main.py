@@ -31,6 +31,7 @@ import os
 import signal
 from datetime import datetime
 import threading
+import logging
 import queue
 
 # 添加项目根目录到Python路径
@@ -50,7 +51,7 @@ def signal_handler(signum, frame):
     """
     global _should_exit
     signal_name = signal.Signals(signum).name
-    print(f"\n[{datetime.now()}] [开思自动开单] 收到信号 {signal_name}({signum})，准备优雅退出...")
+    logger.info(f"\n[{datetime.now()}] [开思自动开单] 收到信号 {signal_name}({signum})，准备优雅退出...")
     _should_exit = True
     _exit_event.set()  # 唤醒正在等待的线程
 
@@ -64,15 +65,22 @@ from app.ks_auto_bill.ks_orders import get_orders, extract_and_save_order_info, 
 from app.ks_auto_bill.crm_auto_bill import send_orders_to_crm
 from app.utils.database_connection import get_db_connection
 from app.utils.database.table_manager import init_ks_auto_bill_table
+from app.utils.logger_config import init_loggers
+
+# 初始化日志配置
+init_loggers()
+
+# 开思自动对单 logger
+logger = logging.getLogger('ks_auto_bill')
 
 
 def init_database_table():
     """初始化数据库表，调用统一的表管理工具"""
     try:
         init_ks_auto_bill_table()
-        print("[OK] 成功初始化 crmapp_ks_auto_bill 表")
+        logger.info("[OK] 成功初始化 crmapp_ks_auto_bill 表")
     except Exception as e:
-        print(f"[ERROR] 初始化数据库表时出错: {str(e)}")
+        logger.error(f"[ERROR] 初始化数据库表时出错: {str(e)}")
 
 
 def check_login_status(session):
@@ -119,9 +127,9 @@ def process_company_orders(company, session, order_queue):
     返回:
         bool: 是否成功处理
     """
-    print(f"\n{'='*60}")
-    print(f"[{company}] 开始处理订单")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"[{company}] 开始处理订单")
+    logger.info(f"{'='*60}")
     
     try:
         # 打印本次爬取的时间范围（只打印一次）
@@ -129,20 +137,20 @@ def process_company_orders(company, session, order_queue):
         
         # 获取订单信息和待处理订单ID列表
         all_order_info_list, pending_confirmation_orders = extract_and_save_order_info(session, company=company)
-        print(f"[{company}] 成功获取并保存 {len(all_order_info_list)} 条订单信息到数据库")
-        print(f"[{company}] 找到 {len(pending_confirmation_orders)} 条待处理订单（等待商家确认）")
+        logger.info(f"[{company}] 成功获取并保存 {len(all_order_info_list)} 条订单信息到数据库")
+        logger.info(f"[{company}] 找到 {len(pending_confirmation_orders)} 条待处理订单（等待商家确认）")
         
         # 将待处理订单加入队列
         if pending_confirmation_orders:
             order_queue.put((company, pending_confirmation_orders))
-            print(f"[{company}] 添加 {len(pending_confirmation_orders)} 条订单到处理队列")
+            logger.info(f"[{company}] 添加 {len(pending_confirmation_orders)} 条订单到处理队列")
         else:
-            print(f"[{company}] 没有待处理的订单，跳过")
+            logger.info(f"[{company}] 没有待处理的订单，跳过")
         
         return True
         
     except Exception as e:
-        print(f"[{company}] 处理订单时出错: {str(e)}")
+        logger.info(f"[{company}] 处理订单时出错: {str(e)}")
         return False
 
 
@@ -158,17 +166,17 @@ def process_order_batch(company, pending_confirmation_orders):
         处理结果
     """
     if not pending_confirmation_orders:
-        print(f"[{company}] 没有待处理的订单")
+        logger.info(f"[{company}] 没有待处理的订单")
         return
         
-    print(f"[{company}] 获取到 {len(pending_confirmation_orders)} 条待处理订单")
+    logger.info(f"[{company}] 获取到 {len(pending_confirmation_orders)} 条待处理订单")
     
     # 发送订单到CRM
     results = send_orders_to_crm(pending_confirmation_orders, company=company)
     
     # 统计结果
     success_count = sum(1 for r in results if r.get("result") is not None)
-    print(f"[{company}] 开单完成: 成功 {success_count}/{len(results)}")
+    logger.info(f"[{company}] 开单完成: 成功 {success_count}/{len(results)}")
 
 
 def order_processing_worker(order_queue):
@@ -179,7 +187,7 @@ def order_processing_worker(order_queue):
     修改：添加退出标志检查，支持优雅退出
     """
     global _should_exit
-    print("[开单模块] 订单处理工作线程已启动")
+    logger.info("[开单模块] 订单处理工作线程已启动")
     
     while not _should_exit:
         try:
@@ -188,12 +196,12 @@ def order_processing_worker(order_queue):
             
             # 如果获取到None，则表示需要退出线程
             if batch is None:
-                print("[开单模块] 收到退出信号，处理线程即将退出")
+                logger.info("[开单模块] 收到退出信号，处理线程即将退出")
                 order_queue.task_done()
                 break
             
             company, orders = batch
-            print(f"[开单模块] 开始处理 [{company}] 的订单，包含 {len(orders)} 个订单...")
+            logger.info(f"[开单模块] 开始处理 [{company}] 的订单，包含 {len(orders)} 个订单...")
             process_order_batch(company, orders)
             
             # 标记任务已完成
@@ -206,10 +214,10 @@ def order_processing_worker(order_queue):
             # 队列为空，继续循环（检查退出标志）
             continue
         except Exception as e:
-            print(f"[开单模块] 处理订单时出错: {e}")
+            logger.info(f"[开单模块] 处理订单时出错: {e}")
             continue
     
-    print("[开单模块] 订单处理工作线程已退出")
+    logger.info("[开单模块] 订单处理工作线程已退出")
 
 
 def process_all_companies(order_queue):
@@ -226,10 +234,10 @@ def process_all_companies(order_queue):
     
     for company in COMPANIES:
         if _should_exit:
-            print(f"[主线程] 收到退出信号，停止处理后续公司")
+            logger.info(f"[主线程] 收到退出信号，停止处理后续公司")
             break
         
-        print(f"\n[主线程] 开始处理 [{company}] ...")
+        logger.info(f"\n[主线程] 开始处理 [{company}] ...")
         
         # 登录
         session = None
@@ -239,17 +247,17 @@ def process_all_companies(order_queue):
                 if session:
                     break
             except Exception as e:
-                print(f"[{company}] 登录尝试 {attempt+1} 失败: {e}")
+                logger.info(f"[{company}] 登录尝试 {attempt+1} 失败: {e}")
                 time.sleep(2)
         
         if session is None:
-            print(f"[{company}] 登录失败，跳过该公司")
+            logger.error(f"[{company}] 登录失败，跳过该公司")
             results[company] = {'success': False, 'error': '登录失败'}
             continue
         
         # 检查登录状态
         if not check_login_status(session):
-            print(f"[{company}] 登录状态无效，跳过该公司")
+            logger.info(f"[{company}] 登录状态无效，跳过该公司")
             results[company] = {'success': False, 'error': '登录状态无效'}
             continue
         
@@ -283,16 +291,16 @@ def main(stop_event=None, heartbeat_func=None):
     # 使用外部传入的 stop_event，如果没有则使用内部的全局变量
     use_external_stop = stop_event is not None
 
-    print("=" * 60)
-    print("开思订单自动开单系统（多公司循环模式）")
-    print("=" * 60)
-    print(f"[主线程] 使用外部停止事件: {use_external_stop}")
-    print(f"[主线程] 处理公司列表: {', '.join(COMPANIES)}")
+    logger.info("=" * 60)
+    logger.info("开思订单自动开单系统（多公司循环模式）")
+    logger.info("=" * 60)
+    logger.info(f"[主线程] 使用外部停止事件: {use_external_stop}")
+    logger.info(f"[主线程] 处理公司列表: {', '.join(COMPANIES)}")
 
     # 在程序启动时检查并创建数据库表
-    print("\n【初始化】正在检查数据库表...")
+    logger.info("\n【初始化】正在检查数据库表...")
     init_database_table()
-    print("【初始化】数据库表检查完成")
+    logger.info("【初始化】数据库表检查完成")
 
     # 创建订单队列
     order_queue = queue.Queue()
@@ -301,7 +309,7 @@ def main(stop_event=None, heartbeat_func=None):
     processing_thread = threading.Thread(target=order_processing_worker, args=(order_queue,))
     processing_thread.start()
 
-    print(f"\n[爬取模块] 系统启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"\n[爬取模块] 系统启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     def should_stop():
         """检查是否应该停止"""
@@ -330,7 +338,7 @@ def main(stop_event=None, heartbeat_func=None):
 
             # 检查是否在运行时间内
             if not is_running_time():
-                print(f"\n[爬取模块] 当前时间 {current_time.hour} 点，不在运行时间段内，等待至运行时间...")
+                logger.info(f"\n[爬取模块] 当前时间 {current_time.hour} 点，不在运行时间段内，等待至运行时间...")
 
                 # 等待直到进入运行时间，但每秒检查停止标志
                 while not is_running_time() and not should_stop():
@@ -348,53 +356,53 @@ def main(stop_event=None, heartbeat_func=None):
                 if should_stop():
                     break
 
-                print(f"[爬取模块] 进入运行时间段，继续执行...")
+                logger.info(f"[爬取模块] 进入运行时间段，继续执行...")
             else:
                 # 显示当前时间
-                print(f"\n{'=' * 60}")
-                print(f"[爬取模块] {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                print(f"{'=' * 60}")
+                logger.info(f"\n{'=' * 60}")
+                logger.info(f"[爬取模块] {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info(f"{'=' * 60}")
 
                 # 处理所有公司的订单
                 results = process_all_companies(order_queue)
                 
                 # 打印汇总结果
-                print(f"\n{'='*60}")
-                print("[汇总] 各公司处理结果:")
+                logger.info(f"\n{'='*60}")
+                logger.info("[汇总] 各公司处理结果:")
                 for company, result in results.items():
                     status = "✓ 成功" if result.get('success') else f"✗ 失败 ({result.get('error', '未知错误')})"
-                    print(f"  [{company}] {status}")
-                print(f"{'='*60}")
+                    logger.info(f"  [{company}] {status}")
+                logger.info(f"{'='*60}")
 
             # 等待1分钟后继续爬取，但每秒检查停止标志
-            print(f"\n[爬取模块] 1分钟后进行下一次爬取...")
+            logger.info(f"\n[爬取模块] 1分钟后进行下一次爬取...")
             if not wait_with_stop_check(60):
                 break
 
     except KeyboardInterrupt:
-        print("\n[主线程] 收到键盘中断信号")
+        logger.info("\n[主线程] 收到键盘中断信号")
     finally:
         # 优雅退出流程
-        print("\n" + "=" * 60)
-        print("[主线程] 开始优雅退出...")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("[主线程] 开始优雅退出...")
+        logger.info("=" * 60)
 
         # 设置退出标志
         _should_exit = True
         _exit_event.set()
 
         # 发送 None 到队列，通知处理线程退出
-        print("[主线程] 通知处理线程退出...")
+        logger.info("[主线程] 通知处理线程退出...")
         order_queue.put(None)
 
         # 等待处理线程完成
-        print("[主线程] 等待处理线程完成...")
+        logger.info("[主线程] 等待处理线程完成...")
         processing_thread.join(timeout=30)
 
         if processing_thread.is_alive():
-            print("[主线程] 处理线程未在30秒内退出，强制结束")
+            logger.info("[主线程] 处理线程未在30秒内退出，强制结束")
         else:
-            print("[主线程] 处理线程已正常退出")
+            logger.info("[主线程] 处理线程已正常退出")
 
         # 清空队列
         while not order_queue.empty():
@@ -403,9 +411,9 @@ def main(stop_event=None, heartbeat_func=None):
             except queue.Empty:
                 break
 
-        print("[主线程] 资源清理完成")
-        print(f"[{datetime.now()}] [开思自动开单] 已优雅退出")
-        print("=" * 60)
+        logger.info("[主线程] 资源清理完成")
+        logger.info(f"[{datetime.now()}] [开思自动开单] 已优雅退出")
+        logger.info("=" * 60)
 
 
 if __name__ == "__main__":

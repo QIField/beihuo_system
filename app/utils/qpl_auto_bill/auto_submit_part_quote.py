@@ -8,6 +8,7 @@ import os
 import json
 import io
 import math
+import logging
 from contextlib import redirect_stdout
 
 # 关闭 urllib3 HTTPS 证书验证警告（奔驰接口使用 verify=False）
@@ -40,19 +41,23 @@ from qpl_config import (
 )
 from brand_match_config import get_crm_brand_names
 
+import logging as _logging
+
+_qpl_logger = _logging.getLogger('qpl_auto_bill')
+
 try:
     from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
     CRM_SPIDER_AVAILABLE = True
 except ImportError:
     CRM_SPIDER_AVAILABLE = False
-    print("[汽配龙自动报价] CRM 爬虫模块未找到")
+    _qpl_logger.warning("[汽配龙自动报价] CRM 爬虫模块未找到")
 
 try:
     from app.services.car_parts_library_service.bmw_crawler import external_data_crawler
     BMW_SERVICE_AVAILABLE = True
 except ImportError:
     BMW_SERVICE_AVAILABLE = False
-    print("[汽配龙自动报价] 宝马服务模块未找到")
+    _qpl_logger.warning("[汽配龙自动报价] 宝马服务模块未找到")
 import requests
 
 try:
@@ -60,7 +65,7 @@ try:
     MERCEDES_SERVICE_AVAILABLE = True
 except ImportError:
     MERCEDES_SERVICE_AVAILABLE = False
-    print("[汽配龙自动报价] 奔驰服务模块未找到")
+    _qpl_logger.warning("[汽配龙自动报价] 奔驰服务模块未找到")
 
 
 def submit_quote(quote_request, company='fsbbr'):
@@ -1412,92 +1417,100 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
     Returns:
         list: 报价结果列表
     """
-    if begin_date is None:
-        begin_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
-    if end_date is None:
-        end_date = datetime.now().strftime('%Y-%m-%d')
+    logger = logging.getLogger('qpl_auto_bill')
+    try:
+        if begin_date is None:
+            begin_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
+        if end_date is None:
+            end_date = datetime.now().strftime('%Y-%m-%d')
 
-    result = query_enquiry_list(begin_date, end_date, company=company)
-    orders = result.get('data') or []
+        result = query_enquiry_list(begin_date, end_date, company=company)
+        orders = result.get('data') or []
 
-    unique_orders = {order.get('supplierEnquiryNo'): order for order in orders if order.get('supplierEnquiryNo')}
-    total_orders = len(unique_orders)
+        unique_orders = {order.get('supplierEnquiryNo'): order for order in orders if order.get('supplierEnquiryNo')}
+        total_orders = len(unique_orders)
 
-    # 过滤已处理订单
-    processed_nos = _filter_processed_orders(list(unique_orders.keys()), company, begin_date, end_date)
-    if processed_nos:
-        for order_no in processed_nos:
-            unique_orders.pop(order_no, None)
+        # 过滤已处理订单
+        processed_nos = _filter_processed_orders(list(unique_orders.keys()), company, begin_date, end_date)
+        if processed_nos:
+            for order_no in processed_nos:
+                unique_orders.pop(order_no, None)
 
-    # 分类并统计
-    category_counts = {'A': 0, 'B': 0, 'C': 0, 'SKIP': 0}
-    categorized = []
-    for enquiry_no, order in unique_orders.items():
-        category = classify_order(order)
-        category_counts[category] += 1
-        if category == 'SKIP':
-            continue
-        categorized.append((category, enquiry_no))
-
-    # 按类别排序：A 在前，B/C 在后
-    category_order = {'A': 0, 'B': 1, 'C': 1}
-    categorized.sort(key=lambda x: category_order.get(x[0], 2))
-
-    qpl_log(
-        f"[{company}] 任务开始 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
-        f"跳过{category_counts['SKIP']}个 待处理{len(categorized)}个 "
-        f"类别=A:{category_counts['A']} B:{category_counts['B']} C:{category_counts['C']}"
-    )
-
-    results = []
-
-    # 先处理 A/B 类订单
-    ab_orders = [(c, no) for c, no in categorized if c in ('A', 'B')]
-    for idx, (category, enquiry_no) in enumerate(ab_orders, start=1):
-        _process_single_order(enquiry_no, category, company, idx, len(ab_orders), results)
-
-    # 收集 C 类订单原厂 OE 并补齐本地库
-    c_order_nos = {no for c, no in categorized if c == 'C'}
-    qpl_log(f"[{company}] C 类订单白名单: {c_order_nos}")
-    if c_order_nos:
-        c_orders = [unique_orders[no] for no in c_order_nos]
-        bmw_oe_set = _collect_bmw_original_oes(c_orders, company)
-        qpl_log(f"[{company}] 收集到 BMW 原厂 OE: {bmw_oe_set}")
-        if bmw_oe_set:
-            from app.utils.qpl_auto_bill.bmw_quote_local_db import check_bmw_oes_in_local_db
-            _, status = check_bmw_oes_in_local_db(list(bmw_oe_set))
-            qpl_log(f"[{company}] 本地库缺失 BMW OE: {status}")
-            missing_oes = status.get('missing', [])
-            if missing_oes:
-                qpl_log(f"[{company}] 发现 {len(missing_oes)} 个 BMW OE 需要补齐本地库")
-                _ensure_bmw_oes_in_local_db(missing_oes, company)
-
-    # 重新拉取订单，只处理白名单内的 C 类订单
-    if c_order_nos:
-        fresh_result = query_enquiry_list(begin_date, end_date, company=company)
-        fresh_orders = fresh_result.get('data') or []
-        fresh_unique_orders = {o.get('supplierEnquiryNo'): o for o in fresh_orders if o.get('supplierEnquiryNo')}
-
-        c_count = 0
-        for idx, (category, enquiry_no) in enumerate(categorized, start=1):
-            if category != 'C':
+        # 分类并统计
+        category_counts = {'A': 0, 'B': 0, 'C': 0, 'SKIP': 0}
+        categorized = []
+        for enquiry_no, order in unique_orders.items():
+            category = classify_order(order)
+            category_counts[category] += 1
+            if category == 'SKIP':
                 continue
-            if enquiry_no not in fresh_unique_orders:
-                continue
-            c_count += 1
-            _process_single_order(enquiry_no, 'C', company, c_count, len(c_order_nos), results)
+            categorized.append((category, enquiry_no))
 
-    # 任务完成统计
-    processed_category_counts = {'A': 0, 'B': 0, 'C': 0}
-    for result in results:
-        processed_category_counts[result['order_category']] += 1
-    qpl_log(
-        f"[{company}] 任务完成 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
-        f"跳过{category_counts['SKIP']}个 待处理{len(results)}个 "
-        f"类别=A:{processed_category_counts['A']} B:{processed_category_counts['B']} C:{processed_category_counts['C']}"
-    )
+        # 按类别排序：A 在前，B/C 在后
+        category_order = {'A': 0, 'B': 1, 'C': 1}
+        categorized.sort(key=lambda x: category_order.get(x[0], 2))
 
-    return results
+        qpl_log(
+            f"[{company}] 任务开始 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
+            f"跳过{category_counts['SKIP']}个 待处理{len(categorized)}个 "
+            f"类别=A:{category_counts['A']} B:{category_counts['B']} C:{category_counts['C']}"
+        )
+
+        results = []
+
+        # 先处理 A/B 类订单
+        ab_orders = [(c, no) for c, no in categorized if c in ('A', 'B')]
+        for idx, (category, enquiry_no) in enumerate(ab_orders, start=1):
+            _process_single_order(enquiry_no, category, company, idx, len(ab_orders), results)
+
+        # 收集 C 类订单原厂 OE 并补齐本地库
+        c_order_nos = {no for c, no in categorized if c == 'C'}
+        qpl_log(f"[{company}] C 类订单白名单: {c_order_nos}")
+        if c_order_nos:
+            c_orders = [unique_orders[no] for no in c_order_nos]
+            bmw_oe_set = _collect_bmw_original_oes(c_orders, company)
+            qpl_log(f"[{company}] 收集到 BMW 原厂 OE: {bmw_oe_set}")
+            if bmw_oe_set:
+                from app.utils.qpl_auto_bill.bmw_quote_local_db import check_bmw_oes_in_local_db
+                _, status = check_bmw_oes_in_local_db(list(bmw_oe_set))
+                qpl_log(f"[{company}] 本地库缺失 BMW OE: {status}")
+                missing_oes = status.get('missing', [])
+                if missing_oes:
+                    qpl_log(f"[{company}] 发现 {len(missing_oes)} 个 BMW OE 需要补齐本地库")
+                    _ensure_bmw_oes_in_local_db(missing_oes, company)
+
+        # 重新拉取订单，只处理白名单内的 C 类订单
+        if c_order_nos:
+            fresh_result = query_enquiry_list(begin_date, end_date, company=company)
+            fresh_orders = fresh_result.get('data') or []
+            fresh_unique_orders = {o.get('supplierEnquiryNo'): o for o in fresh_orders if o.get('supplierEnquiryNo')}
+
+            c_count = 0
+            for idx, (category, enquiry_no) in enumerate(categorized, start=1):
+                if category != 'C':
+                    continue
+                if enquiry_no not in fresh_unique_orders:
+                    continue
+                c_count += 1
+                _process_single_order(enquiry_no, 'C', company, c_count, len(c_order_nos), results)
+
+        # 任务完成统计
+        processed_category_counts = {'A': 0, 'B': 0, 'C': 0}
+        for result in results:
+            processed_category_counts[result['order_category']] += 1
+        qpl_log(
+            f"[{company}] 任务完成 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
+            f"跳过{category_counts['SKIP']}个 待处理{len(results)}个 "
+            f"类别=A:{processed_category_counts['A']} B:{processed_category_counts['B']} C:{processed_category_counts['C']}"
+        )
+
+        return results
+
+
+
+    except Exception:
+        logger.exception(f'[失败] 汽配龙自动报价 [{company}]')
+        raise
 
 
 def main(company='fsbbr'):

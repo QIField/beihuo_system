@@ -47,4 +47,4 @@ def register_qpl_auto_quote_tasks(task_manager):
         next_run_time=datetime.now(),
         replace_existing=True
     )
-    print("[汽配龙自动报价] 定时任务已注册（每 2 分钟，08:00-20:00 运行）")
+    logger.info("[汽配龙自动报价] 定时任务已注册（每 2 分钟，08:00-20:00 运行）")
