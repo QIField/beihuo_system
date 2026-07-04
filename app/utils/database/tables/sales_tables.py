@@ -72,10 +72,10 @@ def init_sales_history_detail_table():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销量明细表';
                 """
                 cursor.execute(create_table_sql)
-                print(f"  ✓ 销量明细表: 创建成功")
+                print(f"  [成功] 销量明细表: 创建成功")
             else:
                 # 表已存在，检查并修改字段长度
-                print(f"  ℹ 销量明细表: 已存在，检查字段长度...")
+                print(f"  [信息] 销量明细表: 已存在，检查字段长度...")
                 
                 # 检查 number 字段长度
                 number_length = check_column_length(cursor, table_name, 'number')
@@ -84,9 +84,9 @@ def init_sales_history_detail_table():
                         ALTER TABLE {table_name} 
                         MODIFY COLUMN number VARCHAR(200) DEFAULT '' COMMENT 'OE号'
                     """)
-                    print(f"    ✓ number 字段: {number_length} → 200")
+                    print(f"    [成功] number 字段: {number_length} → 200")
                 else:
-                    print(f"    ✓ number 字段: 已是 {number_length or '200'}")
+                    print(f"    [成功] number 字段: 已是 {number_length or '200'}")
                 
                 # 检查 frey_no 字段长度
                 frey_no_length = check_column_length(cursor, table_name, 'frey_no')
@@ -95,14 +95,14 @@ def init_sales_history_detail_table():
                         ALTER TABLE {table_name} 
                         MODIFY COLUMN frey_no VARCHAR(200) DEFAULT '' COMMENT 'Frey编号'
                     """)
-                    print(f"    ✓ frey_no 字段: {frey_no_length} → 200")
+                    print(f"    [成功] frey_no 字段: {frey_no_length} → 200")
                 else:
-                    print(f"    ✓ frey_no 字段: 已是 {frey_no_length or '200'}")
+                    print(f"    [成功] frey_no 字段: 已是 {frey_no_length or '200'}")
                 
-                print(f"  ✓ 销量明细表: 字段长度检查完成")
+                print(f"  [成功] 销量明细表: 字段长度检查完成")
                 
     except Exception as e:
-        print(f"  ✗ 销量明细表: {e}")
+        print(f"  [失败] 销量明细表: {e}")
     finally:
         conn.close()
 
@@ -137,11 +137,11 @@ def init_quote_count_ks_table():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开思询价次数统计表';
                 """
                 cursor.execute(create_table_sql)
-                print(f"  ✓ 询价次数表: 创建成功")
+                print(f"  [成功] 询价次数表: 创建成功")
             else:
-                print(f"  ℹ 询价次数表: 已存在，跳过")
+                print(f"  [信息] 询价次数表: 已存在，跳过")
                 
     except Exception as e:
-        print(f"  ✗ 询价次数表: {e}")
+        print(f"  [失败] 询价次数表: {e}")
     finally:
         conn.close()

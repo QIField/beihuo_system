@@ -94,7 +94,7 @@ def crawl_data_crm_wms_test():
         sheet_name='合并订单数据',
         engine='openpyxl',
     )
-    print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_result)}")
+    print(f"[成功] 导出成功！\n文件: {filename}\n记录数: {len(df_result)}")
 
 
 if __name__ == "__main__":

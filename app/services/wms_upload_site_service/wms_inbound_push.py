@@ -189,10 +189,10 @@ def inventory_sync_batch(items):
             message = result.get('message', '')
             if '更新库存成功' in message:
                 success_count += 1
-                print(f"✅ 第 {idx} 条数据更新成功")
+                print(f"[成功] 第 {idx} 条数据更新成功")
             else:
                 failed_count += 1
-                print(f"❌ 第 {idx} 条数据更新失败: {message}")
+                print(f"[失败] 第 {idx} 条数据更新失败: {message}")
         except Exception as e:
             failed_count += 1
             error_msg = str(e)
@@ -200,7 +200,7 @@ def inventory_sync_batch(items):
                 'product_id': product_id,
                 'error': error_msg
             })
-            print(f"❌ 第 {idx} 条数据处理异常: {error_msg}")
+            print(f"[失败] 第 {idx} 条数据处理异常: {error_msg}")
     
     print(f"\n=== 批量同步完成 ===")
     print(f"成功: {success_count}, 失败: {failed_count}")

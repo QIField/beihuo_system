@@ -32,7 +32,7 @@ def execute_daily_calculation():
 
     # 1. 初始化数据表
     SafetyStockDBService.init_table()
-    print("  ✓ 数据表初始化完成")
+    print("  [成功] 数据表初始化完成")
 
     total_saved = 0
 
@@ -43,28 +43,28 @@ def execute_daily_calculation():
         # 2.1 读取销量数据（近1年）
         print(f"  → 读取销量数据...")
         sales_data = SafetyStockDBService.get_sales_data(company=company)
-        print(f"  ✓ 读取到 {len(sales_data)} 个产品的销量数据")
+        print(f"  [成功] 读取到 {len(sales_data)} 个产品的销量数据")
 
         # 2.2 读取库存数据
         print(f"  → 读取库存数据...")
         inventory_data = SafetyStockDBService.get_inventory_data(company=company)
-        print(f"  ✓ 读取到 {len(inventory_data)} 个产品的库存数据")
+        print(f"  [成功] 读取到 {len(inventory_data)} 个产品的库存数据")
 
         # 2.3 读取在途数据
         print(f"  → 读取在途数据...")
         in_transit_data = SafetyStockDBService.get_in_transit_data(company=company)
-        print(f"  ✓ 读取到 {len(in_transit_data)} 个产品的在途数据")
+        print(f"  [成功] 读取到 {len(in_transit_data)} 个产品的在途数据")
 
         # 2.4 读取产品主数据信息（oe、brand、product_name、替换号、产品等级、中文车型）
         print(f"  → 读取产品主数据信息...")
         master_data = SafetyStockDBService.get_product_master_data(company=company)
-        print(f"  ✓ 读取到 {len(master_data)} 个产品的主数据信息")
+        print(f"  [成功] 读取到 {len(master_data)} 个产品的主数据信息")
 
         # 2.5 计算安全库存
         print(f"  → 执行安全库存计算...")
         calculator = SafetyStockCalculator()
         calc_results = calculator.calculate_all(sales_data)
-        print(f"  ✓ 完成 {len(calc_results)} 个产品的安全库存计算")
+        print(f"  [成功] 完成 {len(calc_results)} 个产品的安全库存计算")
 
         # 2.6 合并库存数据，判断状态
         print(f"  → 合并库存数据并判断状态...")
@@ -114,14 +114,14 @@ def execute_daily_calculation():
         # 2.6 保存计算结果
         print(f"  → 保存计算结果...")
         saved_count = SafetyStockDBService.save_calculation_results(final_results, company=company)
-        print(f"  ✓ 保存 {saved_count} 条记录")
+        print(f"  [成功] 保存 {saved_count} 条记录")
 
         total_saved += saved_count
 
     # 3. 清理30天前的历史数据
     print("\n  → 清理历史数据...")
     deleted_count = SafetyStockDBService.delete_old_data(keep_days=30)
-    print(f"  ✓ 清理 {deleted_count} 条历史记录")
+    print(f"  [成功] 清理 {deleted_count} 条历史记录")
 
     print(f"\n[{datetime.now()}] 安全库存计算完成！共处理 {total_saved} 条产品记录")
 
@@ -142,33 +142,33 @@ def execute_calculation_for_company(company: str = 'fsbbr'):
 
     # 1. 初始化数据表
     SafetyStockDBService.init_table()
-    print("  ✓ 数据表初始化完成")
+    print("  [成功] 数据表初始化完成")
 
     # 2. 读取销量数据（近1年）
     print("  → 读取销量数据...")
     sales_data = SafetyStockDBService.get_sales_data(company=company)
-    print(f"  ✓ 读取到 {len(sales_data)} 个产品的销量数据")
+    print(f"  [成功] 读取到 {len(sales_data)} 个产品的销量数据")
 
     # 3. 读取库存数据
     print("  → 读取库存数据...")
     inventory_data = SafetyStockDBService.get_inventory_data(company=company)
-    print(f"  ✓ 读取到 {len(inventory_data)} 个产品的库存数据")
+    print(f"  [成功] 读取到 {len(inventory_data)} 个产品的库存数据")
 
     # 4. 读取在途数据
     print("  → 读取在途数据...")
     in_transit_data = SafetyStockDBService.get_in_transit_data(company=company)
-    print(f"  ✓ 读取到 {len(in_transit_data)} 个产品的在途数据")
+    print(f"  [成功] 读取到 {len(in_transit_data)} 个产品的在途数据")
 
     # 5. 读取产品主数据信息（oe、brand、product_name、替换号、产品等级、中文车型）
     print(f"  → 读取产品主数据信息...")
     master_data = SafetyStockDBService.get_product_master_data(company=company)
-    print(f"  ✓ 读取到 {len(master_data)} 个产品的主数据信息")
+    print(f"  [成功] 读取到 {len(master_data)} 个产品的主数据信息")
 
     # 6. 计算安全库存
     print("  → 执行安全库存计算...")
     calculator = SafetyStockCalculator()
     calc_results = calculator.calculate_all(sales_data)
-    print(f"  ✓ 完成 {len(calc_results)} 个产品的安全库存计算")
+    print(f"  [成功] 完成 {len(calc_results)} 个产品的安全库存计算")
 
     # 7. 合并库存数据，判断状态
     print("  → 合并库存数据并判断状态...")
@@ -218,12 +218,12 @@ def execute_calculation_for_company(company: str = 'fsbbr'):
     # 7. 保存计算结果
     print("  → 保存计算结果...")
     saved_count = SafetyStockDBService.save_calculation_results(final_results, company=company)
-    print(f"  ✓ 保存 {saved_count} 条记录")
+    print(f"  [成功] 保存 {saved_count} 条记录")
 
     # 8. 清理30天前的历史数据
     print("  → 清理历史数据...")
     deleted_count = SafetyStockDBService.delete_old_data(keep_days=30)
-    print(f"  ✓ 清理 {deleted_count} 条历史记录")
+    print(f"  [成功] 清理 {deleted_count} 条历史记录")
 
     print(f"[{datetime.now()}] 安全库存计算完成！")
 

@@ -17,7 +17,7 @@ try:
     CURL_CFFI_AVAILABLE = True
 except ImportError:
     CURL_CFFI_AVAILABLE = False
-    print("⚠️  未检测到 curl_cffi 库，请执行: pip install curl_cffi")
+    print("[警告]  未检测到 curl_cffi 库，请执行: pip install curl_cffi")
 
 
 class BMWBrillianceSpider:
@@ -104,7 +104,7 @@ class BMWBrillianceSpider:
                     allow_redirects=True
                 )
             else:
-                print(f"⚠️  不支持的请求方法: {method}")
+                print(f"[警告]  不支持的请求方法: {method}")
                 return None
 
             if resp.status_code != 200:

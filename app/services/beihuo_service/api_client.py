@@ -33,7 +33,7 @@ def update_company(company: str) -> Dict[str, Any]:
             timeout=UPDATE_TIMEOUT
         )
         
-        print(f"📊 [{company}] 更新API响应状态码: {response.status_code}")
+        print(f"[统计] [{company}] 更新API响应状态码: {response.status_code}")
         
         if response.status_code != 200:
             return {
@@ -132,7 +132,7 @@ def fetch_company(company: str) -> Dict[str, Any]:
             timeout=FETCH_TIMEOUT
         )
         
-        print(f"📊 [{company}] 拉取API响应状态码: {response.status_code}")
+        print(f"[统计] [{company}] 拉取API响应状态码: {response.status_code}")
         
         if response.status_code != 200:
             return {
@@ -146,7 +146,7 @@ def fetch_company(company: str) -> Dict[str, Any]:
         # 尝试解析JSON
         try:
             result = response.json()
-            print(f"📊 [{company}] 拉取API响应内容类型: {type(result)}")
+            print(f"[统计] [{company}] 拉取API响应内容类型: {type(result)}")
             
             if not isinstance(result, dict):
                 return {

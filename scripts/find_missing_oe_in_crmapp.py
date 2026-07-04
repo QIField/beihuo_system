@@ -99,7 +99,7 @@ def find_missing_oe():
             filepath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), filename)
             
             df.to_excel(filepath, index=False, engine='openpyxl')
-            print(f"\n✓ 数据已导出到: {filepath}")
+            print(f"\n[成功] 数据已导出到: {filepath}")
 
             # 打印部分示例
             print("\n【前10条缺失数据示例】")

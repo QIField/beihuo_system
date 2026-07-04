@@ -35,7 +35,7 @@ def register_all_tasks(task_manager):
     # 5. 注册安全库存定时任务（每小时，仅fsbbr）
     register_safety_stock_tasks(task_manager)
     
-    # 6. 注册汽配龙自动报价定时任务（每5分钟）
+    # 6. 注册汽配龙自动报价定时任务（每2分钟，08:00-20:00）
     register_qpl_auto_quote_tasks(task_manager)
     
     # 7. 注册CRM仓库库存同步定时任务（每天8:00和20:00）

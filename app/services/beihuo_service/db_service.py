@@ -28,7 +28,7 @@ def clear_company_data(company: str) -> bool:
             return True
     except Exception as e:
         conn.rollback()
-        print(f"❌ 清空门店 {company} 数据失败: {e}")
+        print(f"[失败] 清空门店 {company} 数据失败: {e}")
         return False
     finally:
         conn.close()
@@ -81,17 +81,17 @@ def batch_insert_records(company: str, records: List[Dict[str, Any]]) -> int:
                 # 每 COMMIT_INTERVAL 批次提交一次
                 if batch_count % COMMIT_INTERVAL == 0:
                     conn.commit()
-                    print(f"📊 门店 {company} 插入进度: {processed}/{total} ({processed * 100 // total}%)")
+                    print(f"[统计] 门店 {company} 插入进度: {processed}/{total} ({processed * 100 // total}%)")
         
         # 最后提交剩余数据
         conn.commit()
-        print(f"✅ 门店 {company} 数据插入完成，共 {processed} 条记录")
+        print(f"[成功] 门店 {company} 数据插入完成，共 {processed} 条记录")
         
         return processed
         
     except Exception as e:
         conn.rollback()
-        print(f"❌ 插入门店 {company} 数据失败: {e}")
+        print(f"[失败] 插入门店 {company} 数据失败: {e}")
         raise  # 抛出异常让上层处理
     finally:
         cursor.close()
@@ -110,10 +110,10 @@ def save_company_data(company: str, records: List[Dict[str, Any]]) -> int:
         成功插入的记录数，失败返回 -1
     """
     if not records:
-        print(f"⚠️ 门店 {company} 没有数据需要保存")
+        print(f"[警告] 门店 {company} 没有数据需要保存")
         return 0
     
-    print(f"🗑️ 已清空门店 {company} 的现有数据，准备插入 {len(records)} 条记录")
+    print(f"[垃圾桶] 已清空门店 {company} 的现有数据，准备插入 {len(records)} 条记录")
     
     # 1. 清空数据
     if not clear_company_data(company):
@@ -123,7 +123,7 @@ def save_company_data(company: str, records: List[Dict[str, Any]]) -> int:
     try:
         return batch_insert_records(company, records)
     except Exception as e:
-        print(f"❌ 保存门店 {company} 数据失败: {e}")
+        print(f"[失败] 保存门店 {company} 数据失败: {e}")
         return -1
 
 
@@ -154,7 +154,7 @@ def update_vehicle_fields(company: str) -> int:
         mapping_results = cursor.fetchall()
         
         if not mapping_results:
-            print(f"ℹ️ 门店 {company} 没有车型映射数据")
+            print(f"[信息] 门店 {company} 没有车型映射数据")
             return 0
         
         # 2. 构建映射字典
@@ -176,7 +176,7 @@ def update_vehicle_fields(company: str) -> int:
         beihuo_records = cursor.fetchall()
         
         if not beihuo_records:
-            print(f"ℹ️ 门店 {company} 没有需要更新的备货数据")
+            print(f"[信息] 门店 {company} 没有需要更新的备货数据")
             return 0
         
         # 4. 批量更新匹配的记录（使用 executemany 提升性能）
@@ -203,16 +203,16 @@ def update_vehicle_fields(company: str) -> int:
         updated_count = len(update_data)
         
         if updated_count > 0:
-            print(f"🚗 门店 {company} 车型映射完成，更新 {updated_count} 条记录")
+            print(f"[车型] 门店 {company} 车型映射完成，更新 {updated_count} 条记录")
         else:
-            print(f"ℹ️ 门店 {company} 没有匹配到车型数据")
+            print(f"[信息] 门店 {company} 没有匹配到车型数据")
         
         return updated_count
         
     except Exception as e:
         conn.rollback()
         import traceback
-        print(f"❌ 更新门店 {company} 车型信息失败: {e}")
+        print(f"[失败] 更新门店 {company} 车型信息失败: {e}")
         traceback.print_exc()
         return -1
     finally:

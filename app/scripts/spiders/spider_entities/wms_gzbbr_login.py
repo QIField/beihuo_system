@@ -281,7 +281,7 @@ class WmsGzbbrLogin:
             print("  步骤1: 获取验证码图片...")
             captcha_image = self.get_captcha_image()
             if not captcha_image:
-                print("  ✗ 无法获取验证码图片，等待后重试...")
+                print("  [失败] 无法获取验证码图片，等待后重试...")
                 time.sleep(1)
                 continue
 
@@ -289,7 +289,7 @@ class WmsGzbbrLogin:
             print("  步骤2: OCR识别验证码...")
             captcha_text = self.recognize_captcha(captcha_image)
             if not captcha_text or not self._validate_captcha_text(captcha_text):
-                print(f"  ✗ 验证码识别失败或格式不正确: '{captcha_text}'，重新获取...")
+                print(f"  [失败] 验证码识别失败或格式不正确: '{captcha_text}'，重新获取...")
                 continue
 
             # 步骤3: 提交登录请求
@@ -308,7 +308,7 @@ class WmsGzbbrLogin:
             else:
                 # 登录失败（可能是验证码错误）
                 error_msg = result.get("msg", result.get("error", "未知错误"))
-                print(f"  ✗ 登录失败: {error_msg}")
+                print(f"  [失败] 登录失败: {error_msg}")
 
                 # 如果是验证码错误，继续尝试
                 if "验证码" in error_msg or "captcha" in error_msg.lower():
@@ -449,23 +449,23 @@ class WmsGzbbrLoginService:
             token = config.get("token")  # pyright: ignore[reportAttributeAccessIssue]
 
             if token:
-                print("✓ 从数据库获取到配置")
+                print("[成功] 从数据库获取到配置")
 
                 # 2. 验证 token 是否有效
                 print("\n[2/6] 验证数据库中的 token...")
                 is_valid, error_msg = WmsGzbbrLoginService.validate_token(token)
                
                 if is_valid:
-                    print("✓ 数据库中的 token 有效，直接使用现有配置")
+                    print("[成功] 数据库中的 token 有效，直接使用现有配置")
                     print("=" * 80)
                     return token
                 else:
-                    print(f"✗ Token 验证失败: {error_msg}")
+                    print(f"[失败] Token 验证失败: {error_msg}")
                     print("需要重新登录...")
             else:
-                print("✗ 数据库中没有有效的 token")
+                print("[失败] 数据库中没有有效的 token")
         else:
-            print("✗ 数据库中没有找到配置")
+            print("[失败] 数据库中没有找到配置")
 
         # 从配置中获取登录凭据
         username = config.get("username") if config else None  # pyright: ignore[reportAttributeAccessIssue]
@@ -483,11 +483,11 @@ class WmsGzbbrLoginService:
 
         if not success:
             error_msg = result.get("error", "未知登录错误")
-            print(f"✗ 登录失败: {error_msg}")
+            print(f"[失败] 登录失败: {error_msg}")
             print("=" * 80)
             raise Exception(f"WMS 登录失败: {error_msg}")
 
-        print("✓ API 登录成功")
+        print("[成功] API 登录成功")
         new_token = result.get("token", "")
 
         # 同时保存用户信息到配置
@@ -506,23 +506,23 @@ class WmsGzbbrLoginService:
 
         if save_result.get("code") != 200:
             error_msg = save_result.get("message", "保存配置失败")
-            print(f"✗ {error_msg}")
+            print(f"[失败] {error_msg}")
             print("=" * 80)
             raise Exception(error_msg)
-        print("✓ 配置保存成功")
+        print("[成功] 配置保存成功")
 
         # 5. 再次验证新配置
         print("\n[5/6] 验证新保存的配置...")
         is_valid, error_msg = WmsGzbbrLoginService.validate_token(new_token)
 
         if is_valid:
-            print("✓ 新配置验证通过")
+            print("[成功] 新配置验证通过")
             print("\n[6/6] 获取有效配置完成")
             print("=" * 80)
             return new_token
         else:
             # 6. 如果还是失败则抛出异常
-            print(f"✗ 新配置验证失败: {error_msg}")
+            print(f"[失败] 新配置验证失败: {error_msg}")
             print("\n[6/6] 配置验证失败，异常抛出")
             print("=" * 80)
             raise Exception(f"新配置验证失败: {error_msg}")

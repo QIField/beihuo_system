@@ -31,13 +31,13 @@ def update_company(company: str) -> Dict[str, Any]:
     Returns:
         更新结果
     """
-    print(f"🔄 开始更新门店 {company}...")
+    print(f"[更新] 开始更新门店 {company}...")
     result = api_client.update_company(company)
     
     if result['success']:
-        print(f"✅ 门店 {company} 更新请求发送成功: {result['message']}")
+        print(f"[成功] 门店 {company} 更新请求发送成功: {result['message']}")
     else:
-        print(f"❌ 门店 {company} 更新请求失败: {result['message']}")
+        print(f"[失败] 门店 {company} 更新请求失败: {result['message']}")
     
     return result
 
@@ -91,9 +91,9 @@ def _post_update_cleanup():
         
         if cleanup_results['cart_cleanup']['status'] == 'completed':
             total_deleted = cleanup_results['cart_cleanup']['total_deleted']
-            print(f"🕒 定时更新后清理完成：共删除 {total_deleted} 个高库存商品")
+            print(f"[定时] 定时更新后清理完成：共删除 {total_deleted} 个高库存商品")
     except Exception as e:
-        print(f"❌ 定时更新后清理失败: {e}")
+        print(f"[失败] 定时更新后清理失败: {e}")
 
 
 def _merge_vehicle_mapping(company: str, records: list) -> list:
@@ -152,11 +152,11 @@ def _merge_vehicle_mapping(company: str, records: list) -> list:
                 record['替换号'] = mapping.get('replace_number', '')
                 merged_count += 1
         
-        print(f"🚗 门店 {company} 车型映射合并完成，共 {merged_count}/{len(records)} 条记录")
+        print(f"[车型] 门店 {company} 车型映射合并完成，共 {merged_count}/{len(records)} 条记录")
         return records
         
     except Exception as e:
-        print(f"⚠️ 门店 {company} 车型映射合并失败: {e}，继续保存原始数据")
+        print(f"[警告] 门店 {company} 车型映射合并失败: {e}，继续保存原始数据")
         return records
     finally:
         cursor.close()
@@ -175,51 +175,51 @@ def fetch_company(company: str) -> int:
     Returns:
         成功插入的记录数，失败返回 -1
     """
-    print(f"📥 开始拉取门店 {company} 数据...")
+    print(f"[导入] 开始拉取门店 {company} 数据...")
     
     # 1. 调用 API 获取数据
     api_result = api_client.fetch_company(company)
     
     if not api_result['success']:
-        print(f"❌ 门店 {company} 拉取失败: {api_result['message']}")
+        print(f"[失败] 门店 {company} 拉取失败: {api_result['message']}")
         return -1
     
     raw_data = api_result['data']
     gx_date = api_result['gx_date']
     
     if not raw_data:
-        print(f"⚠️ 门店 {company} 没有数据")
+        print(f"[警告] 门店 {company} 没有数据")
         return 0
     
-    print(f"📊 门店 {company} 获取到 {len(raw_data)} 条原始数据")
+    print(f"[统计] 门店 {company} 获取到 {len(raw_data)} 条原始数据")
     
     # 2. 数据处理
     records = data_processor.transform_fetch_data(raw_data, company, gx_date)
     
     # 3. 获取车型映射数据并合并到 records
-    print(f"🚗 门店 {company} 开始获取车型映射...")
+    print(f"[车型] 门店 {company} 开始获取车型映射...")
     records = _merge_vehicle_mapping(company, records)
     
     # 4. 保存到数据库（已包含车型和替换号）
     saved_count = db_service.save_company_data(company, records)
     
     if saved_count >= 0:
-        print(f"✅ 门店 {company} 数据保存完成，共 {saved_count} 条")
+        print(f"[成功] 门店 {company} 数据保存完成，共 {saved_count} 条")
         
         # 5. 异步执行购物车更新（车型映射已完成，不需要再执行）
         threading.Thread(target=_update_cart_only, args=(company,), daemon=True).start()
     else:
-        print(f"❌ 门店 {company} 数据保存失败")
+        print(f"[失败] 门店 {company} 数据保存失败")
     
     return saved_count
 
 
 def _update_cart_only(company: str):
     """仅更新购物车数据（车型映射已在保存前完成）"""
-    print(f"🛒 [{company}] 开始更新购物车...")
+    print(f"[购物车] [{company}] 开始更新购物车...")
     from app.services.cart_service.cart_update_service import update_cart_data
     update_cart_data(company)  # 只更新当前门店的购物车
-    print(f"✅ [{company}] 购物车更新完成")
+    print(f"[成功] [{company}] 购物车更新完成")
 
 
 def fetch_all_companies() -> Dict[str, Any]:
@@ -271,9 +271,9 @@ def _update_cart_data():
     try:
         from app.services.cart_service.cart_update_service import update_cart_data
         update_cart_data()
-        print("🛒 购物车数据更新完成")
+        print("[购物车] 购物车数据更新完成")
     except Exception as e:
-        print(f"🛒 购物车数据更新失败: {e}")
+        print(f"[购物车] 购物车数据更新失败: {e}")
 
 
 def update_then_fetch_all():
@@ -286,7 +286,7 @@ def update_then_fetch_all():
     
     with _updating_lock:
         if _is_updating_flag:
-            print("⏭️ 已有更新任务在执行，跳过本次执行")
+            print("[跳过] 已有更新任务在执行，跳过本次执行")
             return
         _is_updating_flag = True
     

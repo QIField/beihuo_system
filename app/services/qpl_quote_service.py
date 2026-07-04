@@ -136,7 +136,8 @@ def _parse_created_time(created_time_str):
 
 def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None,
                           item_submit_results=None, order_success=True,
-                          failed_brand_names=None, failed_item_prices=None):
+                          failed_brand_names=None, failed_item_prices=None,
+                          company=None):
     """
     从详情数据中提取报价明细（包括无报价的失败项目）
 
@@ -148,6 +149,7 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
         order_success: 订单整体是否成功
         failed_brand_names: 失败项实际尝试过的品牌名 {enquiry_item_id: brand_name}
         failed_item_prices: 价格检测失败时的尝试价格 {enquiry_item_id: sell_price}
+        company: 组织代码，用于日志标识
 
     Returns:
         list: 报价明细列表
@@ -225,7 +227,7 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
             elif str(quote_status).strip() == 'WAITING_QUOTE':
                 # CRM 未匹配 / 无原厂 等明确不记录场景：跳过
                 qpl_log(
-                    f"[{company}] 项目 {enquiry_item_id} 无报价且未进入失败记录 "
+                    f"[{company or 'unknown'}] 项目 {enquiry_item_id} 无报价且未进入失败记录 "
                     f"(quote_status={quote_status})，按规则跳过",
                     order_no=enquiry_no
                 )
@@ -233,7 +235,7 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
             else:
                 # 非 WAITING_QUOTE 且无报价：属于数据异常，记录并暴露
                 qpl_log(
-                    f"[{company}] 项目 {enquiry_item_id} 状态异常 "
+                    f"[{company or 'unknown'}] 项目 {enquiry_item_id} 状态异常 "
                     f"(quote_status={quote_status}) 无报价记录",
                     order_no=enquiry_no
                 )
@@ -494,7 +496,8 @@ def process_and_save_quotes_for_company(company, begin_date=None, end_date=None)
             result['detail_data'], failed_items, extra_quote_items,
             item_submit_results, result.get('success', False),
             failed_brand_names=failed_brand_names,
-            failed_item_prices=failed_item_prices
+            failed_item_prices=failed_item_prices,
+            company=company
         )
 
         if details:

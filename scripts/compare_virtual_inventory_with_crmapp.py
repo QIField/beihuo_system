@@ -181,7 +181,7 @@ def compare_virtual_inventory_with_crmapp():
             filepath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), filename)
             
             df.to_excel(filepath, index=False, engine='openpyxl')
-            print(f"\n✓ 数据已导出到: {filepath}")
+            print(f"\n[成功] 数据已导出到: {filepath}")
             
             # 打印统计信息
             print("\n【按Company统计未匹配数量】")

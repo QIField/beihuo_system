@@ -34,7 +34,7 @@ def init_procurement_history_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 采购历史表: {e}")
+        print(f"  [失败] 采购历史表: {e}")
     finally:
         conn.close()
 

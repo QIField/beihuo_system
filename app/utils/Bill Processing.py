@@ -87,7 +87,7 @@ def process_file(df, filename):
                 found_col = df_col
                 break
         if found_col is None:
-            print(f"❌ {filename} 缺少必要列: {col}")
+            print(f"[失败] {filename} 缺少必要列: {col}")
             return False
         actual_cols[col] = found_col
 
@@ -189,7 +189,7 @@ def write_to_excel(output_df, output_file, actual_cols):
                 break
         
         if order_col_idx is None:
-            print("❌ 未找到订单号列")
+            print("[失败] 未找到订单号列")
             return
 
         # 找到序号列的索引
@@ -200,7 +200,7 @@ def write_to_excel(output_df, output_file, actual_cols):
                 break
         
         if seq_col_idx is None:
-            print("❌ 未找到序号列")
+            print("[失败] 未找到序号列")
             return
 
         # 数据行逐行写入
@@ -494,7 +494,7 @@ def process_files(file_paths):
         try:
             df = read_file(file_path)
             if df is None:
-                print(f"❌ 无法读取文件: {file_path}")
+                print(f"[失败] 无法读取文件: {file_path}")
                 continue
 
             # 检查必要列
@@ -510,7 +510,7 @@ def process_files(file_paths):
                     missing_cols.append(col)
 
             if missing_cols:
-                print(f"❌ {file_path} 缺少必要列: {missing_cols}")
+                print(f"[失败] {file_path} 缺少必要列: {missing_cols}")
                 continue
 
             # 处理数据
@@ -532,19 +532,19 @@ def process_files(file_paths):
                     
                 write_to_excel(result, output_file, actual_cols)
                 results.append(output_file)
-                print(f"✅ 处理完成: {file_path} -> {output_file}")
+                print(f"[成功] 处理完成: {file_path} -> {output_file}")
             else:
-                print(f"❌ 处理失败: {file_path}")
+                print(f"[失败] 处理失败: {file_path}")
 
         except Exception as e:
-            print(f"❌ 处理文件时出错 {file_path}: {str(e)}")
+            print(f"[失败] 处理文件时出错 {file_path}: {str(e)}")
             continue
 
     return results
 def main(file_paths=None):
     """主函数，接受文件路径列表作为参数进行处理"""
     if file_paths is None:
-        print("❌ 未提供文件路径列表")
+        print("[失败] 未提供文件路径列表")
         return []
     
     print("=" * 80)

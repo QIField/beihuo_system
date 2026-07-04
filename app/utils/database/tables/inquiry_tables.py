@@ -28,9 +28,9 @@ def init_ks_inquiry_monitor_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='开思询价单监控数据表';
             """
             cursor.execute(create_table_sql)
-            print("  ✓ 开思询价单监控数据表")
+            print("  [成功] 开思询价单监控数据表")
     except Exception as e:
-        print(f"  ✗ 开思询价单监控数据表: {e}")
+        print(f"  [失败] 开思询价单监控数据表: {e}")
     finally:
         conn.close()
 
@@ -87,7 +87,7 @@ def init_ks_inquiry_detail_table():
                     ALTER TABLE crmapp_ks_inquiry_detail
                     ADD COLUMN resolve_parts_num VARCHAR(100) DEFAULT NULL COMMENT 'resolveitems/detail返回的OE号/零件号'
                 """)
-                print("  ✓ 已添加列 resolve_parts_num")
+                print("  [成功] 已添加列 resolve_parts_num")
             except Exception as e:
                 if "Duplicate column name" not in str(e):
                     print(f"  ! 添加列 resolve_parts_num 时出错: {str(e)}")
@@ -97,14 +97,14 @@ def init_ks_inquiry_detail_table():
                     ALTER TABLE crmapp_ks_inquiry_detail
                     ADD COLUMN resolve_parts_name VARCHAR(255) DEFAULT NULL COMMENT 'resolveitems/detail返回的零件名称'
                 """)
-                print("  ✓ 已添加列 resolve_parts_name")
+                print("  [成功] 已添加列 resolve_parts_name")
             except Exception as e:
                 if "Duplicate column name" not in str(e):
                     print(f"  ! 添加列 resolve_parts_name 时出错: {str(e)}")
 
-            print("  ✓ 开思询价明细表")
+            print("  [成功] 开思询价明细表")
     except Exception as e:
-        print(f"  ✗ 开思询价明细表: {e}")
+        print(f"  [失败] 开思询价明细表: {e}")
     finally:
         conn.close()
 
@@ -135,7 +135,7 @@ def init_weixin_inquiry_detail_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 微信询价明细表: {e}")
+        print(f"  [失败] 微信询价明细表: {e}")
     finally:
         conn.close()
 
@@ -182,13 +182,13 @@ def init_price_inquiry_direct_table():
                     ALTER TABLE crmapp_price_inquiry_direct
                     ADD UNIQUE INDEX uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)
                 """)
-                print("  ✓ 已添加唯一索引 uk_oe_brand_supplier_price_company")
+                print("  [成功] 已添加唯一索引 uk_oe_brand_supplier_price_company")
             except Exception as e:
                 if "Duplicate key name" not in str(e):
                     print(f"  ! 添加唯一索引时出错: {str(e)}")
 
-            print("  ✓ 询价直接入库数据表")
+            print("  [成功] 询价直接入库数据表")
     except Exception as e:
-        print(f"  ✗ 询价直接入库数据表: {e}")
+        print(f"  [失败] 询价直接入库数据表: {e}")
     finally:
         conn.close()

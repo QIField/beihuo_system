@@ -165,14 +165,14 @@ def process_single_oe_thread(item: Dict[str, Any], product_df, alias_df, session
     brand_id = get_brand_id_by_name(session, brand)
     if not brand_id:
         result = f"失败 - 没有匹配到品牌ID: {brand}"
-        print(f"[线程-{threading.current_thread().name}] ❌ {oe_number}: {result}")
+        print(f"[线程-{threading.current_thread().name}] [失败] {oe_number}: {result}")
         return result
     
     # 步骤 2: 获取 OE 信息（带重试）
     oe_info = retry_request(lambda: get_oe_link(oe_number, session), "get_oe_link")
     if not oe_info:
         result = f"失败 - 获取 OE 信息失败"
-        print(f"[线程-{threading.current_thread().name}] ❌ {oe_number}: {result}")
+        print(f"[线程-{threading.current_thread().name}] [失败] {oe_number}: {result}")
         return result
     
     product_name = oe_info.get('product_name', '')
@@ -189,14 +189,14 @@ def process_single_oe_thread(item: Dict[str, Any], product_df, alias_df, session
             if matched_name:
                 product_name = matched_name
                 used_excel_name = True
-                print(f"[线程-{threading.current_thread().name}] ✓ {oe_number}: 从 Excel 匹配到产品名称: {product_name}")
+                print(f"[线程-{threading.current_thread().name}] [成功] {oe_number}: 从 Excel 匹配到产品名称: {product_name}")
             else:
                 result = f"失败 - 未找到产品名称"
-                print(f"[线程-{threading.current_thread().name}] ❌ {oe_number}: {result}")
+                print(f"[线程-{threading.current_thread().name}] [失败] {oe_number}: {result}")
                 return result
         else:
             result = f"失败 - 产品数据未加载"
-            print(f"[线程-{threading.current_thread().name}] ❌ {oe_number}: {result}")
+            print(f"[线程-{threading.current_thread().name}] [失败] {oe_number}: {result}")
             return result
     
     # brand_name 为空则填"其他"
@@ -221,7 +221,7 @@ def process_single_oe_thread(item: Dict[str, Any], product_df, alias_df, session
     
     if not add_result:
         result = f"失败 - 添加产品请求失败"
-        print(f"[线程-{threading.current_thread().name}] ❌ {oe_number}: {result}")
+        print(f"[线程-{threading.current_thread().name}] [失败] {oe_number}: {result}")
         return result
     
     # 解析响应
@@ -231,13 +231,13 @@ def process_single_oe_thread(item: Dict[str, Any], product_df, alias_df, session
     # 检查车型为空的错误
     if not vehicle_name or "车型不能为空" in msg or ("车型" in msg and "不能为空" in msg):
         result = f"失败 - 车型不能为空 | 请求: {product_data} | 响应: {add_result}"
-        print(f"[线程-{threading.current_thread().name}] ❌ {oe_number}: {result}")
+        print(f"[线程-{threading.current_thread().name}] [失败] {oe_number}: {result}")
         return result
     
     if status == 200:
         product_id = add_result.get('data')
         result = f"成功 - product_id: {product_id}"
-        print(f"[线程-{threading.current_thread().name}] ✅ {oe_number}: {result}")
+        print(f"[线程-{threading.current_thread().name}] [成功] {oe_number}: {result}")
         
         # 如果使用了 Excel 匹配的名称，需要更新为最佳匹配
         if used_excel_name:
@@ -246,17 +246,17 @@ def process_single_oe_thread(item: Dict[str, Any], product_df, alias_df, session
     elif status == 201:
         if "该物料已关联当前组织" in msg:
             result = f"已存在 - {msg}"
-            print(f"[线程-{threading.current_thread().name}] ⚠️  {oe_number}: {result}")
+            print(f"[线程-{threading.current_thread().name}] [警告]  {oe_number}: {result}")
         else:
             result = f"成功 - {msg}"
-            print(f"[线程-{threading.current_thread().name}] ✅ {oe_number}: {result}")
+            print(f"[线程-{threading.current_thread().name}] [成功] {oe_number}: {result}")
             
         # 已存在也需要更新最佳匹配名称
         if used_excel_name:
             _update_with_best_match_thread(session, oe_number, brand, product_name)
     else:
         result = f"失败 - {msg}"
-        print(f"[线程-{threading.current_thread().name}] ❌ {oe_number}: {result}")
+        print(f"[线程-{threading.current_thread().name}] [失败] {oe_number}: {result}")
         return result
     
     # 步骤 6: 三列模式更新 brand_code
@@ -264,10 +264,10 @@ def process_single_oe_thread(item: Dict[str, Any], product_df, alias_df, session
         update_result = update_brand_code_by_oe(session, oe_number, brand, brand_code)
         if update_result:
             result += f" | brand_code更新成功"
-            print(f"[线程-{threading.current_thread().name}] ✓ {oe_number}: brand_code 更新成功")
+            print(f"[线程-{threading.current_thread().name}] [成功] {oe_number}: brand_code 更新成功")
         else:
             result += f" | brand_code更新失败"
-            print(f"[线程-{threading.current_thread().name}] ⚠️  {oe_number}: brand_code 更新失败")
+            print(f"[线程-{threading.current_thread().name}] [警告]  {oe_number}: brand_code 更新失败")
     
     return result
 
@@ -285,18 +285,18 @@ def _update_with_best_match_thread(session, oe_number: str, brand: str, product_
                 best_match = find_best_match_product(product_name, name_list)
                 if best_match:
                     matched_name = best_match.get('product_name', '')
-                    print(f"[线程-{threading.current_thread().name}] 🔄 {oe_number}: 最佳匹配名称: {matched_name}")
+                    print(f"[线程-{threading.current_thread().name}] [更新] {oe_number}: 最佳匹配名称: {matched_name}")
                     
                     # 更新产品名称
                     update_result = update_product_name_by_oe(
                         session, oe_number, brand, matched_name
                     )
                     if update_result:
-                        print(f"[线程-{threading.current_thread().name}] ✓ {oe_number}: 产品名称更新成功")
+                        print(f"[线程-{threading.current_thread().name}] [成功] {oe_number}: 产品名称更新成功")
                     else:
-                        print(f"[线程-{threading.current_thread().name}] ⚠️  {oe_number}: 产品名称更新失败")
+                        print(f"[线程-{threading.current_thread().name}] [警告]  {oe_number}: 产品名称更新失败")
     except Exception as e:
-        print(f"[线程-{threading.current_thread().name}] ⚠️  {oe_number}: 更新最佳匹配名称时出错: {e}")
+        print(f"[线程-{threading.current_thread().name}] [警告]  {oe_number}: 更新最佳匹配名称时出错: {e}")
 
 
 # ============================================================================
@@ -321,7 +321,7 @@ def worker_thread(thread_name: str, items: List[Dict], product_df, alias_df, res
         session = create_crm_session()
         print(f"[{thread_name}] Session 创建成功")
     except Exception as e:
-        print(f"[{thread_name}] ❌ Session 创建失败: {e}")
+        print(f"[{thread_name}] [失败] Session 创建失败: {e}")
         # 记录所有失败
         for item in items:
             results_store.add_result(item['oe_number'], f"失败 - Session创建失败: {e}")
@@ -336,7 +336,7 @@ def worker_thread(thread_name: str, items: List[Dict], product_df, alias_df, res
         except Exception as e:
             result = f"失败 - 处理异常: {e}"
             results_store.add_result(item['oe_number'], result)
-            print(f"[{thread_name}] ❌ {item['oe_number']}: {result}")
+            print(f"[{thread_name}] [失败] {item['oe_number']}: {result}")
         
         completed += 1
         if completed % 10 == 0 or completed == len(items):
@@ -549,12 +549,12 @@ def main():
     try:
         result_path = process_excel_file(file_path)
         if result_path:
-            print(f"\n✅ 处理完成！")
+            print(f"\n[成功] 处理完成！")
             print(f"结果文件: {result_path}")
         else:
-            print("\n⚠️ 没有数据被处理")
+            print("\n[警告] 没有数据被处理")
     except Exception as e:
-        print(f"\n❌ 处理失败: {e}")
+        print(f"\n[失败] 处理失败: {e}")
         import traceback
         traceback.print_exc()
 

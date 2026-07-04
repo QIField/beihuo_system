@@ -11,7 +11,7 @@ import time
 def log_time_cost(operation_name, start_time):
     """记录操作耗时"""
     cost = (time.time() - start_time) * 1000  # 转换为毫秒
-    print(f"[⏱️ 后端计时] {operation_name} 耗时: {cost:.2f}ms")
+    print(f"[[耗时] 后端计时] {operation_name} 耗时: {cost:.2f}ms")
     return cost
 
 # 创建蓝图
@@ -463,7 +463,7 @@ def get_virtual_inventory_search():
 def get_update_msg_options():
     """获取更新信息的选项列表（按格式分类）"""
     api_start_time = time.time()
-    print(f"\n[⏱️ 后端计时] ========== API /api/update_msg_options 开始 ==========")
+    print(f"\n[[耗时] 后端计时] ========== API /api/update_msg_options 开始 ==========")
     try:
         db_connect_start = time.time()
         conn = get_db_connection()
@@ -527,7 +527,7 @@ def get_update_msg_options():
         print(f"总计非空更新信息: {len(update_msgs)} 条")
 
         total_cost = log_time_cost("API 总耗时", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/update_msg_options 完成，总耗时: {total_cost:.2f}ms ==========\n")
+        print(f"[[耗时] 后端计时] ========== API /api/update_msg_options 完成，总耗时: {total_cost:.2f}ms ==========\n")
 
         return jsonify({
             'code': 0,
@@ -537,7 +537,7 @@ def get_update_msg_options():
 
     except Exception as e:
         total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/update_msg_options 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
+        print(f"[[耗时] 后端计时] ========== API /api/update_msg_options 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取更新信息选项失败: {str(e)}'}), 500
 
 
@@ -637,7 +637,7 @@ def get_virtual_inventory_statistics():
 def get_virtual_inventory_by_msg_pattern():
     """根据更新信息模式获取虚拟库存数据 - 遵循用户选择的日期范围"""
     api_start_time = time.time()
-    print(f"\n[⏱️ 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 开始 ==========")
+    print(f"\n[[耗时] 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 开始 ==========")
     try:
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 10))
@@ -811,7 +811,7 @@ def get_virtual_inventory_by_msg_pattern():
         conn.close()
 
         total_cost = log_time_cost("API 总耗时", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 完成，总耗时: {total_cost:.2f}ms ==========\n")
+        print(f"[[耗时] 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 完成，总耗时: {total_cost:.2f}ms ==========\n")
 
         return jsonify({
             'code': 0,
@@ -826,7 +826,7 @@ def get_virtual_inventory_by_msg_pattern():
 
     except Exception as e:
         total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
+        print(f"[[耗时] 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取数据失败: {str(e)}'}), 500
 
 @virtual_inventory_bp.route('/api/virtual_inventory_statistics_by_pattern', methods=['GET'])
@@ -834,7 +834,7 @@ def get_virtual_inventory_by_msg_pattern():
 def get_virtual_inventory_statistics_by_pattern():
     """根据筛选条件获取统计信息 - 异步加载专用接口"""
     api_start_time = time.time()
-    print(f"\n[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 开始 ==========")
+    print(f"\n[[耗时] 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 开始 ==========")
     try:
         pattern = request.args.get('pattern', '').strip()
         business_date_type = request.args.get('business_date_type', '').strip()
@@ -900,7 +900,7 @@ def get_virtual_inventory_statistics_by_pattern():
         conn.close()
 
         total_cost = log_time_cost("API 总耗时", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 完成，总耗时: {total_cost:.2f}ms ==========\n")
+        print(f"[[耗时] 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 完成，总耗时: {total_cost:.2f}ms ==========\n")
 
         return jsonify({
             'code': 0,
@@ -916,7 +916,7 @@ def get_virtual_inventory_statistics_by_pattern():
 
     except Exception as e:
         total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
+        print(f"[[耗时] 后端计时] ========== API /api/virtual_inventory_statistics_by_pattern 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取统计数据失败: {str(e)}'}), 500
 
 @virtual_inventory_bp.route('/api/supplier_summary')
@@ -924,7 +924,7 @@ def get_virtual_inventory_statistics_by_pattern():
 def get_supplier_summary():
     """获取各供应商上传成功和失败统计 - 基于用户选择的日期范围"""
     api_start_time = time.time()
-    print(f"\n[⏱️ 后端计时] ========== API /api/supplier_summary 开始 ==========")
+    print(f"\n[[耗时] 后端计时] ========== API /api/supplier_summary 开始 ==========")
     try:
         # 获取日期范围参数
         start_date_str = request.args.get('start_date', '').strip()
@@ -975,7 +975,7 @@ def get_supplier_summary():
         conn.close()
 
         total_cost = log_time_cost("API 总耗时", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/supplier_summary 完成，总耗时: {total_cost:.2f}ms ==========\n")
+        print(f"[[耗时] 后端计时] ========== API /api/supplier_summary 完成，总耗时: {total_cost:.2f}ms ==========\n")
 
         return jsonify({
             'code': 0,
@@ -986,7 +986,7 @@ def get_supplier_summary():
 
     except Exception as e:
         total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
-        print(f"[⏱️ 后端计时] ========== API /api/supplier_summary 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
+        print(f"[[耗时] 后端计时] ========== API /api/supplier_summary 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取供应商汇总失败: {str(e)}'}), 500
 
 @virtual_inventory_bp.route('/api/admin/refresh_update_status', methods=['POST'])

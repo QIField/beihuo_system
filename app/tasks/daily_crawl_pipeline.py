@@ -38,18 +38,18 @@ def crawl_company_crm(company):
     """单个门店的CRM爬取任务（在线程中运行）"""
     try:
         thread_safe_print(f"\n{'='*80}")
-        thread_safe_print(f"🚀 [CRM爬取] 开始处理: {company}")
+        thread_safe_print(f"[开始] [CRM爬取] 开始处理: {company}")
         thread_safe_print(f"{'='*80}")
         
         from app.services.procurement_service.crawl_service import CRMDataCrawlService
         service = CRMDataCrawlService(company)
         result = service.crawl_all()
         
-        thread_safe_print(f"\n✅ [CRM爬取] 完成: {company}")
+        thread_safe_print(f"\n[成功] [CRM爬取] 完成: {company}")
         return (company, result)
         
     except Exception as e:
-        thread_safe_print(f"\n❌ [CRM爬取] {company} 出现异常: {e}")
+        thread_safe_print(f"\n[失败] [CRM爬取] {company} 出现异常: {e}")
         import traceback
         with _print_lock:
             traceback.print_exc()
@@ -193,11 +193,11 @@ def execute_daily_pipeline():
     print(f"总耗时: {duration}")
     print(f"{'='*80}")
 
-    print(f"\n📊 总同步记录数: {all_results['total_synced']}")
-    print(f"❌ 总失败数: {all_results['total_failed']}")
+    print(f"\n[统计] 总同步记录数: {all_results['total_synced']}")
+    print(f"[失败] 总失败数: {all_results['total_failed']}")
 
     if all_results['total_failed'] > 0:
-        print("\n⚠️  检测到部分任务失败，详见上方错误日志。")
+        print("\n[警告]  检测到部分任务失败，详见上方错误日志。")
 
     print(f"\n{'='*80}")
     print(f"每日定时任务执行完毕")

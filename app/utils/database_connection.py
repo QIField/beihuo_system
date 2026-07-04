@@ -109,7 +109,7 @@ def _execute_db_operation(operation_func, connection=None):
         conn.commit()
         return result
     except Exception as e:
-        print(f"         ✗ 数据库操作出错: {str(e)}")
+        print(f"         [失败] 数据库操作出错: {str(e)}")
         # 回滚事务以确保数据一致性
         conn.rollback()
         return None

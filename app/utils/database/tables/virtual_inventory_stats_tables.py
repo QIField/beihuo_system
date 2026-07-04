@@ -29,9 +29,9 @@ def init_virtual_inventory_stats_log_table():
             """
             cursor.execute(create_table_sql)
         conn.commit()
-        print("  ✓ 虚拟库存统计日志表")
+        print("  [成功] 虚拟库存统计日志表")
     except Exception as e:
-        print(f"  ✗ 虚拟库存统计日志表: {e}")
+        print(f"  [失败] 虚拟库存统计日志表: {e}")
         raise
     finally:
         conn.close()

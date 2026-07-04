@@ -46,7 +46,7 @@ def init_zhuozhixing_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 卓之星库存表: {e}")
+        print(f"  [失败] 卓之星库存表: {e}")
     finally:
         conn.close()
 
@@ -83,7 +83,7 @@ def init_inventory_detail_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 库存明细表: {e}")
+        print(f"  [失败] 库存明细表: {e}")
     finally:
         conn.close()
 
@@ -121,7 +121,7 @@ def init_warehouse_inventory_latest_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 仓库库存最新表: {e}")
+        print(f"  [失败] 仓库库存最新表: {e}")
     finally:
         conn.close()
 
@@ -172,6 +172,6 @@ def init_inventory_record_latest_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 库存变动记录表: {e}")
+        print(f"  [失败] 库存变动记录表: {e}")
     finally:
         conn.close()

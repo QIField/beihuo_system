@@ -37,7 +37,7 @@ def get_stores():
             'dghf': '合峰门店'
         }
     except Exception as e:
-        print(f"⚠️ 获取 STORES 失败: {str(e)}，使用默认配置")
+        print(f"[警告] 获取 STORES 失败: {str(e)}，使用默认配置")
         return {
             'fsbbr': '佛山门店',
             'zsbbr': '中山门店',
@@ -101,7 +101,7 @@ class CartAutoCleanupService:
                             'message': result['msg'],
                             'elapsed_ms': store_elapsed_ms
                         })
-                        print(f"🕒 定时更新后清理 {store} 门店: 删除 {result['deleted_count']} 个高库存商品 (耗时: {store_elapsed_ms:.2f}ms)")
+                        print(f"[定时] 定时更新后清理 {store} 门店: 删除 {result['deleted_count']} 个高库存商品 (耗时: {store_elapsed_ms:.2f}ms)")
                     else:
                         results.append({
                             'store': store,
@@ -125,11 +125,11 @@ class CartAutoCleanupService:
                     'error': str(e),
                     'elapsed_ms': store_elapsed_ms
                 })
-                print(f"🕒 定时清理 {store} 门店失败: {str(e)} (耗时: {store_elapsed_ms:.2f}ms)")
+                print(f"[定时] 定时清理 {store} 门店失败: {str(e)} (耗时: {store_elapsed_ms:.2f}ms)")
         
         total_end = time.time()
         total_elapsed_ms = (total_end - total_start) * 1000
-        print(f"⏱️ 【定时更新后批量清理】共处理 {store_count} 个门店，总耗时: {total_elapsed_ms:.2f}ms")
+        print(f"[耗时] 【定时更新后批量清理】共处理 {store_count} 个门店，总耗时: {total_elapsed_ms:.2f}ms")
         
         return results
     
@@ -158,11 +158,11 @@ class CartAutoCleanupService:
             total_elapsed_ms = (total_end - total_start) * 1000
             
             if result['code'] == 0 and result['deleted_count'] > 0:
-                print(f"🛒 用户打开购物车时清理 {store} 门店: 删除 {result['deleted_count']} 个高库存商品 (总耗时: {total_elapsed_ms:.2f}ms)")
+                print(f"[购物车] 用户打开购物车时清理 {store} 门店: 删除 {result['deleted_count']} 个高库存商品 (总耗时: {total_elapsed_ms:.2f}ms)")
             elif result['code'] == 0:
-                print(f"🛒 用户打开购物车时清理 {store} 门店: 无高库存商品需要清理 (总耗时: {total_elapsed_ms:.2f}ms)")
+                print(f"[购物车] 用户打开购物车时清理 {store} 门店: 无高库存商品需要清理 (总耗时: {total_elapsed_ms:.2f}ms)")
             else:
-                print(f"🛒 打开购物车时清理 {store} 门店失败: {result['msg']} (总耗时: {total_elapsed_ms:.2f}ms)")
+                print(f"[购物车] 打开购物车时清理 {store} 门店失败: {result['msg']} (总耗时: {total_elapsed_ms:.2f}ms)")
             
             # 将耗时信息添加到返回结果中
             result['elapsed_ms'] = total_elapsed_ms
@@ -177,5 +177,5 @@ class CartAutoCleanupService:
                 'msg': f'清理失败: {str(e)}',
                 'elapsed_ms': total_elapsed_ms
             }
-            print(f"🛒 打开购物车时清理 {store} 门店失败: {str(e)} (总耗时: {total_elapsed_ms:.2f}ms)")
+            print(f"[购物车] 打开购物车时清理 {store} 门店失败: {str(e)} (总耗时: {total_elapsed_ms:.2f}ms)")
             return error_result
