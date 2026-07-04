@@ -4500,7 +4500,7 @@ def init_background_tasks():
             'cron',
             'virtual_inventory_daily',
             hour=20,
-            minute=30,
+            minute=20,
             replace_existing=True
         )
 
