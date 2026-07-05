@@ -319,10 +319,10 @@ def process_excel(excel_path):
                 
                 if success:
                     df.at[idx, '更新状态'] = f'更新成功: {msg}'
-                    print(f"  ✓ 更新成功: {msg}")
+                    print(f"  [成功] 更新成功: {msg}")
                 else:
                     df.at[idx, '更新状态'] = f'更新失败: {msg}'
-                    print(f"  ✗ 更新失败: {msg}")
+                    print(f"  [失败] 更新失败: {msg}")
                 
     finally:
         conn.close()

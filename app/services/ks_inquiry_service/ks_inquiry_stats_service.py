@@ -26,7 +26,7 @@ class KsInquiryStatsService:
     @staticmethod
     def get_oe_stats(
         inquiry_id: str = '',
-        parts_num: str = '',
+        resolve_parts_num: str = '',
         parts_name: str = '',
         brand_name: str = '',
         brand: str = '',
@@ -41,7 +41,7 @@ class KsInquiryStatsService:
         column_filters: Optional[Dict[str, List[str]]] = None
     ) -> Dict[str, Any]:
         """
-        获取OE号统计维度（按partsNum分组聚合）
+        获取OE号统计维度（按resolve_parts_num分组聚合）
 
         Args:
             sort_column: 排序列名
@@ -57,7 +57,7 @@ class KsInquiryStatsService:
 
         # 基础查询条件
         if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
-        if parts_num:     conditions.append("partsNum LIKE %s");            params.append(f"%{parts_num}%")
+        if resolve_parts_num: conditions.append("resolve_parts_num LIKE %s"); params.append(f"%{resolve_parts_num}%")
         if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
@@ -74,8 +74,8 @@ class KsInquiryStatsService:
         if column_filters:
             for col_id, values in column_filters.items():
                 placeholders = ', '.join(['%s'] * len(values))
-                if col_id == 'partsNum':
-                    conditions.append(f"partsNum IN ({placeholders})")
+                if col_id == 'resolve_parts_num':
+                    conditions.append(f"resolve_parts_num IN ({placeholders})")
                     params.extend(values)
                 elif col_id == 'partsName':
                     conditions.append(f"resolve_parts_name IN ({placeholders})")
@@ -91,19 +91,19 @@ class KsInquiryStatsService:
         count_sql = f"""
             SELECT COUNT(*) FROM (
                 SELECT
-                    partsNum,
+                    resolve_parts_num,
                     COUNT(DISTINCT inquiryId) as count,
                     MAX(unquoted_products) as unquotedProducts
                 FROM crmapp_ks_inquiry_detail
                 WHERE {where_clause}
-                GROUP BY partsNum
+                GROUP BY resolve_parts_num
                 {having_clause}
             ) t
         """
 
         # OE统计排序：白名单映射（前端列名 -> SQL列名）
         oe_column_map = {
-            'partsNum': 'partsNum',
+            'resolve_parts_num': 'resolve_parts_num',
             'count': 'count',
             'partsName': 'partsName',
             'unquotedProducts': 'unquotedProducts'
@@ -118,13 +118,13 @@ class KsInquiryStatsService:
         data_sql = f"""
             SELECT * FROM (
                 SELECT
-                    partsNum,
+                    resolve_parts_num,
                     COUNT(DISTINCT inquiryId) as count,
                     MAX(resolve_parts_name) as partsName,
                     MAX(unquoted_products) as unquotedProducts
                 FROM crmapp_ks_inquiry_detail
                 WHERE {where_clause}
-                GROUP BY partsNum
+                GROUP BY resolve_parts_num
                 {having_clause}
             ) t
             ORDER BY {order_by}
@@ -153,7 +153,7 @@ class KsInquiryStatsService:
             cursor.execute(data_sql, data_params)
             rows = cursor.fetchall()
 
-            columns = ['partsNum', 'count', 'partsName', 'unquotedProducts']
+            columns = ['resolve_parts_num', 'count', 'partsName', 'unquotedProducts']
             result = []
             for row in rows:
                 if isinstance(row, dict):
@@ -175,7 +175,7 @@ class KsInquiryStatsService:
 
     @staticmethod
     def get_customer_stats_by_oe(
-        parts_num: str = '',
+        resolve_parts_num: str = '',
         inquiry_id: str = '',
         parts_name: str = '',
         brand_name: str = '',
@@ -202,7 +202,7 @@ class KsInquiryStatsService:
 
         # 基础查询条件
         if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
-        if parts_num:     conditions.append("partsNum = %s");               params.append(parts_num)
+        if resolve_parts_num: conditions.append("resolve_parts_num = %s");  params.append(resolve_parts_num)
         if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
@@ -293,7 +293,7 @@ class KsInquiryStatsService:
 
             end_time = time.time()
             elapsed_time = (end_time - start_time) * 1000
-            print(f"[KsInquiryStatsService] OE客户统计查询完成: OE={parts_num}, 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
+            print(f"[KsInquiryStatsService] OE客户统计查询完成: OE={resolve_parts_num}, 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
 
             return {
                 'list': result,

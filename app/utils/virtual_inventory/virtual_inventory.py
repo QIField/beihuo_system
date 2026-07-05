@@ -6,11 +6,16 @@ import pyodbc
 from datetime import datetime, timedelta
 import time
 from collections import defaultdict
-import math
 from ..database_connection import get_db_connection as get_pooled_db_connection  # 导入统一的连接池实现并重命名
 from ..supplier_data_fetchers.changsheng_inventory import start as fetch_changsheng_data
 from ..supplier_data_fetchers.wantuo_inventory import start as fetch_wantuo_data
 from ..supplier_data_fetchers.shengwen_inventory import start as fetch_shengwen_data
+from app.utils.logger_config import get_task_logger
+
+
+
+logger = get_task_logger('virtual_inventory')
+
 
 
 # 全局品牌缓存
@@ -35,7 +40,7 @@ def load_crm_brand_list():
             sql = "SELECT l_name_zh, type_cn FROM crm_brand_list"
             cursor.execute(sql)
             rows = cursor.fetchall()
-            print(f"查询 crm_brand_list 返回 {len(rows)} 行数据")
+            logger.info(f"查询 crm_brand_list 返回 {len(rows)} 行数据")
             for row in rows:
                 brand_name = row['l_name_zh'].strip() if row['l_name_zh'] else ''
                 type_cn = row['type_cn'].strip() if row['type_cn'] else ''
@@ -43,12 +48,10 @@ def load_crm_brand_list():
                     brand_dict[brand_name] = type_cn
         
         _brand_cache = brand_dict
-        print(f"已从 crm_brand_list 表加载 {len(brand_dict)} 个品牌")
+        logger.info(f"已从 crm_brand_list 表加载 {len(brand_dict)} 个品牌")
         return brand_dict
-    except Exception as e:
-        import traceback
-        print(f"加载 crm_brand_list 表失败: {e}")
-        print(traceback.format_exc())
+    except Exception:
+        logger.exception(f"加载 crm_brand_list 表失败")
         _brand_cache = {}
         return {}
     finally:
@@ -59,7 +62,7 @@ def clear_brand_cache():
     """清除品牌缓存"""
     global _brand_cache
     _brand_cache = None
-    print("品牌缓存已清除")
+    logger.info("品牌缓存已清除")
 
 
 def process_price_by_brand(price, brand, is_wantuo=False, is_changsheng_special=False, company='fsbbr'):
@@ -145,8 +148,8 @@ def clean_business_time_data():
     current_time = datetime.now()
     business_start, business_end = get_business_time_range(current_time)
 
-    print(f"当前时间: {current_time}")
-    print(f"业务时间范围: {business_start} 到 {business_end}")
+    logger.info(f"当前时间: {current_time}")
+    logger.info(f"业务时间范围: {business_start} 到 {business_end}")
 
     tables = [
         'virtual_inventory',
@@ -169,19 +172,19 @@ def clean_business_time_data():
             count = result[0]['count']
 
             if count > 0:
-                print(f"[{table}] 发现 {count} 条属于当前业务时间段的数据，正在删除...")
+                logger.info(f"[{table}] 发现 {count} 条属于当前业务时间段的数据，正在删除...")
 
                 delete_query = f"""
                     DELETE FROM {table}
                     WHERE fetch_time >= %s AND fetch_time < %s
                 """
                 deleted_count = db_manager.execute_update(delete_query, (business_start, business_end))
-                print(f"[{table}] 已删除 {deleted_count} 条数据")
+                logger.info(f"[{table}] 已删除 {deleted_count} 条数据")
             else:
-                print(f"[{table}] 当前业务时间段内没有数据")
+                logger.info(f"[{table}] 当前业务时间段内没有数据")
 
     except Exception as e:
-        print(f"清理业务时间数据时出错: {e}")
+        logger.exception(f"清理业务时间数据时出错")
     finally:
         db_manager.close()
 
@@ -198,7 +201,7 @@ class DatabaseManager:
             self.connection = get_pooled_db_connection()
             return True
         except Exception as e:
-            print(f"数据库连接失败: {e}")
+            logger.exception(f"数据库连接失败")
             return False
 
     def check_connection(self):
@@ -217,12 +220,12 @@ class DatabaseManager:
     def ensure_connection(self):
         """确保数据库连接可用，否则重连"""
         if not self.check_connection():
-            print("数据库连接已断开，正在尝试重连...")
+            logger.info("数据库连接已断开，正在尝试重连...")
             if self.connect():
-                print("数据库重连成功")
+                logger.info("数据库重连成功")
                 return True
             else:
-                print("数据库重连失败")
+                logger.error("数据库重连失败")
                 return False
         return True
     
@@ -311,7 +314,7 @@ def load_crm_aliases_mapping():
         
         # 检查文件是否存在
         if not os.path.exists(excel_path):
-            print(f"警告: 未找到 {excel_path} 文件，将不进行品牌名称映射")
+            logger.warning(f"警告: 未找到 {excel_path} 文件，将不进行品牌名称映射")
             return {}
         
         df = pd.read_excel(excel_path)
@@ -328,10 +331,10 @@ def load_crm_aliases_mapping():
                 if name and name != "-":  # 忽略占位符"-"
                     brand_mapping[name] = pp_name
         
-        print(f"加载了 {len(brand_mapping)} 个品牌别名映射")
+        logger.info(f"加载了 {len(brand_mapping)} 个品牌别名映射")
         return brand_mapping
     except Exception as e:
-        print(f"读取CRM可用别名文件时出错: {e}")
+        logger.exception(f"读取CRM可用别名文件时出错")
         return {}
 
 
@@ -395,14 +398,14 @@ def load_brands_from_json():
             if brand_name:
                 valid_brands.add(brand_name)
 
-        print(f"从brands.json加载了 {len(valid_brands)} 个有效品牌")
+        logger.info(f"从brands.json加载了 {len(valid_brands)} 个有效品牌")
         return valid_brands
 
     except FileNotFoundError:
-        print("警告: 未找到brands.json文件，将不过滤品牌数据")
+        logger.warning("警告: 未找到brands.json文件，将不过滤品牌数据")
         return None
     except Exception as e:
-        print(f"读取brands.json文件时出错: {e}")
+        logger.exception(f"读取brands.json文件时出错")
         return None
 
 
@@ -414,7 +417,7 @@ def process_supplier_data(all_data, valid_brands=None):
     3. 只保留brands.json中存在的品牌
     4. 除了腾隆外，其他供应商只有库存大于等于2的才保留
     """
-    print("处理供应商数据")
+    logger.info("处理供应商数据")
 
     # 如果提供了有效的品牌列表，则过滤数据
     if valid_brands is not None:
@@ -422,7 +425,7 @@ def process_supplier_data(all_data, valid_brands=None):
         for item in all_data:
             if item['brand'] in valid_brands:
                 filtered_data.append(item)
-        print(f"品牌过滤: 从 {len(all_data)} 条数据过滤为 {len(filtered_data)} 条数据")
+        logger.info(f"品牌过滤: 从 {len(all_data)} 条数据过滤为 {len(filtered_data)} 条数据")
         all_data = filtered_data
 
     # 过滤其他供应商库存小于2的数据
@@ -435,7 +438,7 @@ def process_supplier_data(all_data, valid_brands=None):
         elif int(item['stock']) >= 2:
             filtered_data.append(item)
 
-    print(f"供应商库存过滤: 从 {len(all_data)} 条数据过滤为 {len(filtered_data)} 条数据")
+    logger.info(f"供应商库存过滤: 从 {len(all_data)} 条数据过滤为 {len(filtered_data)} 条数据")
     all_data = filtered_data
 
     # 按编码和品牌分组
@@ -558,7 +561,7 @@ def fetch_supplier_data(supplier_name, server, database, username, password):
         return processed_data
 
     except Exception as e:
-        print(f"获取{supplier_name}数据时出错: {e}")
+        logger.exception(f"获取{supplier_name}数据时出错")
         return []
 
 
@@ -575,23 +578,23 @@ def sql_sever_data():
     # 获取各供应商数据
     all_data = []
 
-    print("获取腾隆数据...")
+    logger.info("获取腾隆数据...")
     tenglong_data = fetch_supplier_data('腾隆', server, database, username, password)
     all_data.extend(tenglong_data)
 
-    print("获取宝翼隆数据...")
+    logger.info("获取宝翼隆数据...")
     baoyilong_data = fetch_supplier_data('宝翼隆', server, database, username, password)
     all_data.extend(baoyilong_data)
 
-    print("获取沐博数据...")
+    logger.info("获取沐博数据...")
     mubo_data = fetch_supplier_data('沐博', server, database, username, password)
     all_data.extend(mubo_data)
 
-    print(f"总共获取到 {len(all_data)} 条原始数据")
+    logger.info(f"总共获取到 {len(all_data)} 条原始数据")
 
     # 处理数据（去序号、去重、取中间值、品牌过滤、库存过滤）
     final_data = process_supplier_data(all_data, valid_brands)
-    print(f"处理后剩余 {len(final_data)} 条数据")
+    logger.info(f"处理后剩余 {len(final_data)} 条数据")
 
     # 批量保存到数据库
     db_manager = get_db_connection()
@@ -622,14 +625,13 @@ def sql_sever_data():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(final_data))} / {len(final_data)} 条腾隆数据")
+            logger.info(f"已批量保存 {min(i + batch_size, len(final_data))} / {len(final_data)} 条腾隆数据")
         
     finally:
         db_manager.close()
 
     # 将处理后的数据保存到各公司整合表
     # 转换为DataFrame格式
-    import pandas as pd
     df = pd.DataFrame(final_data)
     df = df.rename(columns={
         'supplier': '供应商名称',
@@ -646,7 +648,7 @@ def sql_sever_data():
     # 保存到各公司表（腾隆数据不是万拓也不是昌盛）
     save_to_company_tables(df, is_wantuo=False, is_changsheng=False)
 
-    print("腾隆数据已批量保存到数据库")
+    logger.info("腾隆数据已批量保存到数据库")
 
 
 def get_crm_cookies():
@@ -730,7 +732,7 @@ def get_stock(cookies, headers):
                 timeout=10
             ).json()['data']
         except (requests.RequestException, KeyError) as e:
-            print(f"请求失败: {e}")
+            logger.exception(f"请求失败")
             return {}, {}, {}, {}
 
         page_max = response.get('last_page', 1)
@@ -749,7 +751,7 @@ def get_stock(cookies, headers):
                     'stock': stock
                 }
 
-        print(f'Page {page} / {page_max}')
+        logger.info(f'Page {page} / {page_max}')
         page += 1
 
     return (
@@ -761,9 +763,9 @@ def get_stock(cookies, headers):
 
 
 def chuli_beiermale(male, beier, ntf, jky):
-    print(beier)
-    print('m')
-    print(male)
+    logger.info(beier)
+    logger.info('m')
+    logger.info(male)
     data = []
 
     # 马勒-贝洱对比组
@@ -775,7 +777,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                 try:
                     price_value = float(price_value)
                 except ValueError:
-                    print(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
+                    logger.warning(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
             adjusted_price = process_price_by_brand(price_value, '贝洱')
             data.append([
@@ -790,7 +792,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                 try:
                     price_value = float(price_value)
                 except ValueError:
-                    print(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
+                    logger.warning(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
             adjusted_price = process_price_by_brand(price_value, '马勒')
             data.append([
@@ -806,7 +808,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                 try:
                     price_value = float(price_value)
                 except ValueError:
-                    print(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
+                    logger.warning(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
             adjusted_price = process_price_by_brand(price_value, '吉凯恩')
             data.append([
@@ -821,7 +823,7 @@ def chuli_beiermale(male, beier, ntf, jky):
                 try:
                     price_value = float(price_value)
                 except ValueError:
-                    print(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
+                    logger.warning(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
             adjusted_price = process_price_by_brand(price_value, '纳铁福')
             data.append([
@@ -865,7 +867,7 @@ def save_beiermale_to_db(data):
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(data))} / {len(data)} 条贝尔马勒数据")
+            logger.info(f"已批量保存 {min(i + batch_size, len(data))} / {len(data)} 条贝尔马勒数据")
         
     finally:
         db_manager.close()
@@ -924,8 +926,8 @@ def gylqp_start():
             except:
                 time.sleep(2)
         if page == 1:
-            print(response[0])
-            print()
+            logger.info(response[0])
+            logger.info('')
         if c > 0:
             for item in response:
                 d_.append([
@@ -933,7 +935,7 @@ def gylqp_start():
                     item['kcamount'], item['areaname'].strip(), item['qq'].strip(), item['posi'].strip(),
                     item['sxnote'].strip(), item['hhm'].strip()
                 ])
-            print(f'\r以获取第{page}页，共{c}条数据')
+            logger.info(f'\r以获取第{page}页，共{c}条数据')
             page += 1
         else:
             break
@@ -1012,7 +1014,7 @@ def gylqp_start():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(foshan_data))} / {len(foshan_data)} 条爱车贝母佛山数据")
+            logger.info(f"已批量保存 {min(i + batch_size, len(foshan_data))} / {len(foshan_data)} 条爱车贝母佛山数据")
         
         # 保存东莞数据
         for i in range(0, len(dongguan_data), batch_size):
@@ -1029,7 +1031,7 @@ def gylqp_start():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(dongguan_data))} / {len(dongguan_data)} 条爱车贝母东莞数据")
+            logger.info(f"已批量保存 {min(i + batch_size, len(dongguan_data))} / {len(dongguan_data)} 条爱车贝母东莞数据")
         
         # 保存中山数据
         for i in range(0, len(zhongshan_data), batch_size):
@@ -1046,7 +1048,7 @@ def gylqp_start():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(zhongshan_data))} / {len(zhongshan_data)} 条爱车贝母中山数据")
+            logger.info(f"已批量保存 {min(i + batch_size, len(zhongshan_data))} / {len(zhongshan_data)} 条爱车贝母中山数据")
         
     finally:
         db_manager.close()
@@ -1087,16 +1089,16 @@ def get_zhuozhixing_multi():
             response = requests.request("GET", url)
             response.raise_for_status()  # 确保请求成功
         except requests.exceptions.RequestException as e:
-            print(f"获取{supplier_name}数据时出错: {e}")
+            logger.exception(f"获取{supplier_name}数据时出错")
             continue
             
         try:
             allkckey = json.loads(response.text)['allkckey']
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"解析{supplier_name}初始响应失败: {e}")
+            logger.exception(f"解析{supplier_name}初始响应失败")
             continue
             
-        print(f"{supplier_name} allkckey: {allkckey}")
+        logger.info(f"{supplier_name} allkckey: {allkckey}")
         pindex = 1
         res_list = []
         while True:
@@ -1105,29 +1107,29 @@ def get_zhuozhixing_multi():
                 response = requests.request("GET", url)
                 response.raise_for_status()
             except Exception as e:
-                print(f"{supplier_name} 第{pindex}页请求失败: {e}")
+                logger.exception(f"{supplier_name} 第{pindex}页请求失败")
                 try:
                     response = requests.request("GET", url)
                     response.raise_for_status()
                 except Exception as e:
-                    print(f"{supplier_name} 第{pindex}页第二次请求失败: {e}")
+                    logger.exception(f"{supplier_name} 第{pindex}页第二次请求失败")
                     try:
                         response = requests.request("GET", url)
                         response.raise_for_status()
                     except Exception as e:
-                        print(f"{supplier_name} 第{pindex}页第三次请求失败，跳过: {e}")
+                        logger.exception(f"{supplier_name} 第{pindex}页第三次请求失败，跳过")
                         break
 
             try:
                 data_list = json.loads(response.text)['list']
             except (json.JSONDecodeError, KeyError) as e:
-                print(f"{supplier_name} 解析第{pindex}页响应失败: {e}")
+                logger.exception(f"{supplier_name} 解析第{pindex}页响应失败")
                 break
                 
             if len(data_list) == 0:
                 break
             pindex = pindex + 1
-            print(f"{supplier_name} 正在查询第{pindex}页")
+            logger.info(f"{supplier_name} 正在查询第{pindex}页")
             res_list.append(pd.DataFrame(data_list))
 
         if res_list:  # 如果有数据
@@ -1214,10 +1216,10 @@ def fetch_and_process_latest_data():
         latest_date = latest_date_result['latest_date'].iloc[0]
 
         if latest_date is None:
-            print("数据库中没有数据")
+            logger.info("数据库中没有数据")
             return None
 
-        print(f"最新数据日期: {latest_date}")
+        logger.info(f"最新数据日期: {latest_date}")
 
         # 查询最新日期的所有数据
         data_query = f"""
@@ -1232,7 +1234,7 @@ def fetch_and_process_latest_data():
         df = pd.concat([df, df2])
 
         if df.empty:
-            print(f"在 {latest_date} 没有找到数据")
+            logger.info(f"在 {latest_date} 没有找到数据")
             return None
 
         # 品牌名称映射
@@ -1331,7 +1333,7 @@ def fetch_and_process_latest_data():
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 db_manager.execute_many(sql, batch_data)
-                print(f"已批量保存 {min(i + batch_size, len(result_df))} / {len(result_df)} 条机器人数据到机器人数据表")
+                logger.info(f"已批量保存 {min(i + batch_size, len(result_df))} / {len(result_df)} 条机器人数据到机器人数据表")
             
         finally:
             db_manager.close()
@@ -1339,11 +1341,11 @@ def fetch_and_process_latest_data():
         # 将数据保存到各公司整合表（机器人数据不是万拓也不是昌盛）
         save_to_company_tables(result_df, is_wantuo=False, is_changsheng=False)
 
-        print(f"成功保存 {len(result_df)} 条机器人数据到数据库")
+        logger.info(f"成功保存 {len(result_df)} 条机器人数据到数据库")
         return result_df
 
     except Exception as e:
-        print(f"处理数据时发生错误: {e}")
+        logger.exception(f"处理数据时发生错误")
         return None
     finally:
         conn.close()
@@ -1368,12 +1370,12 @@ def ggg2():
     try:
         response_data = json.loads(response.text)
     except json.JSONDecodeError:
-        print(f"响应不是有效的JSON格式: {response.text}")
+        logger.info(f"响应不是有效的JSON格式: {response.text}")
         return pd.DataFrame()  # 返回空DataFrame
     
     # 检查是否有'files'键
     if 'files' not in response_data:
-        print(f"API响应中没有'files'键: {response_data}")
+        logger.info(f"API响应中没有'files'键: {response_data}")
         return pd.DataFrame()  # 返回空DataFrame
     
     files = response_data['files']
@@ -1386,10 +1388,10 @@ def ggg2():
             cdf = pd.DataFrame(file_data)
             xs_df_list.append(cdf)
         except json.JSONDecodeError:
-            print(f"下载文件响应不是有效的JSON格式: {response.text}")
+            logger.info(f"下载文件响应不是有效的JSON格式: {response.text}")
             continue
         except KeyError:
-            print(f"下载文件响应中没有'data'键: {response.text}")
+            logger.info(f"下载文件响应中没有'data'键: {response.text}")
             continue
 
     if not xs_df_list:  # 如果没有有效数据
@@ -1442,7 +1444,7 @@ def ggg2():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             db_manager.execute_many(sql, batch_data)
-            print(f"已批量保存 {min(i + batch_size, len(fd_df))} / {len(fd_df)} 条外部数据到外部数据表")
+            logger.info(f"已批量保存 {min(i + batch_size, len(fd_df))} / {len(fd_df)} 条外部数据到外部数据表")
 
     finally:
         db_manager.close()
@@ -1472,7 +1474,7 @@ def delete_old_data():
                 WHERE fetch_time < DATE_SUB(NOW(), INTERVAL 50 DAY)
             """
             deleted_count = db_manager.execute_update(delete_sql)
-            print(f"[{table}] 已删除 {deleted_count} 条50天前的数据")
+            logger.info(f"[{table}] 已删除 {deleted_count} 条50天前的数据")
     finally:
         db_manager.close()
 
@@ -1619,7 +1621,7 @@ def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changshe
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 db_manager.execute_many(sql, batch)
-                print(f"[{company}] 已保存 {min(i + batch_size, len(processed_data))} / {len(processed_data)} 条")
+                logger.info(f"[{company}] 已保存 {min(i + batch_size, len(processed_data))} / {len(processed_data)} 条")
 
     finally:
         db_manager.close()
@@ -1630,7 +1632,7 @@ def save_supplier_to_virtual_inventory(df, supplier_name="供应商"):
     保存供应商库存数据到各公司虚拟库存表
     """
     if df is None or df.empty:
-        print(f"{supplier_name}库存数据为空，跳过保存")
+        logger.info(f"{supplier_name}库存数据为空，跳过保存")
         return
 
     is_wantuo = supplier_name == "佛山万拓"
@@ -1706,7 +1708,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                 if "Lost connection" in str(e) or "10060" in str(e):
                     if attempt == 2:
                         raise Exception(f"[{company}] 获取token失败，数据库连接超时: {e}")
-                    print(f"[{company}] 数据库连接超时，第{attempt + 1}次重试...")
+                    logger.info(f"[{company}] 数据库连接超时，第{attempt + 1}次重试...")
                     time.sleep(2)
                 else:
                     raise
@@ -1774,7 +1776,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
         for i, group in enumerate(record_groups):
             # 使用传入的token，不再重复获取
             if token is None:
-                print(f"[{company}] 未提供token，跳过批次 {i+1}")
+                logger.info(f"[{company}] 未提供token，跳过批次 {i+1}")
                 continue
 
             url = "https://openapi.gzbbr.com/Product.Quote/batchSave"
@@ -1794,42 +1796,42 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                     break
                 except requests.exceptions.ConnectTimeout:
                     if attempt == 2:
-                        print(f'[{company}] 批次 {i+1} 连接超时，跳过此批次')
+                        logger.info(f'[{company}] 批次 {i+1} 连接超时，跳过此批次')
                         continue
                     time.sleep(10)
                 except requests.exceptions.ReadTimeout:
                     if attempt == 2:
-                        print(f'[{company}] 批次 {i+1} 读取超时，跳过此批次')
+                        logger.info(f'[{company}] 批次 {i+1} 读取超时，跳过此批次')
                         continue
                     time.sleep(10)
                 except requests.exceptions.ConnectionError as e:
                     if "Read timed out" in str(e):
                         if attempt == 2:
-                            print(f'[{company}] 批次 {i+1} 读取超时，跳过此批次')
+                            logger.info(f'[{company}] 批次 {i+1} 读取超时，跳过此批次')
                             continue
                         time.sleep(10)
                     else:
                         if attempt == 2:
-                            print(f'[{company}] 批次 {i+1} 连接错误，跳过此批次')
+                            logger.info(f'[{company}] 批次 {i+1} 连接错误，跳过此批次')
                             continue
                         time.sleep(10)
                 except Exception as e:
                     if attempt == 2:
-                        print(f'[{company}] 批次 {i+1} 发生未知错误，跳过此批次')
+                        logger.info(f'[{company}] 批次 {i+1} 发生未知错误，跳过此批次')
                         continue
                     time.sleep(10)
 
             if response is None:
-                print(f"[{company}] 批次 {i+1} 响应为空，跳过")
+                logger.info(f"[{company}] 批次 {i+1} 响应为空，跳过")
                 continue
 
             try:
                 result = json.loads(response.text)
             except json.JSONDecodeError:
-                print(f'[{company}] 批次 {i+1} 响应不是有效的JSON格式')
+                logger.info(f'[{company}] 批次 {i+1} 响应不是有效的JSON格式')
                 continue
             except Exception as e:
-                print(f'[{company}] 批次 {i+1} 解析响应时发生错误: {e}')
+                logger.exception(f'[{company}] 批次 {i+1} 解析响应时发生错误')
                 continue
 
             # 更新数据库中的update_msg字段
@@ -1844,7 +1846,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                     all_results = succes_data + error_data
                     all_results.sort(key=lambda x: x['no'])
 
-                    print(f'[{company}] 批次 {i+1}/{total_groups}: 成功上传 {result["data"]["succes_num"]} 条, 失败 {result["data"]["error_num"]} 条')
+                    logger.info(f'[{company}] 批次 {i+1}/{total_groups}: 成功上传 {result["data"]["succes_num"]} 条, 失败 {result["data"]["error_num"]} 条')
 
                     # 根据公司确定要更新的表
                     table_map = {
@@ -1908,12 +1910,10 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                             WHERE id = %s
                         """
                         db_manager.execute_many(update_sql, update_data)
-                        print(f"[{company}] 已更新 {len(update_data)} 条记录到 {table_name}")
+                        logger.info(f"[{company}] 已更新 {len(update_data)} 条记录到 {table_name}")
 
             except Exception as e:
-                print(f"[{company}] 更新数据库时出错: {e}")
-                import traceback
-                traceback.print_exc()  # 打印详细错误信息
+                logger.exception(f"[{company}] 更新数据库时出错")
             finally:
                 db_manager.close()
 
@@ -1939,53 +1939,53 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
     }
 
     # 一次性获取所有公司的 token
-    print("\n" + "="*60)
-    print("开始预获取所有公司 token...")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("开始预获取所有公司 token...")
+    logger.info("="*60)
     company_tokens = {}
     for company in companies:
         try:
             token = login(company)
             if token:
                 company_tokens[company] = token
-                print(f"[{company}] 成功获取 token")
+                logger.info(f"[{company}] 成功获取 token")
             else:
-                print(f"[{company}] 获取 token 失败: 返回空值")
+                logger.error(f"[{company}] 获取 token 失败: 返回空值")
                 company_tokens[company] = None
         except Exception as e:
-            print(f"[{company}] 获取 token 失败: {e}")
+            logger.exception(f"[{company}] 获取 token 失败")
             company_tokens[company] = None
-    print("="*60)
+    logger.info("="*60)
 
     # 循环推送到各公司
     for company in companies:
         # 检查是否有可用 token
         if not company_tokens.get(company):
-            print(f"\n[{company}] 没有可用 token，跳过")
+            logger.info(f"\n[{company}] 没有可用 token，跳过")
             continue
         company_start_time = time.time()
         table_name = table_map[company]
 
-        print(f"\n{'='*60}")
-        print(f"开始向 [{company}] 推送数据...")
-        print(f"从表 [{table_name}] 读取数据")
-        print(f"{'='*60}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"开始向 [{company}] 推送数据...")
+        logger.info(f"从表 [{table_name}] 读取数据")
+        logger.info(f"{'='*60}")
 
         # 使用预获取的token
         token = company_tokens[company]
-        print(f"[{company}] 使用预获取的token...")
+        logger.info(f"[{company}] 使用预获取的token...")
 
         ck_data = getAllCassWarehouse(token)
         if ck_data is None or ck_data.empty:
-            print(f"[{company}] 获取仓库数据失败，跳过")
+            logger.error(f"[{company}] 获取仓库数据失败，跳过")
             continue
 
         gys_data = getAllSupplierChannel(token)
         if gys_data is None or gys_data.empty:
-            print(f"[{company}] 获取供应商数据失败，跳过")
+            logger.error(f"[{company}] 获取供应商数据失败，跳过")
             continue
 
-        print(f"[{company}] 成功获取token和仓库/供应商数据")
+        logger.info(f"[{company}] 成功获取token和仓库/供应商数据")
 
         # ========== 游标分页处理（按 id 升序逐页拉取并上传，避免一次性把全表数据装入内存导致 OOM） ==========
         PAGE_SIZE = 5000  # 单页拉取行数，过小会增加 SQL 次数，过大会失去内存优化效果
@@ -2006,7 +2006,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                 """
             range_rows = db_manager.execute_query(range_sql)
         except Exception as e:
-            print(f"[{company}] 查询 id 范围失败: {e}")
+            logger.exception(f"[{company}] 查询 id 范围失败")
             db_manager.close()
             continue
         finally:
@@ -2016,13 +2016,13 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                 pass
 
         if not range_rows or range_rows[0].get('cnt') in (None, 0) or range_rows[0].get('max_id') is None:
-            print(f"[{company}] 没有数据需要上传")
+            logger.info(f"[{company}] 没有数据需要上传")
             continue
 
         min_id = range_rows[0]['min_id']
         max_id_lock = range_rows[0]['max_id']
         total_count = range_rows[0]['cnt']
-        print(f"[{company}] 待上传 {total_count} 条，id 范围 [{min_id}, {max_id_lock}]，分页大小 {PAGE_SIZE}")
+        logger.info(f"[{company}] 待上传 {total_count} 条，id 范围 [{min_id}, {max_id_lock}]，分页大小 {PAGE_SIZE}")
 
         from ..inventory_tasks import filter_by_blacklist  # 提前导入，避免循环内重复导入
 
@@ -2063,7 +2063,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                     """
                 rows = db_manager.execute_query(page_sql, (last_id, max_id_lock, PAGE_SIZE))
             except Exception as e:
-                print(f"[{company}] 页 {page_no} 查询失败: {e}")
+                logger.exception(f"[{company}] 页 {page_no} 查询失败")
                 rows = None
             finally:
                 try:
@@ -2085,7 +2085,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                 rows = filter_by_blacklist(rows)
                 removed_count = rows_before_filter - len(rows)
                 if removed_count > 0:
-                    print(f"[{company}] 页 {page_no} 黑名单剔除 {removed_count} 条")
+                    logger.info(f"[{company}] 页 {page_no} 黑名单剔除 {removed_count} 条")
 
                 # 非佛山公司过滤掉菲尔品牌
                 if company != 'fsbbr':
@@ -2093,10 +2093,10 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                     rows = [row for row in rows if row.get('brand') != '菲尔']
                     feier_removed = rows_before_feier - len(rows)
                     if feier_removed > 0:
-                        print(f"[{company}] 页 {page_no} 菲尔品牌剔除 {feier_removed} 条")
+                        logger.info(f"[{company}] 页 {page_no} 菲尔品牌剔除 {feier_removed} 条")
 
                 if not rows:
-                    print(f"[{company}] 页 {page_no} 过滤后无数据，跳过")
+                    logger.info(f"[{company}] 页 {page_no} 过滤后无数据，跳过")
                     processed_total += page_row_count
                     continue
 
@@ -2139,7 +2139,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                 df_merged = pd.merge(df_merged, gys_data, left_on='供应商名称_映射', right_on='name', how='inner')
 
                 if df_merged.empty:
-                    print(f"[{company}] 页 {page_no} 没有匹配的仓库或供应商数据，跳过")
+                    logger.info(f"[{company}] 页 {page_no} 没有匹配的仓库或供应商数据，跳过")
                     processed_total += page_row_count
                     # 释放
                     del df, df_merged, rows, original_brand_series
@@ -2174,7 +2174,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                 result = batchSave(records, filtered_rows, brand_mapping_info, reverse_brand_mapping, df, company, token=token)
 
                 processed_total += page_row_count
-                print(f"[{company}] 页 {page_no} 完成（本页 {page_row_count} 条，累计 {processed_total}/{total_count}），耗时 {time.time() - page_start_time:.2f}s")
+                logger.info(f"[{company}] 页 {page_no} 完成（本页 {page_row_count} 条，累计 {processed_total}/{total_count}），耗时 {time.time() - page_start_time:.2f}s")
 
                 # 显式释放本页对象
                 del df, df_merged, df_final, df_data, records, filtered_rows, id_to_row
@@ -2183,9 +2183,7 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                 gc.collect()
 
             except Exception as e:
-                print(f"[{company}] 页 {page_no} 处理异常，跳过本页: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.exception(f"[{company}] 页 {page_no} 处理异常，跳过本页")
                 # 异常时也要释放可能存在的局部变量
                 try:
                     del df, df_merged, df_final, df_data, records, filtered_rows, id_to_row
@@ -2196,11 +2194,11 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
                 gc.collect()
                 continue
 
-        print(f"[{company}] 推送完成：应处理 {total_count} 条，累计扫描 {processed_total} 条，耗时 {time.time() - company_start_time:.2f}s")
+        logger.info(f"[{company}] 推送完成：应处理 {total_count} 条，累计扫描 {processed_total} 条，耗时 {time.time() - company_start_time:.2f}s")
 
-    print(f"\n{'='*60}")
-    print(f"所有公司推送完成，总耗时: {time.time() - start_time:.2f}s")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"所有公司推送完成，总耗时: {time.time() - start_time:.2f}s")
+    logger.info(f"{'='*60}")
     return result
 
 
@@ -2211,7 +2209,7 @@ def main_process():
     clear_brand_cache()
     
     # 预加载 crm_brand_list 品牌列表到缓存
-    print("正在加载 crm_brand_list 品牌列表...")
+    logger.info("正在加载 crm_brand_list 品牌列表...")
     load_crm_brand_list()
     
     # 清理当前业务时间范围内的数据
@@ -2234,54 +2232,48 @@ def main_process():
     
     # 获取昌盛库存数据
     try:
-        print("\n" + "="*60)
-        print("开始获取昌盛库存数据")
-        print("="*60)
+        logger.info("\n" + "="*60)
+        logger.info("开始获取昌盛库存数据")
+        logger.info("="*60)
         changsheng_df = fetch_changsheng_data()
         if changsheng_df is not None and not changsheng_df.empty:
             save_supplier_to_virtual_inventory(changsheng_df, "昌盛")
-            print(f"昌盛库存数据获取完成，共 {len(changsheng_df)} 条")
+            logger.info(f"昌盛库存数据获取完成，共 {len(changsheng_df)} 条")
         else:
-            print("昌盛库存数据为空")
-        print("="*60)
+            logger.info("昌盛库存数据为空")
+        logger.info("="*60)
     except Exception as e:
-        print(f"获取昌盛库存数据失败: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"获取昌盛库存数据失败")
 
     # 获取佛山万拓库存数据
     try:
-        print("\n" + "="*60)
-        print("开始获取佛山万拓库存数据")
-        print("="*60)
+        logger.info("\n" + "="*60)
+        logger.info("开始获取佛山万拓库存数据")
+        logger.info("="*60)
         wantuo_df = fetch_wantuo_data()
         if wantuo_df is not None and not wantuo_df.empty:
             save_supplier_to_virtual_inventory(wantuo_df, "佛山万拓")
-            print(f"佛山万拓库存数据获取完成，共 {len(wantuo_df)} 条")
+            logger.info(f"佛山万拓库存数据获取完成，共 {len(wantuo_df)} 条")
         else:
-            print("佛山万拓库存数据为空")
-        print("="*60)
+            logger.info("佛山万拓库存数据为空")
+        logger.info("="*60)
     except Exception as e:
-        print(f"获取佛山万拓库存数据失败: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"获取佛山万拓库存数据失败")
 
     # 获取盛旻库存数据
     try:
-        print("\n" + "="*60)
-        print("开始获取盛旻库存数据")
-        print("="*60)
+        logger.info("\n" + "="*60)
+        logger.info("开始获取盛旻库存数据")
+        logger.info("="*60)
         shengwen_df = fetch_shengwen_data()
         if shengwen_df is not None and not shengwen_df.empty:
             save_supplier_to_virtual_inventory(shengwen_df, "盛旻")
-            print(f"盛旻库存数据获取完成，共 {len(shengwen_df)} 条")
+            logger.info(f"盛旻库存数据获取完成，共 {len(shengwen_df)} 条")
         else:
-            print("盛旻库存数据为空")
-        print("="*60)
+            logger.info("盛旻库存数据为空")
+        logger.info("="*60)
     except Exception as e:
-        print(f"获取盛旻库存数据失败: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"获取盛旻库存数据失败")
 
     # 读取所有数据并整合到虚拟库存表（已通过各模块自动添加）
     db_manager = get_db_connection()
@@ -2296,7 +2288,7 @@ def main_process():
         ]
         for table, name in tables:
             count = db_manager.execute_query(f"SELECT COUNT(*) FROM {table}")[0]['COUNT(*)']
-            print(f"[{name}] 虚拟库存表处理了 {count} 条数据")
+            logger.info(f"[{name}] 虚拟库存表处理了 {count} 条数据")
     finally:
         db_manager.close()
     
@@ -2304,24 +2296,22 @@ def main_process():
     start_b2b_upload_with_brand_mapping(today_only=True)
     
     # 运行CRM产品新建（数据库模式）
-    print("\n" + "="*60)
-    print("开始运行CRM产品新建（数据库模式）")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("开始运行CRM产品新建（数据库模式）")
+    logger.info("="*60)
     try:
         from app.utils.crm_product.crm_productAdd.main import process_database_mode_api
         process_database_mode_api()
-        print("="*60)
-        print("CRM产品新建完成")
-        print("="*60)
+        logger.info("="*60)
+        logger.info("CRM产品新建完成")
+        logger.info("="*60)
     except Exception as e:
-        print(f"CRM产品新建失败: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"CRM产品新建失败")
 
     # ===== 保存当日统计数据到日志 =====
-    print("\n" + "="*60)
-    print("开始保存当日统计数据")
-    print("="*60)
+    logger.info("\n" + "="*60)
+    logger.info("开始保存当日统计数据")
+    logger.info("="*60)
     try:
         from app.services.virtual_inventory_stats_service import save_recent_statistics
 
@@ -2331,13 +2321,13 @@ def main_process():
         for result in results:
             if result['code'] == 0:
                 data = result['data']
-                print(f"[统计日志] 保存成功: {data['business_date']} {data['company']}")
+                logger.info(f"[统计日志] 保存成功: {data['business_date']} {data['company']}")
                 if latest_business_date is None:
                     latest_business_date = data['business_date']
                 if data['business_date'] == latest_business_date:
                     latest_stats.append(data)
             else:
-                print(f"[统计日志] 保存失败: {result['msg']}")
+                logger.error(f"[统计日志] 保存失败: {result['msg']}")
 
         if latest_stats:
             from app.utils.common_util_module.server_push import message_push
@@ -2360,12 +2350,12 @@ def main_process():
 
             try:
                 push_result = message_push('虚拟库存数据', '\n'.join(message_lines))
-                print(f"[统计日志] 微信推送结果: {push_result}")
+                logger.info(f"[统计日志] 微信推送结果: {push_result}")
             except Exception as push_error:
-                print(f"[统计日志] 微信推送失败: {push_error}")
+                logger.error(f"[统计日志] 微信推送失败: {push_error}")
     except Exception as e:
-        print(f"[统计日志] 保存时出错: {e}")
-    print("="*60)
+        logger.exception(f"[统计日志] 保存时出错")
+    logger.info("="*60)
 
 
 if __name__ == '__main__':

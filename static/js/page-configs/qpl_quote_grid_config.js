@@ -146,7 +146,9 @@ window.QplQuoteGridConfig = (function() {
                 { data: 'rowNumber', title: '行号', width: 70, className: 'row-number-cell', readOnly: true },
                 { data: 'item_oe', title: 'OE', width: 150, className: 'oe-cell', readOnly: true },
                 { data: 'item_name', title: '产品名称', width: 200, readOnly: true },
-                { data: 'occurrence_count', title: '出现次数', width: 120, className: 'count-cell', readOnly: true, type: 'numeric', numericFormat: { pattern: '0' } }
+                { data: 'occurrence_count', title: '出现次数', width: 120, className: 'count-cell', readOnly: true, type: 'numeric', numericFormat: { pattern: '0' } },
+                { data: 'ordered_count', title: '已下单数', width: 120, className: 'count-cell', readOnly: true, type: 'numeric', numericFormat: { pattern: '0' } },
+                { data: 'conversion_rate', title: '转化率(%)', width: 120, className: 'count-cell', readOnly: true, type: 'numeric', numericFormat: { pattern: '0.00' } }
             ],
             paramsBuilder: buildOeStatsParams,
             getFilterValues: function(colId, callback, params) {

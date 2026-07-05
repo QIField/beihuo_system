@@ -265,10 +265,10 @@ class MercedesLogin:
         response = self._direct_request(url, method="GET", headers=headers)
 
         if response and (response.status_code == 200 or response.status_code == 302):
-            print(f"  ✓ 成功访问初始页面")
+            print(f"  [成功] 成功访问初始页面")
             return True
         else:
-            print(f"  ✗ 访问初始页面失败: {response.status_code if response else '无响应'}")
+            print(f"  [失败] 访问初始页面失败: {response.status_code if response else '无响应'}")
             return False
 
     def _step2_visit_oauth_and_redirect(self) -> Optional[str]:
@@ -281,10 +281,10 @@ class MercedesLogin:
         response = self._direct_request(url, method="GET", headers=headers, allow_redirects=True)
 
         if not response:
-            print(f"  ✗ 访问 OAuth2 授权页面失败")
+            print(f"  [失败] 访问 OAuth2 授权页面失败")
             return None
 
-        print(f"  ✓ 成功访问 OAuth2 授权页面")
+        print(f"  [成功] 成功访问 OAuth2 授权页面")
 
         # 从响应历史中查找 login.mercedes-benz.com 的 URL
         login_url = None
@@ -307,16 +307,16 @@ class MercedesLogin:
             login_url = response.url
 
         if login_url:
-            print(f"  ✓ 找到登录页面 URL")
+            print(f"  [成功] 找到登录页面 URL")
             self.login_url_with_params = login_url
 
             # 访问最终的登录页面
             login_response = self._direct_request(login_url, method="GET")
             if login_response and (login_response.status_code == 200 or login_response.status_code == 302):
-                print(f"  ✓ 成功访问登录页面")
+                print(f"  [成功] 成功访问登录页面")
                 return login_response.text
 
-        print(f"  ✗ 无法获取登录页面内容")
+        print(f"  [失败] 无法获取登录页面内容")
         return None
 
     def _step3_extract_parameters(self, html_content: str) -> bool:
@@ -326,17 +326,17 @@ class MercedesLogin:
         # 提取 CSRF token
         self.csrf_token = self._extract_csrf_token(html_content)
         if self.csrf_token:
-            print(f"  ✓ 提取 CSRF Token 成功: {self.csrf_token[:20]}...")
+            print(f"  [成功] 提取 CSRF Token 成功: {self.csrf_token[:20]}...")
         else:
-            print(f"  ✗ 无法提取 CSRF Token")
+            print(f"  [失败] 无法提取 CSRF Token")
             success = False
 
         # 提取 RSA 公钥
         self.public_key_pem = self._extract_public_key(html_content)
         if self.public_key_pem:
-            print(f"  ✓ 提取 RSA 公钥成功")
+            print(f"  [成功] 提取 RSA 公钥成功")
         else:
-            print(f"  ✗ 无法提取 RSA 公钥")
+            print(f"  [失败] 无法提取 RSA 公钥")
             success = False
 
         # 从保存的登录 URL 中提取 resumePath 等参数
@@ -349,11 +349,11 @@ class MercedesLogin:
             self.unique_id = query_params.get('unique_id', [None])[0]
 
             if self.ping_resume:
-                print(f"  ✓ 提取 resumePath 成功: {self.ping_resume[:30]}...")
+                print(f"  [成功] 提取 resumePath 成功: {self.ping_resume[:30]}...")
             if self.ref_value:
-                print(f"  ✓ 提取 REF 成功: {self.ref_value[:20]}...")
+                print(f"  [成功] 提取 REF 成功: {self.ref_value[:20]}...")
             if self.unique_id:
-                print(f"  ✓ 提取 unique_id 成功: {self.unique_id}")
+                print(f"  [成功] 提取 unique_id 成功: {self.unique_id}")
 
         return success
 
@@ -371,7 +371,7 @@ class MercedesLogin:
         response = self._direct_request(url, method="GET", params=params, headers=headers)
 
         if response and response.status_code == 200:
-            print(f"  ✓ 成功提交用户名")
+            print(f"  [成功] 成功提交用户名")
             try:
                 data = response.json()
                 print(f"  - 获取到 loginFeature: {data.get('loginFeature', 'unknown')}")
@@ -379,7 +379,7 @@ class MercedesLogin:
                 pass
             return True
         else:
-            print(f"  ✗ 提交用户名失败: {response.status_code if response else '无响应'}")
+            print(f"  [失败] 提交用户名失败: {response.status_code if response else '无响应'}")
             return False
 
     def _step5_get_timestamp(self) -> bool:
@@ -394,7 +394,7 @@ class MercedesLogin:
         if response and response.status_code == 200:
             try:
                 self.timestamp = response.json()
-                print(f"  ✓ 成功获取时间戳: {self.timestamp}")
+                print(f"  [成功] 成功获取时间戳: {self.timestamp}")
                 return True
             except:
                 pass
@@ -402,13 +402,13 @@ class MercedesLogin:
         # 如果失败，使用本地时间作为备选
         import time
         self.timestamp = int(time.time() * 1000)
-        print(f"  ⚠ 使用本地时间作为备选: {self.timestamp}")
+        print(f"  [警告] 使用本地时间作为备选: {self.timestamp}")
         return True
 
     def _step6_submit_login_form(self) -> bool:
         """步骤 6: 提交登录表单"""
         if not self.public_key_pem:
-            print("  ✗ 没有 RSA 公钥，无法加密密码")
+            print("  [失败] 没有 RSA 公钥，无法加密密码")
             return False
 
         # 加密密码
@@ -455,31 +455,31 @@ class MercedesLogin:
         )
 
         if response:
-            print(f"  ✓ 登录表单提交，状态码: {response.status_code}")
+            print(f"  [成功] 登录表单提交，状态码: {response.status_code}")
 
             # 检查是否包含 code（授权码）
             auth_code_found = False
 
             # 检查最终 URL
             if hasattr(response, 'url') and 'code=' in response.url:
-                print(f"  ✓ 在最终 URL 中找到授权码")
+                print(f"  [成功] 在最终 URL 中找到授权码")
                 auth_code_found = True
 
             # 检查重定向历史
             if hasattr(response, 'history') and response.history:
                 for resp in response.history:
                     if 'location' in resp.headers and 'code=' in resp.headers['location']:
-                        print(f"  ✓ 在重定向中找到授权码")
+                        print(f"  [成功] 在重定向中找到授权码")
                         auth_code_found = True
                         break
 
             if auth_code_found:
                 return True
             else:
-                print(f"  ⚠ 未找到授权码，但继续尝试")
+                print(f"  [警告] 未找到授权码，但继续尝试")
                 return True
         else:
-            print(f"  ✗ 登录表单提交失败")
+            print(f"  [失败] 登录表单提交失败")
             return False
 
     def _step7_complete_oauth_callback(self) -> bool:
@@ -489,10 +489,10 @@ class MercedesLogin:
         response = self._direct_request(url, method="GET")
 
         if response and (response.status_code == 200 or response.status_code == 302):
-            print(f"  ✓ OAuth2 回调完成")
+            print(f"  [成功] OAuth2 回调完成")
             return True
         else:
-            print(f"  ✗ OAuth2 回调可能失败，状态码: {response.status_code if response else '无响应'}")
+            print(f"  [失败] OAuth2 回调可能失败，状态码: {response.status_code if response else '无响应'}")
             # 即使失败也继续，因为可能已经有 Cookie
             return True
 
@@ -632,23 +632,23 @@ class MercedesLoginService:
             cookie = config.get('cookie')  # pyright: ignore[reportAttributeAccessIssue]
             
             if cookie:
-                print("✓ 从数据库获取到配置")
+                print("[成功] 从数据库获取到配置")
                 
                 # 2. 验证cookie是否有效
                 print("\n[2/6] 验证数据库中的cookie...")
                 is_valid, error_msg = MercedesLoginService.validate_cookie(cookie)
                 
                 if is_valid:
-                    print("✓ 数据库中的cookie有效，直接使用现有配置")
+                    print("[成功] 数据库中的cookie有效，直接使用现有配置")
                     print("=" * 80)
                     return cookie
                 else:
-                    print(f"✗ Cookie验证失败: {error_msg}")
+                    print(f"[失败] Cookie验证失败: {error_msg}")
                     print("需要重新登录...")
             else:
-                print("✗ 数据库中没有有效的cookie")
+                print("[失败] 数据库中没有有效的cookie")
         else:
-            print("✗ 数据库中没有找到配置")
+            print("[失败] 数据库中没有找到配置")
 
         # 从配置中获取登录凭据
         username = config.get('username') if config else None  # pyright: ignore[reportAttributeAccessIssue]
@@ -664,11 +664,11 @@ class MercedesLoginService:
         
         if not success:
             error_msg = result.get('error', '未知登录错误')
-            print(f"✗ 登录失败: {error_msg}")
+            print(f"[失败] 登录失败: {error_msg}")
             print("=" * 80)
             raise Exception(f"登录失败: {error_msg}")
 
-        print("✓ API登录成功")
+        print("[成功] API登录成功")
         new_cookie = result['cookie']
 
         # 4. 保存到数据库 - 直接调用通用函数
@@ -684,23 +684,23 @@ class MercedesLoginService:
         
         if save_result.get('code') != 200:
             error_msg = save_result.get('message', '保存配置失败')
-            print(f"✗ {error_msg}")
+            print(f"[失败] {error_msg}")
             print("=" * 80)
             raise Exception(error_msg)
-        print("✓ 配置保存成功")
+        print("[成功] 配置保存成功")
 
         # 5. 再次验证新配置
         print("\n[5/6] 验证新保存的配置...")
         is_valid, error_msg = MercedesLoginService.validate_cookie(new_cookie)
 
         if is_valid:
-            print("✓ 新配置验证通过")
+            print("[成功] 新配置验证通过")
             print("\n[6/6] 获取有效配置完成")
             print("=" * 80)
             return new_cookie
         else:
             # 6. 如果还是失败则抛出异常
-            print(f"✗ 新配置验证失败: {error_msg}")
+            print(f"[失败] 新配置验证失败: {error_msg}")
             print("\n[6/6] 配置验证失败，异常抛出")
             print("=" * 80)
             raise Exception(f"新配置验证失败: {error_msg}")

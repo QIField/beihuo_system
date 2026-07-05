@@ -19,7 +19,7 @@ def log_step(step_name: str, start_time: float, end_time: float):
         end_time: 结束时间戳（秒）
     """
     elapsed_ms = (end_time - start_time) * 1000
-    print(f"⏱️ [{step_name}] 耗时: {elapsed_ms:.2f}ms")
+    print(f"[耗时] [{step_name}] 耗时: {elapsed_ms:.2f}ms")
 
 
 class CartRemoveService:

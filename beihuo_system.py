@@ -317,7 +317,7 @@ def run_virtual_inventory_task():
 # 注册每小时购物车高库存清理任务
 def run_cart_cleanup_task():
     """每小时自动清理购物车高库存商品"""
-    print(f"[{datetime.now()}] 🕒 开始执行每小时购物车高库存清理任务...")
+    print(f"[{datetime.now()}] [定时] 开始执行每小时购物车高库存清理任务...")
 
     try:
         from app.services.cart_service.cart_auto_cleanup import CartAutoCleanupService
@@ -333,12 +333,12 @@ def run_cart_cleanup_task():
         )
 
         if total_deleted > 0:
-            print(f"✅ 每小时购物车清理完成：共删除 {total_deleted} 个高库存商品")
+            print(f"[成功] 每小时购物车清理完成：共删除 {total_deleted} 个高库存商品")
         else:
-            print("ℹ️ 每小时购物车清理完成：无高库存商品需要清理")
+            print("[信息] 每小时购物车清理完成：无高库存商品需要清理")
 
     except Exception as e:
-        print(f"❌ 每小时购物车清理任务失败: {str(e)}")
+        print(f"[失败] 每小时购物车清理任务失败: {str(e)}")
 
 def print_task_debug_info():
     """打印任务执行调试信息"""
@@ -396,7 +396,7 @@ def auto_update_and_fetch():
     # 使用锁防止并发执行
     with updating_lock:
         if is_updating_flag:
-            print("🔄 自动更新已在执行中，跳过本次执行")
+            print("[更新] 自动更新已在执行中，跳过本次执行")
             return
         
         is_updating_flag = True
@@ -537,55 +537,55 @@ def update_all_stores():
                     if isinstance(result, dict):
                         if result.get('code') == 0:
                             success_count += 1
-                            print(f"✅ 门店 {company} 数据更新请求发送成功")
+                            print(f"[成功] 门店 {company} 数据更新请求发送成功")
                         else:
                             # 输出完整的错误信息
                             error_msg = result.get('msg', 'Unknown error')
-                            print(f"❌ 门店 {company} 数据更新请求失败: {error_msg}")
+                            print(f"[失败] 门店 {company} 数据更新请求失败: {error_msg}")
                             
                             # 检查响应中是否包含特定的成功提示（即使code不为0）
                             response_text = str(result)
                             if '正在更新' in response_text or '处理' in response_text:
                                 success_count += 1
-                                print(f"✅ 门店 {company} 数据更新请求已发送（正在后台处理）")
+                                print(f"[成功] 门店 {company} 数据更新请求已发送（正在后台处理）")
                     else:
-                        print(f"❌ 门店 {company} 数据更新响应格式异常: {result}")
+                        print(f"[失败] 门店 {company} 数据更新响应格式异常: {result}")
                         
                         # 如果响应不是预期的字典格式，检查文本内容
                         response_text = response.text
-                        print(f"💡 门店 {company} 响应内容预览: {response_text[:500]}")
+                        print(f"[灯泡] 门店 {company} 响应内容预览: {response_text[:500]}")
                         
                         # 检查是否包含成功或正在处理的关键词
                         if '正在更新' in response_text or '正在处理' in response_text or 'start' in response_text or 'running' in response_text:
                             success_count += 1
-                            print(f"✅ 门店 {company} 数据更新请求已发送（正在后台处理）")
+                            print(f"[成功] 门店 {company} 数据更新请求已发送（正在后台处理）")
                         else:
-                            print(f"❌ 门店 {company} 数据更新请求失败: 响应格式异常")
+                            print(f"[失败] 门店 {company} 数据更新请求失败: 响应格式异常")
                             
                 except json.JSONDecodeError:
                     # 如果响应不是JSON格式，检查文本内容中是否包含成功标识
                     response_text = response.text
-                    print(f"💡 门店 {company} 响应内容预览: {response_text[:500]}")
+                    print(f"[灯泡] 门店 {company} 响应内容预览: {response_text[:500]}")
                     
                     # 检查是否包含成功或正在处理的关键词
                     if '正在更新' in response_text or '正在处理' in response_text or 'start' in response_text or 'running' in response_text:
                         success_count += 1
-                        print(f"✅ 门店 {company} 数据更新请求已发送（正在后台处理）")
+                        print(f"[成功] 门店 {company} 数据更新请求已发送（正在后台处理）")
                     else:
-                        print(f"❌ 门店 {company} 数据更新请求失败: 无法解析响应")
+                        print(f"[失败] 门店 {company} 数据更新请求失败: 无法解析响应")
             else:
-                print(f"❌ 门店 {company} 数据更新请求HTTP错误 {response.status_code}: {response.text[:200]}...")
+                print(f"[失败] 门店 {company} 数据更新请求HTTP错误 {response.status_code}: {response.text[:200]}...")
                 
         except requests.exceptions.Timeout:
             # 超时可能意味着请求已发送，但响应较慢
             print(f"⏰ 门店 {company} 数据更新请求超时（可能仍在后台处理）")
             success_count += 1  # 假设请求已发送
         except requests.exceptions.RequestException as e:
-            print(f"❌ 门店 {company} 更新网络请求时出错: {str(e)}")
+            print(f"[失败] 门店 {company} 更新网络请求时出错: {str(e)}")
         except Exception as e:
-            print(f"❌ 门店 {company} 更新时出错: {str(e)}")
+            print(f"[失败] 门店 {company} 更新时出错: {str(e)}")
     
-    print(f"✅ 自动更新完成！成功发送更新请求到 {success_count}/{len(companies)} 个门店")
+    print(f"[成功] 自动更新完成！成功发送更新请求到 {success_count}/{len(companies)} 个门店")
 
     try:
         from app.services.data_sync_service.update_completion_handler import UpdateCompletionHandler
@@ -594,9 +594,9 @@ def update_all_stores():
         
         if cleanup_results['cart_cleanup']['status'] == 'completed':
             total_deleted = cleanup_results['cart_cleanup']['total_deleted']
-            print(f"🕒 定时更新后清理完成：共删除 {total_deleted} 个高库存商品")
+            print(f"[定时] 定时更新后清理完成：共删除 {total_deleted} 个高库存商品")
     except Exception as e:
-        print(f"❌ 定时更新后清理失败: {str(e)}")
+        print(f"[失败] 定时更新后清理失败: {str(e)}")
 
 def auto_fetch_data():
     """自动拉取数据 - 添加锁防止并发"""
@@ -613,20 +613,20 @@ def auto_fetch_data():
                 processed_count = fetch_data_for_company(company)
                 if processed_count >= 0:  # 成功时返回非负数
                     success_count += 1
-                    print(f"✅ 门店 {company} 数据自动拉取完成，处理了 {processed_count} 条记录")
+                    print(f"[成功] 门店 {company} 数据自动拉取完成，处理了 {processed_count} 条记录")
                 else:
-                    print(f"❌ 门店 {company} 数据自动拉取失败")
+                    print(f"[失败] 门店 {company} 数据自动拉取失败")
             except Exception as e:
-                print(f"❌ 门店 {company} 自动拉取时出错: {str(e)}")
+                print(f"[失败] 门店 {company} 自动拉取时出错: {str(e)}")
         
         # 拉取数据完成后，更新购物车数据
         try:
             update_cart_data()
-            print("🛒 购物车数据自动更新完成")
+            print("[购物车] 购物车数据自动更新完成")
         except Exception as e:
-            print(f"🛒 购物车数据自动更新失败: {str(e)}")
+            print(f"[购物车] 购物车数据自动更新失败: {str(e)}")
         
-        print(f"✅ 自动拉取数据完成！成功更新 {success_count}/{len(companies)} 个门店的数据")
+        print(f"[成功] 自动拉取数据完成！成功更新 {success_count}/{len(companies)} 个门店的数据")
 
 
 
@@ -679,12 +679,12 @@ def fetch_data_for_company(company):
             timeout=120
         )
         
-        print(f"📊 {company} 拉取数据API响应状态码: {response.status_code}")
+        print(f"[统计] {company} 拉取数据API响应状态码: {response.status_code}")
         
         if response.status_code == 200:
             try:
                 result = response.json()
-                print(f"📊 {company} 拉取数据API响应内容类型: {type(result)}, keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
+                print(f"[统计] {company} 拉取数据API响应内容类型: {type(result)}, keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
                 
                 # 检查响应格式 - 实际API返回的是直接包含'data'的数据，而非标准格式
                 if isinstance(result, dict):
@@ -693,12 +693,12 @@ def fetch_data_for_company(company):
                         # 处理返回的数据
                         data_list = result.get("data", [])
                         if not isinstance(data_list, list):
-                            print(f"⚠️ company={company} 返回数据格式异常")
+                            print(f"[警告] company={company} 返回数据格式异常")
                             return 0
 
                         # 获取接口返回的更新时间（如果有的话）
                         gx_date = result.get("gx_date", None)
-                        print(f"📅 接口数据更新时间 (company={company}): {gx_date}")
+                        print(f"[日历] 接口数据更新时间 (company={company}): {gx_date}")
 
                         # 使用与手动拉取相同的字段定义和SQL构造方式
                         # 定义字段映射：API字段名 -> 数据库字段名
@@ -784,7 +784,7 @@ def fetch_data_for_company(company):
 
                         try:
                             cursor.execute("DELETE FROM crmapp_beihuo WHERE company = %s", (company,))
-                            print(f"🗑️ 已清空门店 {company} 的现有数据，准备插入 {total} 条记录")
+                            print(f"[垃圾桶] 已清空门店 {company} 的现有数据，准备插入 {total} 条记录")
 
                             # 批量插入新数据 - 使用字典列表，完全避免顺序依赖
                             batch_count = 0
@@ -812,53 +812,53 @@ def fetch_data_for_company(company):
 
                                 if batch_count % commit_interval == 0:
                                     conn.commit()
-                                    print(f"📊 门店 {company} 插入进度: {processed}/{total} ({processed*100//total}%)")
+                                    print(f"[统计] 门店 {company} 插入进度: {processed}/{total} ({processed*100//total}%)")
 
                             conn.commit()
-                            print(f"✅ 门店 {company} 数据插入完成，共 {processed} 条记录")
+                            print(f"[成功] 门店 {company} 数据插入完成，共 {processed} 条记录")
 
                         except Exception as e:
                             conn.rollback()
-                            print(f"❌ 插入失败 (company={company}): {str(e)}")
+                            print(f"[失败] 插入失败 (company={company}): {str(e)}")
                             return -1
                         finally:
                             cursor.close()
                             conn.close()
 
-                        print(f"✅ 门店 {company} 数据自动拉取完成，处理了 {processed} 条记录")
+                        print(f"[成功] 门店 {company} 数据自动拉取完成，处理了 {processed} 条记录")
                         return processed
                     else:
                         # 如果没有'data'字段，可能返回的是错误信息
-                        print(f"❌ API请求失败 (company={company}): 响应中没有'data'字段，响应内容: {result}")
+                        print(f"[失败] API请求失败 (company={company}): 响应中没有'data'字段，响应内容: {result}")
                         return -1
                 else:
-                    print(f"❌ company={company} 返回的数据格式不是字典: {type(result)}")
+                    print(f"[失败] company={company} 返回的数据格式不是字典: {type(result)}")
                     return -1
             except json.JSONDecodeError:
                 # 响应不是JSON格式，检查文本内容
                 response_text = response.text
-                print(f"📊 {company} 非JSON响应内容: {response_text[:500]}...")
+                print(f"[统计] {company} 非JSON响应内容: {response_text[:500]}...")
                 
                 # 检查是否包含成功或正在处理的关键词
                 if '正在' in response_text or '处理' in response_text or 'start' in response_text or 'running' in response_text:
-                    print(f"✅ 门店 {company} 数据拉取请求已发送（正在后台处理）")
+                    print(f"[成功] 门店 {company} 数据拉取请求已发送（正在后台处理）")
                     return 0  # 表示请求已发送
                 else:
-                    print(f"❌ {company} 响应无法解析为JSON且不包含处理信息")
+                    print(f"[失败] {company} 响应无法解析为JSON且不包含处理信息")
                     return -1
         else:
-            print(f"❌ API请求失败 (company={company}), 状态码: {response.status_code}")
-            print(f"❌ 响应内容: {response.text[:500]}...")
+            print(f"[失败] API请求失败 (company={company}), 状态码: {response.status_code}")
+            print(f"[失败] 响应内容: {response.text[:500]}...")
             return -1
         
     except requests.exceptions.Timeout:
         print(f"⏰ 门店 {company} 数据拉取请求超时（可能仍在后台处理）")
         return 0  # 超时情况下假设请求已发送
     except requests.exceptions.RequestException as e:
-        print(f"❌ 门店 {company} 拉取网络请求时出错: {str(e)}")
+        print(f"[失败] 门店 {company} 拉取网络请求时出错: {str(e)}")
         return -1
     except Exception as e:
-        print(f"❌ 门店 {company} 拉取时出错: {str(e)}")
+        print(f"[失败] 门店 {company} 拉取时出错: {str(e)}")
         return -1
 
 # 配置定时任务 - 使用 task_manager
@@ -1199,12 +1199,12 @@ def update_user(user_id):
             params.append(user_id)
             cursor.execute(sql, params)
             conn.commit()
-            print(f"✅ 用户 {target_username} 信息更新成功")
+            print(f"[成功] 用户 {target_username} 信息更新成功")
         else:
-            print("ℹ️ 没有提供需要更新的字段")
+            print("[信息] 没有提供需要更新的字段")
     except Exception as e:
         import traceback
-        print(f"❌ 更新用户信息失败: {str(e)}")
+        print(f"[失败] 更新用户信息失败: {str(e)}")
         print(traceback.format_exc())
         conn.rollback()
         return jsonify({'code': 1, 'msg': f'更新失败: {str(e)}'}), 500
@@ -3266,11 +3266,11 @@ def update_cart_data():
                         cursor.executemany(update_sql, update_data_for_batch)
                         conn.commit()
             
-            print(f"✅ 购物车数据批量更新完成，共处理 {len(cart_items)} 条记录")
+            print(f"[成功] 购物车数据批量更新完成，共处理 {len(cart_items)} 条记录")
         else:
-            print("ℹ️ 购物车为空，无需更新")
+            print("[信息] 购物车为空，无需更新")
     except Exception as e:
-        print(f"❌ 更新购物车数据失败: {str(e)}")
+        print(f"[失败] 更新购物车数据失败: {str(e)}")
         conn.rollback()
     finally:
         conn.close()
@@ -3410,16 +3410,16 @@ def fetch_data_api():
                 response.raise_for_status()
                 result = response.json()
             except Exception as e:
-                print(f"❌ 请求失败 (company={company}): {e}")
+                print(f"[失败] 请求失败 (company={company}): {e}")
                 return 0  # 只返回处理数量
 
             # 获取接口返回的更新时间
             gx_date = result.get("gx_date", None)
-            print(f"📅 接口数据更新时间 (company={company}): {gx_date}")
+            print(f"[日历] 接口数据更新时间 (company={company}): {gx_date}")
 
             data_list = result.get("data", [])
             if not isinstance(data_list, list):
-                print(f"⚠️ company={company} 返回数据格式异常")
+                print(f"[警告] company={company} 返回数据格式异常")
                 return 0
 
             # 优化：增大批次大小，减少commit频率
@@ -3431,7 +3431,7 @@ def fetch_data_api():
             try:
                 # 1. 先清空当前门店的数据
                 cursor.execute("DELETE FROM crmapp_beihuo WHERE company = %s", (company,))
-                print(f"🗑️ 已清空门店 {company} 的现有数据，准备插入 {total} 条记录")
+                print(f"[垃圾桶] 已清空门店 {company} 的现有数据，准备插入 {total} 条记录")
 
                 # 2. 批量插入新数据 - 使用字典列表，完全避免顺序依赖
                 batch_count = 0
@@ -3460,15 +3460,15 @@ def fetch_data_api():
                     # 每commit_interval批次才commit一次
                     if batch_count % commit_interval == 0:
                         conn.commit()
-                        print(f"📊 门店 {company} 插入进度: {processed}/{total} ({processed*100//total}%)")
+                        print(f"[统计] 门店 {company} 插入进度: {processed}/{total} ({processed*100//total}%)")
 
                 # 最后提交剩余数据
                 conn.commit()
-                print(f"✅ 门店 {company} 数据插入完成，共 {processed} 条记录")
+                print(f"[成功] 门店 {company} 数据插入完成，共 {processed} 条记录")
 
             except Exception as e:
                 conn.rollback()
-                print(f"❌ 插入失败 (company={company}): {e}")
+                print(f"[失败] 插入失败 (company={company}): {e}")
                 return 0
 
             return processed
@@ -3604,10 +3604,10 @@ def load_data_api():
                 response.raise_for_status()
                 result = response.json()
                 
-                print(f"✅ {company} 数据更新完成")
+                print(f"[成功] {company} 数据更新完成")
                 return result
             except Exception as e:
-                print(f"❌ {company} 数据更新失败: {e}")
+                print(f"[失败] {company} 数据更新失败: {e}")
                 return None
         
         # 异步更新所有公司的数据
@@ -4499,8 +4499,8 @@ def init_background_tasks():
             run_virtual_inventory_task,
             'cron',
             'virtual_inventory_daily',
-            hour=20,
-            minute=30,
+            hour=19,
+            minute=00,
             replace_existing=True
         )
 

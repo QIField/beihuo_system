@@ -8,6 +8,7 @@ import os
 import json
 import io
 import math
+import logging
 from contextlib import redirect_stdout
 
 # 关闭 urllib3 HTTPS 证书验证警告（奔驰接口使用 verify=False）
@@ -40,19 +41,23 @@ from qpl_config import (
 )
 from brand_match_config import get_crm_brand_names
 
+import logging as _logging
+
+_qpl_logger = _logging.getLogger('qpl_auto_bill')
+
 try:
     from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
     CRM_SPIDER_AVAILABLE = True
 except ImportError:
     CRM_SPIDER_AVAILABLE = False
-    print("[汽配龙自动报价] CRM 爬虫模块未找到")
+    _qpl_logger.warning("[汽配龙自动报价] CRM 爬虫模块未找到")
 
 try:
     from app.services.car_parts_library_service.bmw_crawler import external_data_crawler
     BMW_SERVICE_AVAILABLE = True
 except ImportError:
     BMW_SERVICE_AVAILABLE = False
-    print("[汽配龙自动报价] 宝马服务模块未找到")
+    _qpl_logger.warning("[汽配龙自动报价] 宝马服务模块未找到")
 import requests
 
 try:
@@ -60,7 +65,7 @@ try:
     MERCEDES_SERVICE_AVAILABLE = True
 except ImportError:
     MERCEDES_SERVICE_AVAILABLE = False
-    print("[汽配龙自动报价] 奔驰服务模块未找到")
+    _qpl_logger.warning("[汽配龙自动报价] 奔驰服务模块未找到")
 
 
 def submit_quote(quote_request, company='fsbbr'):
@@ -87,35 +92,67 @@ def query_mercedes_service_all(oe_list):
         oe_list: OE列表（去重后）
 
     Returns:
-        dict: {oe: {'wholesale_price': xxx, 'stock_info': [...]}, ...}
+        tuple: (oe_price_map, has_request_error, has_price_but_no_stock, has_invalid_price)
+            - oe_price_map: {oe: {'wholesale_price': xxx, 'stock_info': [...]}, ...}
+            - has_request_error: 是否所有OE都没返回零件信息
+            - has_price_but_no_stock: 是否有OE有有效价格但无库存
+            - has_invalid_price: 是否有OE返回了数据但价格无效
     """
     oe_price_map = {}
+    has_request_error = False
+    has_price_but_no_stock = False
+    has_invalid_price = False
+    found_any_data = False
+
     for oe in oe_list:
         try:
             # 抑制奔驰服务的冗长输出
             buf = io.StringIO()
             with redirect_stdout(buf):
                 result = by_part_number_get_data(oe)
-            if result and result.get('part_info'):
-                oe_price_map[oe] = {
-                    'wholesale_price': result['part_info'].get('wholesale_price', 0),
-                    'stock_info': result.get('stock_info', [])
-                }
+            if not result or not result.get('part_info'):
+                continue
+
+            found_any_data = True
+            wholesale_price = result['part_info'].get('wholesale_price', 0)
+            try:
+                price = float(wholesale_price)
+            except (ValueError, TypeError):
+                price = 0
+
+            if price <= 0:
+                has_invalid_price = True
+                continue
+
+            stock_info = result.get('stock_info', [])
+            selected_warehouse, _ = select_warehouse_and_days(stock_info)
+            if not selected_warehouse:
+                has_price_but_no_stock = True
+                continue
+
+            oe_price_map[oe] = {
+                'wholesale_price': price,
+                'stock_info': stock_info
+            }
         except Exception:
             continue
-    return oe_price_map
+
+    if not found_any_data:
+        has_request_error = True
+
+    return oe_price_map, has_request_error, has_price_but_no_stock, has_invalid_price
 
 
 # 失败原因常量
-FAIL_NO_ORIGINAL_PRODUCT = "适配列表为空，无原厂产品"
+FAIL_ADAPT_LIST_EMPTY = "适配列表为空"
+FAIL_NO_ORIGINAL_PRODUCT = "无原厂产品"
+FAIL_ORIGINAL_PRODUCT_NO_OE = "原厂产品无 OE"
 FAIL_OE_DATA_MISSING = "零件信息请求失败"
-FAIL_NO_VALID_OE_FOR_PRODUCT = "当前产品无可用OE"
-FAIL_NO_STOCK = "无可用库存"
+FAIL_NO_STOCK = "无库存"
 FAIL_INVALID_PRICE = "价格无效"
 FAIL_PART_NO_MISMATCH = "partNo未匹配"
 FAIL_NO_EFFECTIVE_PRICE = "无有效价格"
-FAIL_PRICE_CHECK_FAILED = "价格校验失败"
-FAIL_PROGRAM_UNPROCESSED = "程序未处理"
+FAIL_PRICE_CHECK_FAILED = "价格检测失败"
 
 
 # 通用工具函数
@@ -142,17 +179,6 @@ def _format_price_check_error(product, error):
     brand = product.get('brandName', '未知品牌')
     oe = product.get('itemPerhapsReplaceOe') or product.get('oe', '未知OE')
     return f"{brand} {oe}: {error}"
-
-
-def _ensure_waiting_items_covered(detail_data, quote_items, failed_items):
-    """兜底：确保所有 WAITING_QUOTE item 都有处理结果"""
-    for demand in detail_data.get('supplierEnquiryDemandList', []):
-        for item in demand.get('supplierEnquiryItemList', []):
-            item_id = item.get('enquiryItemId')
-            if (str(item.get('quoteStatus', '')).strip() == 'WAITING_QUOTE' and
-                item_id not in quote_items and
-                item_id not in failed_items):
-                failed_items[item_id] = FAIL_PROGRAM_UNPROCESSED
 
 
 def _filter_processed_orders(order_nos, company, begin_date, end_date):
@@ -242,11 +268,15 @@ def _validate_adapt_list(enquiry_item_id, enquiry_no, company):
 
     Returns:
         tuple: (data, error)
-            - data: {'brand': factory_brand, 'products': factory_product_list} 或 None
+            - data: {'brand': factory_brand, 'products': factory_product_list,
+                     'brand_list': brand_list} 或 None
             - error: 错误信息字符串 或 None
     """
     adapt_result = get_adapt_product_brand(enquiry_item_id, enquiry_no, company)
     brand_list = adapt_result.get('data', {}).get('brandList', [])
+
+    if not brand_list:
+        return None, FAIL_ADAPT_LIST_EMPTY
 
     factory_brand = next((b for b in brand_list if b.get('brandTypeDesc') == '原厂'), None)
     if not factory_brand:
@@ -254,9 +284,9 @@ def _validate_adapt_list(enquiry_item_id, enquiry_no, company):
 
     factory_product_list = factory_brand.get('productList', [])
     if not factory_product_list:
-        return None, FAIL_NO_ORIGINAL_PRODUCT
+        return None, FAIL_ORIGINAL_PRODUCT_NO_OE
 
-    return {'brand': factory_brand, 'products': factory_product_list}, None
+    return {'brand': factory_brand, 'products': factory_product_list, 'brand_list': brand_list}, None
 
 
 def _get_best_price_info(product, oe_price_map):
@@ -420,17 +450,21 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
         company: 组织代码
 
     Returns:
-        tuple: (crm_quote_items, original_quoted_ids, crm_failed_items)
+        tuple: (crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices)
             - crm_quote_items: {enquiry_item_id: [quote_item, ...]}
             - original_quoted_ids: CRM 报上原厂品牌的 enquiry_item_id 集合
             - crm_failed_items: {enquiry_item_id: reason}
+            - crm_failed_brand_names: {enquiry_item_id: 实际匹配到的 CRM 候选品牌名}
+            - crm_failed_item_prices: {enquiry_item_id: 价格检测失败时的尝试价格}
     """
     if not CRM_SPIDER_AVAILABLE:
-        return {}, set(), {}
+        return {}, set(), {}, {}, {}
 
     crm_quote_items = {}
     original_quoted_ids = set()
     crm_failed_items = {}
+    crm_failed_brand_names = {}
+    crm_failed_item_prices = {}
 
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
@@ -510,6 +544,9 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                 quoted_for_item = []
                 has_original = False
                 max_failure_stage = 0  # 0=品牌, 1=partNo, 2=价格, 3=价格校验
+                matched_brand_name = None  # 推进最远的候选品牌名（用于失败展示）
+                matched_sell_price = None  # 推进最远时的尝试价格
+                last_price_check_error = None  # 价格校验失败时的响应信息
 
                 for candidate in candidates:
                     brand = candidate['brand']
@@ -519,21 +556,28 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                     part_no = candidate['part_no']
 
                     crm_brand_names = get_crm_brand_names(brand_name, brand_type_desc)
+                    is_original_factory = brand_type_desc == '原厂'
 
                     brand_matched_products = []
                     for crm_product in crm_products:
                         crm_brand_name = str(crm_product.get('brand_name', '')).strip()
-                        if crm_brand_name in crm_brand_names:
-                            brand_matched_products.append(crm_product)
+                        if crm_brand_name not in crm_brand_names:
+                            continue
+                        # 原厂国内4s件必须校验 itemOe 与 CRM 返回的 number 完全一致
+                        if is_original_factory:
+                            crm_number = str(crm_product.get('number', '') or '').strip()
+                            if crm_number != item_oe:
+                                continue
+                        brand_matched_products.append(crm_product)
 
                     if not brand_matched_products:
                         continue
 
                     # 有品牌匹配
-                    if part_no:
-                        max_failure_stage = max(max_failure_stage, 1)
-                    else:
-                        max_failure_stage = max(max_failure_stage, 2)
+                    stage_after_brand = 1 if part_no else 2
+                    if stage_after_brand > max_failure_stage:
+                        max_failure_stage = stage_after_brand
+                        matched_brand_name = brand_name
 
                     # 再按 partNo 严格匹配
                     if part_no:
@@ -550,7 +594,11 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                         continue
 
                     # partNo 匹配（或无 partNo 要求）
-                    max_failure_stage = max(max_failure_stage, 2)
+                    if 2 > max_failure_stage:
+                        max_failure_stage = 2
+                        matched_brand_name = brand_name
+                    elif max_failure_stage == 2 and matched_brand_name is None:
+                        matched_brand_name = brand_name
 
                     crm_product = matched_crm_products[0]
                     qpl_price_str = crm_product.get('qpl_price', '')
@@ -565,9 +613,16 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                     if qpl_price <= 0:
                         continue
 
-                    # 有有效价格
-                    max_failure_stage = max(max_failure_stage, 3)
                     sell_price = math.ceil(qpl_price)
+
+                    # 有有效价格
+                    if 3 > max_failure_stage:
+                        max_failure_stage = 3
+                        matched_brand_name = brand_name
+                        matched_sell_price = sell_price
+                    elif max_failure_stage == 3 and matched_brand_name is None:
+                        matched_brand_name = brand_name
+                        matched_sell_price = sell_price
 
                     product_info = {
                         'pid': candidate['pid'],
@@ -581,6 +636,7 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                     )
 
                     if error:
+                        last_price_check_error = error
                         continue
 
                     all_brand_products = brand.get('productList', [])
@@ -600,18 +656,24 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                 elif max_failure_stage > 0:
                     # 品牌已匹配但后续失败才记录；品牌未匹配（stage=0）不记录
                     reason_map = {
-                        1: "partNo未匹配",
-                        2: "无有效价格",
-                        3: "价格校验失败",
+                        1: FAIL_PART_NO_MISMATCH,
+                        2: FAIL_NO_EFFECTIVE_PRICE,
+                        3: FAIL_PRICE_CHECK_FAILED,
                     }
                     reason = reason_map.get(max_failure_stage, "CRM未匹配")
+                    if max_failure_stage == 3 and last_price_check_error:
+                        reason = f"{FAIL_PRICE_CHECK_FAILED}: {last_price_check_error}"
                     crm_failed_items[enquiry_item_id] = (reason, item_has_original_candidate)
+                    if matched_brand_name:
+                        crm_failed_brand_names[enquiry_item_id] = matched_brand_name
+                    if max_failure_stage == 3 and matched_sell_price is not None:
+                        crm_failed_item_prices[enquiry_item_id] = matched_sell_price
 
             except Exception as e:
                 qpl_log(f"[{company}] CRM现货流程处理异常: {e}", order_no=enquiry_no)
-                continue
+                raise
 
-    return crm_quote_items, original_quoted_ids, crm_failed_items
+    return crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices
 
 
 def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
@@ -624,15 +686,17 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
         skip_item_ids: 需要跳过的 enquiry_item_id 集合（CRM 已报原厂品牌）
 
     Returns:
-        tuple: (mercedes_quote_items, summary_list, failed_items)
+        tuple: (mercedes_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices)
     """
     if not MERCEDES_SERVICE_AVAILABLE:
-        return {}, [], {}
+        return {}, [], {}, {}, {}
 
     skip_item_ids = skip_item_ids or set()
     mercedes_quote_items = {}
     summary_list = []
     failed_items = {}
+    failed_brand_names = {}
+    failed_item_prices = {}
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
     car_brand = detail_data.get('carBrand', '')
@@ -649,96 +713,109 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
 
             category_id = _extract_category_id(item)
 
-            try:
-                # 适配列表校验
-                adapt_data, error = _validate_adapt_list(enquiry_item_id, enquiry_no, company)
-                if error:
+            # 适配列表校验
+            adapt_data, error = _validate_adapt_list(enquiry_item_id, enquiry_no, company)
+            if error:
+                if error == FAIL_ADAPT_LIST_EMPTY:
                     failed_items[enquiry_item_id] = error
-                    continue
-
-                factory_brand = adapt_data['brand']
-                factory_product_list = adapt_data['products']
-
-                # 查询价格
-                product_oe_list = list(set(
-                    oe for p in factory_product_list for oe in p.get('productOeList', [])
-                ))
-                if not product_oe_list:
-                    failed_items[enquiry_item_id] = FAIL_NO_ORIGINAL_PRODUCT
-                    continue
-
-                oe_price_map = query_mercedes_service_all(product_oe_list)
-                if not oe_price_map:
-                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
-                    continue
-
-                # 筛选有价格+库存的产品
-                valid_products = []
-                for product in factory_product_list:
-                    info = _get_best_price_info(product, oe_price_map)
-                    if info:
-                        valid_products.append({'product': product, 'info': info})
-
-                if not valid_products:
-                    failed_items[enquiry_item_id] = FAIL_NO_VALID_OE_FOR_PRODUCT
-                    continue
-
-                # priceCheck校验
-                price_check_errors = []
-                passed_products = []
-
-                for vp in valid_products:
-                    product = vp['product']
-                    product_info = vp['info']
-
-                    snapshot, error = _run_price_check(
-                        product, product_info, tid, car_brand,
-                        enquiry_no, enquiry_item_id, company
-                    )
-
-                    if error:
-                        price_check_errors.append(_format_price_check_error(product, error))
-                    else:
-                        passed_products.append({
-                            'product': product,
-                            'info': product_info,
-                            'snapshot': snapshot
-                        })
-
-                if not passed_products:
-                    failed_items[enquiry_item_id] = "；".join(price_check_errors)
-                    continue
-
-                # 构造报价项
-                quote_items_for_item = []
-                for pp in passed_products:
-                    _, prepare_good_timespan = select_warehouse_and_days(pp['info']['stock_info'])
-                    quote_item = construct_adapter_quote_item(
-                        factory_brand, pp['product'], factory_product_list,
-                        pp['info']['sell_price'], prepare_good_timespan,
-                        pp['snapshot'], category_id
-                    )
-                    quote_items_for_item.append(quote_item)
-
-                mercedes_quote_items[enquiry_item_id] = quote_items_for_item
-
-                # 收集汇总信息
-                last_pp = passed_products[-1]
-                summary_list.append({
-                    'item_oe': item_oe,
-                    'item_name': item_name,
-                    'price': last_pp['info']['sell_price'],
-                    'days': prepare_good_timespan,
-                    'product_count': len(quote_items_for_item)
-                })
-
-            except Exception as e:
-                failed_items[enquiry_item_id] = f"处理异常: {str(e)}"
+                    failed_brand_names[enquiry_item_id] = '无法报价'
+                # 无原厂产品：不记录
                 continue
 
-    _ensure_waiting_items_covered(detail_data, mercedes_quote_items, failed_items)
+            factory_brand = adapt_data['brand']
+            factory_product_list = adapt_data['products']
+            factory_brand_name = factory_brand.get('brandName') if factory_brand else None
 
-    return mercedes_quote_items, summary_list, failed_items
+            # 查询价格
+            product_oe_list = list(set(
+                oe for p in factory_product_list for oe in p.get('productOeList', [])
+            ))
+            if not product_oe_list:
+                failed_items[enquiry_item_id] = FAIL_ORIGINAL_PRODUCT_NO_OE
+                if factory_brand_name:
+                    failed_brand_names[enquiry_item_id] = factory_brand_name
+                continue
+
+            oe_price_map, has_request_error, has_price_but_no_stock, has_invalid_price = query_mercedes_service_all(product_oe_list)
+            if not oe_price_map:
+                if has_request_error:
+                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
+                elif has_price_but_no_stock:
+                    failed_items[enquiry_item_id] = FAIL_NO_STOCK
+                elif has_invalid_price:
+                    failed_items[enquiry_item_id] = FAIL_INVALID_PRICE
+                else:
+                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
+                if factory_brand_name:
+                    failed_brand_names[enquiry_item_id] = factory_brand_name
+                continue
+
+            # 筛选有价格+库存的产品（query_mercedes_service_all 已过滤，此处不再产生新失败原因）
+            valid_products = []
+            for product in factory_product_list:
+                info = _get_best_price_info(product, oe_price_map)
+                if info:
+                    valid_products.append({'product': product, 'info': info})
+
+            # priceCheck校验
+            last_failed_sell_price = None
+            last_price_check_error = None
+            passed_products = []
+
+            for vp in valid_products:
+                product = vp['product']
+                product_info = vp['info']
+
+                snapshot, error = _run_price_check(
+                    product, product_info, tid, car_brand,
+                    enquiry_no, enquiry_item_id, company
+                )
+
+                if error:
+                    last_failed_sell_price = product_info.get('sell_price')
+                    last_price_check_error = error
+                else:
+                    passed_products.append({
+                        'product': product,
+                        'info': product_info,
+                        'snapshot': snapshot
+                    })
+
+            if not passed_products:
+                fail_reason = FAIL_PRICE_CHECK_FAILED
+                if last_price_check_error:
+                    fail_reason = f"{FAIL_PRICE_CHECK_FAILED}: {last_price_check_error}"
+                failed_items[enquiry_item_id] = fail_reason
+                if factory_brand_name:
+                    failed_brand_names[enquiry_item_id] = factory_brand_name
+                if last_failed_sell_price is not None:
+                    failed_item_prices[enquiry_item_id] = last_failed_sell_price
+                continue
+
+            # 构造报价项
+            quote_items_for_item = []
+            for pp in passed_products:
+                _, prepare_good_timespan = select_warehouse_and_days(pp['info']['stock_info'])
+                quote_item = construct_adapter_quote_item(
+                    factory_brand, pp['product'], factory_product_list,
+                    pp['info']['sell_price'], prepare_good_timespan,
+                    pp['snapshot'], category_id
+                )
+                quote_items_for_item.append(quote_item)
+
+            mercedes_quote_items[enquiry_item_id] = quote_items_for_item
+
+            # 收集汇总信息
+            last_pp = passed_products[-1]
+            summary_list.append({
+                'item_oe': item_oe,
+                'item_name': item_name,
+                'price': last_pp['info']['sell_price'],
+                'days': prepare_good_timespan,
+                'product_count': len(quote_items_for_item)
+            })
+
+    return mercedes_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices
 
 
 def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
@@ -751,15 +828,17 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
         skip_item_ids: 需要跳过的 enquiry_item_id 集合（CRM 已报原厂品牌）
 
     Returns:
-        tuple: (bmw_quote_items, summary_list, failed_items)
+        tuple: (bmw_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices)
     """
     if not BMW_SERVICE_AVAILABLE:
-        return {}, [], {}
+        return {}, [], {}, {}, {}
 
     skip_item_ids = skip_item_ids or set()
     bmw_quote_items = {}
     summary_list = []
     failed_items = {}
+    failed_brand_names = {}
+    failed_item_prices = {}
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
     car_brand = detail_data.get('carBrand', '')
@@ -776,103 +855,109 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
 
             category_id = _extract_category_id(item)
 
-            try:
-                # 适配列表校验
-                adapt_data, error = _validate_adapt_list(enquiry_item_id, enquiry_no, company)
-                if error:
+            # 适配列表校验
+            adapt_data, error = _validate_adapt_list(enquiry_item_id, enquiry_no, company)
+            if error:
+                if error == FAIL_ADAPT_LIST_EMPTY:
                     failed_items[enquiry_item_id] = error
-                    continue
-
-                factory_brand = adapt_data['brand']
-                factory_product_list = adapt_data['products']
-
-                # 查询价格
-                product_oe_list = list(set(
-                    oe for p in factory_product_list for oe in p.get('productOeList', [])
-                ))
-                if not product_oe_list:
-                    failed_items[enquiry_item_id] = FAIL_NO_ORIGINAL_PRODUCT
-                    continue
-
-                oe_price_map, has_request_error, has_price_but_no_stock, has_invalid_price = query_bmw_service_all(product_oe_list)
-                if not oe_price_map:
-                    if has_request_error:
-                        failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
-                    elif has_price_but_no_stock:
-                        failed_items[enquiry_item_id] = FAIL_NO_STOCK
-                    elif has_invalid_price:
-                        failed_items[enquiry_item_id] = FAIL_INVALID_PRICE
-                    else:
-                        failed_items[enquiry_item_id] = "未知错误"
-                    continue
-
-                # 筛选有价格+库存的产品
-                valid_products = []
-                for product in factory_product_list:
-                    info = _get_best_price_info_bmw(product, oe_price_map)
-                    if info:
-                        valid_products.append({'product': product, 'info': info})
-
-                if not valid_products:
-                    failed_items[enquiry_item_id] = FAIL_NO_VALID_OE_FOR_PRODUCT
-                    continue
-
-                # priceCheck校验
-                price_check_errors = []
-                passed_products = []
-
-                for vp in valid_products:
-                    product = vp['product']
-                    product_info = vp['info']
-
-                    snapshot, error = _run_price_check(
-                        product, product_info, tid, car_brand,
-                        enquiry_no, enquiry_item_id, company
-                    )
-
-                    if error:
-                        price_check_errors.append(_format_price_check_error(product, error))
-                    else:
-                        passed_products.append({
-                            'product': product,
-                            'info': product_info,
-                            'snapshot': snapshot
-                        })
-
-                if not passed_products:
-                    failed_items[enquiry_item_id] = "；".join(price_check_errors)
-                    continue
-
-                # 构造报价项
-                quote_items_for_item = []
-                for pp in passed_products:
-                    _, prepare_good_timespan = select_bmw_warehouse_and_days(pp['info']['stock_info'])
-                    quote_item = construct_adapter_quote_item(
-                        factory_brand, pp['product'], factory_product_list,
-                        pp['info']['sell_price'], prepare_good_timespan,
-                        pp['snapshot'], category_id
-                    )
-                    quote_items_for_item.append(quote_item)
-
-                bmw_quote_items[enquiry_item_id] = quote_items_for_item
-
-                # 收集汇总信息
-                last_pp = passed_products[-1]
-                summary_list.append({
-                    'item_oe': item_oe,
-                    'item_name': item_name,
-                    'price': last_pp['info']['sell_price'],
-                    'days': prepare_good_timespan,
-                    'product_count': len(quote_items_for_item)
-                })
-
-            except Exception as e:
-                failed_items[enquiry_item_id] = f"处理异常: {str(e)}"
+                    failed_brand_names[enquiry_item_id] = '无法报价'
+                # 无原厂产品：不记录
                 continue
 
-    _ensure_waiting_items_covered(detail_data, bmw_quote_items, failed_items)
+            factory_brand = adapt_data['brand']
+            factory_product_list = adapt_data['products']
+            factory_brand_name = factory_brand.get('brandName') if factory_brand else None
 
-    return bmw_quote_items, summary_list, failed_items
+            # 查询价格
+            product_oe_list = list(set(
+                oe for p in factory_product_list for oe in p.get('productOeList', [])
+            ))
+            if not product_oe_list:
+                failed_items[enquiry_item_id] = FAIL_ORIGINAL_PRODUCT_NO_OE
+                if factory_brand_name:
+                    failed_brand_names[enquiry_item_id] = factory_brand_name
+                continue
+
+            oe_price_map, has_request_error, has_price_but_no_stock, has_invalid_price = query_bmw_service_all(product_oe_list)
+            if not oe_price_map:
+                if has_request_error:
+                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
+                elif has_price_but_no_stock:
+                    failed_items[enquiry_item_id] = FAIL_NO_STOCK
+                elif has_invalid_price:
+                    failed_items[enquiry_item_id] = FAIL_INVALID_PRICE
+                else:
+                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
+                if factory_brand_name:
+                    failed_brand_names[enquiry_item_id] = factory_brand_name
+                continue
+
+            # 筛选有价格+库存的产品（query_bmw_service_all 已过滤，此处不再产生新失败原因）
+            valid_products = []
+            for product in factory_product_list:
+                info = _get_best_price_info_bmw(product, oe_price_map)
+                if info:
+                    valid_products.append({'product': product, 'info': info})
+
+            # priceCheck校验
+            last_failed_sell_price = None
+            last_price_check_error = None
+            passed_products = []
+
+            for vp in valid_products:
+                product = vp['product']
+                product_info = vp['info']
+
+                snapshot, error = _run_price_check(
+                    product, product_info, tid, car_brand,
+                    enquiry_no, enquiry_item_id, company
+                )
+
+                if error:
+                    last_failed_sell_price = product_info.get('sell_price')
+                    last_price_check_error = error
+                else:
+                    passed_products.append({
+                        'product': product,
+                        'info': product_info,
+                        'snapshot': snapshot
+                    })
+
+            if not passed_products:
+                fail_reason = FAIL_PRICE_CHECK_FAILED
+                if last_price_check_error:
+                    fail_reason = f"{FAIL_PRICE_CHECK_FAILED}: {last_price_check_error}"
+                failed_items[enquiry_item_id] = fail_reason
+                if factory_brand_name:
+                    failed_brand_names[enquiry_item_id] = factory_brand_name
+                if last_failed_sell_price is not None:
+                    failed_item_prices[enquiry_item_id] = last_failed_sell_price
+                continue
+
+            # 构造报价项
+            quote_items_for_item = []
+            for pp in passed_products:
+                _, prepare_good_timespan = select_bmw_warehouse_and_days(pp['info']['stock_info'])
+                quote_item = construct_adapter_quote_item(
+                    factory_brand, pp['product'], factory_product_list,
+                    pp['info']['sell_price'], prepare_good_timespan,
+                    pp['snapshot'], category_id
+                )
+                quote_items_for_item.append(quote_item)
+
+            bmw_quote_items[enquiry_item_id] = quote_items_for_item
+
+            # 收集汇总信息
+            last_pp = passed_products[-1]
+            summary_list.append({
+                'item_oe': item_oe,
+                'item_name': item_name,
+                'price': last_pp['info']['sell_price'],
+                'days': prepare_good_timespan,
+                'product_count': len(quote_items_for_item)
+            })
+
+    return bmw_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices
 
 
 def classify_order(order_data):
@@ -946,12 +1031,24 @@ def _handle_bc_category(detail_data, company, bc_process_func, category):
     Returns:
         dict: handler 结果
     """
-    crm_quote_items, original_quoted_ids, crm_failed_items = process_crm_spot_quote(detail_data, company)
-    bc_quote_items, summary_list, bc_failed_items = bc_process_func(
+    crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices = process_crm_spot_quote(detail_data, company)
+    bc_quote_items, summary_list, bc_failed_items, bc_failed_brand_names, bc_failed_item_prices = bc_process_func(
         detail_data, company, skip_item_ids=original_quoted_ids
     )
 
     failed_items = _merge_failed_items(crm_failed_items, bc_quote_items, bc_failed_items)
+
+    # 合并失败品牌名：CRM 实际匹配到的品牌优先，其次是 B/C 原厂品牌
+    failed_brand_names = dict(bc_failed_brand_names)
+    for item_id, brand_name in crm_failed_brand_names.items():
+        if item_id not in bc_quote_items:
+            failed_brand_names[item_id] = brand_name
+
+    # 合并价格检测失败时的尝试价格：CRM 优先
+    failed_item_prices = dict(bc_failed_item_prices)
+    for item_id, price in crm_failed_item_prices.items():
+        if item_id not in bc_quote_items:
+            failed_item_prices[item_id] = price
 
     # CRM 报上的项优先
     merged_quote_items = {**bc_quote_items, **crm_quote_items}
@@ -959,6 +1056,8 @@ def _handle_bc_category(detail_data, company, bc_process_func, category):
         'extra_quote_items': merged_quote_items,
         'summary_list': summary_list,
         'failed_items': failed_items,
+        'failed_brand_names': failed_brand_names,
+        'failed_item_prices': failed_item_prices,
         'category': category,
         'crm_quote_item_ids': set(crm_quote_items.keys()),
         'crm_failed_items': crm_failed_items,
@@ -971,11 +1070,13 @@ def _handle_bc_category(detail_data, company, bc_process_func, category):
 @register_handler('A')
 def handle_category_a(detail_data, company):
     """处理 A 类订单：全 PART_QUOTE，先走 CRM 现货流程"""
-    crm_quote_items, _, crm_failed_items = process_crm_spot_quote(detail_data, company)
+    crm_quote_items, _, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices = process_crm_spot_quote(detail_data, company)
     return {
         'extra_quote_items': crm_quote_items,
         'summary_list': [],
         'failed_items': crm_failed_items,
+        'failed_brand_names': crm_failed_brand_names,
+        'failed_item_prices': crm_failed_item_prices,
         'category': 'A',
         'crm_quote_item_ids': set(crm_quote_items.keys()),
         'crm_failed_items': crm_failed_items,
@@ -1009,7 +1110,9 @@ def _get_process_meta(process_result):
         'crm_failed_items': process_result.get('crm_failed_items', {}),
         'original_quoted_ids': process_result.get('original_quoted_ids', set()),
         'bc_quote_item_ids': process_result.get('bc_quote_item_ids', set()),
-        'bc_failed_items': process_result.get('bc_failed_items', {})
+        'bc_failed_items': process_result.get('bc_failed_items', {}),
+        'failed_brand_names': process_result.get('failed_brand_names', {}),
+        'failed_item_prices': process_result.get('failed_item_prices', {})
     }
 
 
@@ -1021,6 +1124,7 @@ def process_order_by_category(detail_data, company):
             'extra_quote_items': {},
             'summary_list': [],
             'failed_items': {},
+            'failed_brand_names': {},
             'category': 'SKIP',
             'crm_quote_item_ids': set(),
             'crm_failed_items': {},
@@ -1334,92 +1438,100 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
     Returns:
         list: 报价结果列表
     """
-    if begin_date is None:
-        begin_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
-    if end_date is None:
-        end_date = datetime.now().strftime('%Y-%m-%d')
+    logger = logging.getLogger('qpl_auto_bill')
+    try:
+        if begin_date is None:
+            begin_date = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
+        if end_date is None:
+            end_date = datetime.now().strftime('%Y-%m-%d')
 
-    result = query_enquiry_list(begin_date, end_date, company=company)
-    orders = result.get('data') or []
+        result = query_enquiry_list(begin_date, end_date, company=company)
+        orders = result.get('data') or []
 
-    unique_orders = {order.get('supplierEnquiryNo'): order for order in orders if order.get('supplierEnquiryNo')}
-    total_orders = len(unique_orders)
+        unique_orders = {order.get('supplierEnquiryNo'): order for order in orders if order.get('supplierEnquiryNo')}
+        total_orders = len(unique_orders)
 
-    # 过滤已处理订单
-    processed_nos = _filter_processed_orders(list(unique_orders.keys()), company, begin_date, end_date)
-    if processed_nos:
-        for order_no in processed_nos:
-            unique_orders.pop(order_no, None)
+        # 过滤已处理订单
+        processed_nos = _filter_processed_orders(list(unique_orders.keys()), company, begin_date, end_date)
+        if processed_nos:
+            for order_no in processed_nos:
+                unique_orders.pop(order_no, None)
 
-    # 分类并统计
-    category_counts = {'A': 0, 'B': 0, 'C': 0, 'SKIP': 0}
-    categorized = []
-    for enquiry_no, order in unique_orders.items():
-        category = classify_order(order)
-        category_counts[category] += 1
-        if category == 'SKIP':
-            continue
-        categorized.append((category, enquiry_no))
-
-    # 按类别排序：A 在前，B/C 在后
-    category_order = {'A': 0, 'B': 1, 'C': 1}
-    categorized.sort(key=lambda x: category_order.get(x[0], 2))
-
-    qpl_log(
-        f"[{company}] 任务开始 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
-        f"跳过{category_counts['SKIP']}个 待处理{len(categorized)}个 "
-        f"类别=A:{category_counts['A']} B:{category_counts['B']} C:{category_counts['C']}"
-    )
-
-    results = []
-
-    # 先处理 A/B 类订单
-    ab_orders = [(c, no) for c, no in categorized if c in ('A', 'B')]
-    for idx, (category, enquiry_no) in enumerate(ab_orders, start=1):
-        _process_single_order(enquiry_no, category, company, idx, len(ab_orders), results)
-
-    # 收集 C 类订单原厂 OE 并补齐本地库
-    c_order_nos = {no for c, no in categorized if c == 'C'}
-    qpl_log(f"[{company}] C 类订单白名单: {c_order_nos}")
-    if c_order_nos:
-        c_orders = [unique_orders[no] for no in c_order_nos]
-        bmw_oe_set = _collect_bmw_original_oes(c_orders, company)
-        qpl_log(f"[{company}] 收集到 BMW 原厂 OE: {bmw_oe_set}")
-        if bmw_oe_set:
-            from app.utils.qpl_auto_bill.bmw_quote_local_db import check_bmw_oes_in_local_db
-            _, status = check_bmw_oes_in_local_db(list(bmw_oe_set))
-            qpl_log(f"[{company}] 本地库缺失 BMW OE: {status}")
-            missing_oes = status.get('missing', [])
-            if missing_oes:
-                qpl_log(f"[{company}] 发现 {len(missing_oes)} 个 BMW OE 需要补齐本地库")
-                _ensure_bmw_oes_in_local_db(missing_oes, company)
-
-    # 重新拉取订单，只处理白名单内的 C 类订单
-    if c_order_nos:
-        fresh_result = query_enquiry_list(begin_date, end_date, company=company)
-        fresh_orders = fresh_result.get('data') or []
-        fresh_unique_orders = {o.get('supplierEnquiryNo'): o for o in fresh_orders if o.get('supplierEnquiryNo')}
-
-        c_count = 0
-        for idx, (category, enquiry_no) in enumerate(categorized, start=1):
-            if category != 'C':
+        # 分类并统计
+        category_counts = {'A': 0, 'B': 0, 'C': 0, 'SKIP': 0}
+        categorized = []
+        for enquiry_no, order in unique_orders.items():
+            category = classify_order(order)
+            category_counts[category] += 1
+            if category == 'SKIP':
                 continue
-            if enquiry_no not in fresh_unique_orders:
-                continue
-            c_count += 1
-            _process_single_order(enquiry_no, 'C', company, c_count, len(c_order_nos), results)
+            categorized.append((category, enquiry_no))
 
-    # 任务完成统计
-    processed_category_counts = {'A': 0, 'B': 0, 'C': 0}
-    for result in results:
-        processed_category_counts[result['order_category']] += 1
-    qpl_log(
-        f"[{company}] 任务完成 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
-        f"跳过{category_counts['SKIP']}个 待处理{len(results)}个 "
-        f"类别=A:{processed_category_counts['A']} B:{processed_category_counts['B']} C:{processed_category_counts['C']}"
-    )
+        # 按类别排序：A 在前，B/C 在后
+        category_order = {'A': 0, 'B': 1, 'C': 1}
+        categorized.sort(key=lambda x: category_order.get(x[0], 2))
 
-    return results
+        qpl_log(
+            f"[{company}] 任务开始 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
+            f"跳过{category_counts['SKIP']}个 待处理{len(categorized)}个 "
+            f"类别=A:{category_counts['A']} B:{category_counts['B']} C:{category_counts['C']}"
+        )
+
+        results = []
+
+        # 先处理 A/B 类订单
+        ab_orders = [(c, no) for c, no in categorized if c in ('A', 'B')]
+        for idx, (category, enquiry_no) in enumerate(ab_orders, start=1):
+            _process_single_order(enquiry_no, category, company, idx, len(ab_orders), results)
+
+        # 收集 C 类订单原厂 OE 并补齐本地库
+        c_order_nos = {no for c, no in categorized if c == 'C'}
+        qpl_log(f"[{company}] C 类订单白名单: {c_order_nos}")
+        if c_order_nos:
+            c_orders = [unique_orders[no] for no in c_order_nos]
+            bmw_oe_set = _collect_bmw_original_oes(c_orders, company)
+            qpl_log(f"[{company}] 收集到 BMW 原厂 OE: {bmw_oe_set}")
+            if bmw_oe_set:
+                from app.utils.qpl_auto_bill.bmw_quote_local_db import check_bmw_oes_in_local_db
+                _, status = check_bmw_oes_in_local_db(list(bmw_oe_set))
+                qpl_log(f"[{company}] 本地库缺失 BMW OE: {status}")
+                missing_oes = status.get('missing', [])
+                if missing_oes:
+                    qpl_log(f"[{company}] 发现 {len(missing_oes)} 个 BMW OE 需要补齐本地库")
+                    _ensure_bmw_oes_in_local_db(missing_oes, company)
+
+        # 重新拉取订单，只处理白名单内的 C 类订单
+        if c_order_nos:
+            fresh_result = query_enquiry_list(begin_date, end_date, company=company)
+            fresh_orders = fresh_result.get('data') or []
+            fresh_unique_orders = {o.get('supplierEnquiryNo'): o for o in fresh_orders if o.get('supplierEnquiryNo')}
+
+            c_count = 0
+            for idx, (category, enquiry_no) in enumerate(categorized, start=1):
+                if category != 'C':
+                    continue
+                if enquiry_no not in fresh_unique_orders:
+                    continue
+                c_count += 1
+                _process_single_order(enquiry_no, 'C', company, c_count, len(c_order_nos), results)
+
+        # 任务完成统计
+        processed_category_counts = {'A': 0, 'B': 0, 'C': 0}
+        for result in results:
+            processed_category_counts[result['order_category']] += 1
+        qpl_log(
+            f"[{company}] 任务完成 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
+            f"跳过{category_counts['SKIP']}个 待处理{len(results)}个 "
+            f"类别=A:{processed_category_counts['A']} B:{processed_category_counts['B']} C:{processed_category_counts['C']}"
+        )
+
+        return results
+
+
+
+    except Exception:
+        logger.exception(f'[失败] 汽配龙自动报价 [{company}]')
+        raise
 
 
 def main(company='fsbbr'):

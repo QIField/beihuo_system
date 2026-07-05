@@ -70,9 +70,9 @@ def init_crmapp_created_products_table(db_manager):
     """
     try:
         db_manager.execute_update(create_table_sql)
-        print("✅ crmapp_created_products 表初始化完成")
+        print("[成功] crmapp_created_products 表初始化完成")
     except Exception as e:
-        print(f"❌ 初始化 crmapp_created_products 表失败: {e}")
+        print(f"[失败] 初始化 crmapp_created_products 表失败: {e}")
         raise
 
 
@@ -88,10 +88,10 @@ def get_existing_products(db_manager):
         for row in result:
             key = (row['oe_code'], row['brand'])
             existing_set.add(key)
-        print(f"📋 已存在 {len(existing_set)} 个产品记录")
+        print(f"[列表] 已存在 {len(existing_set)} 个产品记录")
         return existing_set
     except Exception as e:
-        print(f"❌ 获取已存在产品列表失败: {e}")
+        print(f"[失败] 获取已存在产品列表失败: {e}")
         return set()
 
 
@@ -136,7 +136,7 @@ def record_create_result(db_manager, oe_code, brand, supplier_name, result_msg):
             # 没有更新到，说明是新产品，执行插入
             db_manager.execute_update(insert_sql, (oe_code, brand, supplier_name, create_result, result_msg))
     except Exception as e:
-        print(f"❌ 记录创建结果失败 [{oe_code}/{brand}]: {e}")
+        print(f"[失败] 记录创建结果失败 [{oe_code}/{brand}]: {e}")
 
 
 def get_brand_id_by_name(session, brand, timeout=30):
@@ -219,7 +219,7 @@ def process_single_oe(item, product_df, alias_df, db_manager=None, session=None)
     brand_id = get_brand_id_by_name(session, brand)
     if not brand_id:
         result = f"失败 - 没有匹配到品牌ID: {brand}"
-        print(f"❌ {oe_number}: {result}")
+        print(f"[失败] {oe_number}: {result}")
         _save_result(db_manager, oe_number, brand, result)
         return result
     
@@ -227,7 +227,7 @@ def process_single_oe(item, product_df, alias_df, db_manager=None, session=None)
     oe_info = _retry_request(lambda: get_oe_link(oe_number, session), "get_oe_link")
     if not oe_info:
         result = f"失败 - 获取 OE 信息失败"
-        print(f"❌ {oe_number}: {result}")
+        print(f"[失败] {oe_number}: {result}")
         _save_result(db_manager, oe_number, brand, result)
         return result
     
@@ -245,15 +245,15 @@ def process_single_oe(item, product_df, alias_df, db_manager=None, session=None)
             if matched_name:
                 product_name = matched_name
                 used_excel_name = True
-                print(f"✓ {oe_number}: 从 Excel 匹配到产品名称: {product_name}")
+                print(f"[成功] {oe_number}: 从 Excel 匹配到产品名称: {product_name}")
             else:
                 result = f"失败 - 未找到产品名称"
-                print(f"❌ {oe_number}: {result}")
+                print(f"[失败] {oe_number}: {result}")
                 _save_result(db_manager, oe_number, brand, result)
                 return result
         else:
             result = f"失败 - 产品数据未加载"
-            print(f"❌ {oe_number}: {result}")
+            print(f"[失败] {oe_number}: {result}")
             _save_result(db_manager, oe_number, brand, result)
             return result
     
@@ -280,7 +280,7 @@ def process_single_oe(item, product_df, alias_df, db_manager=None, session=None)
     
     if not add_result:
         result = f"失败 - 添加产品请求失败"
-        print(f"❌ {oe_number}: {result}")
+        print(f"[失败] {oe_number}: {result}")
         _save_result(db_manager, oe_number, brand, result)
         return result
     
@@ -291,14 +291,14 @@ def process_single_oe(item, product_df, alias_df, db_manager=None, session=None)
     # 检查车型为空的错误（即使 status 是 201，msg 中也可能包含错误信息）
     if not vehicle_name or "车型不能为空" in msg or "车型" in msg and "不能为空" in msg:
         result = f"失败 - 车型不能为空 | 请求: {product_data} | 响应: {add_result}"
-        print(f"❌ {oe_number}: {result}")
+        print(f"[失败] {oe_number}: {result}")
         _save_result(db_manager, oe_number, brand, result)
         return result
     
     if status == 200:
         product_id = add_result.get('data')
         result = f"成功 - product_id: {product_id}"
-        print(f"✅ {oe_number}: {result}")
+        print(f"[成功] {oe_number}: {result}")
         
         # 如果使用了 Excel 匹配的名称，需要更新为最佳匹配
         if used_excel_name:
@@ -307,17 +307,17 @@ def process_single_oe(item, product_df, alias_df, db_manager=None, session=None)
     elif status == 201:
         if "该物料已关联当前组织" in msg:
             result = f"已存在 - {msg}"
-            print(f"⚠️  {oe_number}: {result}")
+            print(f"[警告]  {oe_number}: {result}")
         else:
             result = f"成功 - {msg}"
-            print(f"✅ {oe_number}: {result}")
+            print(f"[成功] {oe_number}: {result}")
             
         # 已存在也需要更新最佳匹配名称
         if used_excel_name:
             _update_with_best_match(session, oe_number, brand, product_name)
     else:
         result = f"失败 - {msg}"
-        print(f"❌ {oe_number}: {result}")
+        print(f"[失败] {oe_number}: {result}")
         _save_result(db_manager, oe_number, brand, result)
         return result
     
@@ -326,10 +326,10 @@ def process_single_oe(item, product_df, alias_df, db_manager=None, session=None)
         update_result = update_brand_code_by_oe(session, oe_number, brand, brand_code)
         if update_result:
             result += f" | brand_code更新成功"
-            print(f"✓ {oe_number}: brand_code 更新成功")
+            print(f"[成功] {oe_number}: brand_code 更新成功")
         else:
             result += f" | brand_code更新失败"
-            print(f"⚠️  {oe_number}: brand_code 更新失败")
+            print(f"[警告]  {oe_number}: brand_code 更新失败")
     
     _save_result(db_manager, oe_number, brand, result)
     return result
@@ -351,18 +351,18 @@ def _update_with_best_match(session, oe_number, brand, product_name):
                 best_match = find_best_match_product(product_name, name_list)
                 if best_match:
                     matched_name = best_match.get('product_name', '')
-                    print(f"🔄 {oe_number}: 最佳匹配名称: {matched_name}")
+                    print(f"[更新] {oe_number}: 最佳匹配名称: {matched_name}")
                     
                     # 更新产品名称
                     update_result = update_product_name_by_oe(
                         session, oe_number, brand, matched_name
                     )
                     if update_result:
-                        print(f"✓ {oe_number}: 产品名称更新成功")
+                        print(f"[成功] {oe_number}: 产品名称更新成功")
                     else:
-                        print(f"⚠️  {oe_number}: 产品名称更新失败")
+                        print(f"[警告]  {oe_number}: 产品名称更新失败")
     except Exception as e:
-        print(f"⚠️  {oe_number}: 更新最佳匹配名称时出错: {e}")
+        print(f"[警告]  {oe_number}: 更新最佳匹配名称时出错: {e}")
 
 
 def _retry_request(func, name, max_retries=1):
@@ -414,7 +414,7 @@ def process_database_mode(session, product_df, alias_df, supplier_name=None):
     # 获取数据库连接
     db_manager = get_db_connection()
     if not db_manager:
-        print("❌ 数据库连接失败")
+        print("[失败] 数据库连接失败")
         return
     
     try:
@@ -486,13 +486,13 @@ def process_two_column_mode(session, product_df, alias_df, file_path):
             df = pd.read_csv(file_path, dtype=str)
         print(f"读取到 {len(df)} 行数据")
     except Exception as e:
-        print(f"❌ 读取文件失败: {e}")
+        print(f"[失败] 读取文件失败: {e}")
         return
     
     # 识别列
     oe_col, brand_col = _identify_columns(df)
     if not oe_col or not brand_col:
-        print("❌ 未能识别必要的列")
+        print("[失败] 未能识别必要的列")
         return
     
     # 准备处理项
@@ -532,13 +532,13 @@ def process_three_column_mode(session, product_df, alias_df, file_path):
             df = pd.read_csv(file_path, dtype=str)
         print(f"读取到 {len(df)} 行数据")
     except Exception as e:
-        print(f"❌ 读取文件失败: {e}")
+        print(f"[失败] 读取文件失败: {e}")
         return
     
     # 识别列
     oe_col, brand_col, brand_code_col = _identify_columns_extended(df)
     if not oe_col or not brand_col or not brand_code_col:
-        print("❌ 未能识别必要的列")
+        print("[失败] 未能识别必要的列")
         return
     
     # 准备处理项
@@ -586,7 +586,7 @@ def _process_with_loop(items, product_df, alias_df, db_manager=None, progress_ca
         except Exception as e:
             result = f"失败 - 处理异常: {e}"
             results[oe_number] = result
-            print(f"❌ {oe_number}: {result}")
+            print(f"[失败] {oe_number}: {result}")
         
         completed += 1
         if completed % 10 == 0 or completed == total:
@@ -633,7 +633,7 @@ def _process_with_loop_with_record(items, product_df, alias_df, db_manager=None,
         except Exception as e:
             result = f"失败 - 处理异常: {e}"
             results[oe_number] = result
-            print(f"❌ {oe_number}: {result}")
+            print(f"[失败] {oe_number}: {result}")
             
             # 记录失败结果
             if db_manager:
@@ -672,9 +672,9 @@ def batch_update_status(db_manager):
     
     try:
         affected_rows = db_manager.execute_update(update_sql)
-        print(f"✅ 已更新 {affected_rows} 条记录的 update_status")
+        print(f"[成功] 已更新 {affected_rows} 条记录的 update_status")
     except Exception as e:
-        print(f"❌ 更新 update_status 失败: {e}")
+        print(f"[失败] 更新 update_status 失败: {e}")
         import traceback
         traceback.print_exc()
 
@@ -800,14 +800,14 @@ def main():
         if os.path.exists(file_path):
             process_two_column_mode(session, product_df, alias_df, file_path)
         else:
-            print(f"❌ 文件不存在: {file_path}")
+            print(f"[失败] 文件不存在: {file_path}")
     elif mode == 3:
         # 三列模式文件路径
         file_path = r"E:\work download\工作文件\锁机已手动处理.xls"
         if os.path.exists(file_path):
             process_three_column_mode(session, product_df, alias_df, file_path)
         else:
-            print(f"❌ 文件不存在: {file_path}")
+            print(f"[失败] 文件不存在: {file_path}")
     
     print("\n程序执行完毕")
 
@@ -925,7 +925,7 @@ def process_two_column_mode_with_return(session, product_df, alias_df, file_path
             all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str)
             print(f"读取到 {len(all_sheets)} 个工作表: {list(all_sheets.keys())}")
     except Exception as e:
-        print(f"❌ 读取文件失败: {e}")
+        print(f"[失败] 读取文件失败: {e}")
         raise
     
     # 筛选符合两列模式的工作表
@@ -983,7 +983,7 @@ def process_three_column_mode_with_return(session, product_df, alias_df, file_pa
             all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str)
             print(f"读取到 {len(all_sheets)} 个工作表: {list(all_sheets.keys())}")
     except Exception as e:
-        print(f"❌ 读取文件失败: {e}")
+        print(f"[失败] 读取文件失败: {e}")
         raise
     
     # 筛选符合三列模式的工作表

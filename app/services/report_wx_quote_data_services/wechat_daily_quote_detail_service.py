@@ -689,7 +689,7 @@ def fetch_data_and_save_to_database(start_date, end_date):
                 print(f"批次 {batch_count} 完成: 无数据")
         
         except Exception as e:
-            print(f"  ✗ 批次 {batch_count} 处理失败: {str(e)}")
+            print(f"  [失败] 批次 {batch_count} 处理失败: {str(e)}")
             traceback.print_exc()
         
         # 移动到下一批

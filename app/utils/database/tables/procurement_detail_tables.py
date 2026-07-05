@@ -29,7 +29,7 @@ def init_procurement_history_detail_table():
             table_exists = cursor.fetchone()[0] > 0
 
             if table_exists:
-                print("  ℹ️  采购历史明细表已存在，检查字段类型...")
+                print("  [信息]  采购历史明细表已存在，检查字段类型...")
 
                 # 检查 l_model_zh 字段类型
                 cursor.execute("""
@@ -41,14 +41,14 @@ def init_procurement_history_detail_table():
                 result = cursor.fetchone()
 
                 if result and result[0].upper() != 'TEXT':
-                    print("  📝 修改 l_model_zh 字段类型为 TEXT...")
+                    print("  [编辑] 修改 l_model_zh 字段类型为 TEXT...")
                     cursor.execute("""
                         ALTER TABLE crmapp_procurement_history_detail
                         MODIFY COLUMN l_model_zh TEXT COMMENT '车型中文'
                     """)
-                    print("  ✓ l_model_zh 字段类型修改完成")
+                    print("  [成功] l_model_zh 字段类型修改完成")
                 else:
-                    print("  ✓ l_model_zh 字段类型已是 TEXT，无需修改")
+                    print("  [成功] l_model_zh 字段类型已是 TEXT，无需修改")
 
                 return
 
@@ -78,9 +78,9 @@ def init_procurement_history_detail_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='采购历史明细表';
             """
             cursor.execute(create_table_sql)
-            print("  ✓ 采购历史明细表初始化完成")
+            print("  [成功] 采购历史明细表初始化完成")
     except Exception as e:
-        print(f"  ✗ 采购历史明细表: {e}")
+        print(f"  [失败] 采购历史明细表: {e}")
         raise
     finally:
         conn.close()

@@ -18,12 +18,16 @@ from app.utils.ks_auto_bill_model import (
 
 
 # 导入统一任务管理器和简化任务
+import logging
+
 from app.core.task_manager import task_manager
 from app.ks_auto_bill.task import (
     ks_auto_bill_task,
     get_ks_auto_bill_task_status,
     process_orders_once
 )
+
+logger = logging.getLogger('ks_auto_bill')
 
 # 导入获取用户当前门店函数
 try:
@@ -171,10 +175,10 @@ def start_ks_auto_bill_process():
     try:
         # 立即提交任务到线程池
         task_manager.submit(ks_auto_bill_task)
-        print("[开思自动对单] 已提交手动执行任务")
+        logger.info("[开思自动对单] 已提交手动执行任务")
         return True
     except Exception as e:
-        print(f"[开思自动对单] 手动执行失败: {e}")
+        logger.error(f"[开思自动对单] 手动执行失败: {e}")
         return False
 
 
@@ -187,10 +191,10 @@ def stop_ks_auto_bill_process():
     try:
         # 从调度器中移除任务（停止定时执行）
         task_manager._scheduler.remove_job('ks_auto_bill_task')
-        print("[开思自动对单] 已停止定时任务调度")
+        logger.info("[开思自动对单] 已停止定时任务调度")
         return True
     except Exception as e:
-        print(f"[开思自动对单] 停止失败: {e}")
+        logger.error(f"[开思自动对单] 停止失败: {e}")
         return False
 
 
@@ -215,13 +219,13 @@ def restart_ks_auto_bill_process():
             minutes=1,
             replace_existing=True
         )
-        print("[开思自动对单] 已重新调度定时任务")
+        logger.info("[开思自动对单] 已重新调度定时任务")
         
         # 立即执行一次
         task_manager.submit(ks_auto_bill_task)
         return True
     except Exception as e:
-        print(f"[开思自动对单] 重启失败: {e}")
+        logger.error(f"[开思自动对单] 重启失败: {e}")
         return False
 
 

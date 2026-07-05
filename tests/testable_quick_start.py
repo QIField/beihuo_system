@@ -56,7 +56,7 @@ def demo():
     register(hello, route_path='/api/test-hello', methods=['GET'])
 
     # 5. 启动服务（start() 会自动打印路由详情）
-    print('\n🚀 正在启动服务...')
+    print('\n[开始] 正在启动服务...')
     print('''
   服务启动后，你可以：
 
@@ -79,8 +79,8 @@ if __name__ == '__main__':
     try:
         demo()
     except KeyboardInterrupt:
-        print('\n\n👋 再见！')
+        print('\n\n[再见] 再见！')
     except Exception as e:
-        print(f'\n❌ 错误: {e}')
+        print(f'\n[失败] 错误: {e}')
         import traceback
         traceback.print_exc()

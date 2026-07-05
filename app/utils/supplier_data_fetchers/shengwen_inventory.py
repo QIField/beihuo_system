@@ -11,6 +11,11 @@ import time
 import re
 from datetime import datetime, timedelta
 import pandas as pd
+from app.utils.logger_config import get_task_logger
+
+
+logger = get_task_logger('virtual_inventory')
+
 
 
 API_BASE_URL = "http://api.inheartsoft.com/dw-api/kc2018"
@@ -62,17 +67,11 @@ def clean_oecode(code):
 def get_allkckey():
     """
     获取库存查询密钥
-
-    :return: allkckey字符串，失败返回None
     """
     url = f"{API_BASE_URL}?psign={API_PSIGN}&gsign={GSIGN}&mode=allkckey"
-    try:
-        response = requests.get(url, timeout=30)
-        data = response.json()
-        return data.get('allkckey')
-    except Exception as e:
-        print(f"获取allkckey失败: {e}")
-        return None
+    response = requests.get(url, timeout=30)
+    data = response.json()
+    return data['allkckey']
 
 
 def get_inventory_page(allkckey, pindex):
@@ -81,16 +80,12 @@ def get_inventory_page(allkckey, pindex):
 
     :param allkckey: 库存查询密钥
     :param pindex: 页码（从1开始）
-    :return: 该页原始数据列表，失败返回空列表
+    :return: 该页原始数据列表
     """
     url = f"{API_BASE_URL}?psign={API_PSIGN}&gsign={GSIGN}&allkckey={allkckey}&mode=all_kc&pindex={pindex}"
-    try:
-        response = requests.get(url, timeout=30)
-        data = response.json()
-        return data.get('list', [])
-    except Exception as e:
-        print(f"获取第{pindex}页数据失败: {e}")
-        return []
+    response = requests.get(url, timeout=30)
+    data = response.json()
+    return data['list']
 
 
 def get_all_inventory():
@@ -103,30 +98,30 @@ def get_all_inventory():
 
     # 第一步：获取密钥
     allkckey = get_allkckey()
-    if not allkckey:
-        return all_data
-
-    print(f"[盛旻] 获取到allkckey: {allkckey}")
+    logger.info(f"[盛旻] 获取到allkckey: {allkckey}")
 
     # 第二步：分页获取数据
     pindex = 1
-    print(f"[盛旻] 开始分页获取数据...")
+    logger.info(f"[盛旻] 开始分页获取数据...")
 
     while True:
         page_data = get_inventory_page(allkckey, pindex)
+
+        if pindex == 1 and not page_data:
+            raise RuntimeError(f"[盛旻] 第一页数据为空，allkckey={allkckey}")
 
         if not page_data:
             # 没有数据了，结束循环
             break
 
         all_data.extend(page_data)
-        print(f"[盛旻] 第 {pindex} 页: {len(page_data)} 条")
+        logger.info(f"[盛旻] 第 {pindex} 页: {len(page_data)} 条")
 
         pindex += 1
         # 添加延时，避免请求过快
         time.sleep(0.5)
 
-    print(f"[盛旻] 共获取 {len(all_data)} 条原始数据")
+    logger.info(f"[盛旻] 共获取 {len(all_data)} 条原始数据")
     return all_data
 
 
@@ -142,8 +137,7 @@ def start():
     # 1. 获取所有原始数据
     raw_data = get_all_inventory()
     if not raw_data:
-        print("[盛旻] 没有获取到数据")
-        return pd.DataFrame(columns=['供应商名称', '原厂OE码', '品牌', '价格', '失效时间', '仓库名称', '库存', '备注'])
+        raise RuntimeError("[盛旻] 没有获取到数据")
 
     # 2. 转换为DataFrame
     df = pd.DataFrame(raw_data)
@@ -153,7 +147,7 @@ def start():
 
     # 4. 筛选只保留指定品牌的数据
     df = df[df['pjbrand'].isin(ALLOWED_BRANDS)]
-    print(f"[盛旻] 品牌筛选后剩余 {len(df)} 条数据")
+    logger.info(f"[盛旻] 品牌筛选后剩余 {len(df)} 条数据")
 
     # 5. 字段映射和转换
     df['供应商名称'] = '盛旻'
@@ -168,12 +162,12 @@ def start():
     # 6. 选择需要的列
     df = df[['供应商名称', '原厂OE码', '品牌', '价格', '失效时间', '仓库名称', '库存', '备注']]
 
-    print(f"[盛旻] 数据处理完成，共 {len(df)} 条")
+    logger.info(f"[盛旻] 数据处理完成，共 {len(df)} 条")
     return df
 
 
 if __name__ == "__main__":
     df = start()
-    print(f"\n数据预览：")
-    print(df.head(10))
-    print(f"\n数据形状: {df.shape}")
+    logger.info(f"\n数据预览：")
+    logger.info(df.head(10))
+    logger.info(f"\n数据形状: {df.shape}")

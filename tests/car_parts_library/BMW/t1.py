@@ -68,13 +68,13 @@ def _debug_print(step_name, status, text_len, text_preview):
     print(f'[DEBUG] 前300字: {text_preview[:300]}')
     # 检查失败特征
     if text_len == 0:
-        print('[DEBUG] ❌ 空响应')
+        print('[DEBUG] [失败] 空响应')
     elif 'logon' in text_preview.lower() or '登录' in text_preview:
-        print('[DEBUG] ⚠️  返回登录/Logon 页面 → Cookie 失效')
+        print('[DEBUG] [警告]  返回登录/Logon 页面 → Cookie 失效')
     elif '不存在或未激活' in text_preview:
-        print('[DEBUG] ℹ️  零件号不存在或未激活（这是正常的业务响应）')
+        print('[DEBUG] [信息]  零件号不存在或未激活（这是正常的业务响应）')
     elif '<!-- Header  -->' in text_preview:
-        print('[DEBUG] ✅ 返回库存查询页面（成功！）')
+        print('[DEBUG] [成功] 返回库存查询页面（成功！）')
 
 
 # ========================================================
@@ -215,7 +215,7 @@ if __name__ == '__main__':
 
     # 检查 cookie 是否更新
     if '粘贴' in cookie or 'Hoppscotch' in cookie or len(cookie) < 50:
-        print('❌ 请先把 cookie 变量替换成真实的 Cookie 值！')
+        print('[失败] 请先把 cookie 变量替换成真实的 Cookie 值！')
         print('   打开 Hoppscotch → 成功发送请求 → 复制请求头里 Cookie 的完整值')
         sys.exit(1)
 
@@ -225,8 +225,8 @@ if __name__ == '__main__':
 
     print('\n' + '=' * 60)
     if isinstance(result, pd.DataFrame) and len(result) > 0:
-        print(f'✅ 查询成功！零件: {test_oe}')
+        print(f'[成功] 查询成功！零件: {test_oe}')
         print(result)
     else:
-        print(f'❌ 查询失败或无数据，零件: {test_oe}')
+        print(f'[失败] 查询失败或无数据，零件: {test_oe}')
     print('=' * 60)

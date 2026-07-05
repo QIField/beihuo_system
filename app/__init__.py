@@ -9,6 +9,10 @@
 
 def expansion_app(app):
 
+    # 初始化任务日志（按任务拆分日志文件）
+    from app.utils.logger_config import init_loggers
+    init_loggers()
+
     from app.api import api_bp        # 导入接口
     app.register_blueprint(api_bp)     # 注册接口
 

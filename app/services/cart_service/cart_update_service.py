@@ -31,7 +31,7 @@ def update_cart_data(store: Optional[str] = None) -> None:
         cart_items = cursor.fetchall()
         
         if not cart_items:
-            print("ℹ️ 购物车为空，无需更新")
+            print("[信息] 购物车为空，无需更新")
             return
         
         # 按门店分组购物车项目
@@ -116,11 +116,11 @@ def update_cart_data(store: Optional[str] = None) -> None:
                 cursor.executemany(update_sql, update_data_for_batch)
                 conn.commit()
         
-        print(f"✅ 购物车数据批量更新完成，共处理 {len(cart_items)} 条记录")
+        print(f"[成功] 购物车数据批量更新完成，共处理 {len(cart_items)} 条记录")
         
     except Exception as e:
         conn.rollback()
-        print(f"❌ 更新购物车数据失败: {str(e)}")
+        print(f"[失败] 更新购物车数据失败: {str(e)}")
         raise
     finally:
         cursor.close()

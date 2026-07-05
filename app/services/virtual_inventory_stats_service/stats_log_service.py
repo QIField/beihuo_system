@@ -5,6 +5,10 @@
 import pymysql
 from datetime import datetime, timedelta
 from app.utils.database_connection import get_db_connection
+from app.utils.logger_config import get_task_logger
+
+
+logger = get_task_logger('virtual_inventory')
 
 
 COMPANY_TABLES = [
@@ -119,7 +123,7 @@ def save_company_daily_statistics(company, table_name, start_time, end_time):
         ))
         conn.commit()
 
-        print(f"[统计日志] 已保存 {business_date} {company} 数据: 总计 {total_count} 条")
+        logger.info(f"[统计日志] 已保存 {business_date} {company} 数据: 总计 {total_count} 条")
 
         return {
             'code': 0,
@@ -137,7 +141,7 @@ def save_company_daily_statistics(company, table_name, start_time, end_time):
         }
 
     except Exception as e:
-        print(f"[统计日志] 保存失败: {company} {e}")
+        logger.exception(f"[统计日志] 保存失败: {company}")
         conn.rollback()
         return {'code': 1, 'msg': f'{company} 保存失败: {str(e)}'}
     finally:

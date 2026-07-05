@@ -15,7 +15,7 @@ import requests
 from qpl_config import BASE_URL, get_headers, handle_qpl_response
 
 
-def query_enquiry_list(begin_date, end_date, page_num=1, page_size=100, company='fsbbr'):
+def query_enquiry_list(begin_date, end_date, page_num=1, page_size=100, company='fsbbr', supplier_enquiry_status=0):
     """
     查询询价单列表
     
@@ -25,6 +25,7 @@ def query_enquiry_list(begin_date, end_date, page_num=1, page_size=100, company=
         page_num: 页码，默认1
         page_size: 每页数量，默认100
         company: 组织代码，默认fsbbr
+        supplier_enquiry_status: 询价单状态，默认0
     
     Returns:
         dict: API响应结果
@@ -34,7 +35,7 @@ def query_enquiry_list(begin_date, end_date, page_num=1, page_size=100, company=
         "closeLabel": None,
         "qplEnquiryNo": None,
         "supplierEnquiryNo": None,
-        "supplierEnquiryStatus": 0,
+        "supplierEnquiryStatus": supplier_enquiry_status,
         "traderId": None,
         "vinCode": None,
         "tuhuSupplierId": None,

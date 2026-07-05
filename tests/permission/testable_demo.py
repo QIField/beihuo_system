@@ -24,30 +24,30 @@ def main():
     print('═' * 60)
 
     # 1. 导入项目蓝图
-    print('\n📥 导入蓝图...')
+    print('\n[导入] 导入蓝图...')
     try:
         from app.api.system_management_api.permission_api import permission_bp
-        print('  ✓ permission_api.permission_bp')
+        print('  [成功] permission_api.permission_bp')
     except Exception as e:
-        print(f'  ✗ permission_api: {e}')
+        print(f'  [失败] permission_api: {e}')
         permission_bp = None
 
     try:
         from app.routes.permission_manager_web import permission_manager_web_bp
-        print('  ✓ permission_manager_web.permission_manager_web_bp')
+        print('  [成功] permission_manager_web.permission_manager_web_bp')
     except Exception as e:
-        print(f'  ✗ permission_manager_web: {e}')
+        print(f'  [失败] permission_manager_web: {e}')
         permission_manager_web_bp = None
 
     # 2. 显式注册
-    print('\n🔧 注册到测试服务...')
+    print('\n[工具] 注册到测试服务...')
     if permission_bp:
         register(permission_bp, url_prefix='/api')
     if permission_manager_web_bp:
         register(permission_manager_web_bp)
 
     # 3. 启动服务（start() 会自动打印路由详情）
-    print('\n🚀 启动服务...')
+    print('\n[开始] 启动服务...')
     start(port=5001)
 
 
@@ -63,13 +63,13 @@ def unit_test_demo():
         from app.api.system_management_api.permission_api import permission_bp
         register(permission_bp, url_prefix='/api')
     except Exception as e:
-        print(f'  ✗ 导入失败: {e}')
+        print(f'  [失败] 导入失败: {e}')
         return
 
     # 创建测试客户端（内存中执行，不需要网络）
     client = create_app().test_client()
 
-    print('\n📝 发送测试请求...')
+    print('\n[编辑] 发送测试请求...')
 
     # 测试框架内置端点
     resp = client.get('/testable/health')
@@ -92,7 +92,7 @@ def unit_test_demo():
         except Exception as e:
             print(f'  GET {path[:50]:50s} → 错误: {e}')
 
-    print('\n💡 提示：这种模式适合写自动化测试，速度快，不需要启动服务')
+    print('\n[灯泡] 提示：这种模式适合写自动化测试，速度快，不需要启动服务')
 
 
 if __name__ == '__main__':

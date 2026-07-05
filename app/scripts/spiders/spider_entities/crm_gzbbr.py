@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urlencode
 
 from app.scripts.spiders.spider_tool import SpiderTool
@@ -13,7 +14,7 @@ class CrmGzbbrSpider:
     # 网站固定配置
     BASE_URL = "https://crm.gzbbr.com"
 
-    def __init__(self, token=None, timeout=10, retry_count=3, cookies_key='fs'):
+    def __init__(self, token=None, timeout=10, retry_count=3, cookies_key='fs', logger=None):
         """
         初始化爬虫实例
 
@@ -21,12 +22,16 @@ class CrmGzbbrSpider:
         :param timeout: 请求超时时间（秒）
         :param retry_count: 重试次数
         :param cookies_key: Cookies的key，可选值：fs, zs, zh, hf, by，当token为空时使用
+        :param logger: 外部传入的日志记录器，未传入时使用默认的 'crm_gzbbr' logger
         """
         # 🔥 核心：实例化独立爬虫工具（组合模式）
         self.spider_tool = SpiderTool(timeout, retry_count)
         # 必传Token（业务私有属性）
         self.token = token
-        
+
+        # 日志记录器：调用方传入则使用调用方的，否则使用统一的 crm_gzbbr logger
+        self.logger = logger or logging.getLogger('crm_gzbbr')
+
         # 如果没有token，使用cookies认证（实际上是headers认证）
         self.auth_headers = {}
         if not self.token:
@@ -92,9 +97,9 @@ class CrmGzbbrSpider:
         # query_string = urlencode(params, doseq=True)
         # full_url = f"{url}?{query_string}"
         # print("【完整请求URL】", full_url)
-        # ========== 打印请求信息 ==========
-        print("【请求API地址】", url)
-        print("【请求参数】", params)
+        # ========== 记录请求信息 ==========
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{params}")
         # ==================================
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
 
@@ -116,9 +121,9 @@ class CrmGzbbrSpider:
         # query_string = urlencode(params, doseq=True)
         # full_url = f"{url}?{query_string}"
         # print("【完整请求URL】", full_url)
-        # ========== 打印请求信息 ==========
-        print("【请求API地址】", url)
-        print("【请求参数】", params)
+        # ========== 记录请求信息 ==========
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{params}")
         # ==================================
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
 
@@ -185,8 +190,8 @@ class CrmGzbbrSpider:
             "orderdate": orderdate,
             "e_date": e_date
         }
-        print("【请求API地址】", url)
-        print("【请求参数】", data)
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{data}")
         return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
 
     # https://crm.gzbbr.com/api/Crm.PurchaseOrder/orders_view
@@ -208,8 +213,8 @@ class CrmGzbbrSpider:
             "page": page,
             "limit": limit
         }
-        print("【请求API地址】", url)
-        print("【请求参数】", data)
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{data}")
         return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
 
     # https://crm.gzbbr.com/api/crm.Product/getProductList
@@ -243,8 +248,8 @@ class CrmGzbbrSpider:
             "type": product_type,
             "kw_nos": kw_nos,
         }
-        print("【请求API地址】", url)
-        print("【请求参数】", data)
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{data}")
         return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
 
     # https://crm.gzbbr.com/api/crm.Product/inventoryRecordList
@@ -279,8 +284,8 @@ class CrmGzbbrSpider:
             "type": record_type,
             "product_id": product_id,
         }
-        print("【请求API地址】", url)
-        print("【请求参数】", params)
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{params}")
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
 
     # https://crm.gzbbr.com/api/Product.Product/list
@@ -313,8 +318,8 @@ class CrmGzbbrSpider:
             if is_stock is not None:
                 params["is_stock"] = is_stock
 
-            print("【请求API地址】", url)
-            print("【请求参数】", params)
+            self.logger.info(f"【请求API地址】{url}")
+            self.logger.info(f"【请求参数】{params}")
             return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
         else:
             data = {
@@ -328,8 +333,8 @@ class CrmGzbbrSpider:
             if is_stock is not None:
                 data["is_stock"] = is_stock
 
-            print("【请求API地址】", url)
-            print("【请求参数】", data)
+            self.logger.info(f"【请求API地址】{url}")
+            self.logger.info(f"【请求参数】{data}")
             return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
 
     def close(self):

@@ -53,10 +53,10 @@ def init_safety_stock_calculation_table():
             """
             cursor.execute(create_table_sql)
             conn.commit()
-            print("✓ 安全库存计算结果表创建成功")
+            print("[成功] 安全库存计算结果表创建成功")
             
     except Exception as e:
-        print(f"✗ 创建安全库存计算结果表失败: {e}")
+        print(f"[失败] 创建安全库存计算结果表失败: {e}")
         if 'conn' in locals():
             conn.rollback()
     finally:

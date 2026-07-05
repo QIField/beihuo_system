@@ -3,6 +3,7 @@
 
 """配置"""
 
+import logging
 from datetime import datetime
 
 # 基础URL
@@ -19,19 +20,21 @@ BMW_TAX_RATE = 1.13   # 税率
 BMW_DISCOUNT = 0.9    # 折扣
 BMW_PRICE_FORMULA = lambda net_price: net_price * BMW_TAX_RATE * BMW_DISCOUNT
 
+# 汽配龙自动报价 logger
+logger = logging.getLogger('qpl_auto_bill')
+
 
 def qpl_log(message, order_no=None, detail=False, debug=False):
     """
     统一汽配龙自动报价日志格式
 
     输出格式:
-        [2026-06-25 10:17:46] [QPL-QUOTE] [SIQRxxx] [明细] 消息内容
-        [2026-06-25 10:17:46] [QPL-QUOTE] [调试] [SIQRxxx] 消息内容
+        [SIQRxxx] [明细] 消息内容
+        [调试] [SIQRxxx] 消息内容
 
-    这样即使多任务日志穿插，也能通过 grep [QPL-QUOTE] 或 [SIQRxxx] 提取。
+    日志文件本身已按任务区分，且 logging 自带时间戳，因此不再重复输出。
     """
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    parts = [f"[{timestamp}] [QPL-QUOTE]"]
+    parts = []
     if debug:
         parts.append("[调试]")
     if order_no:
@@ -39,7 +42,11 @@ def qpl_log(message, order_no=None, detail=False, debug=False):
     if detail:
         parts.append("[明细]")
     parts.append(str(message))
-    print(" ".join(parts))
+
+    if debug:
+        logger.debug(" ".join(parts))
+    else:
+        logger.info(" ".join(parts))
 
 
 # 组织代码到配置键名的映射
@@ -82,7 +89,7 @@ def get_qpl_token(company='fsbbr'):
     # 从映射获取配置键名
     config_key = COMPANY_TOKEN_KEY_MAP.get(company)
     if not config_key:
-        print(f"[汽配龙配置] 未找到组织 {company} 的Token配置映射")
+        logger.warning(f"[汽配龙配置] 未找到组织 {company} 的Token配置映射")
         return None
     
     # 从数据库获取配置
@@ -149,7 +156,7 @@ def notify_token_invalid(company='fsbbr'):
         from app.utils.common_util_module.server_push import message_push
         return message_push("汽配龙", message)
     except Exception as e:
-        print(f"[汽配龙配置][{company}] Token失效预警推送失败: {e}")
+        logger.error(f"[汽配龙配置][{company}] Token失效预警推送失败: {e}")
         return None
 
 

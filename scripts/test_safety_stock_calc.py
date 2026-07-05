@@ -19,9 +19,9 @@ def main():
     try:
         # 仅测试 fsbbr 组织
         count = execute_calculation_for_company(company='fsbbr')
-        print(f"\n✅ 计算完成！共处理 {count} 条产品记录")
+        print(f"\n[成功] 计算完成！共处理 {count} 条产品记录")
     except Exception as e:
-        print(f"\n❌ 计算失败: {e}")
+        print(f"\n[失败] 计算失败: {e}")
         import traceback
         traceback.print_exc()
         return 1

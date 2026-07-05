@@ -59,7 +59,7 @@ def _analyze_response(text):
 
 # ========== 测试 1：Python requests ==========
 print("=" * 60)
-print("🔧 测试 1 / 2：Python requests 库")
+print("[工具] 测试 1 / 2：Python requests 库")
 try:
     r = requests.post(url, headers=headers, data=payload,
                       verify=False, timeout=30, allow_redirects=True)
@@ -70,14 +70,14 @@ try:
     if len(r.text) > 0:
         print(f"  前 300 字: {r.text[:300]}")
     if r.status_code != 200:
-        print(f"  ⚠️  响应头: {dict(r.headers)}")
+        print(f"  [警告]  响应头: {dict(r.headers)}")
 except Exception as e:
-    print(f"  ❌ 异常: {e}")
+    print(f"  [失败] 异常: {e}")
 
 
 # ========== 测试 2：系统 curl 命令 ==========
 print("\n" + "=" * 60)
-print("🐚 测试 2 / 2：系统 curl 命令")
+print("[测试] 测试 2 / 2：系统 curl 命令")
 try:
     curl_cmd = ['curl', url, '-X', 'POST', '--insecure', '-s', '--compressed']
     for k, v in headers.items():
@@ -97,14 +97,14 @@ try:
     if r.stderr and len(r.stderr.strip()) > 0:
         print(f"  stderr: {r.stderr.strip()[:200]}")
 except FileNotFoundError:
-    print("  ❌ 系统没有安装 curl 或 curl 不在 PATH 中")
+    print("  [失败] 系统没有安装 curl 或 curl 不在 PATH 中")
 except Exception as e:
-    print(f"  ❌ 异常: {e}")
+    print(f"  [失败] 异常: {e}")
 
 
 # ========== 总结 ==========
 print("\n" + "=" * 60)
-print("📊 结论建议：")
+print("[统计] 结论建议：")
 print("  · 如果两个测试都失败 → Cookie 过期了，去 Hoppscotch 重新抓一份")
 print("  · 如果测试1( requests )失败，测试2( curl )成功 → 是 Python 环境/TLS指纹问题")
 print("       → 下一步运行: t2.py (curl_cffi 方案) 或 t3.py (subprocess 方案)")

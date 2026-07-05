@@ -69,7 +69,7 @@ def sync_supplier(supplier_name: str, gsign: str, skip_clear: bool = False) -> D
 
     except Exception as e:
         time_cost = round(time.time() - start_time, 2)
-        print(f"\n[✗] {supplier_name} 同步失败: {e}")
+        print(f"\n[[失败]] {supplier_name} 同步失败: {e}")
 
         return {
             'supplier': supplier_name,

@@ -202,15 +202,15 @@ class CRMDataCrawlService:
             with conn.cursor() as cursor:
                 if company:
                     cursor.execute("DELETE FROM crmapp_compare_summary WHERE company = %s", (company,))
-                    print(f"✅ 已清空 {company} 的 crmapp_compare_summary 数据")
+                    print(f"[成功] 已清空 {company} 的 crmapp_compare_summary 数据")
                 else:
                     cursor.execute("TRUNCATE TABLE crmapp_compare_summary")
-                    print("✅ 已清空 crmapp_compare_summary 表")
+                    print("[成功] 已清空 crmapp_compare_summary 表")
                 conn.commit()
                 return True
         except Exception as e:
             conn.rollback()
-            print(f"❌ 清空表失败: {e}")
+            print(f"[失败] 清空表失败: {e}")
             return False
         finally:
             conn.close()
@@ -290,7 +290,7 @@ class CRMDataCrawlService:
                         
                         # 打印前几条失败原因
                         if failed_reasons:
-                            print(f"  ⚠️  失败示例（前{len(failed_reasons)}条）：")
+                            print(f"  [警告]  失败示例（前{len(failed_reasons)}条）：")
                             for idx, (oe, brand, reason) in enumerate(failed_reasons, 1):
                                 print(f"     {idx}. OE: {oe}, 品牌: {brand}, 原因: {reason}")
 
@@ -303,7 +303,7 @@ class CRMDataCrawlService:
             conn.close()
 
         if total_failed > 0:
-            print(f"  📊 保存统计: 成功{total_saved}条, 失败{total_failed}条")
+            print(f"  [统计] 保存统计: 成功{total_saved}条, 失败{total_failed}条")
 
         return {'saved': total_saved, 'failed': total_failed}
 
@@ -321,9 +321,9 @@ class CRMDataCrawlService:
         try:
             # 获取总页数
             total, last_page = self.get_total_pages()
-            print(f"\n📊 总记录数: {total}")
-            print(f"📄 总页数: {last_page}")
-            print(f"📦 每页数量: {LIMIT}")
+            print(f"\n[统计] 总记录数: {total}")
+            print(f"[文档] 总页数: {last_page}")
+            print(f"[包裹] 每页数量: {LIMIT}")
 
             # 清空该组织的旧数据
             if not self.clear_table(self.company):
@@ -336,7 +336,7 @@ class CRMDataCrawlService:
             # 遍历所有页
             for page in range(1, last_page + 1):
                 print(f"\n{'=' * 80}")
-                print(f"📄 正在处理第 {page}/{last_page} 页")
+                print(f"[文档] 正在处理第 {page}/{last_page} 页")
                 print(f"{'=' * 80}")
 
                 # 获取页面数据
@@ -360,45 +360,45 @@ class CRMDataCrawlService:
                             self.model_sync_service.collect_model_mapping(oe, brand, model)
 
                         except Exception as e:
-                            print(f"⚠️  解析产品失败: {e}")
+                            print(f"[警告]  解析产品失败: {e}")
                             self.total_failed += 1
 
-                print(f"✅ 本页解析成功: {len(page_products)} 条")
+                print(f"[成功] 本页解析成功: {len(page_products)} 条")
 
                 # 加入批量缓存
                 batch_buffer.extend(page_products)
                 total_processed += len(page_products)
-                print(f"📦 当前缓存: {len(batch_buffer)} 条")
+                print(f"[包裹] 当前缓存: {len(batch_buffer)} 条")
 
                 # 检查是否需要批量保存
                 if len(batch_buffer) >= BATCH_SIZE:
-                    print(f"\n💾 批量保存 {len(batch_buffer)} 条数据...")
+                    print(f"\n[软盘] 批量保存 {len(batch_buffer)} 条数据...")
                     result = self.batch_save(batch_buffer)
                     self.total_saved += result['saved']
-                    print(f"✅ 保存成功: {result['saved']} 条")
+                    print(f"[成功] 保存成功: {result['saved']} 条")
                     batch_buffer = []
 
                 # 每10页暂停
                 if page % 10 == 0:
-                    print(f"\n⏸️  已处理10页，暂停2秒...")
+                    print(f"\n[暂停]  已处理10页，暂停2秒...")
                     time.sleep(2)
 
             # 保存最后一批
             if batch_buffer:
-                print(f"\n💾 保存最后一批数据: {len(batch_buffer)} 条...")
+                print(f"\n[软盘] 保存最后一批数据: {len(batch_buffer)} 条...")
                 result = self.batch_save(batch_buffer)
                 self.total_saved += result['saved']
-                print(f"✅ 保存成功: {result['saved']} 条")
+                print(f"[成功] 保存成功: {result['saved']} 条")
 
             # 输出统计
             print("\n" + "=" * 80)
             print(f"爬取完成统计 - 组织: {self.company}")
             print("=" * 80)
-            print(f"📊 总记录数: {total}")
-            print(f"✅ 成功保存: {self.total_saved} 条")
-            print(f"❌ 失败: {self.total_failed} 条")
-            print(f"📄 总页数: {last_page}")
-            print(f"⚠️  失败页数: {page_failed}")
+            print(f"[统计] 总记录数: {total}")
+            print(f"[成功] 成功保存: {self.total_saved} 条")
+            print(f"[失败] 失败: {self.total_failed} 条")
+            print(f"[文档] 总页数: {last_page}")
+            print(f"[警告]  失败页数: {page_failed}")
 
             result = {
                 'total': total,
@@ -422,7 +422,7 @@ class CRMDataCrawlService:
             return result
 
         except Exception as e:
-            print(f"\n❌ 爬取过程出错: {e}")
+            print(f"\n[失败] 爬取过程出错: {e}")
             import traceback
             traceback.print_exc()
             return {'total': 0, 'saved': self.total_saved, 'failed': self.total_failed, 'company': self.company}

@@ -130,7 +130,7 @@ def fetch_mercedes_data(part_numbers):
     spider = MercedesDalfscSpider()
     
     try:
-        print("✓ Spider 初始化完成，cookie 已验证")
+        print("[成功] Spider 初始化完成，cookie 已验证")
         
         # 逐个爬取零件信息
         print("\n开始爬取零件信息...")

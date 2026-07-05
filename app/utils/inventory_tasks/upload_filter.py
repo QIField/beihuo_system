@@ -8,6 +8,10 @@ import time
 import pymysql
 from typing import List, Dict, Set, Tuple
 from app.utils.database_connection import get_db_connection
+from app.utils.logger_config import get_task_logger
+
+
+logger = get_task_logger('virtual_inventory')
 
 
 class BlacklistFilter:
@@ -56,7 +60,7 @@ class BlacklistFilter:
         
         self._last_load_time = current_time
         
-        print(f"[黑名单过滤] 已加载 {len(self._blacklist_set)} 条黑名单到内存")
+        logger.info(f"[黑名单过滤] 已加载 {len(self._blacklist_set)} 条黑名单到内存")
         
         cursor.close()
         conn.close()
@@ -136,7 +140,7 @@ class BlacklistFilter:
             'elapsed_ms': elapsed_time
         }
         
-        print(f"[黑名单过滤] 过滤完成: 原始 {result['total_count']} 条, 剔除 {result['removed_count']} 条, 剩余 {len(filtered_data)} 条, 耗时 {elapsed_time:.2f}ms")
+        logger.info(f"[黑名单过滤] 过滤完成: 原始 {result['total_count']} 条, 剔除 {result['removed_count']} 条, 剩余 {len(filtered_data)} 条, 耗时 {elapsed_time:.2f}ms")
         
         return result
     
@@ -157,7 +161,7 @@ class BlacklistFilter:
         """清空内存缓存"""
         self._blacklist_set.clear()
         self._last_load_time = 0
-        print("[黑名单过滤] 内存缓存已清空")
+        logger.info("[黑名单过滤] 内存缓存已清空")
 
 
 # 全局过滤器实例(单例模式)

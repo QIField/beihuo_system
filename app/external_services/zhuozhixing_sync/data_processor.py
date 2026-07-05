@@ -157,10 +157,10 @@ def process_data(data_list: List[Dict[str, Any]], supplier_name: str) -> List[tu
 
     # 清洗数据（复刻Excel逻辑）
     cleaned_data = clean_data(data_list)
-    print(f"  ✓ 数据清洗完成: {len(cleaned_data)} 条")
+    print(f"  [成功] 数据清洗完成: {len(cleaned_data)} 条")
 
     # 准备数据库格式
     db_records = prepare_for_database(cleaned_data, supplier_name)
-    print(f"  ✓ 数据格式转换完成")
+    print(f"  [成功] 数据格式转换完成")
 
     return db_records

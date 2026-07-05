@@ -213,6 +213,23 @@ class CassmallSpider:
             headers=self._get_auth_header()
         )
 
+    def get_maindata_catalog(self, catalog_id):
+        """
+        获取 maindata 目录详情
+        :param catalog_id: 目录 ID，如 WBAWX5104CL775449
+        :return: 响应对象
+        """
+        url = f"{self.BASE_URL}/maindata/catalog/{catalog_id}"
+
+        print("【请求API地址】", url)
+        print("【请求方法】", "GET")
+
+        return self.spider_tool.fetch(
+            url=url,
+            method="GET",
+            headers=self._get_auth_header()
+        )
+
     def close(self):
         """关闭会话连接"""
         self.spider_tool.close()

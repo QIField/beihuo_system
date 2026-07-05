@@ -120,7 +120,7 @@ class LightweightTaskManager:
 
 
 # 全局实例
-task_manager = LightweightTaskManager(max_workers=10)
+task_manager = LightweightTaskManager(max_workers=20)
 
 
 def init_ks_bill_monitor():
@@ -231,10 +231,10 @@ def init_ks_quote_count_task():
             try:
                 from app.services.quote_count_service.weixin_quote_service import WeixinQuoteParserService
                 weixin_result = WeixinQuoteParserService().parse_recent_days(days=7)
-                print(f"✓ 微信解析完成: {weixin_result.get('saved_count', 0)} 条")
+                print(f"[成功] 微信解析完成: {weixin_result.get('saved_count', 0)} 条")
             except Exception as e:
                 import traceback
-                print(f"✗ 微信解析失败: {e}")
+                print(f"[失败] 微信解析失败: {e}")
                 print(f"详细错误:\n{traceback.format_exc()}")
                 weixin_result = {'saved_count': 0}
             

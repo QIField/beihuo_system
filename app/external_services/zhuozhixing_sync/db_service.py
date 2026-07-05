@@ -26,10 +26,10 @@ def clear_supplier_data(supplier_name: str) -> int:
         with db_cursor(dict_cursor=False) as cursor:
             sql_delete = f"DELETE FROM {DB_TABLE_NAME} WHERE supplier_name = %s"
             affected = cursor.execute(sql_delete, (supplier_name,))
-            print(f"  ✓ 已清空 {supplier_name} 旧数据: {affected} 条")
+            print(f"  [成功] 已清空 {supplier_name} 旧数据: {affected} 条")
             return affected
     except Exception as e:
-        print(f"  ✗ 清空数据失败: {e}")
+        print(f"  [失败] 清空数据失败: {e}")
         raise
 
 
@@ -78,11 +78,11 @@ def batch_insert_records(records: List[Tuple]) -> int:
                 total_inserted += len(batch)
                 print(f"    已插入: {total_inserted}/{len(records)} 条")
 
-        print(f"  ✓ 批量插入完成: {total_inserted} 条")
+        print(f"  [成功] 批量插入完成: {total_inserted} 条")
         return total_inserted
 
     except Exception as e:
-        print(f"  ✗ 批量插入失败: {e}")
+        print(f"  [失败] 批量插入失败: {e}")
         raise
 
 
@@ -121,7 +121,7 @@ def save_supplier_data(supplier_name: str, records: List[Tuple], skip_clear: boo
     # 插入新数据
     inserted_count = batch_insert_records(records)
 
-    print(f"  ✓ {supplier_name} 数据保存完成")
+    print(f"  [成功] {supplier_name} 数据保存完成")
 
     return {
         'supplier': supplier_name,
@@ -164,7 +164,7 @@ def query_data(supplier_name: str = None, limit: int = 100, offset: int = 0) -> 
             cursor.execute(sql, params)
             return cursor.fetchall()
     except Exception as e:
-        print(f"  ✗ 查询数据失败: {e}")
+        print(f"  [失败] 查询数据失败: {e}")
         return []
 
 
@@ -191,5 +191,5 @@ def get_data_count(supplier_name: str = None) -> int:
             result = cursor.fetchone()
             return result['count'] if result else 0
     except Exception as e:
-        print(f"  ✗ 获取数据总数失败: {e}")
+        print(f"  [失败] 获取数据总数失败: {e}")
         return 0

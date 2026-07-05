@@ -46,7 +46,7 @@ class ZhuoZhiXingAPIClient:
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(RETRY_DELAY)
                 else:
-                    print(f"    ✗ 请求最终失败: {url}")
+                    print(f"    [失败] 请求最终失败: {url}")
                     return None
         return None
 
@@ -63,10 +63,10 @@ class ZhuoZhiXingAPIClient:
         data = self._make_request(url)
         if data and 'allkckey' in data:
             allkckey = data['allkckey']
-            print(f"  ✓ 获取成功: {allkckey}")
+            print(f"  [成功] 获取成功: {allkckey}")
             return allkckey
         else:
-            print(f"  ✗ 获取库存密钥失败")
+            print(f"  [失败] 获取库存密钥失败")
             return None
 
     def get_inventory_page(self, allkckey: str, pindex: int) -> List[Dict[str, Any]]:
@@ -118,7 +118,7 @@ class ZhuoZhiXingAPIClient:
 
             pindex += 1
 
-        print(f"  ✓ 共获取 {len(all_data)} 条数据")
+        print(f"  [成功] 共获取 {len(all_data)} 条数据")
         return all_data
 
 

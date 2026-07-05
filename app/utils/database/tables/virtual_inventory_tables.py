@@ -56,7 +56,7 @@ def init_virtual_inventory_table():
                         print(f"添加字段 {col_name} 时出错: {str(e)}")
                         
     except Exception as e:
-        print(f"  ✗ 虚拟库存表: {e}")
+        print(f"  [失败] 虚拟库存表: {e}")
     finally:
         conn.close()
 
@@ -85,7 +85,7 @@ def init_tenglong_data_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 腾隆数据表: {e}")
+        print(f"  [失败] 腾隆数据表: {e}")
     finally:
         conn.close()
 
@@ -114,7 +114,7 @@ def init_beiermale_data_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 贝尔马勒数据表: {e}")
+        print(f"  [失败] 贝尔马勒数据表: {e}")
     finally:
         conn.close()
 
@@ -175,7 +175,7 @@ def init_aichebeimu_data_tables():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='爱车贝母中山数据表';
             """)
     except Exception as e:
-        print(f"  ✗ 爱车贝母数据表: {e}")
+        print(f"  [失败] 爱车贝母数据表: {e}")
     finally:
         conn.close()
 
@@ -204,7 +204,7 @@ def init_robot_data_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 机器人数据表: {e}")
+        print(f"  [失败] 机器人数据表: {e}")
     finally:
         conn.close()
 
@@ -233,7 +233,7 @@ def init_external_data_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 外部数据表: {e}")
+        print(f"  [失败] 外部数据表: {e}")
     finally:
         conn.close()
 

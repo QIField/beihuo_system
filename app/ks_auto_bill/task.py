@@ -14,6 +14,7 @@ import time
 import threading
 import queue
 import tempfile
+import logging
 from datetime import datetime
 from typing import Optional, Tuple, List
 
@@ -376,6 +377,7 @@ def ks_auto_bill_task():
     1. 单次执行，不循环（由调度器负责每分钟调用）
     2. 自带单实例锁，防止重复执行
     """
+    logger = logging.getLogger('ks_auto_bill')
     clear_ks_log_company()
     # 1. 获取单实例锁
     if not _task_lock.acquire():
@@ -384,16 +386,22 @@ def ks_auto_bill_task():
 
     try:
         # 2. 执行任务
+        logger.info('[开始] 开思自动对单')
         success, message, details = process_orders_once()
 
         if not success:
+            logger.error(f'[失败] 开思自动对单: {message}')
             ks_log(f"任务执行失败: {message}")
         else:
+            logger.info(f'[完成] 开思自动对单: {message}')
             ks_log(f"任务执行成功: {message}")
 
+    except Exception:
+        logger.exception('[失败] 开思自动对单')
     finally:
         # 3. 释放锁
         _task_lock.release()
+        clear_ks_log_company()
 
 
 def get_ks_auto_bill_task_status() -> dict:

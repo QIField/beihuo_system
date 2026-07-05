@@ -357,7 +357,7 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
                     time.sleep(0.5)
                     success, msg = update_product_view(session, pid, cass_desc, store_cass_price, store_peer_price, qpl_price)
                     success_count += 1 if success else 0
-                    print(f"  {'✓' if success else '✗'} {pid}")
+                    print(f"  {'[成功]' if success else '[失败]'} {pid}")
                 df.at[idx, '更新状态'] = f'成功{success_count}/{len(product_ids)}'
                 
     finally:

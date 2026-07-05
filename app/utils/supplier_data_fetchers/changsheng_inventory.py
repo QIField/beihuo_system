@@ -4,6 +4,11 @@ import uuid
 import time
 from datetime import datetime, timedelta
 import pandas as pd
+from app.utils.logger_config import get_task_logger
+
+
+logger = get_task_logger('virtual_inventory')
+
 
 
 def shichedao_login(api_key, api_secret):
@@ -40,11 +45,11 @@ def shichedao_login(api_key, api_secret):
             access_token = result['body']['access_token']
             return access_token
         else:
-            print(f"请求失败，状态码: {response.status_code}")
+            logger.error(f"请求失败，状态码: {response.status_code}")
             return None
 
-    except Exception as e:
-        print(f"发生异常: {str(e)}")
+    except Exception:
+        logger.exception(f"获取 access_token 时发生异常")
         return None
 
 
@@ -81,15 +86,15 @@ def get_parts_list(access_token, page_index=1, page_size=1000, update_time=None)
         if response.status_code == 200:
             result = response.json()
             if result["head"]["status"] == '200':
-                print(f"成功获取第{page_index}页数据，共{len(result['body']['parts'])}条记录")
+                logger.info(f"成功获取第{page_index}页数据，共{len(result['body']['parts'])}条记录")
                 return result["body"]['parts']
             else:
                 return []
         else:
             return []
 
-    except Exception as e:
-        print(f"发生异常: {str(e)}")
+    except Exception:
+        logger.exception(f"获取配件列表第{page_index}页时发生异常")
         return []
 
 
@@ -128,7 +133,7 @@ def get_all_parts(api_key, api_secret, page_size=1000, update_time=None):
         # 根据接口要求，每秒最多1次请求
         time.sleep(2)
 
-    print(f"共获取{len(all_parts)}条配件数据")
+    logger.info(f"共获取{len(all_parts)}条配件数据")
     all_parts = pd.DataFrame(all_parts)
     return all_parts
 
@@ -181,6 +186,5 @@ def start():
 
 if __name__ == "__main__":
     start()
-
 
 

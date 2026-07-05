@@ -64,17 +64,17 @@ def modify_field_type(table_name, field_name, new_definition):
                     alter_sql = f"ALTER TABLE `{table_name}` MODIFY COLUMN `{field_name}` {new_definition}"
                     cursor.execute(alter_sql)
                     conn.commit()
-                    print(f"  ✓ 修改 {table_name}.{field_name} 字段类型为 TEXT")
+                    print(f"  [成功] 修改 {table_name}.{field_name} 字段类型为 TEXT")
                 else:
-                    print(f"  ✓ {table_name}.{field_name} 字段已是 TEXT 类型")
+                    print(f"  [成功] {table_name}.{field_name} 字段已是 TEXT 类型")
             else:
                 # 字段不存在，添加字段
                 alter_sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{field_name}` {new_definition}"
                 cursor.execute(alter_sql)
                 conn.commit()
-                print(f"  ✓ 添加 {table_name}.{field_name} 字段")
+                print(f"  [成功] 添加 {table_name}.{field_name} 字段")
     except Exception as e:
-        print(f"  ✗ 修改 {table_name}.{field_name} 字段失败: {e}")
+        print(f"  [失败] 修改 {table_name}.{field_name} 字段失败: {e}")
         import traceback
         traceback.print_exc()
     finally:
@@ -149,7 +149,7 @@ def init_cart_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 购物车表: {e}")
+        print(f"  [失败] 购物车表: {e}")
     finally:
         conn.close()
     
@@ -186,7 +186,7 @@ def init_user_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 用户表: {e}")
+        print(f"  [失败] 用户表: {e}")
     finally:
         conn.close()
 
@@ -282,7 +282,7 @@ def init_beihuo_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 备货数据表: {e}")
+        print(f"  [失败] 备货数据表: {e}")
     finally:
         conn.close()
 
@@ -365,7 +365,7 @@ def init_date_search_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 日期搜索表: {e}")
+        print(f"  [失败] 日期搜索表: {e}")
     finally:
         conn.close()
 
@@ -413,7 +413,7 @@ def init_ks_auto_bill_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 开思自动账单表: {e}")
+        print(f"  [失败] 开思自动账单表: {e}")
     finally:
         conn.close()
 
@@ -665,7 +665,7 @@ def init_price_inquiry_table():
                     print(f"添加唯一索引时出错: {str(e)}")
             
     except Exception as e:
-        print(f"  ✗ 询价比价表: {e}")
+        print(f"  [失败] 询价比价表: {e}")
     finally:
         conn.close()
 
@@ -789,7 +789,7 @@ def init_compare_summary_table():
                     """)
                     print(f"已修改 l_model_zh 字段类型为 TEXT (原类型: {data_type})")
                 else:
-                    print("  ✓ l_model_zh 字段类型已是 TEXT，无需修改")
+                    print("  [成功] l_model_zh 字段类型已是 TEXT，无需修改")
             except Exception as e:
                 print(f"处理 l_model_zh 字段时出错: {e}")
             
@@ -825,7 +825,7 @@ def init_compare_summary_table():
                     """)
                     print(f"已修改 replace_number 字段类型为 TEXT (原类型: {data_type})")
                 else:
-                    print("  ✓ replace_number 字段类型已是 TEXT，无需修改")
+                    print("  [成功] replace_number 字段类型已是 TEXT，无需修改")
             except Exception as e:
                 print(f"处理 replace_number 字段时出错: {e}")
             
@@ -841,7 +841,7 @@ def init_compare_summary_table():
             except Exception as e:
                 print(f"删除字段 procurement_records 时出错: {str(e)}")
     except Exception as e:
-        print(f"  ✗ 比价汇总表: {e}")
+        print(f"  [失败] 比价汇总表: {e}")
     finally:
         conn.close()
 
@@ -916,7 +916,7 @@ def init_all_tables():
             completed.append('✓')
         except Exception as e:
             completed.append('✗')
-            print(f"  ✗ {name}表: {e}")
+            print(f"  [失败] {name}表: {e}")
 
     # 结构优化和索引
     ensure_table_structure()
@@ -927,4 +927,4 @@ def init_all_tables():
     auto_fix_all_tables_collation()
 
     # 简洁输出
-    print(f"[数据库] {sum(1 for c in completed if c == '✓')}/{len(tables)} 表初始化完成")
+    print(f"[数据库] {sum(1 for c in completed if c == '[成功]')}/{len(tables)} 表初始化完成")

@@ -108,16 +108,16 @@ def register(item: Union[Blueprint, Callable],
         # 注册 Blueprint
         bp_name = name or item.name
         _registered_blueprints.append((item, url_prefix, bp_name))
-        _print(f'✓ 注册蓝图: {bp_name} → {url_prefix or "/"}')
+        _print(f'[成功] 注册蓝图: {bp_name} → {url_prefix or "/"}')
 
     elif callable(item) and route_path:
         # 注册独立路由函数
         http_methods = methods or ['GET']
         _registered_routes.append((route_path, http_methods, item))
-        _print(f'✓ 注册路由: [{",".join(http_methods)}] {route_path}')
+        _print(f'[成功] 注册路由: [{",".join(http_methods)}] {route_path}')
 
     else:
-        _print(f'✗ 跳过: 不支持的类型 {type(item)}，或缺少 route_path')
+        _print(f'[失败] 跳过: 不支持的类型 {type(item)}，或缺少 route_path')
 
 
 # ======================================================================
@@ -212,14 +212,14 @@ def create_app(template_folder: Optional[str] = None,
                 app.register_blueprint(bp)
             registered_count += 1
         except Exception as e:
-            _print(f'✗ 注册蓝图 {name} 失败: {e}')
+            _print(f'[失败] 注册蓝图 {name} 失败: {e}')
 
     # 3. 注册所有独立路由
     for path, methods, func in _registered_routes:
         try:
             app.route(path, methods=methods)(func)
         except Exception as e:
-            _print(f'✗ 注册路由 {path} 失败: {e}')
+            _print(f'[失败] 注册路由 {path} 失败: {e}')
 
     # 4. 添加内置辅助端点
     _add_builtin_endpoints(app, registered_count)
@@ -273,14 +273,14 @@ def start(port: int = 5001,
 
     # 打印启动信息
     print('\n' + '═' * 70)
-    print('🚀 Testable Framework - 测试服务已启动')
+    print('[开始] Testable Framework - 测试服务已启动')
     print('═' * 70)
     print(f'  服务地址: http://{host}:{port}')
     print(f'  控制台首页: http://{host}:{port}/testable/')
     print(f'  端点列表: http://{host}:{port}/testable/endpoints')
     print(f'  健康检查: http://{host}:{port}/testable/health')
     print('─' * 70)
-    print('  💡 按 Ctrl+C 停止服务')
+    print('  [灯泡] 按 Ctrl+C 停止服务')
     print('═' * 70)
 
     # 打印详细的路由信息（使用增强版 list_registered）
@@ -330,7 +330,7 @@ def reset() -> None:
     global _registered_blueprints, _registered_routes
     _registered_blueprints = []
     _registered_routes = []
-    _print('🔄 注册表已清空')
+    _print('[更新] 注册表已清空')
 
 
 # ======================================================================
@@ -352,12 +352,12 @@ def list_registered(show_routes: bool = True) -> None:
         list_registered(show_routes=False)  # 只打印摘要
     """
     print('\n' + '═' * 70)
-    print('📋 已注册内容详情')
+    print('[列表] 已注册内容详情')
     print('═' * 70)
 
     # ─── 1. Blueprint 详情 ──────────────────────────────────
     if _registered_blueprints:
-        print(f'\n  📦 Blueprint ({len(_registered_blueprints)} 个):')
+        print(f'\n  [包裹] Blueprint ({len(_registered_blueprints)} 个):')
         print('  ' + '─' * 68)
 
         for bp_idx, (bp, prefix, name) in enumerate(_registered_blueprints, 1):
@@ -401,11 +401,11 @@ def list_registered(show_routes: bool = True) -> None:
                         print(f'        路由数量: 0（可能有嵌套子蓝图）')
 
                 except Exception as e:
-                    print(f'        ⚠️  路由解析失败: {e}')
+                    print(f'        [警告]  路由解析失败: {e}')
 
     # ─── 2. 独立路由详情 ────────────────────────────────────
     if _registered_routes:
-        print(f'\n\n  🚀 独立路由 ({len(_registered_routes)} 个):')
+        print(f'\n\n  [开始] 独立路由 ({len(_registered_routes)} 个):')
         print('  ' + '─' * 68)
 
         for idx, (path, methods, func) in enumerate(_registered_routes, 1):
@@ -419,7 +419,7 @@ def list_registered(show_routes: bool = True) -> None:
     # ─── 3. 空状态 ─────────────────────────────────────────
     if not _registered_blueprints and not _registered_routes:
         print('\n    (空 - 尚未注册任何内容)')
-        print('\n    💡 使用 register(your_blueprint, url_prefix="/api") 注册蓝图')
+        print('\n    [灯泡] 使用 register(your_blueprint, url_prefix="/api") 注册蓝图')
 
     print('\n' + '═' * 70 + '\n')
 

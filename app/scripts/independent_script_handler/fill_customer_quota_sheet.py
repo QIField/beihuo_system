@@ -80,9 +80,9 @@ def fill_customer_quota(batch_size=100):
                 try:
                     inserted = CustomerQuota.bulk_insert(session, customer_quota_data)
                     success_count += inserted
-                    print(f"  - ✓ 本批成功插入 {inserted} 条新记录")
+                    print(f"  - [成功] 本批成功插入 {inserted} 条新记录")
                 except Exception as e:
-                    print(f"  - ✗ 本批处理失败: {str(e)}")
+                    print(f"  - [失败] 本批处理失败: {str(e)}")
                     raise
             else:
                 print(f"  - 本批没有新数据需要插入")

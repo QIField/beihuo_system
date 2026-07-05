@@ -260,7 +260,7 @@ def crawl_data_crm_wms(start_date,end_date):
     #     sheet_name='合并订单数据',
     #     engine='openpyxl',
     # )
-    # print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_merged)}")
+    # print(f"[成功] 导出成功！\n文件: {filename}\n记录数: {len(df_merged)}")
 
     # 条件：orders_no_df2 不是空值 且 不是空字符串
     condition = (df_merged['orders_no_df2'].isna()) | (df_merged['orders_no_df2'] == '')
@@ -371,7 +371,7 @@ def crawl_data_crm_wms(start_date,end_date):
     #     sheet_name='合并订单数据',
     #     engine='openpyxl',
     # )
-    # print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_merged)}")
+    # print(f"[成功] 导出成功！\n文件: {filename}\n记录数: {len(df_merged)}")
 
 
 
@@ -462,7 +462,7 @@ def crawl_data_crm_wms(start_date,end_date):
     #     sheet_name='合并订单数据',
     #     engine='openpyxl',
     # )
-    # print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_merged_new)}")
+    # print(f"[成功] 导出成功！\n文件: {filename}\n记录数: {len(df_merged_new)}")
 
 
     import json
@@ -488,7 +488,7 @@ def crawl_data_crm_wms(start_date,end_date):
     #     sheet_name='合并订单数据',
     #     engine='openpyxl',
     # )
-    # print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_merged_new)}")
+    # print(f"[成功] 导出成功！\n文件: {filename}\n记录数: {len(df_merged_new)}")
 
 
 

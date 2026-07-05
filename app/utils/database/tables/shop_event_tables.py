@@ -27,7 +27,7 @@ def init_shop_event_summary_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 每日事件汇总表: {e}")
+        print(f"  [失败] 每日事件汇总表: {e}")
     finally:
         conn.close()
 
@@ -59,7 +59,7 @@ def init_shop_event_detail_table():
             """
             cursor.execute(create_table_sql)
     except Exception as e:
-        print(f"  ✗ 事件明细表: {e}")
+        print(f"  [失败] 事件明细表: {e}")
     finally:
         conn.close()
 
@@ -114,6 +114,6 @@ def init_shop_business_indicator_table():
                         print(f"添加字段 {col_name} 时出错: {str(e)}")
                         
     except Exception as e:
-        print(f"  ✗ 经营指标表: {e}")
+        print(f"  [失败] 经营指标表: {e}")
     finally:
         conn.close()

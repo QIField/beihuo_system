@@ -35,7 +35,7 @@ def _ask_database_choice():
     提供两个选项：本地数据库（快速开发）或线上数据库（真实延迟测试）
     """
     print("\n" + "=" * 60)
-    print("🗄️  数据库连接选择")
+    print("[数据库]  数据库连接选择")
     print("=" * 60)
     print("1. 本地数据库 (localhost) - 快速开发，无网络延迟")
     print("2. 线上数据库 (113.45.176.129) - 真实延迟测试，模拟生产环境")
@@ -45,15 +45,15 @@ def _ask_database_choice():
         choice = input("请选择数据库 [1/2，默认1]: ").strip() or "1"
         if choice in ["1", "2"]:
             break
-        print("❌ 无效输入，请输入 1 或 2")
+        print("[失败] 无效输入，请输入 1 或 2")
     
     if choice == "2":
-        print("⚠️  已选择线上数据库，请注意：")
+        print("[警告]  已选择线上数据库，请注意：")
         print("   - 所有操作都有真实网络延迟")
         print("   - 请谨慎操作，避免影响线上数据")
         return "online"
     else:
-        print("✅ 已选择本地数据库")
+        print("[成功] 已选择本地数据库")
         return "local"
 
 
@@ -115,6 +115,6 @@ def get_mysql_config():
         # 打印当前连接的数据库信息（隐藏密码）
         config_display = _selected_config.copy()
         config_display['password'] = '********'
-        print(f"\n📡 当前数据库配置: {config_display}\n")
+        print(f"\n[配置] 当前数据库配置: {config_display}\n")
     
     return _selected_config

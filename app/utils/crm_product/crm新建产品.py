@@ -352,14 +352,14 @@ def search_products_by_oe_list(session, oe_list, timeout=30):
             result = response.json()
             # 打印查询结果数量
             total_count = result.get('data', {}).get('total', 0)
-            print(f"🔍 OE查询 {oe_list[0]} 返回 {total_count} 条结果")
+            print(f"[查询] OE查询 {oe_list[0]} 返回 {total_count} 条结果")
             return result
         else:
-            print(f"❌ OE查询 {oe_list[0]} 失败，状态码: {response.status_code}")
+            print(f"[失败] OE查询 {oe_list[0]} 失败，状态码: {response.status_code}")
             return None
             
     except Exception as e:
-        print(f"❌ OE查询 {oe_list[0]} 出错: {e}")
+        print(f"[失败] OE查询 {oe_list[0]} 出错: {e}")
         return None
 
 
@@ -1596,55 +1596,55 @@ def process_single_item_batch(item):
             match = re.search(r'"data":(\d+)', result)
             if match:
                 product_id = match.group(1)
-                print(f"✅ 新建成功，提取到product_id: {product_id}")
+                print(f"[成功] 新建成功，提取到product_id: {product_id}")
             else:
-                print(f"⚠️  新建成功但响应中无data字段: {result}")
+                print(f"[警告]  新建成功但响应中无data字段: {result}")
                 # 新建成功但没有ID，需要查询获取
                 search_result = search_products_by_oe_list(session, [oe_number])
                 if search_result:
                     product_id = find_matching_product_id_simple(search_result, oe_number, brand)
                     if product_id:
-                        print(f"✅ 通过查询获取到product_id: {product_id}")
+                        print(f"[成功] 通过查询获取到product_id: {product_id}")
                     else:
-                        print(f"❌ 查询未找到匹配的product_id")
+                        print(f"[失败] 查询未找到匹配的product_id")
         except Exception as e:
-            print(f"❌ 提取product_id时出错: {e}")
+            print(f"[失败] 提取product_id时出错: {e}")
             
     elif result.startswith("已存在"):
         # 情况2：已存在 - 需要查询获取ID
-        print(f"🔄 OE已存在，查询获取ID: {oe_number}")
+        print(f"[更新] OE已存在，查询获取ID: {oe_number}")
         try:
             search_result = search_products_by_oe_list(session, [oe_number])
             if search_result:
                 product_id = find_matching_product_id_simple(search_result, oe_number, brand)
                 if product_id:
-                    print(f"✅ 已存在OE查询到product_id: {product_id}")
+                    print(f"[成功] 已存在OE查询到product_id: {product_id}")
                 else:
-                    print(f"⚠️  已存在OE但未查询到匹配的product_id")
+                    print(f"[警告]  已存在OE但未查询到匹配的product_id")
             else:
-                print(f"❌ 已存在OE查询失败")
+                print(f"[失败] 已存在OE查询失败")
         except Exception as e:
-            print(f"❌ 查询已存在OE时出错: {e}")
+            print(f"[失败] 查询已存在OE时出错: {e}")
             
     elif result == "跳过":
         # 情况3：跳过 - 需要查询获取ID
-        print(f"🔄 OE跳过处理，查询获取ID: {oe_number}")
+        print(f"[更新] OE跳过处理，查询获取ID: {oe_number}")
         try:
             search_result = search_products_by_oe_list(session, [oe_number])
             if search_result:
                 product_id = find_matching_product_id_simple(search_result, oe_number, brand)
                 if product_id:
-                    print(f"✅ 跳过OE查询到product_id: {product_id}")
+                    print(f"[成功] 跳过OE查询到product_id: {product_id}")
                 else:
-                    print(f"⚠️  跳过OE但未查询到匹配的product_id")
+                    print(f"[警告]  跳过OE但未查询到匹配的product_id")
             else:
-                print(f"❌ 跳过OE查询失败")
+                print(f"[失败] 跳过OE查询失败")
         except Exception as e:
-            print(f"❌ 查询跳过OE时出错: {e}")
+            print(f"[失败] 查询跳过OE时出错: {e}")
             
     else:
         # 情况4：失败 - 不处理
-        print(f"❌ OE处理失败: {result}")
+        print(f"[失败] OE处理失败: {result}")
     
     # 如果有product_id且是三列模式，更新brand_code
     if (item.get('mode') == 'three_column' and 
@@ -1652,16 +1652,16 @@ def process_single_item_batch(item):
         item.get('brand_code')):
         
         brand_code = item['brand_code']
-        print(f"🔄 更新brand_code: product_id={product_id}, brand_code={brand_code}")
+        print(f"[更新] 更新brand_code: product_id={product_id}, brand_code={brand_code}")
         
         try:
             update_result = update_product_brand_code(session, product_id, brand_code)
             result += f" | brand_code更新: {update_result}"
-            print(f"✅ brand_code更新完成: {update_result}")
+            print(f"[成功] brand_code更新完成: {update_result}")
         except Exception as e:
             error_msg = f"brand_code更新失败: {str(e)}"
             result += f" | {error_msg}"
-            print(f"❌ {error_msg}")
+            print(f"[失败] {error_msg}")
             
     elif item.get('mode') == 'three_column' and not product_id:
         if result.startswith("成功"):
@@ -1824,7 +1824,7 @@ def save_results_to_excel(results, original_file_path):
 
 def show_debug_info(products, target_oe, target_brand):
     """显示调试信息帮助排查匹配失败原因"""
-    print(f"\n🔍 调试信息:")
+    print(f"\n[查询] 调试信息:")
     print(f"   目标OE: {target_oe}")
     print(f"   目标品牌: {target_brand}")
     
@@ -1937,9 +1937,9 @@ def process_excel_file_mode(file_path):
                         match = re.search(r'"data":(\d+)', result)
                         if match:
                             product_id = match.group(1)
-                            print(f"✅ 新建成功，提取到product_id: {product_id}")
+                            print(f"[成功] 新建成功，提取到product_id: {product_id}")
                     except Exception as e:
-                        print(f"❌ 提取product_id时出错: {e}")
+                        print(f"[失败] 提取product_id时出错: {e}")
                     
                     if product_id:
                         # 更新brand_code
@@ -1955,13 +1955,13 @@ def process_excel_file_mode(file_path):
                 # 已存在的情况 - 需要查询获取ID
                 brand_code = str(row[brand_code_col]).strip() if pd.notna(row[brand_code_col]) else ''
                 if brand_code:
-                    print(f"🔄 OE已存在，需要查询获取ID: {oe_number}")
+                    print(f"[更新] OE已存在，需要查询获取ID: {oe_number}")
                     try:
                         search_result = search_products_by_oe_list(session, [oe_number])
                         if search_result:
                             product_id = find_matching_product_id_simple(search_result, oe_number, brand)
                             if product_id:
-                                print(f"✅ 已存在OE查询到product_id: {product_id}")
+                                print(f"[成功] 已存在OE查询到product_id: {product_id}")
                                 update_result = update_product_brand_code(session, product_id, brand_code)
                                 print(f"OE: {oe_number} brand_code更新结果: {update_result}")
                                 results_dict[oe_number] += f" | brand_code更新: {update_result}"

@@ -480,4 +480,4 @@ def crawl_data_crm_wms(start_date, end_date):
     #     sheet_name='合并订单数据',
     #     engine='openpyxl',
     # )
-    # print(f"✅ 导出成功！\n文件: {filename}\n记录数: {len(df_merged_new)}")
+    # print(f"[成功] 导出成功！\n文件: {filename}\n记录数: {len(df_merged_new)}")

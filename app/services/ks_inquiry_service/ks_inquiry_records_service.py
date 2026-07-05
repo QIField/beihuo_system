@@ -292,7 +292,7 @@ class KsInquiryRecordsService:
         column: str,
         grid_type: str = 'detail',
         inquiry_id: str = '',
-        parts_num: str = '',
+        resolve_parts_num: str = '',
         parts_name: str = '',
         brand_name: str = '',
         brand: str = '',
@@ -322,12 +322,12 @@ class KsInquiryRecordsService:
         # 基础查询条件
         if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
         # customer_stats_by_oe 限定单个 OE，使用精确匹配
-        if grid_type == 'customer_stats_by_oe' and parts_num:
-            conditions.append("partsNum = %s")
-            params.append(parts_num)
-        elif parts_num:
-            conditions.append("partsNum LIKE %s")
-            params.append(f"%{parts_num}%")
+        if grid_type == 'customer_stats_by_oe' and resolve_parts_num:
+            conditions.append("resolve_parts_num = %s")
+            params.append(resolve_parts_num)
+        elif resolve_parts_num:
+            conditions.append("resolve_parts_num LIKE %s")
+            params.append(f"%{resolve_parts_num}%")
         if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
@@ -342,7 +342,7 @@ class KsInquiryRecordsService:
         grid_configs = {
             'detail':       {'columns': KsInquiryRecordsService._DETAIL_FILTER_MAP, 'aggregated': set()},
             'master':       {'columns': KsInquiryRecordsService._MASTER_FILTER_MAP, 'aggregated': set()},
-            'oe_stats':     {'columns': {'partsNum': 'partsNum', 'partsName': 'resolve_parts_name', 'count': 'count', 'unquotedProducts': 'unquotedProducts'}, 'aggregated': {'count', 'unquotedProducts'}, 'group_by': 'partsNum'},
+            'oe_stats':     {'columns': {'resolve_parts_num': 'resolve_parts_num', 'partsName': 'resolve_parts_name', 'count': 'count', 'unquotedProducts': 'unquotedProducts'}, 'aggregated': {'count', 'unquotedProducts'}, 'group_by': 'resolve_parts_num'},
             'garage_chassis': {'columns': {'carBrandName': 'car_brand_name', 'chassis': 'chassis', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, chassis'},
             'garage_engine':  {'columns': {'carBrandName': 'car_brand_name', 'engine': 'engine', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, engine'},
             'garage_oenum':   {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'partsNum', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, partsNum'},
