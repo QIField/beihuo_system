@@ -60,11 +60,19 @@ ERROR_LOG = os.path.join(TASK_LOG_DIR, 'errors.log')
 
 
 # 需要按任务拆分日志的模块列表
+# 使用规范：
+# 1. 新任务先确认是否属于已有 TASK_LOGGERS 模块（如 qpl_auto_bill）
+# 2. 如果属于，直接导入对应 logger：from app.utils.xxx import logger
+# 3. 如果新建独立任务，把任务名加入 TASK_LOGGERS，并使用 get_task_logger(task_name)
+# 4. 禁止在任务文件中使用 logging.getLogger(__name__)
 # 新任务需要记录独立日志时，在此添加即可
 TASK_LOGGERS = [
     'qpl_auto_bill',                # 汽配龙自动报价
     'ks_auto_bill',                 # 开思自动对单
     'crm_warehouse_inventory_sync', # CRM 仓库库存同步
+    'virtual_inventory',            # 虚拟库存同步
+    'vin_vehicle_info_sync',        # VIN 车辆信息补全
+    'crm_gzbbr',                    # CRM 爬虫公共模块默认日志
 ]
 
 

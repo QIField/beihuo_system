@@ -120,7 +120,7 @@ class LightweightTaskManager:
 
 
 # 全局实例
-task_manager = LightweightTaskManager(max_workers=10)
+task_manager = LightweightTaskManager(max_workers=20)
 
 
 def init_ks_bill_monitor():

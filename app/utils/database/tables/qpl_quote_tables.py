@@ -36,12 +36,14 @@ def init_qpl_quote_record_table():
                 created_time DATETIME COMMENT '询价单创建时间',
                 vin_code VARCHAR(100) COMMENT 'VIN码',
                 car_type TEXT COMMENT '车型信息',
+                order_status VARCHAR(50) COMMENT '汽配龙产品报价状态（quoteStatusStr），如：已下单、已报价',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 INDEX idx_supplier_enquiry_no (supplier_enquiry_no),
                 INDEX idx_item_oe (item_oe),
                 INDEX idx_brand_name (brand_name),
                 INDEX idx_submit_time (submit_time),
-                INDEX idx_company (company)
+                INDEX idx_company (company),
+                INDEX idx_supplier_enquiry_item (supplier_enquiry_no, enquiry_item_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='汽配龙报价记录表';
             """
             cursor.execute(create_table_sql)
@@ -53,7 +55,8 @@ def init_qpl_quote_record_table():
                 {'name': 'created_time', 'definition': "DATETIME COMMENT '询价单创建时间'"},
                 {'name': 'vin_code', 'definition': "VARCHAR(100) COMMENT 'VIN码'"},
                 {'name': 'car_type', 'definition': "TEXT COMMENT '车型信息'"},
-                {'name': 'result_source', 'definition': "VARCHAR(50) COMMENT '报价来源/结果分类'"}
+                {'name': 'result_source', 'definition': "VARCHAR(50) COMMENT '报价来源/结果分类'"},
+                {'name': 'order_status', 'definition': "VARCHAR(50) COMMENT '汽配龙产品报价状态（quoteStatusStr），如：已下单、已报价'"}
             ]
             check_and_add_fields('qpl_quote_record', qpl_fields)
 

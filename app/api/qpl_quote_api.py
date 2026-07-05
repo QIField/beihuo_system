@@ -361,6 +361,19 @@ def get_stats():
         return jsonify({'code': 500, 'msg': str(e)})
 
 
+def _build_oe_stats_select():
+    """构建 OE 统计聚合字段 SELECT 片段（出现次数、已下单数、转化率）"""
+    return '''
+        COUNT(DISTINCT supplier_enquiry_no) as occurrence_count,
+        COUNT(DISTINCT CASE WHEN order_status = '已下单' THEN supplier_enquiry_no END) as ordered_count,
+        ROUND(
+            COUNT(DISTINCT CASE WHEN order_status = '已下单' THEN supplier_enquiry_no END) * 100.0
+            / NULLIF(COUNT(DISTINCT supplier_enquiry_no), 0),
+            2
+        ) as conversion_rate
+    '''
+
+
 @qpl_quote_bp.route('/oe_stats', methods=['GET'])
 @login_required
 def get_oe_stats():
@@ -380,18 +393,18 @@ def get_oe_stats():
 
         offset = (page - 1) * limit
 
-        allowed_columns = {'item_oe', 'item_name', 'occurrence_count'}
-        allowed_filter_columns = {'item_oe', 'item_name', 'occurrence_count'}
+        allowed_columns = {'item_oe', 'item_name', 'occurrence_count', 'ordered_count', 'conversion_rate'}
+        allowed_filter_columns = {'item_oe', 'item_name', 'occurrence_count', 'ordered_count', 'conversion_rate'}
         current_store = get_user_store()
 
-        # occurrence_count 是聚合字段，需用 HAVING 过滤，不能放在 WHERE
+        # occurrence_count/ordered_count/conversion_rate 是聚合字段，需用 HAVING 过滤，不能放在 WHERE
         having_filter_condition = ''
         having_filter_params = []
         query_filter_column = filter_column
         query_filter_values = filter_values
-        if filter_column == 'occurrence_count' and filter_values:
+        if filter_column in ('occurrence_count', 'ordered_count', 'conversion_rate') and filter_values:
             placeholders = ', '.join(['%s'] * len(filter_values))
-            having_filter_condition = f' AND occurrence_count IN ({placeholders})'
+            having_filter_condition = f' AND {filter_column} IN ({placeholders})'
             having_filter_params = list(filter_values)
             query_filter_column = ''
             query_filter_values = []
@@ -413,7 +426,10 @@ def get_oe_stats():
         # 统计总数
         count_sql = f'''
             SELECT COUNT(*) FROM (
-                SELECT item_oe, COALESCE(item_name, '') as item_name, COUNT(DISTINCT supplier_enquiry_no) as occurrence_count
+                SELECT
+                    item_oe,
+                    COALESCE(item_name, '') as item_name,
+                    {_build_oe_stats_select()}
                 FROM qpl_quote_record
                 {where_clause}
                 GROUP BY item_oe, COALESCE(item_name, '')
@@ -424,13 +440,16 @@ def get_oe_stats():
         # 数据查询
         order_by = 'occurrence_count DESC, item_oe ASC'
         if sort_column and sort_column in allowed_columns and sort_dir in ('asc', 'desc'):
-            if sort_column == 'occurrence_count':
-                order_by = f'occurrence_count {sort_dir.upper()}, item_oe ASC'
+            if sort_column in ('occurrence_count', 'ordered_count', 'conversion_rate'):
+                order_by = f'{sort_column} {sort_dir.upper()}, item_oe ASC'
             else:
                 order_by = f'{sort_column} {sort_dir.upper()}'
 
         data_sql = f'''
-            SELECT item_oe, COALESCE(item_name, '') as item_name, COUNT(DISTINCT supplier_enquiry_no) as occurrence_count
+            SELECT
+                item_oe,
+                COALESCE(item_name, '') as item_name,
+                {_build_oe_stats_select()}
             FROM qpl_quote_record
             {where_clause}
             GROUP BY item_oe, COALESCE(item_name, '')
@@ -477,7 +496,7 @@ def get_oe_filter_values():
     """获取 OE 统计维度指定列的去重值"""
     try:
         column = request.args.get('column', '').strip()
-        allowed_columns = {'item_oe', 'item_name', 'occurrence_count'}
+        allowed_columns = {'item_oe', 'item_name', 'occurrence_count', 'ordered_count', 'conversion_rate'}
         if not column or column not in allowed_columns:
             return jsonify({'code': 1, 'msg': '无效的列名'})
 
@@ -499,17 +518,18 @@ def get_oe_filter_values():
 
         where_clause = 'WHERE ' + ' AND '.join(conditions)
 
-        if column == 'occurrence_count':
+        if column in ('occurrence_count', 'ordered_count', 'conversion_rate'):
             sql = f'''
-                SELECT occurrence_count AS value, COUNT(*) AS count
+                SELECT {column} AS value, COUNT(*) AS count
                 FROM (
-                    SELECT COUNT(DISTINCT supplier_enquiry_no) AS occurrence_count
+                    SELECT
+                        {_build_oe_stats_select()}
                     FROM qpl_quote_record
                     {where_clause}
                     GROUP BY item_oe, COALESCE(item_name, '')
                 ) t
-                GROUP BY occurrence_count
-                ORDER BY occurrence_count ASC
+                GROUP BY {column}
+                ORDER BY {column} ASC
                 LIMIT 1000
             '''
         else:

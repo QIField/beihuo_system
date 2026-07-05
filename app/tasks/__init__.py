@@ -9,7 +9,9 @@ from .openapi_gzbbr_token_task import openapi_gzbbr_token_register
 from .crm_data_sync_task import register_crm_data_sync_tasks
 from .safety_stock_tasks import register_safety_stock_tasks
 from .qpl_auto_quote_task import register_qpl_auto_quote_tasks
+from .qpl_order_status_sync_task import register_qpl_order_status_sync_tasks
 from .crm_warehouse_inventory_sync_task import register_crm_warehouse_inventory_sync_tasks
+from .vin_vehicle_info_sync_task import register_vin_vehicle_info_sync_tasks
 from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
 
 
@@ -38,8 +40,14 @@ def register_all_tasks(task_manager):
     # 6. 注册汽配龙自动报价定时任务（每2分钟，08:00-20:00）
     register_qpl_auto_quote_tasks(task_manager)
     
-    # 7. 注册CRM仓库库存同步定时任务（每天8:00和20:00）
+    # 7. 注册汽配龙下单状态同步定时任务（每天11:00）
+    register_qpl_order_status_sync_tasks(task_manager)
+    
+    # 8. 注册CRM仓库库存同步定时任务（每天8:00和20:00）
     register_crm_warehouse_inventory_sync_tasks(task_manager)
+
+    # 9. 注册VIN车辆信息补全定时任务（每天9:00，最多50条）
+    register_vin_vehicle_info_sync_tasks(task_manager)
 
 
 __all__ = ['execute_daily_pipeline', 'register_all_tasks']

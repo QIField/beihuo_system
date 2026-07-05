@@ -7,13 +7,10 @@
 运行时段：每天 08:00 - 20:00
 """
 
-import logging
 from datetime import datetime
 
 from app.services.qpl_quote_service import process_and_save_quotes_for_all_companies
-
-
-logger = logging.getLogger(__name__)
+from app.utils.qpl_auto_bill.qpl_config import logger
 
 TASK_ID = 'qpl_auto_quote'
 

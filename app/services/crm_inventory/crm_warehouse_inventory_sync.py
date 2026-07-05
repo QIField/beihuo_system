@@ -59,6 +59,24 @@ SPECIAL_KW_NOS = [
     '01-09-09-09-10', '01-66-66-66-66', '08-08-08-08-08',
 ]
 
+# 仓位备注映射（Excel 用）
+KW_NO_REMARKS = {
+    '01-01-01-01-01': '临时仓，已经清掉',
+    '01-09-09-09-08': '菲尔次品，下一次退货货物还没退',
+    '01-09-09-09-09': '问题，退不了',
+    '01-09-09-09-10': '找不到',
+    '01-66-66-66-66': '虚拟，已经清掉',
+    '08-08-08-08-08': '中转仓，已经清掉',
+    '01-09-09-09-11': '临时存放，暂时不卖（有库存，需要搞个固定货位）',
+    '01-09-09-09-12': '索赔仓',
+}
+
+
+def _get_kw_no_remark(kw_no):
+    """获取仓位备注，未配置的仓位返回空字符串"""
+    return KW_NO_REMARKS.get(kw_no, '')
+
+
 # kw_nos 解析正则，匹配 仓位号<span...>(数量)</span>
 KW_NOS_PATTERN = re.compile(
     r"(\d{2}-\d{2}-\d{2}-\d{2}-\d{2})\s*<span[^>]*>\((\d+)\)</span>",
@@ -637,6 +655,7 @@ def _build_excel_data(session, company):
                 '操作时间': '',
                 '操作人': '',
                 '备注': '未找到入库记录',
+                '仓位备注': _get_kw_no_remark(kw_no),
             })
             continue
 
@@ -654,6 +673,7 @@ def _build_excel_data(session, company):
                 '操作时间': record.workdate.strftime('%Y-%m-%d %H:%M') if record.workdate else '',
                 '操作人': record.operator_name or '',
                 '备注': record.note or '',
+                '仓位备注': _get_kw_no_remark(kw_no),
             })
             if accumulated >= quantity:
                 break
@@ -692,7 +712,23 @@ def _send_notification(company, sku_total):
             '昨日SKU数': yesterday_count,
             '今日SKU数': today_count,
             '增减': change,
+            '仓位备注': _get_kw_no_remark(kw_no),
         })
+
+    # 无库存数据时不生成 Excel，只发送通知
+    if not summary_rows:
+        message = (
+            f"===【crm仓位库存业务汇报】===\n"
+            f"日期：{today_str}\n"
+            f"门店：{company}\n"
+            f"今日无库存数据"
+        )
+        try:
+            message_push("crm", message)
+            logger.info(f"[通知] {company} 今日无库存数据，跳过Excel导出")
+        except Exception as e:
+            logger.error(f"[通知] 发送失败: {e}")
+        return
 
     # 导出 Excel（按仓位分 sheet）
     export_dir = os.path.join('static', 'exports')
@@ -701,10 +737,7 @@ def _send_notification(company, sku_total):
 
     with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
         # 第一个 sheet：汇总
-        if summary_rows:
-            pd.DataFrame(summary_rows).to_excel(writer, sheet_name='SKU统计汇总', index=False)
-        else:
-            pd.DataFrame({'提示': ['今日无库存数据']}).to_excel(writer, sheet_name='SKU统计汇总', index=False)
+        pd.DataFrame(summary_rows).to_excel(writer, sheet_name='SKU统计汇总', index=False)
 
         # 每个仓位一个 sheet
         for kw_no in sorted(kw_no_rows.keys()):
@@ -757,7 +790,7 @@ def sync_company_inventory(company):
     logger.info(f"# 开始同步门店: {company} (cookie_key={cookie_key})")
     logger.info(f"{'#' * 70}")
 
-    spider = CrmGzbbrSpider(cookies_key=cookie_key)
+    spider = CrmGzbbrSpider(cookies_key=cookie_key, logger=logger)
     sku_total = 0
     product_kw_map = {}
 

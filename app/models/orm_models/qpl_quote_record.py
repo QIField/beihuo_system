@@ -34,6 +34,7 @@ class QplQuoteRecord(BaseModels):
     created_time = Column(DateTime, comment='询价单创建时间')
     vin_code = Column(String(100), comment='VIN码')
     car_type = Column(Text, comment='车型信息')
+    order_status = Column(String(50), comment='汽配龙产品报价状态（quoteStatusStr），如：已下单、已报价')
     created_at = Column(DateTime, server_default='CURRENT_TIMESTAMP', comment='创建时间')
 
     __table_args__ = {
