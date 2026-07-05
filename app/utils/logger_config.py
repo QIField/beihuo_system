@@ -68,6 +68,7 @@ ERROR_LOG = os.path.join(TASK_LOG_DIR, 'errors.log')
 # 新任务需要记录独立日志时，在此添加即可
 TASK_LOGGERS = [
     'qpl_auto_bill',                # 汽配龙自动报价
+    'btl_auto_bill',                # 巴图鲁自动报价
     'ks_auto_bill',                 # 开思自动对单
     'crm_warehouse_inventory_sync', # CRM 仓库库存同步
     'virtual_inventory',            # 虚拟库存同步
