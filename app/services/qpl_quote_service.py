@@ -187,7 +187,7 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
 
             quote_list = item.get('supplierQuoteItemList', [])
 
-            # 优先判断是否为自动报价项
+            # 自动报价项（CRM 新查到 / 奔驰宝马适配）
             if enquiry_item_id in extra_quote_items:
                 _extract_auto_quote(
                     details=details,
@@ -199,7 +199,9 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
                     quote_status=quote_status,
                     quote_items=extra_quote_items[enquiry_item_id]
                 )
-            elif quote_list:
+
+            # 已有报价项：保留原有报价记录；与上面的自动报价项可同时存在
+            if quote_list:
                 _extract_with_quotes(
                     details=details,
                     supplier_demand_id=supplier_demand_id,
@@ -370,6 +372,12 @@ _BC_FAIL_REASON_MAP = {
 }
 
 
+_BC_SOURCE_MAP = {
+    'B': 'mercedes',
+    'C': 'bmw',
+}
+
+
 def _map_crm_fail_reason(reason):
     return _CRM_FAIL_REASON_MAP.get(reason, 'crm_failed')
 
@@ -377,7 +385,7 @@ def _map_crm_fail_reason(reason):
 def _map_bc_fail_reason(reason, category):
     if reason in _BC_FAIL_REASON_MAP:
         return _BC_FAIL_REASON_MAP[reason]
-    return 'mercedes_failed' if category == 'B' else 'bmw_failed'
+    return _BC_SOURCE_MAP.get(category, 'bc') + '_failed'
 
 
 def _build_item_submit_results(order_success, crm_quote_item_ids, crm_failed_items,
@@ -428,29 +436,29 @@ def _build_item_submit_results(order_success, crm_quote_item_ids, crm_failed_ite
 
         submit_result = f"[{order_part}][{crm_part}][{bc_part}]"
 
-        # result_source 用于前端展示和筛选
-        if item_id in crm_quote_item_ids:
-            result_source = 'crm'
-        elif item_id in bc_quote_item_ids:
-            if category == 'B':
-                result_source = 'mercedes'
-            elif category == 'C':
-                result_source = 'bmw'
-            else:
-                result_source = 'bc'
-        elif item_id in crm_failed_items:
-            result_source = _map_crm_fail_reason(crm_failed_items[item_id][0])
-        elif item_id in bc_failed_items:
-            result_source = _map_bc_fail_reason(bc_failed_items[item_id], category)
-        else:
-            result_source = 'unknown'
-
         item_results[item_id] = {
             'submit_result': submit_result,
-            'result_source': result_source,
+            'result_source': _resolve_result_source(
+                item_id, category, crm_quote_item_ids, bc_quote_item_ids,
+                crm_failed_items, bc_failed_items
+            ),
         }
 
     return item_results
+
+
+def _resolve_result_source(item_id, category, crm_quote_item_ids, bc_quote_item_ids,
+                           crm_failed_items, bc_failed_items):
+    """按来源类型判定 result_source"""
+    if item_id in crm_quote_item_ids:
+        return 'crm'
+    if item_id in bc_quote_item_ids:
+        return _BC_SOURCE_MAP.get(category, 'bc')
+    if item_id in crm_failed_items:
+        return _map_crm_fail_reason(crm_failed_items[item_id][0])
+    if item_id in bc_failed_items:
+        return _map_bc_fail_reason(bc_failed_items[item_id], category)
+    return 'unknown'
 
 
 def process_and_save_quotes_for_company(company, begin_date=None, end_date=None):

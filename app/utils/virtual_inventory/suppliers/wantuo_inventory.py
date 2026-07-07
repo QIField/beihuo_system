@@ -65,12 +65,11 @@ def get_inventory_page(allkckey, pindex):
 
     :param allkckey: 库存查询密钥
     :param pindex: 页码（从1开始）
-    :return: 该页数据列表
+    :return: 该页响应数据字典
     """
     url = f"{API_BASE_URL}?psign={API_PSIGN}&gsign={GSIGN}&allkckey={allkckey}&mode=all_kc&pindex={pindex}"
     response = requests.get(url, timeout=30)
-    data = response.json()
-    return data['list']
+    return response.json()
 
 
 def get_all_inventory():
@@ -90,7 +89,40 @@ def get_all_inventory():
     logger.info(f"[佛山万拓] 开始分页获取数据...")
 
     while True:
-        page_data = get_inventory_page(allkckey, pindex)
+        page_data = None
+        last_error = None
+
+        for attempt in range(3):
+            try:
+                data = get_inventory_page(allkckey, pindex)
+
+                if data.get('msgcode') == 9:
+                    logger.warning(f"[佛山万拓] 第 {pindex} 页 allkckey无效或已超时，重新获取key (attempt={attempt + 1})")
+                    try:
+                        allkckey = get_allkckey()
+                        logger.info(f"[佛山万拓] 重新获取到allkckey: {allkckey}")
+                    except Exception:
+                        logger.exception("[佛山万拓] 重新获取allkckey失败")
+                    last_error = data.get('msgtext')
+                    continue
+
+                if data.get('msgcode') != 0:
+                    logger.warning(f"[佛山万拓] 第 {pindex} 页 接口返回异常: msgcode={data.get('msgcode')}, msgtext={data.get('msgtext')}")
+                    last_error = data.get('msgtext')
+                    continue
+
+                page_data = data.get('list')
+                if page_data is None:
+                    logger.warning(f"[佛山万拓] 第 {pindex} 页 响应中缺少list字段: {json.dumps(data, ensure_ascii=False)[:500]}")
+                    last_error = 'missing list'
+                    continue
+                break
+            except Exception as e:
+                logger.exception(f"[佛山万拓] 第 {pindex} 页第{attempt + 1}次请求失败")
+                last_error = str(e)
+
+        if page_data is None:
+            raise RuntimeError(f"[佛山万拓] 第 {pindex} 页最终失败，原因: {last_error}")
 
         if pindex == 1 and not page_data:
             raise RuntimeError(f"[佛山万拓] 第一页数据为空，allkckey={allkckey}")

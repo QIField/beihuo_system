@@ -16,6 +16,10 @@ excel_download_bp = Blueprint('excel_download', __name__)
 # Excel 导出文件统一存放目录
 EXPORT_DIR = os.path.join('static', 'exports')
 
+# 线上环境下载基础 URL，供其他服务生成推送链接时使用
+# 示例：http://x.fsbbr.net/web/download_excel/{category}/{company}/{date_str}
+DOWNLOAD_BASE_URL = "http://x.fsbbr.net"
+
 
 @excel_download_bp.route('/download_excel/<category>/<company>/<date_str>')
 def download_excel(category, company, date_str):
