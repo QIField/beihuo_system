@@ -15,6 +15,16 @@ from .api_client import VinVehicleInfoApiClient
 logger = logging.getLogger('vin_vehicle_info_sync')
 
 
+# label → (目标字段, 是否仅作为备选)
+_LABEL_HANDLERS = {
+    '发动机': ('engine', False),
+    '发动机编码': ('engine', True),
+    '发动机编号': ('engine', True),
+    '底盘': ('chassis', False),
+    '车型编码': ('chassis', True),
+}
+
+
 def parse_catalog_html(html):
     """
     解析 catalog HTML，提取发动机和底盘信息
@@ -31,14 +41,11 @@ def parse_catalog_html(html):
         label = tds[0].get_text(strip=True)
         value = tds[1].get_text(strip=True)
 
-        if label == '发动机':
-            result['engine'] = value
-        elif label == '发动机编码' and 'engine' not in result:
-            result['engine'] = value
-        elif label == '底盘':
-            result['chassis'] = value
-        elif label == '车型编码' and 'chassis' not in result:
-            result['chassis'] = value
+        handler = _LABEL_HANDLERS.get(label)
+        if handler:
+            key, fallback = handler
+            if not fallback or key not in result:
+                result[key] = value
 
     return result
 

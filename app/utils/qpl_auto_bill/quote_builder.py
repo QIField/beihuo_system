@@ -241,14 +241,15 @@ def construct_quote_request(detail_data, extra_quote_items=None):
 
             quote_status = item.get('quoteStatus')
 
-            # PART_QUOTE / QUOTED: 使用已有报价
+            # PART_QUOTE / QUOTED: 保留已有报价
             if quote_status in ('PART_QUOTE', 'QUOTED'):
                 for quote_info in item.get('supplierQuoteItemList', []):
                     quote_item = construct_quote_item(quote_info)
                     quote_item_list.append(quote_item)
 
-            # WAITING_QUOTE + 奔驰/宝马车: 从适配列表构造报价（支持一到多个报价项）
-            elif quote_status == 'WAITING_QUOTE' and enquiry_item_id in extra_quote_items:
+            # 追加自动报价项（CRM 新查到 / 奔驰宝马适配）
+            # 已有报价项在此追加 CRM 查到的其他 pid 报价，最终为：已有报价 + 新报价
+            if enquiry_item_id in extra_quote_items:
                 adapter_quote = extra_quote_items[enquiry_item_id]
                 if isinstance(adapter_quote, list):
                     quote_item_list.extend(adapter_quote)

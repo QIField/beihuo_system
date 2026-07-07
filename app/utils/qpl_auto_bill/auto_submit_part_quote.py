@@ -486,8 +486,12 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
             enquiry_item_id = item.get('enquiryItemId')
             item_oe = item.get('itemOe')
             quote_status = item.get('quoteStatus')
+            quote_status_str = str(quote_status).strip()
+            is_waiting = quote_status_str == 'WAITING_QUOTE'
+            is_quoted = quote_status_str in ('PART_QUOTE', 'QUOTED')
 
-            if str(quote_status).strip() != 'WAITING_QUOTE':
+            # 仅处理等待报价或已有报价的项；其他状态（如已关闭）跳过
+            if not is_waiting and not is_quoted:
                 continue
 
             try:
@@ -651,10 +655,11 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
 
                 if quoted_for_item:
                     crm_quote_items[enquiry_item_id] = quoted_for_item
-                    if has_original:
+                    # 仅对等待报价项记录“CRM 已报原厂”，用于跳过 B/C 流程
+                    if is_waiting and has_original:
                         original_quoted_ids.add(enquiry_item_id)
-                elif max_failure_stage > 0:
-                    # 品牌已匹配但后续失败才记录；品牌未匹配（stage=0）不记录
+                elif is_waiting and max_failure_stage > 0:
+                    # 等待报价项：品牌已匹配但后续失败才记录；品牌未匹配（stage=0）不记录
                     reason_map = {
                         1: FAIL_PART_NO_MISMATCH,
                         2: FAIL_NO_EFFECTIVE_PRICE,
