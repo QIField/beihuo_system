@@ -33,5 +33,11 @@ common_web_bp.register_blueprint(permission_manager_web_bp)
 
 common_web_bp.register_blueprint(excel_download_bp)
 
+
+from .wms_kanban import wms_kanban_web_bp
+common_web_bp.register_blueprint(wms_kanban_web_bp)
+
+
+
 __all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp','warehouse_manager_web_bp','common_web_bp','excel_download_bp']
 

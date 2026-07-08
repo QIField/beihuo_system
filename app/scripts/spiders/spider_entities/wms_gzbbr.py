@@ -34,13 +34,14 @@ class WmsGzbbrSpider:
     # ===================== 业务接口 =====================
     
     # https://wms.gzbbr.com/api/Wms.Orders/get_status_orders
-    def get_status_orders(self, type=None, status=None, page=None):
+    def get_status_orders(self, type=None, status=None, page=None, keywd=None):
         """获取状态订单列表"""
         url = f"{self.BASE_URL}/api/Wms.Orders/get_status_orders"
         params = {
             "type": type,
             "status": status,
             "page": page,
+            "keywd": keywd,
         }
         # ========== 打印请求信息 ==========
         print("【请求API地址】", url)

@@ -53,4 +53,10 @@ api_bp.register_blueprint(daily_inventory_bp)
 from .system_management_api import system_management_bp
 api_bp.register_blueprint(system_management_bp)
 
+# 注册 wms_kanban_api 子蓝图(看板)
+from .wms_kanban_api import wms_kanban_api_bp
+api_bp.register_blueprint(wms_kanban_api_bp)
+
+
+
 __all__ = ["api_bp"]
