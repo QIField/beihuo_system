@@ -13,12 +13,11 @@ from app.models.orm_models.base_models import BaseModels
 from app.utils.orm.type_decorators import StringToIntType
 
 
-class MergeOrderList(BaseModels):
-    """
-    crm销售订单表 ORM 模型
-    
-    对应数据库表：crm_sales_order
-    """
+class CrmSalesOrder(BaseModels):
+    # """
+    # crm销售订单表 ORM 模型
+    # 对应数据库表：crm_sales_order
+    # """
     
     __tablename__ = "crm_sales_order"
 
@@ -64,6 +63,7 @@ class MergeOrderList(BaseModels):
     street = Column(String(500), nullable=True, comment="街道地址")
     warehouse = Column(String(255), nullable=True, comment="仓库")
     order_error = Column(Text, nullable=True, comment="订单错误信息")
+    store = Column(String(255), nullable=True, comment="门店标识")
     created_at = Column(DateTime, nullable=True, default=datetime.now, comment="数据创建时间")
     updated_at = Column(DateTime, nullable=True, default=datetime.now, onupdate=datetime.now, comment="数据更新时间")
 
@@ -75,7 +75,7 @@ class MergeOrderList(BaseModels):
         """
         打印对象时显示的友好格式
         """
-        return f"<MergeOrderList orders_id={self.orders_id} d_sap_no={self.d_sap_no}>"
+        return f"<CrmSalesOrder orders_id={self.orders_id} d_sap_no={self.d_sap_no}>"
 
     def to_dict(self):
         """
@@ -89,7 +89,7 @@ class MergeOrderList(BaseModels):
         return {
             "orders_id": self.orders_id,
             "customer_id": self.customer_id,
-            "partner_id" :self.partner_id,
+            "partner_id": self.partner_id,
             "level_id": self.level_id,
             "is_wms": self.is_wms,
             "sap_no": self.sap_no,
@@ -103,7 +103,7 @@ class MergeOrderList(BaseModels):
             "sfje": self.sfje,
             "no_receive_amount": self.no_receive_amount,
             "status": self.status,
-            "order_type_id": self.order_type_id,
+            "order_type_name": self.order_type_name,
             "order_source_name": self.order_source_name,
             "handler": self.handler,
             "create_date": self.create_date,
@@ -112,6 +112,7 @@ class MergeOrderList(BaseModels):
             "street": self.street,
             "warehouse": self.warehouse,
             "order_error": self.order_error,
+            "store": self.store,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,  # pyright: ignore[reportGeneralTypeIssues]
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,  # pyright: ignore[reportGeneralTypeIssues]
         }

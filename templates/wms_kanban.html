@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS仓库数据看板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #1a2340;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background-color: #161e38;
+            border-bottom: 1px solid #2a385f;
+            min-height: 60px;
+            position: relative;
+        }
+        .header-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .header-center .header-title {
+            pointer-events: auto;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            min-width: 280px;
+            position: relative;
+            z-index: 1;
+        }
+        .date-time {
+            font-size: 14px;
+            color: #8fa4d9;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #40a9ff;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            min-width: 750px;
+            justify-content: flex-end;
+            position: relative;
+            z-index: 1;
+        }
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            background-color: #1e2847;
+            border-radius: 6px;
+            border: 1px solid #2a385f;
+            overflow: hidden;
+        }
+        .date-range-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 12px;
+            border-right: 1px solid #2a385f;
+        }
+        .date-range-group label {
+            color: #8fa4d9;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .date-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .date-input-wrapper svg {
+            position: absolute;
+            left: 0;
+            width: 16px;
+            height: 16px;
+            fill: #8fa4d9;
+            pointer-events: none;
+        }
+        .date-range-group input[type="date"] {
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 14px;
+            width: 125px;
+            padding: 8px 0 8px 22px;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+        }
+        .date-range-group input[type="date"]::-webkit-calendar-picker-indicator {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .date-separator {
+            color: #8fa4d9;
+            margin: 0 4px;
+        }
+        .status-filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 12px;
+            border-right: 1px solid #2a385f;
+        }
+        .status-filter-group label {
+            color: #8fa4d9;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .status-select {
+            background-color: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 14px;
+            padding: 8px 0;
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238fa4d9' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right center;
+            padding-right: 20px;
+        }
+        .status-select option {
+            background-color: #1e2847;
+            color: #ffffff;
+        }
+        .search-group {
+            display: flex;
+            align-items: center;
+        }
+        .search-input {
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 14px;
+            width: 260px;
+            padding: 8px 12px;
+            outline: none;
+        }
+        .search-input::placeholder {
+            color: #5d77a8;
+        }
+        .search-btn {
+            background-color: #40a9ff;
+            color: #ffffff;
+            border: none;
+            padding: 8px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            height: 100%;
+        }
+        .search-btn:hover {
+            background-color: #1890ff;
+        }
+        .btn {
+            background-color: #40a9ff;
+            color: #ffffff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .link-btn {
+            background: transparent;
+            border: none;
+            color: #8fa4d9;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .main-container {
+            padding: 20px;
+        }
+        .timeline-section {
+            background-color: #1e2847;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .timeline-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #2a385f;
+        }
+        .timeline-header-title {
+            font-size: 16px;
+            color: #40a9ff;
+            font-weight: bold;
+        }
+        .timeline-header-container {
+            display: flex;
+            background-color: #161e38;
+            border: 1px solid #2a385f;
+            border-bottom: none;
+        }
+        .timeline-header-left {
+            width: 100px;
+            flex-shrink: 0;
+        }
+        .timeline-header-right {
+            flex: 1;
+            display: flex;
+        }
+        .timeline-container {
+            display: flex;
+            height: 25vh;
+            overflow-y: auto;
+            border: 1px solid #2a385f;
+            border-top: none;
+            border-bottom: none;
+        }
+        .timeline-footer-container {
+            display: flex;
+            background-color: #161e38;
+            border: 1px solid #2a385f;
+            border-top: none;
+        }
+        .timeline-footer-left {
+            width: 100px;
+            flex-shrink: 0;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #40a9ff;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .timeline-footer-right {
+            flex: 1;
+            display: flex;
+        }
+        .timeline-footer-item {
+            flex: 1;
+            min-width: 0;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 18px;
+            border-right: 1px solid #2a385f;
+        }
+        .timeline-footer-item:last-child {
+            border-right: none;
+        }
+        .timeline-left {
+            width: 100px;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .timeline-time-item {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding-right: 20px;
+        }
+        .timeline-time-item .time-text {
+            font-size: 14px;
+            color: #ffffff;
+            font-weight: 500;
+            z-index: 2;
+            position: absolute;
+            right: 60px;
+            text-align: right;
+        }
+        .timeline-time-item .dot {
+            position: absolute;
+            right: 20px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #40a9ff;
+            box-shadow: 0 0 10px rgba(64, 169, 255, 0.8);
+            z-index: 3;
+        }
+        .timeline-time-item .dot-small {
+            width: 6px;
+            height: 6px;
+            background-color: #2a385f;
+            box-shadow: none;
+        }
+        .timeline-right {
+            flex: 1;
+            display: flex;
+            border-left: 1px solid #2a385f;
+        }
+        .timeline-column {
+            flex: 1;
+            min-width: 0;
+            border-right: 1px solid #2a385f;
+        }
+        .timeline-header-container .timeline-column {
+            border-right: 1px solid #2a385f;
+        }
+        .timeline-header-container .timeline-column:last-child {
+            border-right: none;
+        }
+        .timeline-column:last-child {
+            border-right: none;
+        }
+        .timeline-column-header {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #161e38;
+            color: #8fa4d9;
+            font-size: 18px;
+        }
+        .timeline-column-content {
+            display: flex;
+            flex-direction: column;
+        }
+        .timeline-data-item {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #ffffff;
+            border-bottom: 1px solid #2a385f;
+        }
+        .timeline-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .timeline-container::-webkit-scrollbar-track {
+            background: #161e38;
+        }
+        .timeline-container::-webkit-scrollbar-thumb {
+            background: #40a9ff;
+            border-radius: 3px;
+        }
+        .table-section {
+            background-color: #1e2847;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .table-header h3 {
+            font-size: 16px;
+        }
+        .table-count {
+            font-size: 14px;
+            color: #8fa4d9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #161e38;
+            color: #8fa4d9;
+            font-weight: normal;
+        }
+        tr {
+            border-bottom: 1px solid #2a385f;
+        }
+        tr:hover {
+            background-color: #25315a;
+        }
+        .status-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-tag.unstarted {
+            background-color: #8c8c8c;
+            color: #1a2340;
+        }
+        .status-tag.picking {
+            background-color: #faad14;
+            color: #1a2340;
+        }
+        .status-tag.completed {
+            background-color: #52c41a;
+            color: #1a2340;
+        }
+        .status-tag.error {
+            background-color: #ff4d4f;
+            color: #ffffff;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal {
+            background-color: #1e2847;
+            border-radius: 8px;
+            padding: 24px;
+            width: 400px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid #2a385f;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #2a385f;
+        }
+        .modal-header h3 {
+            font-size: 18px;
+            color: #40a9ff;
+            font-weight: bold;
+        }
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: #8fa4d9;
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal-close:hover {
+            color: #ffffff;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #8fa4d9;
+            font-size: 14px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: #161e38;
+            border: 1px solid #2a385f;
+            border-radius: 4px;
+            color: #ffffff;
+            font-size: 14px;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #40a9ff;
+        }
+        .form-hint {
+            font-size: 12px;
+            color: #5d77a8;
+            margin-top: 4px;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #2a385f;
+        }
+        .btn-cancel {
+            background-color: transparent;
+            border: 1px solid #2a385f;
+            color: #8fa4d9;
+        }
+        .btn-cancel:hover {
+            border-color: #40a9ff;
+            color: #40a9ff;
+        }
+        .detail-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .detail-overlay.active {
+            display: flex;
+        }
+        .detail-modal {
+            background-color: #1e2847;
+            border-radius: 8px;
+            padding: 24px;
+            width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid #2a385f;
+        }
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #2a385f;
+        }
+        .detail-header h3 {
+            font-size: 18px;
+            color: #40a9ff;
+            font-weight: bold;
+        }
+        .detail-close {
+            background: transparent;
+            border: none;
+            color: #8fa4d9;
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .detail-close:hover {
+            color: #ffffff;
+        }
+        .detail-item {
+            margin-bottom: 16px;
+        }
+        .detail-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #8fa4d9;
+            font-size: 14px;
+        }
+        .detail-value {
+            color: #ffffff;
+            font-size: 14px;
+        }
+        .detail-photos {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .detail-photo {
+            width: 180px;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #2a385f;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .detail-photo:hover {
+            transform: scale(1.05);
+        }
+        .photo-viewer-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .photo-viewer-overlay.active {
+            display: flex;
+        }
+        .photo-viewer-img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+        .photo-viewer-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 40px;
+            cursor: pointer;
+            line-height: 1;
+            z-index: 10;
+        }
+
+        .photo-viewer-prev,
+        .photo-viewer-next {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            color: #ffffff;
+            font-size: 50px;
+            cursor: pointer;
+            padding: 20px;
+            border-radius: 50%;
+            transition: background 0.3s;
+            z-index: 10;
+        }
+
+        .photo-viewer-prev:hover,
+        .photo-viewer-next:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .photo-viewer-prev {
+            left: 30px;
+        }
+
+        .photo-viewer-next {
+            right: 30px;
+        }
+
+        .photo-viewer-page {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffffff;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 20px;
+            border-radius: 20px;
+            z-index: 10;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a2340;
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loader {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            border-top-color: #40a9ff;
+            border-right-color: #52c41a;
+            border-bottom-color: #faad14;
+            border-left-color: #ff4d4f;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .loader.error {
+            border: none;
+            width: 80px;
+            height: 80px;
+            animation: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 60px;
+            color: #ff4d4f;
+        }
+
+        .loader.error::after {
+            content: "!";
+            font-weight: bold;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 18px;
+            color: #8fa4d9;
+        }
+
+        .loading-text.error {
+            color: #ff4d4f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="date-time" id="dateTime">2025.04.07 09:28:24 星期二 天气晴</div>
+        </div>
+        <div class="header-center">
+            <div class="header-title">WMS仓库数据看板</div>
+        </div>
+        <div class="header-right">
+            <div class="filter-bar">
+                <div class="date-range-group">
+                    <label>日期：</label>
+                    <div class="date-input-wrapper">
+                        <svg viewBox="0 0 1024 1024"><path d="M880 184H712v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H384v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H144c-17.7 0-32 14.3-32 32v664c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V216c0-17.7-14.3-32-32-32z m-40 656H184V460h656v380zM184 392V256h128v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h256v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h128v136H184z"/></svg>
+                        <input type="date" id="startDate">
+                    </div>
+                    <span class="date-separator">~</span>
+                    <div class="date-input-wrapper">
+                        <svg viewBox="0 0 1024 1024"><path d="M880 184H712v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H384v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H144c-17.7 0-32 14.3-32 32v664c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V216c0-17.7-14.3-32-32-32z m-40 656H184V460h656v380zM184 392V256h128v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h256v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h128v136H184z"/></svg>
+                        <input type="date" id="endDate">
+                    </div>
+                </div>
+                <div class="status-filter-group">
+                    <label>状态：</label>
+                    <select id="statusFilter" class="status-select">
+                        <option value="">全部</option>
+                        <option value="3">所有未完成</option>
+                        <option value="0">未开始</option>
+                        <option value="1">正在拣货</option>
+                        <option value="2">已完成</option>
+                    </select>
+                </div>
+                <div class="search-group">
+                    <input type="text" class="search-input" id="searchInput" placeholder="搜索客户名称、金蝶单号、业务员、拣货人、发货员...">
+                    <button class="search-btn" id="searchBtn">搜索</button>
+                </div>
+            </div>
+            <button class="link-btn">设置</button>
+            <button class="link-btn">退出</button>
+        </div>
+    </div>
+    <div class="main-container">
+        <div class="timeline-section">
+            <div class="timeline-header">
+                <div class="timeline-header-title">24小时时间轴</div>
+            </div>
+            <div class="timeline-header-container">
+                <div class="timeline-header-left"></div>
+                <div class="timeline-header-right" id="timelineHeaderRight"></div>
+            </div>
+            <div class="timeline-container" id="timelineContainer">
+                <div class="timeline-left" id="timelineLeft"></div>
+                <div class="timeline-right" id="timelineRight"></div>
+            </div>
+            <div class="timeline-footer-container">
+                <div class="timeline-footer-left">总数</div>
+                <div class="timeline-footer-right" id="timelineFooterRight"></div>
+            </div>
+        </div>
+        <div class="table-section">
+            <div class="table-header">
+                <h3>仓库任务</h3>
+                <div class="table-count" id="tableCount">共0条 1/1</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>金蝶单号</th>
+                        <th>客户名称</th>
+                        <th>业务员</th>
+                        <th>状态</th>
+                        <th>下单时间</th>
+                        <th>拣货人</th>
+                        <th>开始拣货时间</th>
+                        <th>用时</th>
+                        <th>发货员</th>
+                        <th>发货时间</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>系统设置</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="refreshInterval">数据刷新间隔（秒）</label>
+                    <input type="number" id="refreshInterval" min="10" value="60">
+                    <div class="form-hint">建议值：180-600秒</div>
+                </div>
+                <div class="form-group">
+                    <label for="refreshNum">自动翻页间隔（秒）</label>
+                    <input type="number" id="refreshNum" min="1" value="1">
+                    <div class="form-hint">建议值：1-3秒</div>
+                </div>
+                <div class="form-group">
+                    <label for="pageSize">每页显示条数</label>
+                    <input type="number" id="pageSize" min="1" value="5">
+                    <div class="form-hint">建议值：5-20条</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" id="cancelBtn">取消</button>
+                <button class="btn" id="saveBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-overlay" id="detailOverlay">
+        <div class="detail-modal">
+            <div class="detail-header">
+                <h3 id="detailTitle">订单详情</h3>
+                <button class="detail-close" id="detailClose">&times;</button>
+            </div>
+            <div class="detail-content" id="detailContent">
+            </div>
+        </div>
+    </div>
+
+    <div class="photo-viewer-overlay" id="photoViewerOverlay">
+        <button class="photo-viewer-close" id="photoViewerClose">&times;</button>
+        <button class="photo-viewer-prev" id="photoViewerPrev" onclick="prevPhoto()">&#10094;</button>
+        <button class="photo-viewer-next" id="photoViewerNext" onclick="nextPhoto()">&#10095;</button>
+        <img class="photo-viewer-img" id="photoViewerImg" src="">
+        <div class="photo-viewer-page" id="photoViewerPage"></div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loader" id="loader"></div>
+            <div class="loading-text" id="loadingText">数据加载中，请等待</div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 全局变量定义区域 - 所有全局变量都放在这里
+        // =========================================================================
+
+        /**
+         * 仓库任务数据数组
+         * 用于存储从后端API获取的任务列表，初始化为空数组
+         * 等数据加载成功后会被填充
+         */
+        let tasksData = [];
+
+        /**
+         * 日期范围（秒级时间戳）
+         * 用于存储用户选择的查询日期范围
+         */
+        let startTimestamp = 0;
+        let endTimestamp = 0;
+
+        /**
+         * 定时刷新配置（毫秒）
+         * 控制数据自动刷新的时间间隔
+         * 默认值：5*60秒 = 3*60 * 1000毫秒
+         */
+        let REFRESH_INTERVAL = 5*60 * 1000;
+
+        /**
+         * 翻页定时刷新配置（秒）
+         * 控制表格自动翻页的时间间隔
+         * 默认值：1秒
+         */
+        let refreshNum = 2;
+
+        /**
+         * 数据刷新定时器ID
+         * 存储setInterval的返回值，用于后续可能需要清除定时器
+         */
+        let refreshTimer;
+
+        /**
+         * 每页显示的数据条数
+         * 控制任务表格每页显示的记录数量
+         * 默认值：9条
+         */
+        let pageSize = 9;
+
+        /**
+         * 当前页码
+         * 表格分页的当前页码，从1开始计数
+         */
+        let currentPage = 1;
+
+        /**
+         * 自动翻页的定时器变量
+         * 用于存储setInterval的返回值，后续可以通过这个变量来停止定时器
+         */
+        let autoPageInterval;
+
+        /**
+         * 标记是否是首次加载
+         * 用于控制只在网页刚开始加载时显示等待界面
+         */
+        let isFirstLoad = true;
+
+        /**
+         * 搜索关键词
+         * 用于存储用户输入的搜索内容
+         */
+        let searchKeyword = '';
+
+        /**
+         * 状态筛选值
+         * 用于存储用户选择的状态筛选条件
+         * 空字符串表示全部，0=未开始，1=正在拣货，2=已完成
+         */
+        let statusFilter = '';
+
+        /**
+         * 当前查看的图片列表
+         * 用于存储当前详情页中的所有图片URL
+         */
+        let currentPhotoList = [];
+
+        /**
+         * 当前查看的图片索引
+         * 记录当前在图片查看器中显示的是第几张图片
+         */
+        let currentPhotoIndex = 0;
+
+        /**
+         * 时间轴自动滚动管理器
+         * 采用模块化设计，提供初始化、开始、停止、滚动等方法
+         */
+        const timelineAutoScroll = {
+            /** 滚动定时器ID */
+            scrollTimer: null,
+            /** 滚动容器DOM元素 */
+            container: null,
+            /** 滚动速度（保留，当前未使用） */
+            scrollSpeed: 50,
+            /** 滚动间隔（毫秒），数值越小滚动越快 */
+            scrollInterval: 20,
+            /** 是否正在滚动的标志 */
+            isScrolling: false,
+
+            /**
+             * 初始化滚动管理器
+             * @param {string} containerId - 滚动容器的DOM元素ID
+             */
+            init(containerId) {
+                this.container = document.getElementById(containerId);
+            },
+
+            /**
+             * 开始自动滚动
+             * 从顶部开始，平滑向下滚动
+             */
+            start() {
+                if (!this.container || this.isScrolling) return;
+                this.isScrolling = true;
+                this.container.scrollTop = 0;
+                this.scroll();
+            },
+
+            /**
+             * 停止自动滚动
+             * 清除定时器，重置滚动标志
+             */
+            stop() {
+                this.isScrolling = false;
+                if (this.scrollTimer) {
+                    clearTimeout(this.scrollTimer);
+                    this.scrollTimer = null;
+                }
+            },
+
+            /**
+             * 核心滚动逻辑
+             * 每次滚动1px，到达底部后回到顶部循环
+             */
+            scroll() {
+                if (!this.isScrolling || !this.container) return;
+                this.container.scrollTop += 1;
+                if (this.container.scrollTop >= this.container.scrollHeight - this.container.clientHeight) {
+                    this.container.scrollTop = 0;
+                }
+                this.scrollTimer = setTimeout(() => this.scroll(), this.scrollInterval);
+            },
+
+            /**
+             * 重新启动滚动
+             * 先停止再开始，避免重复启动
+             */
+            restart() {
+                this.stop();
+                setTimeout(() => this.start(), 100);
+            }
+        };
+
+        /**
+         * 后端API地址配置对象
+         * 集中管理所有接口地址，如果需要修改接口地址，只需要修改这里即可
+         */
+        const API_CONFIG = {
+            /**
+             * 任务列表API地址
+             * 用于获取仓库任务数据，包含日期范围、搜索关键词和状态参数
+             * start_date和end_date是秒级时间戳，keyword是模糊搜索关键词，status是状态筛选
+             */
+            get tasksUrl() {
+                let url = `/new/api/wms_kanban/screen_data?start_date=${startTimestamp}&end_date=${endTimestamp}`;
+                if (searchKeyword) {
+                    url += `&keyword=${encodeURIComponent(searchKeyword)}`;
+                }
+                if (statusFilter) {
+                    url += `&status=${encodeURIComponent(statusFilter)}`;
+                }
+                return url;
+            }
+        };
+
+        // =========================================================================
+        // 工具函数区域
+        // =========================================================================
+
+        /**
+         * 初始化日期选择器
+         * 设置默认日期为当天
+         */
+        function initDatePicker() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+
+            startDateInput.value = todayStr;
+            endDateInput.value = todayStr;
+
+            updateDateRange();
+        }
+
+        /**
+         * 根据日期选择器的值更新时间戳范围
+         * 将日期字符串转换为秒级时间戳
+         */
+        function updateDateRange() {
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+
+            const startDateStr = startDateInput.value;
+            const endDateStr = endDateInput.value;
+
+            if (startDateStr) {
+                const startDate = new Date(startDateStr + 'T00:00:00');
+                startTimestamp = Math.floor(startDate.getTime() / 1000);
+            }
+
+            if (endDateStr) {
+                const endDate = new Date(endDateStr + 'T23:59:59');
+                endTimestamp = Math.floor(endDate.getTime() / 1000);
+            }
+        }
+
+        /**
+         * 格式化时间戳
+         * 将后端返回的秒级时间戳转换为可读的日期时间格式
+         * @param {number|string} timestamp - 秒级时间戳，可以是数字或字符串类型
+         * @returns {string} 格式化后的时间字符串，格式为"YYYY-MM-DD HH:mm:ss"
+         */
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp * 1000);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+
+        /**
+         * 处理空值
+         * 检查传入的值是否为空，如果为空则返回"-"，否则返回原值
+         * @param {*} value - 原始值，可以是任意类型
+         * @returns {*} 处理后的值，如果为空返回"-"，否则返回原值
+         */
+        function handleEmpty(value) {
+            return (value === null || value === undefined || value === '') ? '-' : value;
+        }
+
+        /**
+         * 处理状态显示
+         * 将后端返回的状态值转换为带样式的HTML标签，并根据数据异常标识添加异常提示
+         * @param {number|string} status - 状态值，0=未开始，1=正在拣货，2=已完成
+         * @param {number|string} isDataExistsWmsKeywd - 数据异常标识，2表示数据异常
+         * @returns {string} 处理后的状态HTML标签
+         */
+        function formatStatus(status, isDataExistsWmsKeywd) {
+            const statusMap = {
+                '0': { text: '未开始', class: 'unstarted' },
+                '1': { text: '正在拣货', class: 'picking' },
+                '2': { text: '已完成', class: 'completed' }
+            };
+            const statusInfo = statusMap[String(status)] || { text: handleEmpty(status), class: '' };
+            let statusText = statusInfo.text;
+            let className = statusInfo.class;
+
+            if (isDataExistsWmsKeywd == 2) {
+                statusText += '（数据异常）';
+                className = 'error';
+            }
+
+            return `<span class="status-tag ${className}">${statusText}</span>`;
+        }
+
+        /**
+         * 计算用时
+         * 只对正在拣货的任务计算从开始拣货到现在的时间
+         * @param {number|string} status - 状态值，1=正在拣货
+         * @param {number|string} jhdateTimestamp - 开始拣货时间戳（秒级）
+         * @returns {string} 用时，格式为"X小时Y分钟"，其他状态返回"-"
+         */
+        function calculateDuration(status, jhdateTimestamp) {
+            if (status != 1 || !jhdateTimestamp) {
+                return '-';
+            }
+
+            const now = Date.now();
+            const startTime = jhdateTimestamp * 1000;
+            const diffMs = now - startTime;
+
+            if (diffMs < 0) {
+                return '-';
+            }
+
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+            const hours = Math.floor(diffMinutes / 60);
+            const minutes = diffMinutes % 60;
+
+            if (hours > 0) {
+                return `${hours}小时${minutes}分钟`;
+            } else {
+                return `${minutes}分钟`;
+            }
+        }
+
+        /**
+         * 打开详情页
+         * @param {Object} task - 任务数据对象
+         */
+        function openDetail(task) {
+            const detailOverlay = document.getElementById('detailOverlay');
+            const detailTitle = document.getElementById('detailTitle');
+            const detailContent = document.getElementById('detailContent');
+
+            detailTitle.textContent = `客户名称：${handleEmpty(task.fullname_crm)}`;
+
+            let photosHtml = '';
+            currentPhotoList = [];
+            if (task.photos) {
+                const photoFiles = task.photos.split(',').filter(p => p.trim());
+                if (photoFiles.length > 0) {
+                    photosHtml = '<div class="detail-photos">';
+                    photoFiles.forEach((photoFile, index) => {
+                        const photoUrl = `https://jh.fsbbr.net/uploads/${photoFile.trim()}`;
+                        currentPhotoList.push(photoUrl);
+                        photosHtml += `<img class="detail-photo" src="${photoUrl}" onclick="openPhotoViewer(${index})" alt="照片">`;
+                    });
+                    photosHtml += '</div>';
+                }
+            }
+
+            let shipperContent = '';
+            if (handleEmpty(task.shipper) === '-') {
+                shipperContent = '<span style="color: #faad14;">此商品还未发货</span>';
+            } else {
+                shipperContent = handleEmpty(task.shipper);
+            }
+
+            detailContent.innerHTML = `
+                <div class="detail-item">
+                    <span class="detail-label">发货员</span>
+                    <span class="detail-value">${shipperContent}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">发货时间</span>
+                    <span class="detail-value">${handleEmpty(task.ship_date)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">图片</span>
+                    <span class="detail-value">${photosHtml || '暂无图片'}</span>
+                </div>
+            `;
+
+            detailOverlay.classList.add('active');
+        }
+
+        /**
+         * 关闭详情页
+         */
+        function closeDetail() {
+            const detailOverlay = document.getElementById('detailOverlay');
+            detailOverlay.classList.remove('active');
+        }
+
+        /**
+         * 打开图片查看器
+         * @param {number} index - 图片索引
+         */
+        function openPhotoViewer(index) {
+            const photoViewerOverlay = document.getElementById('photoViewerOverlay');
+            const photoViewerImg = document.getElementById('photoViewerImg');
+            const photoViewerPage = document.getElementById('photoViewerPage');
+            
+            currentPhotoIndex = index;
+            photoViewerImg.src = currentPhotoList[currentPhotoIndex];
+            updatePhotoPageNumber();
+            photoViewerOverlay.classList.add('active');
+        }
+
+        /**
+         * 更新图片页码显示
+         */
+        function updatePhotoPageNumber() {
+            const photoViewerPage = document.getElementById('photoViewerPage');
+            if (photoViewerPage) {
+                photoViewerPage.textContent = `${currentPhotoIndex + 1} / ${currentPhotoList.length}`;
+            }
+        }
+
+        /**
+         * 上一张图片
+         */
+        function prevPhoto() {
+            if (currentPhotoList.length === 0) return;
+            currentPhotoIndex = (currentPhotoIndex - 1 + currentPhotoList.length) % currentPhotoList.length;
+            const photoViewerImg = document.getElementById('photoViewerImg');
+            photoViewerImg.src = currentPhotoList[currentPhotoIndex];
+            updatePhotoPageNumber();
+        }
+
+        /**
+         * 下一张图片
+         */
+        function nextPhoto() {
+            if (currentPhotoList.length === 0) return;
+            currentPhotoIndex = (currentPhotoIndex + 1) % currentPhotoList.length;
+            const photoViewerImg = document.getElementById('photoViewerImg');
+            photoViewerImg.src = currentPhotoList[currentPhotoIndex];
+            updatePhotoPageNumber();
+        }
+
+        /**
+         * 关闭图片查看器
+         */
+        function closePhotoViewer() {
+            const photoViewerOverlay = document.getElementById('photoViewerOverlay');
+            photoViewerOverlay.classList.remove('active');
+        }
+
+        /**
+         * 初始化详情页事件监听
+         */
+        function initDetailModal() {
+            const detailClose = document.getElementById('detailClose');
+            const detailOverlay = document.getElementById('detailOverlay');
+            const photoViewerClose = document.getElementById('photoViewerClose');
+            const photoViewerOverlay = document.getElementById('photoViewerOverlay');
+
+            detailClose.addEventListener('click', closeDetail);
+            detailOverlay.addEventListener('click', function(e) {
+                if (e.target === detailOverlay) {
+                    closeDetail();
+                }
+            });
+
+            photoViewerClose.addEventListener('click', closePhotoViewer);
+            photoViewerOverlay.addEventListener('click', function(e) {
+                if (e.target === photoViewerOverlay) {
+                    closePhotoViewer();
+                }
+            });
+
+            // 添加键盘事件监听
+            document.addEventListener('keydown', function(e) {
+                const isViewerActive = photoViewerOverlay.classList.contains('active');
+                if (!isViewerActive) return;
+
+                if (e.key === 'ArrowLeft') {
+                    prevPhoto();
+                } else if (e.key === 'ArrowRight') {
+                    nextPhoto();
+                } else if (e.key === 'Escape') {
+                    closePhotoViewer();
+                }
+            });
+        }
+
+        // =========================================================================
+        // 时间轴数据处理函数
+        // =========================================================================
+
+        /**
+         * 处理后端任务数据，生成24小时时间轴数据
+         * 将任务数据按30分钟时间槽分组，并计算各业务员的待拣和已拣数量
+         * @param {Array} tasks - 后端返回的任务数据数组
+         * @returns {Object} 包含时间轴数据、业务员列表和总数统计的对象
+         */
+        function processTimelineData(tasks) {
+            const timeSlots = {};
+            const salesmen = new Set();
+            const totals = {
+                unassigned: 0,
+                salesmen: {}
+            };
+
+            for (let hour = 0; hour < 24; hour++) {
+                for (let minute = 0; minute < 60; minute += 30) {
+                    const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+                    timeSlots[timeStr] = {
+                        time: timeStr,
+                        unassigned: 0,
+                        salesmen: {}
+                    };
+                }
+            }
+
+            tasks.forEach(task => {
+                const createDate = new Date(task.create_date_crm * 1000);
+                const hour = createDate.getHours();
+                const minute = createDate.getMinutes();
+
+                let slotHour = hour;
+                let slotMinute = 0;
+                if (minute >= 30) {
+                    slotMinute = 30;
+                }
+                const timeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}`;
+
+                if (task.status_wms == 0) {
+                    const qty = Number(task.qty_wms) || 0;
+                    timeSlots[timeStr].unassigned += qty;
+                    totals.unassigned += qty;
+                }
+
+                const salesman = task.name_wms;
+                if (salesman) {
+                    salesmen.add(salesman);
+                    const waitPick = Number(task.wait_pick_num_wms) || 0;
+                    const picked = Number(task.toqty_wms) || 0;
+
+                    if (!timeSlots[timeStr].salesmen[salesman]) {
+                        timeSlots[timeStr].salesmen[salesman] = { waitPick: 0, picked: 0 };
+                    }
+                    timeSlots[timeStr].salesmen[salesman].waitPick += waitPick;
+                    timeSlots[timeStr].salesmen[salesman].picked += picked;
+
+                    if (!totals.salesmen[salesman]) {
+                        totals.salesmen[salesman] = { waitPick: 0, picked: 0 };
+                    }
+                    totals.salesmen[salesman].waitPick += waitPick;
+                    totals.salesmen[salesman].picked += picked;
+                }
+            });
+
+            const sortedSalesmen = Array.from(salesmen).sort();
+            const timelineData = Object.values(timeSlots);
+
+            return { timelineData, salesmen: sortedSalesmen, totals };
+        }
+
+        // =========================================================================
+        // 时间轴渲染函数
+        // =========================================================================
+
+        /**
+         * 渲染24小时时间轴
+         * 包括表头、内容区域和底部总数行
+         * @param {Object} result - 包含 timelineData、salesmen 和 totals 的对象
+         */
+        function renderTimelineTable(result) {
+            const { timelineData, salesmen, totals } = result;
+            const timelineLeft = document.getElementById('timelineLeft');
+            const timelineRight = document.getElementById('timelineRight');
+            const timelineHeaderRight = document.getElementById('timelineHeaderRight');
+            const timelineFooterRight = document.getElementById('timelineFooterRight');
+
+            timelineLeft.innerHTML = '';
+            timelineRight.innerHTML = '';
+            timelineHeaderRight.innerHTML = '';
+            timelineFooterRight.innerHTML = '';
+
+            const headerUnassigned = document.createElement('div');
+            headerUnassigned.className = 'timeline-column';
+            headerUnassigned.innerHTML = `<div class="timeline-column-header">未分配</div>`;
+            timelineHeaderRight.appendChild(headerUnassigned);
+
+            salesmen.forEach(salesman => {
+                const headerColumn = document.createElement('div');
+                headerColumn.className = 'timeline-column';
+                headerColumn.innerHTML = `<div class="timeline-column-header">${salesman}</div>`;
+                timelineHeaderRight.appendChild(headerColumn);
+            });
+
+            const unassignedColumn = document.createElement('div');
+            unassignedColumn.className = 'timeline-column';
+            unassignedColumn.innerHTML = `<div class="timeline-column-content" id="unassignedCol"></div>`;
+            timelineRight.appendChild(unassignedColumn);
+            const unassignedCol = document.getElementById('unassignedCol');
+
+            const salesmanCols = {};
+            salesmen.forEach(salesman => {
+                const column = document.createElement('div');
+                column.className = 'timeline-column';
+                const colId = `salesman-${salesman}`;
+                column.innerHTML = `<div class="timeline-column-content" id="${colId}"></div>`;
+                timelineRight.appendChild(column);
+                salesmanCols[salesman] = document.getElementById(colId);
+            });
+
+            timelineData.forEach((item, index) => {
+                const isHour = item.time.endsWith(':00');
+
+                const timeItem = document.createElement('div');
+                timeItem.className = 'timeline-time-item';
+                timeItem.innerHTML = `
+                    ${isHour ? `<span class="time-text">${item.time}</span>` : ''}
+                    <span class="dot ${isHour ? '' : 'dot-small'}"></span>
+                `;
+                timelineLeft.appendChild(timeItem);
+
+                const unassignedItem = document.createElement('div');
+                unassignedItem.className = 'timeline-data-item';
+                unassignedItem.textContent = item.unassigned || '';
+                unassignedCol.appendChild(unassignedItem);
+
+                salesmen.forEach(salesman => {
+                    const dataItem = document.createElement('div');
+                    dataItem.className = 'timeline-data-item';
+                    const salesmanData = item.salesmen[salesman];
+                    if (salesmanData) {
+                        dataItem.textContent = `${salesmanData.waitPick}个/${salesmanData.picked}个`;
+                    } else {
+                        dataItem.textContent = '';
+                    }
+                    salesmanCols[salesman].appendChild(dataItem);
+                });
+            });
+
+            const footerUnassigned = document.createElement('div');
+            footerUnassigned.className = 'timeline-footer-item';
+            footerUnassigned.textContent = totals.unassigned || '';
+            timelineFooterRight.appendChild(footerUnassigned);
+
+            salesmen.forEach(salesman => {
+                const footerItem = document.createElement('div');
+                footerItem.className = 'timeline-footer-item';
+                const salesmanTotal = totals.salesmen[salesman];
+                if (salesmanTotal) {
+                    footerItem.textContent = `${salesmanTotal.waitPick}个/${salesmanTotal.picked}个`;
+                } else {
+                    footerItem.textContent = '';
+                }
+                timelineFooterRight.appendChild(footerItem);
+            });
+
+            timelineAutoScroll.start();
+        }
+
+        // =========================================================================
+        // 任务表格渲染函数
+        // =========================================================================
+
+        /**
+         * 渲染任务表格
+         * 这个函数会清空表格原有内容，然后根据传入的数据和当前页码渲染任务表格
+         * @param {Array} data - 任务数据数组，包含所有仓库任务
+         */
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            const tableCount = document.getElementById('tableCount');
+
+            tbody.innerHTML = '';
+
+            const totalPages = Math.ceil(data.length / pageSize);
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const pageData = data.slice(startIndex, endIndex);
+
+            pageData.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                const serialNumber = (currentPage - 1) * pageSize + index + 1;
+                tr.innerHTML = `
+                    <td>${serialNumber}</td>
+                    <td>${handleEmpty(item.pono_new)}</td>
+                    <td>${handleEmpty(item.fullname_crm)}</td>
+                    <td>${handleEmpty(item.handler_crm)}</td>
+                    <td></td>
+                    <td>${formatTimestamp(item.create_date_crm)}</td>
+                    <td>${handleEmpty(item.name_wms)}</td>
+                    <td>${formatTimestamp(item.jhdate_timestamp)}</td>
+                    <td></td>
+                    <td>${handleEmpty(item.shipper)}</td>
+                    <td>${handleEmpty(item.ship_date)}</td>
+                `;
+                const statusTd = tr.children[4];
+                statusTd.innerHTML = formatStatus(item.status_wms, item.is_data_exists_wms_keywd);
+                const durationTd = tr.children[8];
+                durationTd.textContent = calculateDuration(item.status_wms, item.jhdate_timestamp);
+
+                tr.style.cursor = 'pointer';
+                tr.title = '双击查看详情';
+                tr.addEventListener('dblclick', () => openDetail(item));
+
+                tbody.appendChild(tr);
+            });
+
+            tableCount.textContent = `共${data.length}条 ${currentPage}/${totalPages}`;
+        }
+
+        // =========================================================================
+        // 搜索功能函数
+        // =========================================================================
+
+        /**
+         * 执行搜索/查询
+         * 更新日期范围和搜索关键词，从后端重新获取数据
+         */
+        function performSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const statusSelect = document.getElementById('statusFilter');
+            searchKeyword = searchInput.value.trim();
+            statusFilter = statusSelect.value;
+            updateDateRange();
+            currentPage = 1;
+            fetchTasksData();
+        }
+
+        /**
+         * 初始化搜索和日期选择器事件
+         * 绑定搜索按钮点击事件、搜索框回车事件和状态筛选change事件
+         */
+        function initSearch() {
+            const searchBtn = document.getElementById('searchBtn');
+            const searchInput = document.getElementById('searchInput');
+            const statusSelect = document.getElementById('statusFilter');
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+
+            searchBtn.addEventListener('click', performSearch);
+
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+
+            statusSelect.addEventListener('change', performSearch);
+
+            startDateInput.addEventListener('change', performSearch);
+            endDateInput.addEventListener('change', performSearch);
+        }
+
+        // =========================================================================
+        // 分页控制函数
+        // =========================================================================
+
+        /**
+         * 切换到下一页
+         * 如果当前是最后一页，则回到第一页；否则页码+1
+         */
+        function nextPage() {
+            const totalPages = Math.ceil(tasksData.length / pageSize);
+            currentPage = currentPage >= totalPages ? 1 : currentPage + 1;
+            renderTable(tasksData);
+        }
+
+        /**
+         * 启动自动翻页功能
+         * 设置定时器，每隔固定时间自动切换到下一页
+         */
+        function startAutoPage() {
+            autoPageInterval = setInterval(nextPage, refreshNum * 1000);
+        }
+
+        // =========================================================================
+        // 数据获取函数（AJAX请求）
+        // =========================================================================
+
+        /**
+         * 通过AJAX获取任务数据
+         * 从后端API获取仓库任务数据，成功后渲染表格并启动自动翻页
+         */
+        function fetchTasksData() {
+            timelineAutoScroll.stop();
+
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loader = document.getElementById('loader');
+            const loadingText = document.getElementById('loadingText');
+
+            if (isFirstLoad) {
+                loadingOverlay.classList.add('active');
+                loader.classList.remove('error');
+                loadingText.classList.remove('error');
+                loadingText.textContent = '数据加载中，请等待';
+            }
+
+            fetch(API_CONFIG.tasksUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应异常');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    tasksData = data.data;
+                    renderTable(tasksData);
+                    const timelineResult = processTimelineData(tasksData);
+                    renderTimelineTable(timelineResult);
+
+                    if (isFirstLoad) {
+                        loadingOverlay.classList.remove('active');
+                        isFirstLoad = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('获取任务数据失败:', error);
+
+                    if (isFirstLoad) {
+                        loader.classList.add('error');
+                        loadingText.classList.add('error');
+                        loadingText.textContent = '请检查token';
+                    } else {
+                        const tbody = document.getElementById('tableBody');
+                        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#ff4d4f;">数据加载失败，请稍后重试</td></tr>';
+                        const timelineResult = processTimelineData([]);
+                        renderTimelineTable(timelineResult);
+                    }
+                });
+        }
+
+        // =========================================================================
+        // 定时刷新函数
+        // =========================================================================
+
+        /**
+         * 启动定时刷新功能
+         * 每隔REFRESH_INTERVAL毫秒自动刷新数据
+         */
+        function startAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+            refreshTimer = setInterval(function() {
+                fetchTasksData();
+            }, REFRESH_INTERVAL);
+        }
+
+        // =========================================================================
+        // 设置弹窗相关函数
+        // =========================================================================
+
+        /**
+         * 初始化设置弹窗
+         * 绑定设置按钮、关闭按钮、保存按钮等的事件监听器
+         */
+        function initSettingsModal() {
+            const linkBtns = document.querySelectorAll('.header-right .link-btn');
+            const settingsBtn = linkBtns[0];
+            const settingsModal = document.getElementById('settingsModal');
+            const closeModal = document.getElementById('closeModal');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const saveBtn = document.getElementById('saveBtn');
+
+            settingsBtn.addEventListener('click', function() {
+                openSettingsModal();
+            });
+
+            closeModal.addEventListener('click', function() {
+                closeSettingsModal();
+            });
+
+            settingsModal.addEventListener('click', function(e) {
+                if (e.target === settingsModal) {
+                    closeSettingsModal();
+                }
+            });
+
+            cancelBtn.addEventListener('click', function() {
+                closeSettingsModal();
+            });
+
+            saveBtn.addEventListener('click', function() {
+                saveSettings();
+            });
+        }
+
+        /**
+         * 打开设置弹窗并填充当前值
+         * 将当前的配置值填充到表单输入框中
+         */
+        function openSettingsModal() {
+            const settingsModal = document.getElementById('settingsModal');
+            const refreshIntervalInput = document.getElementById('refreshInterval');
+            const refreshNumInput = document.getElementById('refreshNum');
+            const pageSizeInput = document.getElementById('pageSize');
+
+            refreshIntervalInput.value = REFRESH_INTERVAL / 1000;
+            refreshNumInput.value = refreshNum;
+            pageSizeInput.value = pageSize;
+
+            settingsModal.classList.add('active');
+        }
+
+        /**
+         * 关闭设置弹窗
+         * 隐藏设置弹窗遮罩层
+         */
+        function closeSettingsModal() {
+            const settingsModal = document.getElementById('settingsModal');
+            settingsModal.classList.remove('active');
+        }
+
+        /**
+         * 保存设置
+         * 验证用户输入，更新配置变量，重启相关定时器，重新渲染表格
+         */
+        function saveSettings() {
+            const refreshIntervalInput = document.getElementById('refreshInterval');
+            const refreshNumInput = document.getElementById('refreshNum');
+            const pageSizeInput = document.getElementById('pageSize');
+
+            const newRefreshInterval = parseInt(refreshIntervalInput.value) * 1000;
+            const newRefreshNum = parseInt(refreshNumInput.value);
+            const newPageSize = parseInt(pageSizeInput.value);
+
+            if (isNaN(newRefreshInterval) || newRefreshInterval < 10000) {
+                alert('数据刷新间隔不能小于10秒');
+                return;
+            }
+            if (isNaN(newRefreshNum) || newRefreshNum < 1) {
+                alert('自动翻页间隔不能小于1秒');
+                return;
+            }
+            if (isNaN(newPageSize) || newPageSize < 1) {
+                alert('每页显示条数不能小于1');
+                return;
+            }
+
+            REFRESH_INTERVAL = newRefreshInterval;
+            refreshNum = newRefreshNum;
+            pageSize = newPageSize;
+
+            if (autoPageInterval) {
+                clearInterval(autoPageInterval);
+            }
+            startAutoPage();
+
+            startAutoRefresh();
+
+            currentPage = 1;
+            renderTable(tasksData);
+
+            closeSettingsModal();
+            alert('设置已保存！');
+        }
+
+        // =========================================================================
+        // 实时时间更新函数
+        // =========================================================================
+
+        /**
+         * 更新时间显示
+         * 格式化当前时间并更新到页面上
+         */
+        function updateDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            const weekDay = weekDays[now.getDay()];
+
+            const dateTimeElement = document.getElementById('dateTime');
+            if (dateTimeElement) {
+                dateTimeElement.textContent = `${year}.${month}.${day} ${hours}:${minutes}:${seconds} ${weekDay} 天气晴`;
+            }
+        }
+
+        /**
+         * 启动实时时间更新
+         * 每秒更新一次时间显示
+         */
+        function startRealTimeClock() {
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+        }
+
+        // =========================================================================
+        // 页面初始化
+        // =========================================================================
+
+        /**
+         * 监听DOMContentLoaded事件
+         * 当页面HTML结构加载完成后执行初始化操作
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            startRealTimeClock();
+            timelineAutoScroll.init('timelineContainer');
+            initDatePicker();
+            fetchTasksData();
+            startAutoPage();
+            startAutoRefresh();
+            initSettingsModal();
+            initDetailModal();
+            initSearch();
+        });
+    </script>
+</body>
+</html>

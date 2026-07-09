@@ -27,9 +27,8 @@ def get_status_orders_clean(data_list,store='fsbbr'):
     model_fields = [
         'type', 'is_checkupdate', 'orders_id', 'orders_no', 'pono',
         'rid', 'frey_no', 'status', 'partner_sapno', 'fullname',
-        'orderdate', 'name', 'dhdate', 'jhdate','printtime','companyname', 'qty', 'toqty',
-        'l_name_zh','product_id','order_source_type','supplier_short_name', 'wait_pick_num', 'already_pick_num',
-        'delivery_status','is_transfer_order'
+        'orderdate', 'name', 'dhdate', 'jhdate', 'qty', 'toqty',
+        'l_name_zh','supplier_short_name', 'wait_pick_num', 'already_pick_num'
     ]
 
     # 将数据列表转换为 DataFrame

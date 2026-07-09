@@ -6,11 +6,15 @@
 # @Software: trae-cn
 
 
+from app.dao.crm.crm_sales_order_dao import get_pono_list
 from app.scripts.spiders.spider_entities.wms_gzbbr import WmsGzbbrSpider
 from app.scripts.spiders.pipeline_clean.wms_gzbbr_clear import get_status_orders_clean
+from app.utils.orm.session import orm_session
+from app.models.orm_models.wms.wms_picking_list import WmsPickingList
+from sqlalchemy.dialects.mysql import insert
 
 
-def run_get_status_orders_task(page_num=None, status=2, store='fsbbr'):
+def get_status_orders_by_page_service(page_num=None, status=None, store='fsbbr', keywd=None):
     """
     分页爬取状态订单并清洗（while 循环版本）
 
@@ -33,14 +37,14 @@ def run_get_status_orders_task(page_num=None, status=2, store='fsbbr'):
     :return: list[dict] 清洗后的订单数据列表
     """
     spider = WmsGzbbrSpider()
-    all_data = []
+
+    all_len = 0
     current_page = 1
     type=3
     limit=20
     while True:
         print("正在爬取第", current_page, "页")
-        json_data = spider.get_status_orders(type=type, status=status, page=current_page).json()  # pyright: ignore[reportOptionalMemberAccess]
-        # print(json_data)
+        json_data = spider.get_status_orders(type=type, status=status, page=current_page, keywd=keywd).json()  # pyright: ignore[reportOptionalMemberAccess]
         page_data = json_data.get("data", {}).get("data", {}).get("data")
         
         # 无数据直接退出
@@ -48,8 +52,38 @@ def run_get_status_orders_task(page_num=None, status=2, store='fsbbr'):
             print(f"第 {current_page} 页无数据，爬取结束")
             break
 
-        all_data.extend(page_data)
-        print(f"第 {current_page} 页获取 {len(page_data)} 条，累计 {len(all_data)} 条")
+   
+
+        page_data_clean = get_status_orders_clean(page_data, store=store)
+      
+
+        ##入库
+        with orm_session() as session:
+            if page_data_clean:
+                insert_stmt = insert(WmsPickingList.__table__).values(page_data_clean)
+                
+                # 改为从数据表取字段，避免多余字段KeyError
+                skip_cols = {'created_at', 'updated_at', 'data_flag', 'pono'}
+                all_cols = WmsPickingList.__table__.columns.keys()
+                update_dict = {
+                    k: insert_stmt.inserted[k]
+                    for k in all_cols
+                    if k not in skip_cols
+                }
+
+        # MySQL 写法：只传键值对，删除 index_elements、set_
+        update_stmt = insert_stmt.on_duplicate_key_update(**update_dict)
+        
+        session.execute(update_stmt)
+        session.commit()
+
+
+        page_len = len(page_data_clean)
+        all_len += page_len
+
+
+
+        print(f"第 {current_page} 页获取 {len(page_data)} 条，累计 {page_len} 条")
 
         # 1. 指定了页数：爬够就退出
         if page_num is not None and current_page >= page_num:
@@ -64,19 +98,216 @@ def run_get_status_orders_task(page_num=None, status=2, store='fsbbr'):
         current_page += 1
 
     spider.close()
-    print(f"原始数据共 {len(all_data)} 条")
+    if not all_len:
+        return False
 
-    if not all_data:
-        return []
+   
+    print(f"清洗后数据共 {all_len} 条")
 
-    clean_data = get_status_orders_clean(all_data, store=store)
-    print(f"清洗后数据共 {len(clean_data)} 条")
-
-    return clean_data
+    return True
 
 
-if __name__ == '__main__':
-    orders = run_get_status_orders_task(page_num=10, status=2, store='fsbbr')
-    print(f"最终结果共 {len(orders)} 条清洗后订单")
-    if orders:
-        print("第一条示例：", orders[0])
+
+
+
+def get_wms_picking_list_by_pages5_tasks():
+    """
+    获取WMS拣货订单列表
+    """
+    get_status_orders_by_page_service(status=0)
+    get_status_orders_by_page_service(status=1)
+    get_status_orders_by_page_service(page_num=3, status=None, store='fsbbr')
+    
+
+
+def get_wms_picking_list_by_pages5_register():
+    """
+    任务函数：获取WMS拣货订单列表
+    """
+    # orders = get_status_orders_by_page_tasks(page_num=5, status=None, store='fsbbr')
+
+    from app.core.task_enhancer import get_task_manager
+    import datetime
+    task_manager=get_task_manager()
+    try:
+        task_manager.schedule(
+            func=get_wms_picking_list_by_pages5_tasks,
+            trigger='interval',
+            job_id='get_wms_picking_list_by_pages5_tasks',
+            minutes=5,
+            next_run_time=datetime.datetime.now() + datetime.timedelta(minutes=10),
+            replace_existing=True
+        )
+        from app.core.task_enhancer import register_task_config
+        register_task_config(
+            job_id='get_wms_picking_list_by_pages5_tasks',
+            enabled=True,
+            demand_driven=True,
+            idle_timeout_seconds=30*60,
+            description='获取WMS拣货订单列表任务wms_picking_list_task（按需执行，30分钟心跳）'
+        )
+        print("[任务] 看门狗配置已注册（按需执行模式）")
+
+        # 创建后立即暂停，等待心跳触发
+        job = task_manager._scheduler.get_job('get_wms_picking_list_by_pages5_tasks')
+        if job:
+            job.pause()
+            print(f"[任务] 获取WMS拣货订单列表get_wms_picking_list_by_pages5_tasks,任务已暂停，等待心跳触发")
+
+
+    except Exception as e:
+        print(f"[任务] 注册失败: {e}")
+
+
+
+
+def get_wms_picking_list_by_keywd_tasks(flag=False):
+    """
+    根据订单号爬取WMS拣货订单并标记已爬取
+    
+    :param keywd: 订单号 (pono)
+    :return: True 爬取成功并标记, False 爬取失败或无数据
+    """
+
+    from datetime import datetime, timezone
+
+    # 获取UTC今天凌晨0点的整数时间戳，完全不受服务器时区影响
+    start_date = int(datetime.now(timezone.utc).replace(hour=0,minute=0,second=0,microsecond=0).timestamp()-28800)
+    
+    end_date = start_date + 863990
+
+    if flag:
+        start_date = 1572434342
+        end_date = 1992444342
+
+    
+
+    pono_list = get_pono_list(start_date, end_date)
+
+    print(f"共 {len(pono_list)} 条订单")
+    for pono in pono_list:
+        
+        print(f"[{pono['pono']}]")             
+
+
+    for pono in pono_list:
+        
+        keywd=pono['pono']
+        print(f"[{keywd}] 开始爬取")
+               
+
+
+
+        try:
+            flag_data = get_status_orders_by_page_service(
+                page_num=1, 
+                status=None, 
+                store='fsbbr', 
+                keywd=keywd
+            )
+            
+            if not flag_data:
+                print(f"[{keywd}] 爬取失败，准备标记")
+                # 把 wms_picking_list 表中 data_flag 字段设置为 1，使用 upsert 确保数据库中不存在时也能插入
+                print(flag_data)
+                with orm_session() as session:
+                    insert_stmt = insert(WmsPickingList.__table__).values(
+                        pono=keywd,
+                        data_flag=1,
+                    )
+                    update_stmt = insert_stmt.on_duplicate_key_update(
+                        data_flag=1,
+                    )
+                    session.execute(update_stmt)
+                    session.commit()
+                
+                
+            else:
+                print(f"[{keywd}] 有数据返回")
+                
+                
+        except Exception as e:
+            print(f"[{keywd}] 爬取或标记失败: {e}")
+            
+
+
+
+
+def get_wms_picking_list_by_keywd_register():
+    """
+    任务函数：根据订单号爬取WMS拣货订单并标记已爬取
+    """
+    from app.core.task_enhancer import get_task_manager
+    import datetime
+    task_manager=get_task_manager()
+    try:
+        task_manager.schedule(
+            func=get_wms_picking_list_by_keywd_tasks,
+            trigger='interval',
+            job_id='get_wms_picking_list_by_keywd_tasks',
+            minutes=5,
+            next_run_time=datetime.datetime.now() + datetime.timedelta(minutes=10),
+            replace_existing=True
+        )
+        from app.core.task_enhancer import register_task_config
+        register_task_config(
+            job_id='get_wms_picking_list_by_keywd_tasks',
+            enabled=True,
+            demand_driven=True,
+            idle_timeout_seconds=30*60,
+            description='根据订单号爬取WMS拣货订单并标记已爬取任务get_wms_picking_list_by_keywd_tasks（按需执行，30分钟心跳）'
+        )
+        print("[任务] 看门狗配置已注册（按需执行模式）")
+
+        # 创建后立即暂停，等待心跳触发
+        job = task_manager._scheduler.get_job('get_wms_picking_list_by_keywd_tasks')
+        if job:
+            job.pause()
+            print(f"[任务] 根据订单号爬取WMS拣货订单并标记已爬取get_wms_picking_list_by_keywd_tasks,任务已暂停，等待心跳触发")
+
+
+    except Exception as e:
+        print(f"[任务] 注册失败: {e}")
+
+
+
+
+
+def get_wms_picking_list_by_keywd_all_time_register():
+    """
+    任务函数：根据订单号爬取WMS拣货订单并标记已爬取(查看所有订单)
+    """
+    from app.core.task_enhancer import get_task_manager
+    task_manager=get_task_manager()
+
+    def get_wms_picking_list_by_all_updata_tasks():
+        """
+        任务函数：根据订单号爬取WMS拣货订单并标记已爬取(查看所有订单)
+        """
+        try:
+            get_status_orders_by_page_service(50)
+        except Exception as e:
+            print(f"[get_status_orders_by_page_service] 执行失败: {e}")
+        
+        try:
+            get_wms_picking_list_by_keywd_tasks(flag=True)
+        except Exception as e:
+            print(f"[get_wms_picking_list_by_keywd_tasks] 执行失败: {e}")
+
+
+    try:
+        task_manager.schedule(
+            func=get_wms_picking_list_by_all_updata_tasks,
+            trigger='cron',
+            job_id='get_wms_picking_list_by_all_updata_tasks',
+            hour=2,
+            minute=0,
+            replace_existing=True
+        )
+        print("[任务] get_wms_picking_list_by_all_updata_tasks 已注册（每天凌晨2:00执行）")
+
+    except Exception as e:
+        print(f"[任务] 注册失败: {e}")
+
+
+
