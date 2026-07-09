@@ -718,6 +718,31 @@
                 });
             }
         }
+
+        // 页面加载时检查 URL 参数或 sessionStorage，如果有 oe 则自动填充并搜索
+        (function initFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const oeParam = urlParams.get('oe');
+            if (oeParam) {
+                document.getElementById('searchOe').value = oeParam;
+                searchData();
+                return;
+            }
+
+            const storedOeList = sessionStorage.getItem('diff_replace_number_oe_list');
+            if (storedOeList) {
+                try {
+                    const oeList = JSON.parse(storedOeList);
+                    if (Array.isArray(oeList) && oeList.length > 0) {
+                        document.getElementById('searchOe').value = oeList.join(' ');
+                        sessionStorage.removeItem('diff_replace_number_oe_list');
+                        searchData();
+                    }
+                } catch (e) {
+                    sessionStorage.removeItem('diff_replace_number_oe_list');
+                }
+            }
+        })();
     </script>
 </body>
 </html>

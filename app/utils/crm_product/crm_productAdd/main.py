@@ -566,11 +566,14 @@ def process_three_column_mode(session, product_df, alias_df, file_path):
     _save_excel_results(df, results, oe_col, file_path)
 
 
-def _process_with_loop(items, product_df, alias_df, db_manager=None, progress_callback=None, progress_offset=0, total_items=None):
+def _process_with_loop(items, product_df, alias_df, db_manager=None, progress_callback=None, progress_offset=0, total_items=None, session=None):
     """
     使用循环逐个处理（替代并发）
     避免多线程冲突，提高稳定性
     支持进度回调
+
+    Args:
+        session: 可选，传入已认证的 CRM session；不传则使用线程本地 session
     """
     results = {}
     completed = 0
@@ -581,7 +584,7 @@ def _process_with_loop(items, product_df, alias_df, db_manager=None, progress_ca
         oe_number = item['oe_number']
         
         try:
-            result = process_single_oe(item, product_df, alias_df, db_manager)
+            result = process_single_oe(item, product_df, alias_df, db_manager, session)
             results[oe_number] = result
         except Exception as e:
             result = f"失败 - 处理异常: {e}"
@@ -1114,15 +1117,21 @@ def _save_excel_results_with_return(df, results, oe_col, original_file_path):
     return output_path
 
 
-def process_excel_async_wrapper(file_path: str, mode: str, progress_callback=None):
+def process_excel_async_wrapper(file_path: str, mode: str, company: str = 'fsbbr', progress_callback=None):
     """
     Excel异步处理包装器
     支持进度回调，供异步任务调用
+
+    Args:
+        file_path: Excel/CSV 文件路径
+        mode: 处理模式，two_column 或 three_column
+        company: 门店/组织代码，默认 fsbbr
+        progress_callback: 进度回调函数
     """
     from config import create_crm_session
     
-    # 创建 Session
-    session = create_crm_session()
+    # 创建 Session（按用户所在门店）
+    session = create_crm_session(company)
     
     # 加载 Excel 数据
     from .excel_data_loader import load_product_data, load_alias_data
@@ -1172,19 +1181,41 @@ def process_excel_async_wrapper(file_path: str, mode: str, progress_callback=Non
                 items.append(item)
         
         # 处理并更新进度（传递progress_callback实现实时更新）
-        results = _process_with_loop(items, product_df, alias_df, None, progress_callback, processed, total_items)
+        results = _process_with_loop(items, product_df, alias_df, None, progress_callback, processed, total_items, session)
         all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
         
         processed += len(items)
     
     # 保存结果
     result_path = _save_multi_sheet_results(all_results, file_path)
-    
+
+    # 收集所有处理过的 OE 列表（用于后续替换号对比同步）
+    processed_oe_set = set()
+    success_count = 0
+    fail_count = 0
+    for sheet_name, sheet_data in all_results.items():
+        for oe, result_msg in sheet_data['results'].items():
+            processed_oe_set.add(oe)
+            if result_msg and (result_msg.startswith('成功') or result_msg.startswith('已存在')):
+                success_count += 1
+            else:
+                fail_count += 1
+
+    result_data = {
+        'oe_list': sorted(processed_oe_set),
+        'total': len(processed_oe_set),
+        'success_count': success_count,
+        'fail_count': fail_count
+    }
+
     # 清理临时文件
     import os
     os.remove(file_path)
-    
-    return result_path
+
+    return {
+        'result_file': result_path,
+        'result_data': result_data
+    }
 
 
 if __name__ == "__main__":

@@ -3690,241 +3690,244 @@ function bindEventHandlers(myTable, form, table) {
 
     // 处理对账单按钮事件
             document.getElementById('processBillBtn').onclick = function() {
-                // 创建文件选择弹窗
+                // 创建文件选择弹窗（Tab 标签页形式）
                 var billProcessLayer = layer.open({
                     type: 1,
-                    title: '处理对账单',
-                    area: ['55%', '75%'],
+                    title: 'Excel 处理',
+                    area: ['720px', '600px'],
                     content: `
-                        <div style="padding: 20px;">
-                            <div style="margin-bottom: 15px;">
-                                <label>选择Excel或CSV文件（可多选）：</label>
+                        <style>
+                            .ep-modal { display: flex; flex-direction: column; height: 100%; font-size: 14px; }
+                            .ep-tabs { display: flex; border-bottom: 1px solid #e8e8e8; background: #fafafa; }
+                            .ep-tab { padding: 12px 20px; cursor: pointer; border-bottom: 2px solid transparent; color: #595959; }
+                            .ep-tab.active { color: #1890ff; border-bottom-color: #1890ff; background: #fff; }
+                            .ep-tab.disabled { color: #bfbfbf; cursor: not-allowed; }
+                            .ep-body { flex: 1; padding: 20px; overflow-y: auto; }
+                            .ep-panel { display: none; }
+                            .ep-panel.active { display: block; }
+                            .ep-title { font-size: 16px; font-weight: 500; margin-bottom: 8px; color: #262626; }
+                            .ep-desc { color: #666; font-size: 13px; margin-bottom: 16px; line-height: 1.6; }
+                            .ep-info { background: #f6ffed; border: 1px solid #b7eb8f; padding: 10px; border-radius: 4px; margin-bottom: 16px; font-size: 13px; color: #389e0d; }
+                            .ep-option { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+                            .ep-option label { white-space: nowrap; color: #595959; }
+                            .ep-option select { padding: 6px 10px; border: 1px solid #d9d9d9; border-radius: 4px; min-width: 180px; }
+                            .ep-upload { margin-bottom: 16px; }
+                            .ep-upload input[type="file"] { width: 100%; padding: 6px 0; }
+                            .ep-hint { font-size: 12px; color: #999; margin-top: 6px; }
+                            .ep-result { margin-top: 16px; padding: 16px; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 4px; }
+                            .ep-result-msg { color: #389e0d; margin-bottom: 12px; font-weight: 500; }
+                            .ep-result-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+                            .ep-footer { padding: 16px 20px; border-top: 1px solid #e8e8e8; background: #fafafa; }
+                            .ep-file-list { min-height: 40px; margin-bottom: 12px; font-size: 13px; color: #666; max-height: 90px; overflow-y: auto; }
+                            .ep-actions { display: flex; justify-content: center; gap: 12px; }
+                        </style>
+                        <div class="ep-modal">
+                            <div class="ep-tabs">
+                                <div class="ep-tab active" data-tab="bill">对账单处理</div>
+                                <div class="ep-tab" data-tab="order" id="tabOrder">单据处理</div>
+                                <div class="ep-tab" data-tab="crm">新建CRM档案</div>
+                                <div class="ep-tab" data-tab="update_crm" id="tabUpdateCrm">更新CRM产品信息</div>
                             </div>
-                            <div style="margin-bottom: 15px; display: flex; flex-direction: column;">
-                                <div style="margin-bottom: 8px;">
-                                    <input type="radio" id="processBillRadio" name="billType" checked>
-                                    <label for="processBillRadio">处理对账单</label>
-                                </div>
-                                <div id="processOrderOption" style="margin-bottom: 8px;">
-                                    <input type="radio" id="processOrderRadio" name="billType">
-                                    <label for="processOrderRadio">处理单据</label>
-                                    <select id="orderTypeSelect" style="margin-left: 10px;" disabled>
-                                        <option value="" selected>请选择</option>
-                                        <option value="广州龙星景丰">广州龙星景丰</option>
-                                        <option value="厦门华禹">厦门华禹</option>
-                                    </select>
-                                </div>
-                                <div id="processCrmOption" style="margin-bottom: 8px;">
-                                    <input type="radio" id="processCrmRadio" name="billType">
-                                    <label for="processCrmRadio">新建CRM档案</label>
-                                    <select id="crmModeSelect" style="margin-left: 10px; margin-top: 5px;" disabled>
-                                        <option value="" selected>请选择有无物料条码</option>
-                                        <option value="two_column">无</option>
-                                        <option value="three_column">有</option>
-                                    </select>
-                                    <div style="font-size: 12px; color: #666; margin-left: 20px; margin-top: 5px;">
-                                        只需要Excel文件包含“oe”，“brand”两个表头即可使用，若有条码，则加上“条码”表头，自动读取表头
+                            <div class="ep-body">
+                                <!-- 对账单处理 -->
+                                <div class="ep-panel active" data-panel="bill">
+                                    <div class="ep-title">处理对账单</div>
+                                    <div class="ep-desc">上传对账单 Excel/CSV 文件，系统会自动解析并处理。</div>
+                                    <div class="ep-upload">
+                                        <input type="file" id="billFileSelect" accept=".xlsx,.xls,.csv" multiple>
+                                        <div class="ep-hint">支持多文件，按住 Ctrl 可选择多个文件</div>
                                     </div>
                                 </div>
-                                <div id="updateCrmProductOption" style="margin-bottom: 8px;">
-                                    <input type="radio" id="updateCrmProductRadio" name="billType">
-                                    <label for="updateCrmProductRadio">更新CRM产品信息</label>
-                                    <div style="font-size: 12px; color: #666; margin-left: 20px; margin-top: 5px;">
-                                        更新产品的开思描述、开思价、同行价、汽配龙价格等信息，需要包含"配件编码"、"品牌"表头
+
+                                <!-- 单据处理 -->
+                                <div class="ep-panel" data-panel="order">
+                                    <div class="ep-title">处理单据</div>
+                                    <div class="ep-desc">选择单据类型并上传对应 Excel/CSV 文件。</div>
+                                    <div class="ep-option">
+                                        <label>单据类型：</label>
+                                        <select id="orderTypeSelect">
+                                            <option value="" selected>请选择</option>
+                                            <option value="广州龙星景丰">广州龙星景丰</option>
+                                            <option value="厦门华禹">厦门华禹</option>
+                                        </select>
+                                    </div>
+                                    <div class="ep-upload">
+                                        <input type="file" id="orderFileSelect" accept=".xlsx,.xls,.csv" multiple>
+                                        <div class="ep-hint">支持多文件</div>
+                                    </div>
+                                </div>
+
+                                <!-- 新建CRM档案 -->
+                                <div class="ep-panel" data-panel="crm">
+                                    <div class="ep-title">新建 CRM 产品档案</div>
+                                    <div class="ep-desc">上传包含 OE 和品牌的 Excel，系统自动在 CRM 中创建产品档案。处理完成后可查看替换号差异。</div>
+                                    <div class="ep-info">Excel 只需包含 “oe”、“brand” 两个表头；若包含条码，请加上 “brand_code” 表头。</div>
+                                    <div class="ep-option">
+                                        <label>物料条码模式：</label>
+                                        <select id="crmModeSelect">
+                                            <option value="" selected>请选择有无物料条码</option>
+                                            <option value="two_column">无</option>
+                                            <option value="three_column">有</option>
+                                        </select>
+                                    </div>
+                                    <div class="ep-upload">
+                                        <input type="file" id="crmFileSelect" accept=".xlsx,.xls,.csv">
+                                        <div class="ep-hint">仅支持单个 Excel 或 CSV 文件</div>
+                                    </div>
+                                    <div class="ep-result" id="crmResultArea" style="display:none;">
+                                        <div class="ep-result-msg" id="crmResultMsg"></div>
+                                        <div class="ep-result-actions">
+                                            <button type="button" class="layui-btn layui-btn-normal" id="crmDownloadBtn">下载结果文件</button>
+                                            <button type="button" class="layui-btn layui-btn-primary" id="crmDiffBtn">查看替换号差异</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 更新CRM产品信息 -->
+                                <div class="ep-panel" data-panel="update_crm">
+                                    <div class="ep-title">更新 CRM 产品信息</div>
+                                    <div class="ep-desc">更新产品的开思描述、开思价、同行价、汽配龙价格等信息，需要包含“配件编码”、“品牌”表头。</div>
+                                    <div class="ep-upload">
+                                        <input type="file" id="updateCrmFileSelect" accept=".xlsx,.xls,.csv">
+                                        <div class="ep-hint">仅支持单个 Excel 或 CSV 文件</div>
                                     </div>
                                 </div>
                             </div>
-                            <div style="margin-bottom: 15px;">
-                                <input type="file" id="billFileSelect" name="files" accept=".xlsx,.xls,.csv" multiple style="width: 100%;">
-                                <div style="font-size: 12px; color: #666; margin-top: 5px;">提示：按住 Ctrl 键可选择多个文件</div>
-                            </div>
-                            <div style="margin-bottom: 15px; height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; background-color: #f9f9f9;">
-                                <div id="selectedFilesList">暂无选择文件</div>
-                            </div>
-                            <div style="text-align: center; margin-top: 20px;">
-                                <button type="button" class="layui-btn layui-btn-normal" id="downloadTemplateBtn">下载模板</button>
-                                <button type="button" class="layui-btn layui-btn-normal" id="confirmProcessBtn">确定处理</button>
+                            <div class="ep-footer">
+                                <div class="ep-file-list" id="selectedFilesList">暂无选择文件</div>
+                                <div class="ep-actions">
+                                    <button type="button" class="layui-btn layui-btn-normal" id="downloadTemplateBtn">下载模板</button>
+                                    <button type="button" class="layui-btn layui-btn-normal" id="confirmProcessBtn">确定处理</button>
+                                </div>
                             </div>
                         </div>
                     `,
                     success: function(layero, index) {
-                        // 根据用户权限决定是否显示处理单据选项
-                        const processOrderOption = layero[0].querySelector('#processOrderOption');
-                        if (window.currentUserPermissions && window.currentUserPermissions.can_process_orders) {
-                            processOrderOption.style.display = 'block';
-                        } else {
-                            processOrderOption.style.display = 'none';
+                        var currentTab = 'bill';
+                        var tabFiles = {
+                            bill: [],
+                            order: [],
+                            crm: [],
+                            update_crm: []
+                        };
+                        var currentTaskId = null;
+                        var currentTaskData = null;
+
+                        // 根据用户权限控制 Tab 显示
+                        var canProcessOrders = window.currentUserPermissions && window.currentUserPermissions.can_process_orders;
+                        var canUpdateCrm = window.currentUserPermissions && window.currentUserPermissions.can_update_crm;
+                        if (!canProcessOrders) {
+                            document.getElementById('tabOrder').classList.add('disabled');
                         }
-                        
-                        // 根据用户权限决定是否显示更新CRM产品信息选项
-                        const updateCrmProductOption = layero[0].querySelector('#updateCrmProductOption');
-                        if (window.currentUserPermissions && window.currentUserPermissions.can_update_crm) {
-                            updateCrmProductOption.style.display = 'block';
-                        } else {
-                            updateCrmProductOption.style.display = 'none';
+                        if (!canUpdateCrm) {
+                            document.getElementById('tabUpdateCrm').classList.add('disabled');
                         }
-                        
-                        // 控制下拉框的启用/禁用
-                        var processBillRadio = document.getElementById('processBillRadio');
-                        var processOrderRadio = document.getElementById('processOrderRadio');
-                        var processCrmRadio = document.getElementById('processCrmRadio');
-                        var updateCrmProductRadio = document.getElementById('updateCrmProductRadio');
-                        var orderTypeSelect = document.getElementById('orderTypeSelect');
-                        
-                        // 默认情况下禁用下拉框（因为默认选中处理对账单）
-                        orderTypeSelect.disabled = true;
-                        
-                        // 控制CRM模式下拉框的启用/禁用
-                        processCrmRadio.addEventListener('change', function() {
-                            if (this.checked) {
-                                orderTypeSelect.disabled = true;
-                                orderTypeSelect.value = '';
-                                document.getElementById('crmModeSelect').disabled = false;
-                            }
+
+                        // Tab 切换
+                        var tabs = layero[0].querySelectorAll('.ep-tab');
+                        tabs.forEach(function(tab) {
+                            tab.addEventListener('click', function() {
+                                if (tab.classList.contains('disabled')) return;
+                                var target = tab.getAttribute('data-tab');
+                                if (target === currentTab) return;
+
+                                currentTab = target;
+                                tabs.forEach(function(t) { t.classList.remove('active'); });
+                                tab.classList.add('active');
+
+                                layero[0].querySelectorAll('.ep-panel').forEach(function(panel) {
+                                    panel.classList.remove('active');
+                                });
+                                layero[0].querySelector('.ep-panel[data-panel="' + target + '"]').classList.add('active');
+
+                                updateFileList();
+                            });
                         });
 
-                        // 在处理单据和其他选项的change事件中也要禁用CRM下拉框
-                        processBillRadio.addEventListener('change', function() {
-                            if (this.checked) {
-                                orderTypeSelect.disabled = true;
-                                orderTypeSelect.value = '';
-                                document.getElementById('crmModeSelect').disabled = true;
-                                document.getElementById('crmModeSelect').value = '';
-                            }
-                        });
+                        function getFileInputId(tab) {
+                            if (tab === 'bill') return 'billFileSelect';
+                            if (tab === 'order') return 'orderFileSelect';
+                            if (tab === 'crm') return 'crmFileSelect';
+                            if (tab === 'update_crm') return 'updateCrmFileSelect';
+                            return 'billFileSelect';
+                        }
 
-                        processOrderRadio.addEventListener('change', function() {
-                            if (this.checked) {
-                                orderTypeSelect.disabled = false;
-                                document.getElementById('crmModeSelect').disabled = true;
-                                document.getElementById('crmModeSelect').value = '';
-                            }
-                        });
-
-
-                        // 处理单选框变化事件
-                        processBillRadio.addEventListener('change', function() {
-                            if (this.checked) {
-                                orderTypeSelect.disabled = true;
-                                orderTypeSelect.value = '';
-                            }
-                        });
-                        
-                        processOrderRadio.addEventListener('change', function() {
-                            if (this.checked) {
-                                orderTypeSelect.disabled = false;
-                            }
-                        });
-                        
-                        processCrmRadio.addEventListener('change', function() {
-                            if (this.checked) {
-                                orderTypeSelect.disabled = true;
-                                orderTypeSelect.value = '';
-                            }
-                        });
-
-                        // 控制更新CRM产品信息选项
-                        updateCrmProductRadio.addEventListener('change', function() {
-                            if (this.checked) {
-                                orderTypeSelect.disabled = true;
-                                orderTypeSelect.value = '';
-                                document.getElementById('crmModeSelect').disabled = true;
-                                document.getElementById('crmModeSelect').value = '';
-                            }
-                        });
-
-                        // 添加下载模板按钮事件处理
-                        document.getElementById('downloadTemplateBtn').addEventListener('click', function() {
-                            // 获取当前选中的处理类型
-                            var processBillRadio = document.getElementById('processBillRadio');
-                            var processOrderRadio = document.getElementById('processOrderRadio');
-                            var processCrmRadio = document.getElementById('processCrmRadio');
-                            var orderTypeSelect = document.getElementById('orderTypeSelect');
-
-                            if (processBillRadio.checked) {
-                                // 如果选择了处理对账单
-                                layui.layer.msg('当前选择暂无模板', {icon: 2});
-                            } else if (processOrderRadio.checked && orderTypeSelect.value) {
-                                // 如果选择了处理单据并且选择了类型
-                                var orderType = orderTypeSelect.value;
-                                if (orderType === '广州龙星景丰') {
-                                    // 下载广州龙星景丰单据模板
-                                    window.location.href = '/download_template/guangzhou_lxjf';
-                                } else if (orderType === '厦门华禹') {
-                                    // 下载厦门华禹单据模板
-                                    window.location.href = '/download_template/xiamen_huayu';
-                                }
-                            } else if (processCrmRadio.checked) {
-                                // 如果选择了新建CRM档案
-                                layui.layer.msg('CRM档案处理无需模板', {icon: 1});
-                            } else if (updateCrmProductRadio.checked) {
-                                // 如果选择了更新CRM产品信息
-                                window.location.href = '/api/excel/template/updateview';
-                            } else {
-                                // 其他情况
-                                layui.layer.msg('请选择处理方式', {icon: 2});
-                            }
-                        });
-
-                        // 文件选择事件
-                        document.getElementById('billFileSelect').addEventListener('change', function(e) {
-                            var files = e.target.files;
+                        function updateFileList() {
+                            var files = tabFiles[currentTab];
                             var fileListDiv = document.getElementById('selectedFilesList');
-                            
-                            if (files.length === 0) {
+                            if (!files || files.length === 0) {
                                 fileListDiv.innerHTML = '暂无选择文件';
                                 return;
                             }
-
-                            var fileListHTML = '<strong>已选择文件：</strong><br>';
+                            var html = '<strong>已选择文件：</strong><br>';
                             for (var i = 0; i < files.length; i++) {
-                                fileListHTML += (i + 1) + '. ' + files[i].name + '<br>';
+                                html += (i + 1) + '. ' + files[i].name + '<br>';
                             }
+                            fileListDiv.innerHTML = html;
+                        }
 
-                            fileListDiv.innerHTML = fileListHTML;
+                        // 文件选择事件
+                        ['bill', 'order', 'crm', 'update_crm'].forEach(function(tab) {
+                            var inputId = getFileInputId(tab);
+                            var input = document.getElementById(inputId);
+                            if (!input) return;
+                            input.addEventListener('change', function(e) {
+                                tabFiles[tab] = Array.from(e.target.files);
+                                if (currentTab === tab) {
+                                    updateFileList();
+                                }
+                            });
                         });
 
-                        // 确定处理按钮事件
-                        document.getElementById('confirmProcessBtn').onclick = function() {
-                            var files = document.getElementById('billFileSelect').files;
-                            var processBillRadio = document.getElementById('processBillRadio');
-                            var processOrderRadio = document.getElementById('processOrderRadio');
-                            var processCrmRadio = document.getElementById('processCrmRadio');
+                        // 下载模板
+                        document.getElementById('downloadTemplateBtn').addEventListener('click', function() {
                             var orderTypeSelect = document.getElementById('orderTypeSelect');
-                            var crmModeSelect = document.getElementById('crmModeSelect'); // 新增
-                            
-                            if (files.length === 0) {
+                            if (currentTab === 'bill') {
+                                layui.layer.msg('当前选择暂无模板', {icon: 2});
+                            } else if (currentTab === 'order') {
+                                var orderType = orderTypeSelect.value;
+                                if (orderType === '广州龙星景丰') {
+                                    window.location.href = '/download_template/guangzhou_lxjf';
+                                } else if (orderType === '厦门华禹') {
+                                    window.location.href = '/download_template/xiamen_huayu';
+                                } else {
+                                    layui.layer.msg('请选择单据类型', {icon: 2});
+                                }
+                            } else if (currentTab === 'crm') {
+                                layui.layer.msg('CRM档案处理无需模板', {icon: 1});
+                            } else if (currentTab === 'update_crm') {
+                                window.location.href = '/api/excel/template/updateview';
+                            }
+                        });
+
+                        // 确定处理
+                        document.getElementById('confirmProcessBtn').onclick = function() {
+                            var files = tabFiles[currentTab];
+                            var formData = new FormData();
+                            var processType = currentTab;
+                            var crmMode = '';
+                            var orderType = '';
+
+                            if (!files || files.length === 0) {
                                 layer.msg('请至少选择一个文件', {icon: 2});
                                 return;
                             }
 
-                            // 根据用户选择确定处理类型
-                            var processType = '';
-                            var orderType = '';
-                            var crmMode = ''; // 新增
-                            var updateCrmProductRadio = document.getElementById('updateCrmProductRadio');
-                            
-                            if (processBillRadio.checked) {
-                                processType = 'bill';
-                            } else if (processOrderRadio.checked) {
-                                processType = 'order';
-                                orderType = orderTypeSelect.value;
-                                
+                            if (currentTab === 'order') {
+                                orderType = document.getElementById('orderTypeSelect').value;
                                 if (!orderType) {
                                     layer.msg('请选择单据类型', {icon: 2});
                                     return;
                                 }
-                            } else if (processCrmRadio.checked) {
-                                processType = 'crm';
-                                crmMode = crmModeSelect.value; // 获取选择的模式
-                                
-                                // 验证是否选择了模式
+                                for (var i = 0; i < files.length; i++) {
+                                    formData.append('files', files[i]);
+                                }
+                            } else if (currentTab === 'crm') {
+                                crmMode = document.getElementById('crmModeSelect').value;
                                 if (!crmMode) {
                                     layer.msg('请选择物料条码模式', {icon: 2});
                                     return;
                                 }
-                                
-                                // 验证文件格式（只支持单个Excel文件）
                                 if (files.length > 1) {
                                     layer.msg('新建CRM档案仅支持单个文件', {icon: 2});
                                     return;
@@ -3934,10 +3937,9 @@ function bindEventHandlers(myTable, form, table) {
                                     layer.msg('新建CRM档案仅支持Excel或CSV文件', {icon: 2});
                                     return;
                                 }
-                            } else if (updateCrmProductRadio.checked) {
-                                processType = 'update_crm_product';
-                                
-                                // 验证文件格式（只支持单个Excel文件）
+                                formData.append('file', files[0]);
+                                formData.append('mode', crmMode);
+                            } else if (currentTab === 'update_crm') {
                                 if (files.length > 1) {
                                     layer.msg('更新CRM产品信息仅支持单个文件', {icon: 2});
                                     return;
@@ -3947,50 +3949,80 @@ function bindEventHandlers(myTable, form, table) {
                                     layer.msg('更新CRM产品信息仅支持Excel或CSV文件', {icon: 2});
                                     return;
                                 }
+                                formData.append('file', files[0]);
                             } else {
-                                layer.msg('请选择处理方式', {icon: 2});
-                                return;
-                            }
-
-                            // 创建FormData对象
-                            var formData = new FormData();
-                            // 只取第一个文件（CRM处理和更新CRM产品信息只支持单个文件）
-                            if ((processType === 'crm' || processType === 'update_crm_product') && files.length > 0) {
-                                formData.append('file', files[0]);  // 单数形式
-                            } else {
-                                // 其他类型支持多文件
+                                // bill
                                 for (var i = 0; i < files.length; i++) {
                                     formData.append('files', files[i]);
                                 }
                             }
-                            
-                            // 添加处理类型参数
+
                             formData.append('process_type', processType);
-                            if (processType === 'order') {
+                            if (orderType) {
                                 formData.append('order_type', orderType);
                             }
-                            if (processType === 'crm') {
-                                formData.append('mode', crmMode); // 添加模式参数
-                            }
 
+                            // 隐藏上次 CRM 结果
+                            document.getElementById('crmResultArea').style.display = 'none';
+                            currentTaskId = null;
+                            currentTaskData = null;
 
                             // 显示处理进度
-                            var processLoading = layer.load(1, {
-                                shade: [0.1, '#fff']
-                            });
+                            var processLoading = layer.load(1, { shade: [0.1, '#fff'] });
 
-                            // 根据处理类型发送不同的请求
-                            if (processType === 'crm') {
-                                // 新建CRM档案使用异步API接口
-                                handleCrmAsyncProcess(formData, processLoading, '/api/excel/async/product_archive');
-                            } else if (processType === 'update_crm_product') {
-                                // 更新CRM产品信息使用异步API接口
+                            if (currentTab === 'crm') {
+                                handleCrmAsyncProcess(formData, processLoading, '/api/excel/async/product_archive', function(taskId, resultData) {
+                                    currentTaskId = taskId;
+                                    currentTaskData = resultData || {};
+                                    var sc = currentTaskData.success_count || 0;
+                                    var fc = currentTaskData.fail_count || 0;
+                                    document.getElementById('crmResultMsg').textContent = '处理完成：成功 ' + sc + ' 条，失败 ' + fc + ' 条';
+                                    document.getElementById('crmResultArea').style.display = 'block';
+                                });
+                            } else if (currentTab === 'update_crm') {
                                 handleCrmAsyncProcess(formData, processLoading, '/api/excel/async/update_crm_product');
                             } else {
-                                // 其他类型使用原有的API接口
                                 handleSyncProcess(formData, processLoading, processType, files);
                             }
                         };
+
+                        // 下载结果文件
+                        document.getElementById('crmDownloadBtn').addEventListener('click', function() {
+                            if (currentTaskId) {
+                                window.location.href = '/api/excel/async/download/' + currentTaskId;
+                            }
+                        });
+
+                        // 查看替换号差异
+                        document.getElementById('crmDiffBtn').addEventListener('click', function() {
+                            var oeList = currentTaskData && currentTaskData.oe_list ? currentTaskData.oe_list : [];
+                            if (!oeList || oeList.length === 0) {
+                                layer.msg('没有可对比的 OE 数据', {icon: 2});
+                                return;
+                            }
+
+                            var syncLoading = layer.load(1, { shade: [0.1, '#fff'] });
+                            fetch('/new/api/compare/sync-oe-list', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ oe_list: oeList })
+                            })
+                            .then(function(r) { return r.json(); })
+                            .then(function(res) {
+                                layer.close(syncLoading);
+                                if (res.code === 0) {
+                                    layer.msg('同步完成：保存 ' + (res.data.saved || 0) + ' 条', {icon: 1});
+                                    sessionStorage.setItem('diff_replace_number_oe_list', JSON.stringify(oeList));
+                                    window.open('/diff_replace_number', '_blank');
+                                } else {
+                                    layer.msg('同步失败：' + res.message, {icon: 2});
+                                }
+                            })
+                            .catch(function(err) {
+                                layer.close(syncLoading);
+                                layer.msg('同步请求失败：' + err.message, {icon: 2});
+                            });
+                        });
                     }
                 });
             };
@@ -4062,7 +4094,8 @@ function bindEventHandlers(myTable, form, table) {
     });
 
     // CRM异步处理函数
-    function handleCrmAsyncProcess(formData, loadingIndex, apiUrl) {
+    // onComplete 回调参数: (taskId, resultData)
+    function handleCrmAsyncProcess(formData, loadingIndex, apiUrl, onComplete) {
         // 步骤1：提交异步任务
         fetch(apiUrl, {
             method: 'POST',
@@ -4079,22 +4112,37 @@ function bindEventHandlers(myTable, form, table) {
             var taskId = result.data.task_id;
             layer.msg('任务已提交，处理中...', {icon: 1});
 
-            // 创建进度提示层
-            var progressMsgIndex = layer.msg('处理中: 0/0 - 初始化...', {
-                icon: 16,
-                time: 0,  // 不自动关闭
-                shade: 0.3
+            // 创建进度提示层（使用固定 DOM，避免闪烁）
+            var progressLayerIndex = layer.open({
+                type: 1,
+                title: false,
+                closeBtn: 0,
+                shade: 0.3,
+                area: ['280px', '100px'],
+                content: '<div id="crmProgressContent" style="padding: 28px 0; text-align: center; font-size: 14px;"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> <span id="crmProgressText">初始化中...</span></div>'
             });
 
             // 步骤2：轮询查询任务状态
+            var pollCount = 0;
+            var maxPollCount = 900; // 最多轮询 900 次，约 30 分钟
             var checkInterval = setInterval(function() {
+                pollCount++;
+                if (pollCount > maxPollCount) {
+                    clearInterval(checkInterval);
+                    layer.close(loadingIndex);
+                    layer.close(progressLayerIndex);
+                    document.title = '巴博瑞科技';
+                    layer.msg('处理超时，请稍后重试', {icon: 2});
+                    return;
+                }
+
                 fetch('/api/excel/async/status/' + taskId)
                 .then(response => response.json())
                 .then(statusResult => {
                     if (statusResult.code !== 0) {
                         clearInterval(checkInterval);
                         layer.close(loadingIndex);
-                        layer.close(progressMsgIndex);
+                        layer.close(progressLayerIndex);
                         layer.msg('查询状态失败: ' + statusResult.msg, {icon: 2});
                         return;
                     }
@@ -4106,30 +4154,43 @@ function bindEventHandlers(myTable, form, table) {
                         var progress = status.progress || 0;
                         var total = status.total || 0;
                         var message = status.message || '处理中...';
-                        // 关闭旧弹窗，创建新弹窗（确保内容更新）
-                        layer.close(progressMsgIndex);
-                        progressMsgIndex = layer.msg('处理中: ' + progress + '/' + total + ' - ' + message, {
-                            icon: 16,
-                            time: 0,  // 不自动关闭
-                            shade: 0.3
-                        });
-                        // 同时更新页面title显示进度
-                        document.title = '处理中 ' + progress + '/' + total + ' - 巴博瑞科技';
+
+                        var displayMsg;
+                        var pageTitle;
+                        if (progress === 0 && total === 0) {
+                            displayMsg = '初始化中...';
+                            pageTitle = '初始化中... - 巴博瑞科技';
+                        } else {
+                            displayMsg = '处理中: ' + progress + '/' + total + ' - ' + message;
+                            pageTitle = '处理中 ' + progress + '/' + total + ' - 巴博瑞科技';
+                        }
+
+                        var progressText = document.getElementById('crmProgressText');
+                        if (progressText) {
+                            progressText.textContent = displayMsg;
+                        }
+                        document.title = pageTitle;
                     } else if (status.status === 'completed') {
                         // 任务完成
                         clearInterval(checkInterval);
                         layer.close(loadingIndex);
-                        layer.close(progressMsgIndex);
+                        layer.close(progressLayerIndex);
                         document.title = '巴博瑞科技';
-                        layer.msg('处理完成，开始下载...', {icon: 1});
 
-                        // 下载结果文件
-                        window.location.href = '/api/excel/async/download/' + taskId;
+                        // 如果有完成回调，把 taskId 和 result_data 传出去
+                        if (typeof onComplete === 'function') {
+                            onComplete(taskId, status.result_data);
+                            layer.msg('处理完成', {icon: 1});
+                        } else {
+                            layer.msg('处理完成，开始下载...', {icon: 1});
+                            // 下载结果文件
+                            window.location.href = '/api/excel/async/download/' + taskId;
+                        }
                     } else if (status.status === 'failed') {
                         // 任务失败
                         clearInterval(checkInterval);
                         layer.close(loadingIndex);
-                        layer.close(progressMsgIndex);
+                        layer.close(progressLayerIndex);
                         document.title = '巴博瑞科技';
                         layer.msg('处理失败: ' + (status.error || '未知错误'), {icon: 2});
                     }
@@ -4137,7 +4198,7 @@ function bindEventHandlers(myTable, form, table) {
                 .catch(error => {
                     clearInterval(checkInterval);
                     layer.close(loadingIndex);
-                    layer.close(progressMsgIndex);
+                    layer.close(progressLayerIndex);
                     document.title = '巴博瑞科技';
                     layer.msg('查询状态失败: ' + error.message, {icon: 2});
                 });

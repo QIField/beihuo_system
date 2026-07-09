@@ -19,7 +19,7 @@ import os
 import tempfile
 from datetime import datetime, timedelta
 from app.utils.database_connection import get_db_connection
-from app.services.procurement_service import add_inquiry_record
+from app.services.procurement_service import add_inquiry_record, GzbbrQuoteService
 from app.utils.search.parser import parse_space, parse_comma
 
 # 导入B2B上传模块
@@ -61,6 +61,11 @@ def inquiry_permission_required(f):
             return jsonify({'code': 1, 'msg': '您没有权限访问询价模块'}), 403
         return f(*args, **kwargs)
     return decorated_function
+
+
+def _get_current_store_code():
+    """获取当前用户门店代码"""
+    return session.get('current_org') or session.get('store') or 'fsbbr'
 
 
 @inquiry_bp.route('/import', methods=['POST'])
@@ -1098,3 +1103,51 @@ def parse_oe_list():
         import traceback
         traceback.print_exc()
         return jsonify({'code': 1, 'msg': f'解析失败: {str(e)}'}), 500
+
+
+@inquiry_bp.route('/gzbbr_quote_search', methods=['GET'])
+@inquiry_permission_required
+def gzbbr_quote_search():
+    """搜索 data.gzbbr.com 报价列表"""
+    oe = request.args.get('oe', '')
+    supplier = request.args.get('supplier', '')
+    limit = request.args.get('limit', 500, type=int)
+
+    try:
+        rows = GzbbrQuoteService.search_quote_prices(
+            store_code=_get_current_store_code(),
+            oe=oe,
+            supplier=supplier,
+            limit=limit
+        )
+        return jsonify({'code': 0, 'msg': '查询成功', 'data': rows})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'code': 1, 'msg': f'查询失败: {str(e)}'}), 500
+
+
+@inquiry_bp.route('/gzbbr_quote_update', methods=['POST'])
+@inquiry_permission_required
+def gzbbr_quote_update():
+    """批量更新 data.gzbbr.com 报价失效时间"""
+    data = request.get_json() or {}
+    records = data.get('records', [])
+    lose_date = data.get('lose_date', '')
+
+    if not records:
+        return jsonify({'code': 1, 'msg': '请选择要更新的记录'}), 400
+    if not lose_date:
+        return jsonify({'code': 1, 'msg': '请设置新的失效时间'}), 400
+
+    try:
+        result = GzbbrQuoteService.batch_update_lose_date(
+            store_code=_get_current_store_code(),
+            records=records,
+            lose_date=lose_date
+        )
+        return jsonify({'code': 0, 'msg': '更新完成', 'data': result})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'code': 1, 'msg': f'更新失败: {str(e)}'}), 500

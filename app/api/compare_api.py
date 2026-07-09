@@ -11,6 +11,7 @@ from app.services.compare_service.compare_data_service import (
     get_oe_with_different_replace_numbers,
     use_replace_number,
 )
+from app.services.compare_service.crm_sync_service import sync_oe_list_from_crm
 
 # 创建蓝图（不设置 url_prefix，在 __init__.py 中统一设置）
 bp = Blueprint('compare', __name__)
@@ -341,5 +342,60 @@ def api_use_replace_number():
         return jsonify({
             'code': -1,
             'message': f'操作失败: {str(e)}',
+            'data': None
+        }), 500
+
+
+@bp.route('/sync-oe-list', methods=['POST'])
+@login_required
+def api_sync_oe_list():
+    """
+    根据 OE 列表从 CRM 同步最新产品数据到 crmapp_compare_summary
+
+    用于新建 CRM 档案后，确保替换号对比基于最新数据。
+
+    请求参数:
+        {
+            "oe_list": ["A000000001119", "A000000002228", ...]
+        }
+
+    返回:
+        {
+            "code": 0,
+            "message": "success",
+            "data": {
+                "total": 100,
+                "saved": 95,
+                "failed": 5,
+                "company": "fsbbr"
+            }
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'code': -1, 'message': '请求体不能为空', 'data': None}), 400
+
+        oe_list = data.get('oe_list', [])
+        if not isinstance(oe_list, list):
+            return jsonify({'code': -1, 'message': 'oe_list 必须是数组', 'data': None}), 400
+        if not oe_list:
+            return jsonify({'code': -1, 'message': 'oe_list 不能为空', 'data': None}), 400
+        if len(oe_list) > 1000:
+            return jsonify({'code': -1, 'message': 'oe_list 数量不能超过 1000 个', 'data': None}), 400
+
+        company = get_user_company()
+        result = sync_oe_list_from_crm(oe_list=oe_list, company=company)
+
+        return jsonify({
+            'code': 0,
+            'message': 'success',
+            'data': result
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': -1,
+            'message': f'同步失败: {str(e)}',
             'data': None
         }), 500

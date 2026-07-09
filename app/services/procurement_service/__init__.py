@@ -48,6 +48,10 @@ from .procurement_record_service import (
     add_inquiry_record
 )
 
+from .gzbbr_quote_service import (
+    GzbbrQuoteService
+)
+
 # 兼容别名
 init_procurement_table = init_table
 
@@ -57,20 +61,23 @@ __all__ = [
     'process_oe_list',
     'process_all_pending_oes',
     'get_crm_session',
-    
+
     # API 客户端
     'fetch_product_info',
     'fetch_product_info_batch',
-    
+
     # 数据库服务
     'update_product_fields',
     'batch_update_product_fields',
     'get_pending_oe_list',
-    
+
     # 采购记录服务
     'parse_purchasing_record',
     'get_procurement_records',
     'init_table',
     'init_procurement_table',
-    'add_inquiry_record'
+    'add_inquiry_record',
+
+    # data.gzbbr 报价服务
+    'GzbbrQuoteService'
 ]

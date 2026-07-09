@@ -5,6 +5,8 @@
 # @File    : data_gzbbr.py
 # @Software: PyCharm
 
+import logging
+
 from app.scripts.spiders.spider_tool import SpiderTool
 from config.config_list_manager.config_cache import get_config_value
 
@@ -27,11 +29,13 @@ class DataGzbbrSpider:
         "dghf": "data_gzbbr_com_hf",
     }
 
-    def __init__(self, cookie=None, config_key=None, store_code="fsbbr", timeout=10, retry_count=3):
+    def __init__(self, cookie=None, config_key=None, store_code="fsbbr", timeout=10, retry_count=3, logger=None):
         # 核心：实例化独立爬虫工具（组合模式）
         self.spider_tool = SpiderTool(timeout, retry_count)
         # 解析并保存 Cookie 字符串
         self.cookie = self._resolve_cookie(cookie, config_key, store_code)
+        # 日志记录器：调用方传入则使用调用方的，否则使用统一的 data_gzbbr logger
+        self.logger = logger or logging.getLogger('data_gzbbr')
 
     def _resolve_cookie(self, cookie, config_key, store_code):
         """
@@ -100,10 +104,10 @@ class DataGzbbrSpider:
             "remark": remark,
         }
 
-        # ========== 打印请求信息 ==========
-        print("【请求API地址】", url)
-        print("【请求方法】", "POST")
-        print("【请求参数】", data)
+        # ========== 记录请求信息 ==========
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求方法】POST")
+        self.logger.info(f"【请求参数】{data}")
         # ==================================
 
         return self.spider_tool.fetch(
@@ -143,10 +147,10 @@ class DataGzbbrSpider:
             "remark": remark,
         }
 
-        # ========== 打印请求信息 ==========
-        print("【请求API地址】", url)
-        print("【请求方法】", "POST")
-        print("【请求参数】", data)
+        # ========== 记录请求信息 ==========
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求方法】POST")
+        self.logger.info(f"【请求参数】{data}")
         # ==================================
 
         return self.spider_tool.fetch(

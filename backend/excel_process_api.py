@@ -294,7 +294,15 @@ def register_excel_process_routes(app):
             from app.core.async_task_store import submit_excel_task
             from app.utils.crm_product.crm_productAdd.main import process_excel_async_wrapper
             
-            task_id = submit_excel_task(process_excel_async_wrapper, temp_file_path, mode)
+            # 获取用户当前门店/组织
+            user_store = session.get('store', 'fsbbr')
+            current_org = session.get('current_org', user_store)
+            if not current_org or current_org in ('all', 'none', 'undefined', ''):
+                company = user_store
+            else:
+                company = current_org
+            
+            task_id = submit_excel_task(process_excel_async_wrapper, temp_file_path, mode, company=company)
             
             return jsonify({
                 'code': 0,

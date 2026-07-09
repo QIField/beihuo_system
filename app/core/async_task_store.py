@@ -37,6 +37,7 @@ def submit_excel_task(func: Callable, *args, **kwargs) -> str:
             'total': 0,
             'message': '等待处理',
             'result_file': None,
+            'result_data': None,
             'error': None,
             'created_at': datetime.now().isoformat(),
             'completed_at': None
@@ -78,7 +79,12 @@ def _execute_wrapper(task_id: str, func: Callable, *args, **kwargs):
             task['status'] = 'completed'
             task['progress'] = task['total']
             task['message'] = '处理完成'
-            task['result_file'] = result
+            # 兼容返回字典（包含 result_file 和 result_data）的旧函数
+            if isinstance(result, dict) and 'result_file' in result:
+                task['result_file'] = result.get('result_file')
+                task['result_data'] = result.get('result_data')
+            else:
+                task['result_file'] = result
             task['completed_at'] = datetime.now().isoformat()
             _task_store[task_id] = task
             

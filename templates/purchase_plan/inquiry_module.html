@@ -658,9 +658,12 @@
             <button class="data-tab" id="tabDirect" data-type="direct">
                 直接入库数据<span class="tab-badge" id="directBadge">0</span>
             </button>
+            <button class="data-tab" id="tabGzbbr" data-type="gzbbr">
+                失效时间调整(data.gzbbr)<span class="tab-badge" id="gzbbrBadge">0</span>
+            </button>
         </div>
 
-        <div class="data-container">
+        <div class="data-container" id="mainDataContainer">
             <div class="data-header">
                 <span id="dataTitle">询价比价数据</span>
                 <div class="search-bar">
@@ -686,6 +689,30 @@
                     <option value="200">200条/页</option>
                 </select>
             </div>
+        </div>
+
+        <!-- data.gzbbr 失效时间调整 -->
+        <div class="data-container" id="gzbbrContainer" style="display: none;">
+            <div class="data-header">
+                <span>data.gzbbr 报价失效时间调整</span>
+                <div class="search-bar">
+                    <input type="text" class="search-input" id="gzbbrSearchOe" placeholder="OE号">
+                    <input type="text" class="search-input" id="gzbbrSearchSupplier" placeholder="供应商">
+                    <input type="text" class="search-input" id="gzbbrSearchBrand" placeholder="品牌（前端过滤）">
+                    <button class="btn btn-primary" id="gzbbrSearchBtn">搜索</button>
+                </div>
+            </div>
+            <div class="data-header" style="margin-top: 10px;">
+                <div class="search-bar">
+                    <label style="font-size: 14px; color: #333;">新失效时间：</label>
+                    <input type="datetime-local" class="search-input" id="gzbbrLoseDate" style="width: 200px;">
+                    <button class="btn btn-primary" id="gzbbrUpdateBtn">批量更新失效时间</button>
+                    <label style="margin-left: 15px; font-size: 14px;">
+                        <input type="checkbox" id="gzbbrSelectAll"> 全选
+                    </label>
+                </div>
+            </div>
+            <div id="gzbbrHandsontableContainer" style="margin-top: 10px;"></div>
         </div>
     </div>
 
@@ -1045,14 +1072,20 @@
         function initTabs() {
             const tabNormal = document.getElementById('tabNormal');
             const tabDirect = document.getElementById('tabDirect');
+            const tabGzbbr = document.getElementById('tabGzbbr');
             const dataTitle = document.getElementById('dataTitle');
+            const mainContainer = document.getElementById('mainDataContainer');
+            const gzbbrContainer = document.getElementById('gzbbrContainer');
 
             tabNormal.addEventListener('click', () => {
                 if (currentDataType !== 'normal') {
                     currentDataType = 'normal';
                     tabNormal.classList.add('active');
                     tabDirect.classList.remove('active');
+                    tabGzbbr.classList.remove('active');
                     dataTitle.textContent = '询价比价数据';
+                    mainContainer.style.display = 'block';
+                    gzbbrContainer.style.display = 'none';
                     expandedRows.clear();
                     loadData();
                 }
@@ -1063,9 +1096,24 @@
                     currentDataType = 'direct';
                     tabDirect.classList.add('active');
                     tabNormal.classList.remove('active');
+                    tabGzbbr.classList.remove('active');
                     dataTitle.textContent = '直接入库数据';
+                    mainContainer.style.display = 'block';
+                    gzbbrContainer.style.display = 'none';
                     expandedRows.clear();
                     loadData();
+                }
+            });
+
+            tabGzbbr.addEventListener('click', () => {
+                if (currentDataType !== 'gzbbr') {
+                    currentDataType = 'gzbbr';
+                    tabGzbbr.classList.add('active');
+                    tabNormal.classList.remove('active');
+                    tabDirect.classList.remove('active');
+                    dataTitle.textContent = 'data.gzbbr 报价失效时间调整';
+                    mainContainer.style.display = 'none';
+                    gzbbrContainer.style.display = 'block';
                 }
             });
         }
@@ -1112,6 +1160,146 @@
                     pageJumpBtn.click();
                 }
             });
+        }
+
+        // data.gzbbr 失效时间调整相关变量和函数
+        let gzbbrHot;
+        let gzbbrAllData = [];
+
+        function initGzbbrTab() {
+            document.getElementById('gzbbrSearchBtn').addEventListener('click', loadGzbbrQuotes);
+            document.getElementById('gzbbrUpdateBtn').addEventListener('click', batchUpdateGzbbrLoseDate);
+            document.getElementById('gzbbrSelectAll').addEventListener('change', toggleGzbbrSelectAll);
+        }
+
+        function formatTimestamp(value) {
+            if (!value) return '';
+            const ts = parseInt(value);
+            if (isNaN(ts)) return value;
+            const date = new Date(ts * 1000);
+            const pad = n => n < 10 ? '0' + n : n;
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+        }
+
+        function loadGzbbrQuotes() {
+            const oe = document.getElementById('gzbbrSearchOe').value.trim();
+            const supplier = document.getElementById('gzbbrSearchSupplier').value.trim();
+            const brand = document.getElementById('gzbbrSearchBrand').value.trim();
+
+            const url = `/api/purchase_plan/inquiry/gzbbr_quote_search?oe=${encodeURIComponent(oe)}&supplier=${encodeURIComponent(supplier)}`;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.code !== 0) {
+                        alert(res.msg);
+                        return;
+                    }
+                    gzbbrAllData = res.data || [];
+                    // 前端按品牌过滤
+                    if (brand) {
+                        gzbbrAllData = gzbbrAllData.filter(item =>
+                            (item.brand_name || '').toLowerCase().includes(brand.toLowerCase())
+                        );
+                    }
+                    renderGzbbrTable();
+                    document.getElementById('gzbbrBadge').textContent = gzbbrAllData.length;
+                })
+                .catch(err => alert('搜索失败: ' + err));
+        }
+
+        function renderGzbbrTable() {
+            const container = document.getElementById('gzbbrHandsontableContainer');
+            const data = gzbbrAllData.map(item => ({
+                selected: false,
+                quote_price_id: item.quote_price_id,
+                number: item.number,
+                brand_name: item.brand_name,
+                supplier_name: item.supplier_name,
+                cass_warehouse_id: item.cass_warehouse_id,
+                cass_warehouse_name: item.cass_warehouse_name,
+                price: item.price,
+                stock: item.stock,
+                lose_date: formatTimestamp(item.lose_date),
+                remark: item.remark,
+                _raw: item
+            }));
+
+            if (gzbbrHot) {
+                gzbbrHot.destroy();
+            }
+
+            gzbbrHot = new Handsontable(container, {
+                data: data,
+                colHeaders: ['选择', 'OE号', '品牌', '供应商', '仓库', '价格', '库存', '原失效时间', '备注'],
+                columns: [
+                    { data: 'selected', type: 'checkbox', width: 50 },
+                    { data: 'number', readOnly: true },
+                    { data: 'brand_name', readOnly: true },
+                    { data: 'supplier_name', readOnly: true },
+                    { data: 'cass_warehouse_name', readOnly: true },
+                    { data: 'price', readOnly: true },
+                    { data: 'stock', readOnly: true },
+                    { data: 'lose_date', readOnly: true },
+                    { data: 'remark', readOnly: true }
+                ],
+                rowHeights: DEFAULT_ROW_HEIGHT,
+                height: 500,
+                stretchH: 'all',
+                licenseKey: 'non-commercial-and-evaluation'
+            });
+
+            // 重置全选状态
+            document.getElementById('gzbbrSelectAll').checked = false;
+        }
+
+        function toggleGzbbrSelectAll(e) {
+            const checked = e.target.checked;
+            if (!gzbbrHot) return;
+            const data = gzbbrHot.getSourceData();
+            data.forEach(row => row.selected = checked);
+            gzbbrHot.render();
+        }
+
+        function batchUpdateGzbbrLoseDate() {
+            if (!gzbbrHot) {
+                alert('请先搜索数据');
+                return;
+            }
+            const loseDateInput = document.getElementById('gzbbrLoseDate').value;
+            if (!loseDateInput) {
+                alert('请设置新失效时间');
+                return;
+            }
+
+            const selectedRows = gzbbrHot.getSourceData().filter(row => row.selected);
+            if (selectedRows.length === 0) {
+                alert('请选择要更新的记录');
+                return;
+            }
+
+            const records = selectedRows.map(row => row._raw);
+            const formattedDate = loseDateInput.replace('T', ' ') + ':00';
+
+            if (!confirm(`确定更新选中的 ${records.length} 条记录失效时间为 ${formattedDate} 吗？`)) {
+                return;
+            }
+
+            fetch('/api/purchase_plan/inquiry/gzbbr_quote_update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ records: records, lose_date: formattedDate })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.code !== 0) {
+                    alert(res.msg);
+                    return;
+                }
+                alert(`更新完成：成功 ${res.data.success_count} 条，失败 ${res.data.failed_count} 条，本地同步 ${res.data.total_synced_rows || 0} 条`);
+                loadGzbbrQuotes();
+            })
+            .catch(err => alert('更新失败: ' + err));
         }
 
         // 临时存储待上传的文件
@@ -1604,6 +1792,7 @@
             initPagination();
             initBrandSearch();
             initTabs();
+            initGzbbrTab();
             loadData();
         });
 

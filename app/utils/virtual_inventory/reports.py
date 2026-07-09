@@ -160,12 +160,13 @@ def build_and_push_report(latest_business_date, latest_stats):
 
     :param latest_business_date: 业务日期字符串，如 '2026-07-07'
     :param latest_stats: 当日各公司统计字典列表
-    :return: message_push 的响应结果，或 None
+    :return: 两次 message_push 的响应结果列表
     """
     company_order = ['fsbbr', 'zhbbr', 'zsbbr', 'dgby', 'dghf']
     stats_map = {item['company']: item for item in latest_stats}
 
-    message_lines = [
+    # 第一条：各公司业务汇总
+    summary_lines = [
         '===【虚拟库存业务汇报】===',
         f'统计日期：{latest_business_date}'
     ]
@@ -174,28 +175,37 @@ def build_and_push_report(latest_business_date, latest_stats):
         item = stats_map.get(company)
         if not item:
             continue
-        message_lines.append(
+        summary_lines.append(
             f"{company}：总数 {item['total_count']}，上传成功 {item['upload_success_count']}，"
             f"新建成功 {item['new_create_success_count']}，新建失败 {item['new_create_fail_count']}，"
             f"上传失败 {item['upload_fail_count']}，没有档案 {item['no_record_count']}"
         )
 
-    message_lines.extend(_build_supplier_summary_lines())
-
-    # 生成当天与昨天的对比Excel，并把下载链接追加到推送消息
+    # 第二条：供应商爬取量 + Excel 链接
+    detail_lines = _build_supplier_summary_lines()
     try:
         excel_url = generate_virtual_inventory_compare_excel(latest_business_date)
-        message_lines.append('')
-        message_lines.append(f'对比Excel下载：{excel_url}')
+        detail_lines.append('')
+        detail_lines.append(f'对比Excel下载：{excel_url}')
     except Exception as e:
-        logger.exception(f"[统计日志] 生成对比Excel失败")
-        message_lines.append('')
-        message_lines.append(f'对比Excel生成失败：{e}')
+        logger.exception("[统计日志] 生成对比Excel失败")
+        detail_lines.append('')
+        detail_lines.append(f'对比Excel生成失败：{e}')
+
+    results = []
 
     try:
-        push_result = message_push('虚拟库存数据', '\n'.join(message_lines))
-        logger.info(f"[统计日志] 微信推送结果: {push_result}")
-        return push_result
+        push_result = message_push('虚拟库存数据', '\n'.join(summary_lines))
+        logger.info(f"[统计日志] 微信推送结果（汇总）: {push_result}")
+        results.append(push_result)
     except Exception as push_error:
-        logger.error(f"[统计日志] 微信推送失败: {push_error}")
-        return None
+        logger.error(f"[统计日志] 微信推送失败（汇总）: {push_error}")
+
+    try:
+        push_result = message_push('虚拟库存数据', '\n'.join(detail_lines))
+        logger.info(f"[统计日志] 微信推送结果（明细）: {push_result}")
+        results.append(push_result)
+    except Exception as push_error:
+        logger.error(f"[统计日志] 微信推送失败（明细）: {push_error}")
+
+    return results

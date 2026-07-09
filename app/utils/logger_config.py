@@ -74,6 +74,7 @@ TASK_LOGGERS = [
     'virtual_inventory',            # 虚拟库存同步
     'vin_vehicle_info_sync',        # VIN 车辆信息补全
     'crm_gzbbr',                    # CRM 爬虫公共模块默认日志
+    'data_gzbbr',                   # data.gzbbr 报价接口日志
 ]
 
 
