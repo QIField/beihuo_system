@@ -4,10 +4,13 @@ CRM Product Package - CRM产品处理包
 """
 
 # 从 crm_productAdd 模块导出新的 API 函数
-from .crm_productAdd.main import (
-    process_database_mode_api,
+from .crm_productAdd.api_wrappers import (
+    process_excel_async_wrapper,
     process_excel_two_column_mode_api,
     process_excel_three_column_mode_api,
+)
+from .crm_productAdd.main import (
+    process_database_mode_api,
 )
 
 # 保留旧版的导出（兼容现有代码）
@@ -47,9 +50,10 @@ __version__ = "2.0.0"
 __author__ = "BBR Team"
 __all__ = [
     # 新版 API 函数
-    'process_database_mode_api',
+    'process_excel_async_wrapper',
     'process_excel_two_column_mode_api',
     'process_excel_three_column_mode_api',
+    'process_database_mode_api',
     # 旧版函数（兼容）
     'main',
     'main_excel_mode',
