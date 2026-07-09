@@ -75,6 +75,8 @@ TASK_LOGGERS = [
     'vin_vehicle_info_sync',        # VIN 车辆信息补全
     'crm_gzbbr',                    # CRM 爬虫公共模块默认日志
     'data_gzbbr',                   # data.gzbbr 报价接口日志
+    'wms_order_push',               # WMS 订单推送
+    'wms_gzbbr',                    # WMS 爬虫公共模块日志
 ]
 
 
