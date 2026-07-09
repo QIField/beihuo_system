@@ -7,7 +7,7 @@ import os
 import tempfile
 import pandas as pd
 import importlib.util
-from flask import request, jsonify, send_file
+from flask import request, jsonify, send_file, session
 from datetime import datetime
 
 # 导入新的 API 函数
@@ -292,7 +292,7 @@ def register_excel_process_routes(app):
             
             # 提交异步任务
             from app.core.async_task_store import submit_excel_task
-            from app.utils.crm_product.crm_productAdd.main import process_excel_async_wrapper
+            from app.utils.crm_product.crm_productAdd.api_wrappers import process_excel_async_wrapper
             
             # 获取用户当前门店/组织
             user_store = session.get('store', 'fsbbr')
@@ -311,6 +311,9 @@ def register_excel_process_routes(app):
             })
             
         except Exception as e:
+            import traceback
+            print(f"[ERROR] 提交 CRM 档案异步任务失败: {e}")
+            traceback.print_exc()
             return jsonify({'code': 1, 'msg': f'提交失败: {str(e)}'}), 500
 
     @app.route('/api/excel/async/status/<task_id>', methods=['GET'])

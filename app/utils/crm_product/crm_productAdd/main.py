@@ -12,20 +12,18 @@ from datetime import datetime
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
-# 导入统一的 SessionManager
-from app.utils.session_manager import SessionManager, get_session
-
 # 导入 CRM Session 创建函数
 from config import create_crm_session
+
+# 导入统一的 SessionManager
+from app.utils.session_manager import get_session
 
 # 保持向后兼容的别名
 get_thread_session = get_session
 
 # 导入 CRM 相关模块 (使用相对导入)
-from .crm_brand_id import get_brand_dict
 from .crm_get_oe_link import get_oe_link
 from .crm_Product_Add import add_product
-from .crm_product_id import get_product_id
 from .crm_updateView import update_product_name_by_oe, update_brand_code_by_oe
 
 # 导入 Excel 数据模块 (使用相对导入)
@@ -42,6 +40,13 @@ from .db_manager import (
     get_db_connection,
     load_data_from_mysql,
     update_msg_with_processed_result
+)
+
+# 导入重构后的新模块（对外 API 复用新实现）
+from .api_wrappers import (
+    process_excel_async_wrapper,
+    process_excel_two_column_mode_api,
+    process_excel_three_column_mode_api,
 )
 
 
@@ -847,70 +852,6 @@ def process_database_mode_api(supplier_name=None):
     return True
 
 
-def process_excel_two_column_mode_api(file_path):
-    """
-    两列模式 API 接口
-    供前端上传 Excel 后调用
-    
-    Args:
-        file_path: Excel 文件路径
-    
-    Returns:
-        结果文件路径
-    """
-    print(f"\n=== CRM Product Add - 两列模式 ===")
-    print(f"文件: {file_path}")
-    
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"文件不存在: {file_path}")
-    
-    # 创建 Session
-    session = create_crm_session()
-    print("Session 创建成功")
-    
-    # 加载 Excel 数据
-    product_df = load_product_data()
-    alias_df = load_alias_data()
-    
-    # 处理两列模式
-    result_file_path = process_two_column_mode_with_return(session, product_df, alias_df, file_path)
-    
-    print(f"\n两列模式处理完毕，结果: {result_file_path}")
-    return result_file_path
-
-
-def process_excel_three_column_mode_api(file_path):
-    """
-    三列模式 API 接口
-    供前端上传 Excel 后调用
-    
-    Args:
-        file_path: Excel 文件路径
-    
-    Returns:
-        结果文件路径
-    """
-    print(f"\n=== CRM Product Add - 三列模式 ===")
-    print(f"文件: {file_path}")
-    
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"文件不存在: {file_path}")
-    
-    # 创建 Session
-    session = create_crm_session()
-    print("Session 创建成功")
-    
-    # 加载 Excel 数据
-    product_df = load_product_data()
-    alias_df = load_alias_data()
-    
-    # 处理三列模式
-    result_file_path = process_three_column_mode_with_return(session, product_df, alias_df, file_path)
-    
-    print(f"\n三列模式处理完毕，结果: {result_file_path}")
-    return result_file_path
-
-
 def process_two_column_mode_with_return(session, product_df, alias_df, file_path):
     """
     两列模式处理，支持多工作表，返回结果文件路径
@@ -1115,107 +1056,6 @@ def _save_excel_results_with_return(df, results, oe_col, original_file_path):
     df.to_excel(output_path, index=False)
     print(f"结果已保存: {output_path}")
     return output_path
-
-
-def process_excel_async_wrapper(file_path: str, mode: str, company: str = 'fsbbr', progress_callback=None):
-    """
-    Excel异步处理包装器
-    支持进度回调，供异步任务调用
-
-    Args:
-        file_path: Excel/CSV 文件路径
-        mode: 处理模式，two_column 或 three_column
-        company: 门店/组织代码，默认 fsbbr
-        progress_callback: 进度回调函数
-    """
-    from config import create_crm_session
-    
-    # 创建 Session（按用户所在门店）
-    session = create_crm_session(company)
-    
-    # 加载 Excel 数据
-    from .excel_data_loader import load_product_data, load_alias_data
-    product_df = load_product_data()
-    alias_df = load_alias_data()
-    
-    # 读取所有工作表
-    if file_path.endswith('.csv'):
-        all_sheets = {'Sheet1': pd.read_csv(file_path, dtype=str)}
-    else:
-        all_sheets = pd.read_excel(file_path, sheet_name=None, dtype=str)
-    
-    # 筛选工作表
-    valid_sheets = _filter_sheets_by_mode(all_sheets, mode)
-    if not valid_sheets:
-        raise ValueError("没有找到符合要求的工作表")
-    
-    # 计算总项目数
-    total_items = sum(len(sheet['df']) for sheet in valid_sheets.values())
-    
-    processed = 0
-    all_results = {}
-    
-    # 处理每个工作表
-    for sheet_name, sheet_info in valid_sheets.items():
-        df = sheet_info['df']
-        columns = sheet_info['columns']
-        oe_col = columns[0]
-        brand_col = columns[1]
-        
-        # 准备处理项
-        items = []
-        for _, row in df.iterrows():
-            oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
-            brand = str(row[brand_col]).strip() if pd.notna(row[brand_col]) else ''
-            if oe and brand:
-                item = {
-                    'oe_number': oe,
-                    'brand': brand,
-                    'mode': mode
-                }
-                # 三列模式添加 brand_code
-                if mode == 'three_column' and len(columns) > 2:
-                    brand_code_col = columns[2]
-                    brand_code = str(row[brand_code_col]).strip() if pd.notna(row[brand_code_col]) else ''
-                    item['brand_code'] = brand_code
-                items.append(item)
-        
-        # 处理并更新进度（传递progress_callback实现实时更新）
-        results = _process_with_loop(items, product_df, alias_df, None, progress_callback, processed, total_items, session)
-        all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
-        
-        processed += len(items)
-    
-    # 保存结果
-    result_path = _save_multi_sheet_results(all_results, file_path)
-
-    # 收集所有处理过的 OE 列表（用于后续替换号对比同步）
-    processed_oe_set = set()
-    success_count = 0
-    fail_count = 0
-    for sheet_name, sheet_data in all_results.items():
-        for oe, result_msg in sheet_data['results'].items():
-            processed_oe_set.add(oe)
-            if result_msg and (result_msg.startswith('成功') or result_msg.startswith('已存在')):
-                success_count += 1
-            else:
-                fail_count += 1
-
-    result_data = {
-        'oe_list': sorted(processed_oe_set),
-        'total': len(processed_oe_set),
-        'success_count': success_count,
-        'fail_count': fail_count
-    }
-
-    # 清理临时文件
-    import os
-    os.remove(file_path)
-
-    return {
-        'result_file': result_path,
-        'result_data': result_data
-    }
 
 
 if __name__ == "__main__":
