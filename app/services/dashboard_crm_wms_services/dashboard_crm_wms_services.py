@@ -48,13 +48,13 @@ def on_heartbeat():
         else:
             print("[心跳] get_wms_picking_list_by_pages5_tasks 未注册看门狗配置")
         
-        cfg3 = load_task_config('get_wms_picking_list_by_keywd')
+        cfg3 = load_task_config('get_wms_picking_list_by_keywd_tasks')
         if cfg3:
             cfg3['last_request_time'] = datetime.datetime.now().isoformat()
-            save_task_config('get_wms_picking_list_by_keywd', cfg3)
-            print("[心跳] get_wms_picking_list_by_keywd 请求时间已更新")
+            save_task_config('get_wms_picking_list_by_keywd_tasks', cfg3)
+            print("[心跳] get_wms_picking_list_by_keywd_tasks 请求时间已更新")
         else:
-            print("[心跳] get_wms_picking_list_by_keywd 未注册看门狗配置")
+            print("[心跳] get_wms_picking_list_by_keywd_tasks 未注册看门狗配置")
         
     except Exception as e:
         print(f"[心跳] 更新失败: {e}")
