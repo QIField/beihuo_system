@@ -8,6 +8,7 @@
 import re
 import traceback
 from datetime import datetime, timedelta
+from app.models.orm_models.wechat_daily_quote_detail import WechatDailyQuoteDetail
 from app.models.orm_models.weixin_decoding_result import WeixinDecodingResult
 from app.utils.orm.session import orm_session
 from app.dao.wechat_daily_quote_detail_dao import WechatDailyQuoteDetailDao
@@ -364,80 +365,6 @@ def batch_get_update_deal_info(start_date, end_date):
         print(f"批量处理失败：{str(e)}")
         traceback.print_exc()
         return total_stats
-
-
-
-def fetch_data_and_save_to_database(start_date, end_date):
-    """
-    获取并保存数据到数据库（按10天分批处理）
-    
-    Args:
-        start_date: 开始日期字符串，如 "2026-01-01"
-        end_date: 结束日期字符串，如 "2026-04-20"
-    """
-    
-    print("\n" + "="*70)
-    print("开始批量获取并保存数据")
-    print("="*70)
-    print(f"日期范围: {start_date} 至 {end_date}")
-    
-    # 解析日期
-    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-    
-    # 统计信息
-    total_records = 0
-    
-    # 当前处理日期
-    current_start = start_dt
-    
-    # 按10天一批循环处理
-    batch_count = 0
-    while current_start <= end_dt:
-        batch_count += 1
-        
-        # 计算当前批次的结束日期（不超过总结束日期）
-        current_end = current_start + timedelta(days=9)
-        if current_end > end_dt:
-            current_end = end_dt
-        
-        # 转换为字符串格式
-        batch_start_str = current_start.strftime('%Y-%m-%d')
-        batch_end_str = current_end.strftime('%Y-%m-%d')
-        
-        print(f"\n[批次 {batch_count}] 处理日期: {batch_start_str} 至 {batch_end_str}")
-        
-        try:
-            # 查询数据
-            db_data_list = get_weixin_decoding_result(batch_start_str, batch_end_str)
-            
-            # 转换数据
-            data_list = convert_to_database_format(db_data_list)
-            
-            # 保存到数据库
-            if data_list:
-                save_stats = batch_save_to_database(data_list)
-                print(f"批次 {batch_count} 完成: 获取 {len(data_list)} 条记录，保存统计: {save_stats}")
-                total_records += len(data_list)
-            else:
-                print(f"批次 {batch_count} 完成: 无数据")
-        
-        except Exception as e:
-            print(f"  [失败] 批次 {batch_count} 处理失败: {str(e)}")
-            traceback.print_exc()
-        
-        # 移动到下一批
-        current_start = current_end + timedelta(days=1)
-    
-    print("\n" + "="*70)
-    print(f"全部完成！总共处理 {total_records} 条记录")
-    print("="*70)
-
-
-
-
-        
-       
 
 
 # def test_batch_get_update_deal_info():
