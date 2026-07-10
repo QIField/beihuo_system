@@ -8,6 +8,7 @@ from functools import wraps
 from flask import Blueprint, jsonify, request, session
 
 from app.services.compare_service.compare_data_service import (
+    CompareDataService,
     get_oe_with_different_replace_numbers,
     use_replace_number,
 )
@@ -76,6 +77,8 @@ def api_get_diff_replace_numbers():
         brand = request.args.get('brand', '').strip()
         product_name = request.args.get('product_name', '').strip()
         vehicle_brand = request.args.get('vehicle_brand', '').strip()
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
         page = request.args.get('page', '1').strip()
         limit = request.args.get('limit', '100').strip()
         
@@ -109,7 +112,9 @@ def api_get_diff_replace_numbers():
             vehicle_brand=vehicle_brand,
             company=company,
             page=page,
-            limit=limit
+            limit=limit,
+            start_date=start_date,
+            end_date=end_date,
         )
         
         return jsonify({
@@ -152,31 +157,43 @@ def api_get_total_oe_count():
     try:
         from app.utils.database_connection import get_db_connection
         import pymysql
-        
+        from app.services.compare_service.wms_return_items_query_service import (
+            get_distinct_number_clean_by_date_range,
+        )
+
         brand = request.args.get('brand', '').strip()
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
         company = get_user_company()
-        
+
         conn = get_db_connection()
         try:
             with conn.cursor(pymysql.cursors.Cursor) as cursor:
                 # 构建 WHERE 条件
                 where_conditions = ["company = %s"]
                 params = [company]
-                
+
+                # 日期范围筛选：从 WMS 入库明细获取 number_clean 精确匹配 oe
+                if start_date and end_date:
+                    number_clean_list = get_distinct_number_clean_by_date_range(
+                        start_date, end_date
+                    )
+                    CompareDataService._build_in_clause(
+                        'oe', number_clean_list, where_conditions, params
+                    )
+
                 if brand:
-                    brand_list = brand.split(',')
-                    or_conditions = []
-                    for item in brand_list:
-                        or_conditions.append("brand LIKE %s")
-                        params.append(f"%{item.strip()}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
-                
+                    brand_list = [item.strip() for item in brand.split(',')]
+                    CompareDataService._build_like_conditions(
+                        'brand', brand_list, where_conditions, params
+                    )
+
                 where_clause = "WHERE " + " AND ".join(where_conditions)
-                
+
                 # 查询总OE数
                 sql = f"""
-                    SELECT COUNT(DISTINCT oe) 
-                    FROM crmapp_compare_summary 
+                    SELECT COUNT(DISTINCT oe)
+                    FROM crmapp_compare_summary
                     {where_clause}
                 """
                 cursor.execute(sql, params)
@@ -217,10 +234,12 @@ def api_export_diff_replace_numbers():
         brand = request.args.get('brand', '').strip()
         product_name = request.args.get('product_name', '').strip()
         vehicle_brand = request.args.get('vehicle_brand', '').strip()
-        
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+
         # 获取当前用户公司
         company = get_user_company()
-        
+
         # 调用服务层查询所有数据（不分页，设置一个较大的limit）
         data_list, total = get_oe_with_different_replace_numbers(
             oe=oe,
@@ -229,7 +248,9 @@ def api_export_diff_replace_numbers():
             vehicle_brand=vehicle_brand,
             company=company,
             page=1,
-            limit=100000  # 导出时设置较大的限制
+            limit=100000,  # 导出时设置较大的限制
+            start_date=start_date,
+            end_date=end_date,
         )
         
         if not data_list:

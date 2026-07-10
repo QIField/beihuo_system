@@ -13,6 +13,7 @@ from .qpl_order_status_sync_task import register_qpl_order_status_sync_tasks
 from .crm_warehouse_inventory_sync_task import register_crm_warehouse_inventory_sync_tasks
 from .vin_vehicle_info_sync_task import register_vin_vehicle_info_sync_tasks
 from .wms_order_push_task import register_wms_order_push_tasks
+from .wms_return_items_detail_task import register_wms_return_items_detail_tasks
 from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
 
 
@@ -52,6 +53,9 @@ def register_all_tasks(task_manager):
 
     # 10. 注册WMS订单推送定时任务（每天07:00、14:00-19:00）
     register_wms_order_push_tasks(task_manager)
+
+    # 11. 注册WMS采购入库单明细同步定时任务（按指定字段，每天06:00）
+    register_wms_return_items_detail_tasks(task_manager)
 
 
 __all__ = ['execute_daily_pipeline', 'register_all_tasks']

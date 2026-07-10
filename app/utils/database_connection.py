@@ -34,6 +34,10 @@ def get_db_connection():
     """
     获取数据库连接
     从连接池获取一个可用的连接
+
+    注意：业务代码中优先使用 DBCursorContext / db_cursor()，
+    避免直接调用本函数后手动管理游标和事务。必须直接使用时，
+    请显式指定 Cursor 或 DictCursor，不要依赖默认游标类型。
     """
     global POOL
     
