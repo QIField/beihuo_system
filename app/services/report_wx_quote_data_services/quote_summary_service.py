@@ -79,9 +79,9 @@ def summarize_oe_codes_daily(start_date=None, end_date=None, groupname=None, nic
         
         # 打印 SQL
         print("\n" + "="*100)
-        print("SQL 语句:")
-        print("="*100)
-        print(str(query.statement.compile(compile_kwargs={"literal_binds": True})))
+        # print("SQL 语句:")
+        # print("="*100)
+        # print(str(query.statement.compile(compile_kwargs={"literal_binds": True})))
         print("="*100 + "\n")
         
         # 获取总数

@@ -337,6 +337,128 @@ class CrmGzbbrSpider:
             self.logger.info(f"【请求参数】{data}")
             return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
 
+    # https://crm.gzbbr.com/api/Product.Product/list
+    # page 分页页码
+    # limit 分页每页数量
+    # keyword 关键词
+    # number OE号
+    # numberlist OE号列表，逗号分隔
+    # brand_id 品牌ID
+    # warehouse_id 仓库ID
+    # customer_id 客户ID
+    # is_stock 是否有库存
+    # is_dangerstock 是否危险库存
+    # is_nostock 是否无库存
+    # sale_type 销售类型
+    # is_zaitu 是否在途
+    # product_type_id 产品类型ID
+    # make_id 品牌ID
+    # series_id 系列ID
+    # car_id 车型ID
+    # chassis_id 底盘ID
+    # engine_id 发动机ID
+    def get_product_product_list(self, page=1, limit=200, keyword=None, number=None,
+                                 numberlist=None, brand_id=None, warehouse_id=None,
+                                 customer_id=None, is_stock=None, is_dangerstock=None,
+                                 is_nostock=None, sale_type=None, is_zaitu=None,
+                                 product_type_id=None, make_id=None, series_id=None,
+                                 car_id=None, chassis_id=None, engine_id=None):
+        """
+        获取产品列表（开思产品数据）
+
+        :param page: 分页页码，默认1
+        :param limit: 分页每页数量，默认20
+        :param keyword: 关键词
+        :param number: OE号
+        :param numberlist: OE号列表，逗号分隔
+        :param brand_id: 品牌ID
+        :param warehouse_id: 仓库ID
+        :param customer_id: 客户ID
+        :param is_stock: 是否有库存
+        :param is_dangerstock: 是否危险库存
+        :param is_nostock: 是否无库存
+        :param sale_type: 销售类型
+        :param is_zaitu: 是否在途
+        :param product_type_id: 产品类型ID
+        :param make_id: 品牌ID
+        :param series_id: 系列ID
+        :param car_id: 车型ID
+        :param chassis_id: 底盘ID
+        :param engine_id: 发动机ID
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/Product.Product/list"
+        data = {
+            "page": page,
+            "limit": limit,
+            "keyword": keyword,
+            "number": number,
+            "numberlist": numberlist,
+            "brand_id": brand_id,
+            "warehouse_id": warehouse_id,
+            "customer_id": customer_id,
+            "is_stock": is_stock,
+            "is_dangerstock": is_dangerstock,
+            "is_nostock": is_nostock,
+            "sale_type": sale_type,
+            "is_zaitu": is_zaitu,
+            "product_type_id": product_type_id,
+            "make_id": make_id,
+            "series_id": series_id,
+            "car_id": car_id,
+            "chassis_id": chassis_id,
+            "engine_id": engine_id,
+        }
+        print("【请求API地址】", url)
+        print("【请求参数】", data)
+        return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
+
+
+    # https://crm.gzbbr.com/api/Crm.Pdcart/cartAddToOrders
+    def get_cart_add_to_orders(self, product_id=None, partner_id=None):
+        """
+        将购物车商品添加到订单
+        
+        :param product_id: 产品ID列表，如 ["269140"]
+        :param partner_id: 合作伙伴ID
+        """
+        url = f"{self.BASE_URL}/api/Crm.Pdcart/cartAddToOrders"
+        data = {
+            "product_id": product_id,
+            "partner_id": partner_id,
+        }
+        # ========== 打印请求信息 ==========
+        print("【请求API地址】", url)
+        print("【请求参数】", data)
+        # ==================================
+        return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
+
+
+    # https://crm.gzbbr.com/api/Crm.Cart/addcart?search_no=31108854990&pid=6131&num=10&sales_price=279.99
+    def get_add_cart(self, search_no=None, pid=None, num=None, sales_price=None):
+        """
+        添加商品到购物车
+
+        :param search_no: 搜索编号
+        :param pid: 产品ID
+        :param num: 数量
+        :param sales_price: 销售价格
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/Crm.Cart/addcart"
+        params = {
+            "search_no": search_no,
+            "pid": pid,
+            "num": num,
+            "sales_price": sales_price,
+        }
+        # ========== 打印请求信息 ==========
+        print("【请求API地址】", url)
+        print("【请求参数】", params)
+        # ==================================
+        return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
+
     def close(self):
         """
         关闭会话连接，释放资源

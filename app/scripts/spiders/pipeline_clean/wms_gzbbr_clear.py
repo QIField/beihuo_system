@@ -53,3 +53,55 @@ def get_status_orders_clean(data_list,store='fsbbr'):
 
     # 返回过滤后的订单数据列表，供调用者进行入库操作
     return clean_data_list
+
+
+def product_list_clean(data,oe_code):
+    """
+    产品列表数据清洗函数
+    
+    从 Product.Product/list 接口返回的数据中提取产品信息，
+    只保留 name、stock、number、price、product_id、brand_name 字段，
+    并且只保留 stock 大于 0 的记录。
+    
+    :param data: 接口返回的原始 JSON 数据（已解析为字典）
+    :return: 清洗后的产品列表，每个元素包含 name、stock、number、price、product_id、brand_name
+    """
+    if not data or not isinstance(data, dict):
+        return []
+    
+    data_obj = data.get('data', {})
+    if not data_obj or not isinstance(data_obj, dict):
+        return []
+    
+    data_list = data_obj.get('data', [])
+    if not data_list or not isinstance(data_list, list):
+        return []
+    
+    model_fields = ['name', 'stock', 'number', 'price', 'product_id', 'brand_name']
+    
+    all_products = []
+    for item in data_list:
+        child_list = item.get('child', [])
+        if child_list and isinstance(child_list, list):
+            for product in child_list:
+                all_products.append(product)
+    
+    df = pd.DataFrame(all_products)
+    
+    if df.empty:
+        return []
+    
+    available_fields = [field for field in model_fields if field in df.columns]
+    df = df[available_fields].copy()
+    
+    df['stock'] = pd.to_numeric(df['stock'], errors='coerce').fillna(0)  # pyright: ignore[reportAttributeAccessIssue]
+    
+    df = df[df['stock'] > 0].copy()
+    
+    df['contrast_price_flag'] = pd.to_numeric(df['price'], errors='coerce').round(0).astype(int)  # pyright: ignore[reportAttributeAccessIssue]
+    df['product_id'] = pd.to_numeric(df['product_id'], errors='coerce')
+    df['search_no'] = oe_code
+    
+    clean_data_list = df.to_dict('records')  # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
+    
+    return clean_data_list

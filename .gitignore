@@ -63,3 +63,4 @@ docker/logs/
 /excel
 /sql
 /.trae
+log.txt
