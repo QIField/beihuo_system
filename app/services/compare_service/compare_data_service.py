@@ -3,10 +3,13 @@
 用于操作 crmapp_compare_summary 表的增删改查
 """
 from datetime import datetime
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 import pymysql
 from app.utils.database_connection import get_db_connection
 from app.utils.search.parser import parse_space, parse_comma
+from app.services.compare_service.wms_return_items_query_service import (
+    get_distinct_number_clean_by_date_range,
+)
 
 
 class CompareDataService:
@@ -282,6 +285,50 @@ class CompareDataService:
         'avg_sales_12m', 'avg_sales_6m', 'sales_7d', 'sales_6m', 'sales_12m',
         'updated_time', 'price_update_time', 'product_level'
     }
+
+    @staticmethod
+    def _build_like_conditions(
+        field: str,
+        values: List[str],
+        where_conditions: List[str],
+        params: List[Any],
+    ) -> None:
+        """
+        构建字段的 LIKE 模糊查询条件
+
+        :param field: 数据库字段名
+        :param values: 筛选值列表
+        :param where_conditions: WHERE 条件列表（会被修改）
+        :param params: SQL 参数列表（会被修改）
+        """
+        if not values:
+            return
+
+        or_conditions = [f"{field} LIKE %s" for _ in values]
+        params.extend(f"%{item}%" for item in values)
+        where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+
+    @staticmethod
+    def _build_in_clause(
+        field: str,
+        values: List[str],
+        where_conditions: List[str],
+        params: List[Any],
+    ) -> None:
+        """
+        构建字段的 IN 精确匹配条件
+
+        :param field: 数据库字段名
+        :param values: 筛选值列表
+        :param where_conditions: WHERE 条件列表（会被修改）
+        :param params: SQL 参数列表（会被修改）
+        """
+        if not values:
+            return
+
+        placeholders = ', '.join(['%s'] * len(values))
+        where_conditions.append(f"{field} IN ({placeholders})")
+        params.extend(values)
 
     @staticmethod
     def list_data(
@@ -692,16 +739,18 @@ class CompareDataService:
         vehicle_brand: str = '',
         company: str = '',
         page: int = 1,
-        limit: int = 100
+        limit: int = 100,
+        start_date: str = '',
+        end_date: str = '',
     ) -> Tuple[List[Dict], int]:
         """
         查询 replace_number 有差异的 OE 分组数据
-        
+
         逻辑：
         1. 先找出有差异的 oe（该 oe 下不同 brand 的 replace_number 不一致）
         2. 查询这些 oe 的所有数据（包含所有 brand）
         3. 支持分页和筛选
-        
+
         参数:
             oe: OE号筛选
             brand: 品牌筛选
@@ -710,7 +759,9 @@ class CompareDataService:
             company: 公司/组织筛选
             page: 页码
             limit: 每页条数
-            
+            start_date: 订单日期范围开始
+            end_date: 订单日期范围结束
+
         返回:
             (数据列表, 总记录数)
         """
@@ -720,46 +771,42 @@ class CompareDataService:
                 # 构建基础 WHERE 条件
                 where_conditions = []
                 params = []
-                
+
                 # 必须按公司过滤
                 if company:
                     where_conditions.append("company = %s")
                     params.append(company)
-                
+
+                # 处理日期范围筛选：从 WMS 入库明细获取 number_clean 精确匹配 oe
+                if start_date and end_date:
+                    number_clean_list = get_distinct_number_clean_by_date_range(
+                        start_date, end_date
+                    )
+                    if not number_clean_list:
+                        return [], 0
+                    CompareDataService._build_in_clause(
+                        'oe', number_clean_list, where_conditions, params
+                    )
+
                 # 处理多行搜索
                 oe_list = parse_space(oe) if oe else []
                 brand_list = parse_comma(brand) if brand else []
                 product_name_list = parse_comma(product_name) if product_name else []
                 vehicle_brand_list = parse_comma(vehicle_brand) if vehicle_brand else []
-                
-                if oe_list:
-                    or_conditions = []
-                    for item in oe_list:
-                        or_conditions.append("oe LIKE %s")
-                        params.append(f"%{item}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
-                
-                if brand_list:
-                    or_conditions = []
-                    for item in brand_list:
-                        or_conditions.append("brand LIKE %s")
-                        params.append(f"%{item}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
-                
-                if product_name_list:
-                    or_conditions = []
-                    for item in product_name_list:
-                        or_conditions.append("product_name LIKE %s")
-                        params.append(f"%{item}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
-                
-                if vehicle_brand_list:
-                    or_conditions = []
-                    for item in vehicle_brand_list:
-                        or_conditions.append("vehicle_brand LIKE %s")
-                        params.append(f"%{item}%")
-                    where_conditions.append("(" + " OR ".join(or_conditions) + ")")
-                
+
+                CompareDataService._build_like_conditions(
+                    'oe', oe_list, where_conditions, params
+                )
+                CompareDataService._build_like_conditions(
+                    'brand', brand_list, where_conditions, params
+                )
+                CompareDataService._build_like_conditions(
+                    'product_name', product_name_list, where_conditions, params
+                )
+                CompareDataService._build_like_conditions(
+                    'vehicle_brand', vehicle_brand_list, where_conditions, params
+                )
+
                 where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else "WHERE 1=1"
                 
                 # 第一步：找出有差异的 oe
@@ -1053,16 +1100,18 @@ def get_oe_with_different_replace_numbers(
     vehicle_brand: str = '',
     company: str = '',
     page: int = 1,
-    limit: int = 100
+    limit: int = 100,
+    start_date: str = '',
+    end_date: str = '',
 ) -> Tuple[List[Dict], int]:
     """
     查询 replace_number 有差异的 OE 分组数据
-    
+
     逻辑：
     1. 按 oe 分组，收集所有 brand 和 replace_number
     2. 检查每个 oe 下的 replace_number 是否有差异（去重后数量>1）
     3. 只返回有差异的 oe 分组数据（该 oe 下的所有 brand 都展示）
-    
+
     参数:
         oe: OE号筛选
         brand: 品牌筛选
@@ -1071,15 +1120,18 @@ def get_oe_with_different_replace_numbers(
         company: 公司/组织筛选
         page: 页码
         limit: 每页条数
-        
+        start_date: 订单日期范围开始
+        end_date: 订单日期范围结束
+
     返回:
         (数据列表, 总记录数)
         数据列表格式: [{oe, brand, replace_number, replace_number_with_keys, product_name, ...}, ...]
     """
     return CompareDataService.get_oe_with_different_replace_numbers(
-        oe=oe, brand=brand, product_name=product_name, 
+        oe=oe, brand=brand, product_name=product_name,
         vehicle_brand=vehicle_brand, company=company,
-        page=page, limit=limit
+        page=page, limit=limit,
+        start_date=start_date, end_date=end_date,
     )
 
 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>替换号差异对比</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/date-range-picker.css') }}">
     <style>
         * {
             margin: 0;
@@ -361,6 +362,10 @@
                     <label>品牌：</label>
                     <input type="text" id="searchBrand" placeholder="支持逗号分隔多值">
                 </div>
+                <div class="form-item search-item date-range-item">
+                    <label>订单日期：</label>
+                    <input type="text" id="searchOrderdate" placeholder="请选择日期范围" readonly>
+                </div>
             </div>
             <div class="form-actions">
                 <button class="btn btn-primary" onclick="searchData()">开始查询</button>
@@ -434,7 +439,11 @@
     </div>
 
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
     <script>
+        // 初始化订单日期范围选择器
+        initDateRangePicker('searchOrderdate');
+
         // 全局变量
         let allData = [];           // 所有数据
         let groupedData = {};       // 按OE分组的数据
@@ -445,20 +454,31 @@
         async function searchData() {
             const oe = document.getElementById('searchOe').value.trim();
             const brand = document.getElementById('searchBrand').value.trim();
-            
+            const dateRange = document.getElementById('searchOrderdate').value.trim();
+
+            let startDate = '';
+            let endDate = '';
+            if (dateRange) {
+                const dates = dateRange.split(' - ');
+                if (dates.length === 2) {
+                    startDate = dates[0].trim();
+                    endDate = dates[1].trim();
+                }
+            }
+
             // 显示加载状态
             document.getElementById('loading').style.display = 'block';
             document.getElementById('loading').textContent = '加载中...';
             document.getElementById('emptyState').style.display = 'none';
             document.getElementById('dataContainer').style.display = 'none';
             document.getElementById('statusContainer').style.display = 'none';
-            
+
             allData = [];
             let page = 1;
             const limit = 5000; // 每页获取数量
             let hasMore = true;
             let totalExpected = 0;
-            
+
             try {
                 // 循环获取所有数据
                 while (hasMore) {
@@ -467,24 +487,26 @@
                         page: page,
                         limit: limit
                     });
-                    
+
                     if (oe) params.append('oe', oe);
                     if (brand) params.append('brand', brand);
-                    
+                    if (startDate) params.append('start_date', startDate);
+                    if (endDate) params.append('end_date', endDate);
+
                     // 发送请求
                     const response = await fetch(`/new/api/compare/diff-replace-numbers?${params.toString()}`);
                     const result = await response.json();
-                    
+
                     if (result.code === 0) {
                         const pageData = result.data.list;
                         totalExpected = result.data.total;
-                        
+
                         if (pageData.length === 0) {
                             hasMore = false;
                         } else {
                             allData = allData.concat(pageData);
                             document.getElementById('loading').textContent = `已加载 ${allData.length} / ${totalExpected} 条数据...`;
-                            
+
                             // 如果获取的数据少于 limit，说明已经获取完
                             if (pageData.length < limit) {
                                 hasMore = false;
@@ -496,32 +518,32 @@
                         throw new Error(result.message);
                     }
                 }
-                
+
                 document.getElementById('loading').style.display = 'none';
-                
+
                 if (allData.length === 0) {
                     document.getElementById('emptyState').style.display = 'block';
                     document.getElementById('emptyState').textContent = '没有找到数据';
                     return;
                 }
-                
+
                 // 按OE分组
                 groupDataByOe();
-                
+
                 // 显示第一个OE
                 currentIndex = 0;
                 showCurrentOe();
-                
+
                 // 显示进度条和统计
                 document.getElementById('statusContainer').style.display = 'flex';
                 document.getElementById('dataContainer').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
-                
+
                 updateProgress();
-                
+
                 // 获取总OE数统计
-                loadTotalStats(oe, brand);
-                
+                loadTotalStats(oe, brand, startDate, endDate);
+
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('emptyState').style.display = 'block';
@@ -531,15 +553,17 @@
         }
         
         // 加载总统计信息
-        function loadTotalStats(oe, brand) {
+        function loadTotalStats(oe, brand, startDate, endDate) {
             // 构建请求参数（不带oe筛选，获取总数）
             const params = new URLSearchParams({
                 page: 1,
                 limit: 1
             });
-            
+
             if (brand) params.append('brand', brand);
-            
+            if (startDate) params.append('start_date', startDate);
+            if (endDate) params.append('end_date', endDate);
+
             // 调用普通列表接口获取总OE数
             fetch(`/new/api/compare/total-oe-count?${params.toString()}`)
                 .then(response => response.json())
@@ -547,10 +571,10 @@
                     if (result.code === 0) {
                         const totalOe = result.data.total_oe_count;
                         const diffOe = oeList.length;
-                        
+
                         document.getElementById('totalOeCount').textContent = totalOe;
                         document.getElementById('diffOeCount').textContent = diffOe;
-                        
+
                         // 计算差异率
                         const rate = totalOe > 0 ? ((diffOe / totalOe) * 100).toFixed(2) : 0;
                         document.getElementById('diffRate').textContent = rate + '%';
@@ -665,10 +689,11 @@
         function resetForm() {
             document.getElementById('searchOe').value = '';
             document.getElementById('searchBrand').value = '';
+            document.getElementById('searchOrderdate').value = '';
             document.getElementById('dataContainer').style.display = 'none';
             document.getElementById('statusContainer').style.display = 'none';
             document.getElementById('emptyState').style.display = 'block';
-            document.getElementById('emptyState').textContent = '请点击"开始查询"按钮查询数据';
+            document.getElementById('emptyState').textContent = '请选择查询条件后点击"开始查询"';
             allData = [];
             groupedData = {};
             oeList = [];
