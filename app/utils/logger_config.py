@@ -76,6 +76,7 @@ TASK_LOGGERS = [
     'crm_gzbbr',                    # CRM 爬虫公共模块默认日志
     'data_gzbbr',                   # data.gzbbr 报价接口日志
     'wms_order_push',               # WMS 订单推送
+    'wms_return_items_detail',      # WMS 采购入库单明细同步（按指定字段）
     'wms_gzbbr',                    # WMS 爬虫公共模块日志
 ]
 

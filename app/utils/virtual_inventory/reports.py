@@ -33,8 +33,8 @@ FSBBR_SUPPLIER_NAMES = [
 
 def generate_virtual_inventory_compare_excel(business_date):
     """生成当天与昨天的虚拟库存对比Excel，返回下载URL"""
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    export_dir = os.path.join(project_root, 'static', 'exports')
+    # 与 excel_download.py 保持一致：使用相对路径，基于 Flask 启动目录
+    export_dir = os.path.join('static', 'exports')
     os.makedirs(export_dir, exist_ok=True)
 
     today = datetime.strptime(business_date, '%Y-%m-%d').date()
