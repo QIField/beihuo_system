@@ -7,13 +7,16 @@
 
 from flask import jsonify, request
 
+from app.core.permission.decorators import require_authentication
+
 from . import report_wx_quote_data_bp
-from app.services.report_wx_quote_data_services import weixin_decoding_result_service
 from app.services.report_wx_quote_data_services import wechat_daily_quote_detail_service
 from app.services.report_wx_quote_data_services import quote_summary_service
+from app.services.report_wx_quote_data_services import wechat_daily_quote_detail_subsidiary
 
 
 @report_wx_quote_data_bp.route('/weixin_decoding_result_list_api', methods=['GET'])
+@require_authentication()
 def weixin_decoding_result_list_api():
     """
     获取每日报价明细列表 API
@@ -78,6 +81,7 @@ def weixin_decoding_result_list_api():
 
 
 @report_wx_quote_data_bp.route('/daily_summary_list_api', methods=['GET'])
+@require_authentication()
 def daily_summary_list_api():
     """
     获取每日汇总列表 API
@@ -124,6 +128,7 @@ def daily_summary_list_api():
 
 
 @report_wx_quote_data_bp.route('/monthly_summary_list_api', methods=['GET'])
+@require_authentication()
 def monthly_summary_list_api():
     """
     获取每月汇总列表 API
@@ -165,12 +170,13 @@ def monthly_summary_list_api():
 
 
 @report_wx_quote_data_bp.route('/groupname_list_api', methods=['GET'])
+@require_authentication()
 def groupname_list_api():
     """
     获取所有群名称列表 API
     """
     try:
-        result = weixin_decoding_result_service.fetch_groupname_list()
+        result = wechat_daily_quote_detail_service.fetch_groupname_list()
         return jsonify({
             'code': 200,
             'msg': '获取群名称列表成功',
@@ -184,102 +190,72 @@ def groupname_list_api():
         })
 
 
-@report_wx_quote_data_bp.route('/nickname_list_api', methods=['GET'])
-def nickname_list_api():
-    """
-    获取所有业务员列表 API
-    """
-    try:
-        result = weixin_decoding_result_service.fetch_nickname_list()
-        return jsonify({
-            'code': 200,
-            'msg': '获取业务员列表成功',
-            'data': result
-        })
-    except Exception as e:
-        return jsonify({
-            'code': 500,
-            'msg': f'获取业务员列表失败: {str(e)}',
-            'data': None
-        })
 
 
-@report_wx_quote_data_bp.route('/get_customer_list_api', methods=['GET'])
-def get_customer_list_api():
+@report_wx_quote_data_bp.route('/search_crm_customer_api', methods=['GET'])
+@require_authentication()
+def search_crm_customer_api():
     """
-    获取客户列表 API
-    根据 OE 号和创建日期查询历史销售记录中的客户
+    搜索CRM客户 API
+    根据客户名称关键词在合作伙伴表中进行模糊搜索
     """
     try:
-        oe_code = request.args.get('oe_code', '')
-        create_date = request.args.get('create_date', '')
+        keyword = request.args.get('keyword', '')
         
         # 处理空值
-        if oe_code == '':
-            oe_code = None
-        if create_date == '':
-            create_date = None
-        
-        # 如果 OE 码和日期都没有，返回失败
-        if not oe_code and not create_date:
+        if keyword == '':
             return jsonify({
-                'code': 400,
-                'msg': 'OE码和日期不能为空',
-                'data': None
+                'code': 200,
+                'msg': '获取CRM客户列表成功',
+                'data': []
             })
         
-        result = wechat_daily_quote_detail_service.get_customer_list(
-            oe_code=oe_code,
-            create_date=create_date
-        )
+        result = wechat_daily_quote_detail_subsidiary.get_crm_customer(keyword)
         
         return jsonify({
             'code': 200,
-            'msg': '获取客户列表成功',
+            'msg': '获取CRM客户列表成功',
             'data': result
         })
     except Exception as e:
         return jsonify({
                 'code': 500,
-                'msg': f'获取客户列表失败: {str(e)}',
+                'msg': f'获取CRM客户列表失败: {str(e)}',
                 'data': None
             })
 
 
-@report_wx_quote_data_bp.route('/update_deal_info', methods=['POST'])
-def update_deal_info():
+@report_wx_quote_data_bp.route('/update_inquiry_customer_api', methods=['POST'])
+@require_authentication()
+def update_inquiry_customer_api():
     """
-    更新成交信息
+    更新询价客户 API
+    只更新 inquiry_customer_id 和 inquiry_customer 字段
+    根据 weixin_decoding_result_id 更新所有匹配的记录
     """
     try:
         from flask import request
-        quote_number = request.json.get('quote_number')
-        weixin_decoding_result_id = request.json.get('weixin_decoding_result_id')
-        deal_status = request.json.get('deal_status')
-        deal_customer = request.json.get('deal_customer')
-        deal_brand = request.json.get('deal_brand')
-        deal_amount = request.json.get('deal_amount')
+        weixin_decoding_result_id = request.json.get('weixin_decoding_result_id')  # pyright: ignore[reportOptionalMemberAccess]
+        inquiry_customer_id = request.json.get('inquiry_customer_id')  # pyright: ignore[reportOptionalMemberAccess]
+        inquiry_customer = request.json.get('inquiry_customer')  # pyright: ignore[reportOptionalMemberAccess]
         
-        if quote_number is None or weixin_decoding_result_id is None:
+        if weixin_decoding_result_id is None:
             return jsonify({
                 'code': 400,
-                'msg': 'quote_number和weixin_decoding_result_id不能为空',
+                'msg': 'weixin_decoding_result_id不能为空',
                 'data': None
             })
         
-        success = wechat_daily_quote_detail_service.update_deal_info(
-            quote_number=quote_number,
+        updated_count = wechat_daily_quote_detail_subsidiary.update_inquiry_customer(
             weixin_decoding_result_id=weixin_decoding_result_id,
-            deal_status=deal_status,
-            deal_customer=deal_customer,
-            deal_brand=deal_brand,
-            deal_amount=deal_amount
+            inquiry_customer_id=inquiry_customer_id,
+            inquiry_customer=inquiry_customer
         )
         
-        if success:
+        if updated_count > 0:
             return jsonify({
                 'code': 200,
-                'msg': '保存成功',
+                'msg': f'保存成功，更新了{updated_count}条记录',
                 'data': None
             })
         else:
@@ -297,7 +273,11 @@ def update_deal_info():
         })
 
 
-@report_wx_quote_data_bp.route('/fetch_data_and_save_to_database', methods=['POST'])
+
+
+
+@report_wx_quote_data_bp.route('/fetch_data_and_save_to_database_api', methods=['POST'])
+@require_authentication()
 def fetch_data_and_save_to_database_api():
     """
     获取并保存数据到数据库 API
@@ -305,8 +285,8 @@ def fetch_data_and_save_to_database_api():
     """
     try:
         from flask import request
-        start_date = request.json.get('start_date')
-        end_date = request.json.get('end_date')
+        start_date = request.json.get('start_date')  # pyright: ignore[reportOptionalMemberAccess]
+        end_date = request.json.get('end_date')  # pyright: ignore[reportOptionalMemberAccess]
         
         if not start_date or not end_date:
             return jsonify({
@@ -335,39 +315,49 @@ def fetch_data_and_save_to_database_api():
         })
 
 
-@report_wx_quote_data_bp.route('/batch_get_update_deal_info', methods=['POST'])
-def batch_get_update_deal_info_api():
+@report_wx_quote_data_bp.route('/generate_draft_link_api', methods=['POST'])
+@require_authentication()
+def generate_draft_link_api():
     """
-    批量更新成交信息 API
-    从 crmapp_sales_history_detail 表获取数据并批量更新成交信息
+    生成草稿链接 API
+    根据选中的配件生成草稿链接，并更新到数据库
     """
     try:
         from flask import request
-        start_date = request.json.get('start_date')
-        end_date = request.json.get('end_date')
+        weixin_decoding_result_id = request.json.get('weixin_decoding_result_id')  # pyright: ignore[reportOptionalMemberAccess]
+        items = request.json.get('items')  # pyright: ignore[reportOptionalMemberAccess]
         
-        if not start_date or not end_date:
+        if not weixin_decoding_result_id:
             return jsonify({
                 'code': 400,
-                'msg': '开始日期和结束日期不能为空',
+                'msg': 'weixin_decoding_result_id不能为空',
                 'data': None
             })
         
-        # 调用服务函数获取统计信息
-        stats = wechat_daily_quote_detail_service.batch_get_update_deal_info(
-            start_date=start_date,
-            end_date=end_date
+        if not items or not isinstance(items, list):
+            return jsonify({
+                'code': 400,
+                'msg': '请选择至少一个配件',
+                'data': None
+            })
+        
+        result = wechat_daily_quote_detail_subsidiary.generate_draft_link(
+            weixin_decoding_result_id=weixin_decoding_result_id,
+            items=items
         )
         
         return jsonify({
             'code': 200,
-            'msg': '批量更新成交信息成功',
-            'data': stats
+            'msg': '生成成功',
+            'data': {'draft_link': result}
         })
         
     except Exception as e:
         return jsonify({
             'code': 500,
-            'msg': f'批量更新成交信息失败: {str(e)}',
+            'msg': f'生成草稿链接失败: {str(e)}',
             'data': None
         })
+
+
+

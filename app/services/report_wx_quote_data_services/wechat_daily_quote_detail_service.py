@@ -8,219 +8,16 @@
 import re
 import traceback
 from datetime import datetime, timedelta
-from app.utils.orm.session import orm_session
 from app.models.orm_models.weixin_decoding_result import WeixinDecodingResult
-from app.models.orm_models.wechat_daily_quote_detail import WechatDailyQuoteDetail
+from app.utils.orm.session import orm_session
+from app.dao.wechat_daily_quote_detail_dao import WechatDailyQuoteDetailDao
 from app.models.orm_models.crmapp_sales_history_detail import CrmappSalesHistoryDetail
-
-def convert_to_database_format(records):
-    """
-    将 weixin_decoding_result 字典列表转换为 wechat_daily_quote_detail 表格式
-    
-    Args:
-        records: weixin_decoding_result 字典列表
-        
-    Returns:
-        适合插入 wechat_daily_quote_detail 表的数据列表
-    """
-    database_data = []
-    
-    for record in records:
-        # 获取源数据的 id 和 result
-        source_id = record.get('id')
-        
-        # ==========================================
-        # 第一步：解析 result 字段，获取所有报价行
-        # ==========================================
-        result_text = record.get('result', '')
-        result_array = parse_lines(result_text) if result_text else []
-        
-        # ==========================================
-        # 第二步：判断是否需要跳过第一行
-        # 通常第一行是 VIN 码或查询条件，不是报价信息
-        # ==========================================
-        should_skip_first = True
-        content = record.get('content', '')
-        if content:
-            content_lines = parse_lines(content)
-            if content_lines:
-                first_content_line = content_lines[0].strip()
-                
-                # 情况1：result 第一行与 content 第一行相同 → 跳过（通常是 VIN 码）
-                if len(result_array) > 0 and result_array[0].strip() == first_content_line:
-                    should_skip_first = True
-                
-                # 情况2：content 第一行是纯数字/字母组合 → 不跳过（可能是 OE 码查询）
-                elif re.match(r'^[A-Za-z0-9]+$', first_content_line):
-                    should_skip_first = False
-        
-        # 执行跳过操作
-        if should_skip_first and len(result_array) > 0:
-            result_array = result_array[1:]
-        
-        # ==========================================
-        # 第三步：逐行解析报价信息
-        # 每行格式示例："1、92A启停电池 (61215A14945) = 菲尔(蓄电池 AGM L5(92AH)) 800 / 菲尔(蓄电池 AGM L5 92AH) 800 / 盖茨 800 / 原厂国内4s件(92A蓄电池) 1400 / 原厂国内4s件(进口92A蓄电池) 1450"
-        # ==========================================
-        for result_item in result_array:
-            # 初始化字段
-            quote_number = None      # 报价序号
-            part_name = ''           # 配件名称
-            oe_code = ''             # OE 码
-            brand_price = ''         # 品牌价格（完整报价信息）
-            original_quote = result_item  # 原始报价（完整一行）
-            
-            # ---------- 3.0 解析序号 ----------
-            # 正则说明：匹配开头的数字+顿号/逗号/点，如 "1、" "2," "3."
-            quote_num_match = re.match(r'^(\d+)[、.,]\s*', result_item)
-            if quote_num_match:
-                quote_number = int(quote_num_match.group(1))
-            
-            # ---------- 3.1 解析配件名称 ----------
-            # 正则说明：匹配数字开头+顿号/逗号/点，然后提取到括号或等号之前的内容
-            part_name_match = re.match(r'^(?:\d+[、.,])?\s*(.*?)(?=\s*\(|=|$)', result_item)
-            if part_name_match:
-                part_name = part_name_match.group(1).strip()
-            
-            # ---------- 3.2 解析 OE 码 ----------
-            # 正则说明：匹配括号中的数字字母组合，如 (61215A14945)
-            oe_match = re.search(r'\(([A-Za-z0-9]+)\)', result_item)
-            oe_code = oe_match.group(1) if oe_match else ''
-            # 特殊处理：OE 码为 "0" 时，当作空处理
-            if oe_code == '0':
-                oe_code = ''
-            
-            # ---------- 3.3 解析报价信息 ----------
-            # 正则说明：匹配等号之后的所有内容
-            quote_match = re.search(r'=\s*(.*)$', result_item)
-            if quote_match:
-                brand_price = quote_match.group(1).strip()
-            
-            # ---------- 3.4 判断是否缺货 ----------
-            # 正则说明：匹配 "=0" 或 "= 0" 格式，表示缺货
-            is_out_of_stock = bool(re.search(r'=\s*0', result_item))
-            
-            # ==========================================
-            # 第四步：构建数据库记录
-            # ==========================================
-            db_item = {
-                'weixin_decoding_result_id': source_id,          # 微信解码结果表ID
-                'quote_number': quote_number,                    # 报价序号
-                'create_date': record.get('creation_date'),      # 创建日期（字符串格式）
-                'group_name': record.get('groupname'),           # 群名称
-                'user_name': record.get('nickname'),             # 用户昵称
-                'inquiry': content,                              # 询价内容
-                'part_name': part_name,                          # 配件名称
-                'oe_code': oe_code,                              # OE 码
-                'brand_price': brand_price,                      # 品牌价格（完整报价信息）
-                'original_quote': original_quote,                # 原始报价（完整一行）
-                'is_out_of_stock': is_out_of_stock,  # 缺货状态
-                # 成交相关字段暂时为空，后续可能需要根据其他数据填充
-                'deal_customer_id': None,
-                'deal_customer': None,
-                'deal_brand': None,
-                'deal_amount': None,
-                'deal_status': 0                                 # 成交状态：0-未知，1-成交，2-未成交
-            }
-            
-            database_data.append(db_item)
-    
-    return database_data
-
-
-def parse_lines(text):
-    """
-    按行分割文本，过滤空行
-    
-    Args:
-        text: 文本内容
-        
-    Returns:
-        行列表
-    """
-    items = []
-    
-    if not text:
-        return items
-    
-    # 按行分割
-    lines = text.strip().split('\n')
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        
-        items.append(line)
-    
-    return items
-
-
-def get_weixin_decoding_result(start_date=None, end_date=None):
-    """
-    从 weixin_decoding_result 表获取数据并转换为 wechat_daily_quote_detail 格式
-    
-    Args:
-        start_date: 开始日期 (YYYY-MM-DD)，可选
-        end_date: 结束日期 (YYYY-MM-DD)，可选
-        
-    Returns:
-        转换后的数据列表
-    """
-    records = []
-    
-    with orm_session() as session:
-        # 构建查询
-        query = session.query(WeixinDecodingResult).filter(
-            WeixinDecodingResult.result.isnot(None),
-            WeixinDecodingResult.result != ''
-        )
-        
-        # 添加时间范围筛选 - 直接比较字符串
-        if start_date:
-            # 例如 start_date='2026-01-05' → 匹配 >= '2026-01-05 00:00:00'
-            query = query.filter(WeixinDecodingResult.creation_date >= f'{start_date} 00:00:00')
-        if end_date:
-            # 例如 end_date='2026-01-05' → 匹配 <= '2026-01-05 23:59:59'
-            query = query.filter(WeixinDecodingResult.creation_date <= f'{end_date} 23:59:59')
-        
-        # 按创建时间倒序
-        query = query.order_by(WeixinDecodingResult.creation_date.desc())
-        
-        # 获取数据
-        items = query.all()
-        
-        # 转换为字典
-        for item in items:
-            records.append(item.to_dict())
-    
-    # 转换为数据库格式
-    return records
-
-
-def batch_save_to_database(data_list):
-    """
-    批量保存数据到 wechat_daily_quote_detail 表
-    以 quote_number 和 weixin_decoding_result_id 为联合索引进行插入更新
-    
-    Args:
-        data_list: 转换后的数据列表
-        
-    Returns:
-        保存的记录数
-    """
-    if not data_list:
-        return 0
-    
-    with orm_session() as session:
-        result = WechatDailyQuoteDetail.bulk_upsert(session, data_list)
-        session.commit()
-        return result
+from .weixin_decoding_result_clear import fetch_data_and_save_to_database
 
 
 def fetch_data_paged(start_date=None, end_date=None, groupname=None, nickname=None, deal_status=None, page=1, limit=20):
     """
-    从数据库获取微信日报报价详情数据（使用 ORM，带分页信息）
+    从数据库获取微信日报报价详情数据（使用原生SQL，带分页信息）
     
     Args:
         start_date: 开始日期 (YYYY-MM-DD)，可选
@@ -234,124 +31,61 @@ def fetch_data_paged(start_date=None, end_date=None, groupname=None, nickname=No
     Returns:
         包含分页信息的字典 {'result': [...], 'total': ..., 'page': ..., 'limit': ...}
     """
-    total = 0
-    
     with orm_session() as session:
-        # 先获取 distinct 的 weixin_decoding_result_id，用于分页
-        id_query = session.query(WechatDailyQuoteDetail.weixin_decoding_result_id).distinct()
+        result = WechatDailyQuoteDetailDao.fetch_data_paged(
+            session=session,
+            start_date=start_date,
+            end_date=end_date,
+            groupname=groupname,
+            nickname=nickname,
+            deal_status=deal_status,
+            page=page,
+            limit=limit
+        )
+
+    expanded_result = []
+    for record in result['result']:
+        brand_price = record.get('brand_price', '')
+        if not brand_price:
+            record['brand'] = ''
+            record['price'] = ''
+            expanded_result.append(record)
+            continue
         
-        # 添加筛选条件
-        if start_date:
-            # 例如 start_date='2026-01-05' → 匹配 >= '2026-01-05 00:00:00'
-            id_query = id_query.filter(WechatDailyQuoteDetail.create_date >= f'{start_date} 00:00:00')
-        if end_date:
-            # 例如 end_date='2026-01-05' → 匹配 <= '2026-01-05 23:59:59'
-            id_query = id_query.filter(WechatDailyQuoteDetail.create_date <= f'{end_date} 23:59:59')
-        if groupname:
-            id_query = id_query.filter(WechatDailyQuoteDetail.group_name == groupname)
-        if nickname:
-            id_query = id_query.filter(WechatDailyQuoteDetail.user_name.like(f'%{nickname}%'))
-        if deal_status is not None:
-            id_query = id_query.filter(WechatDailyQuoteDetail.deal_status == deal_status)
-        
-        # 排序
-        id_query = id_query.order_by(WechatDailyQuoteDetail.weixin_decoding_result_id.desc())
-        
-        # 获取总数
-        total = id_query.count()
-        
-        # 分页获取 id 列表
-        id_list = []
-        if page and limit:
-            offset = (page - 1) * limit
-            id_list = [row[0] for row in id_query.offset(offset).limit(limit).all()]
-        else:
-            id_list = [row[0] for row in id_query.all()]
-        
-        # 如果没有 id，直接返回
-        if not id_list:
-            items = []
-        else:
-            # 根据 id 列表获取所有详情数据
-            query = session.query(WechatDailyQuoteDetail).filter(
-                WechatDailyQuoteDetail.weixin_decoding_result_id.in_(id_list)
-            )
-            # 添加deal_status筛选条件
-            if deal_status is not None:
-                query = query.filter(WechatDailyQuoteDetail.deal_status == deal_status)
-            # 排序：weixin_decoding_result_id 降序，quote_number 升序
-            query = query.order_by(
-                WechatDailyQuoteDetail.weixin_decoding_result_id.desc(),
-                WechatDailyQuoteDetail.quote_number.asc()
-            )
-            items = query.all()
-        
-        # 转换为字典并直接分组
-        grouped_data = {}
-        for item in items:
-            record = item.to_dict()
-            result_id = record['weixin_decoding_result_id']
+        pairs = re.split(r'\s*/\s*', brand_price)
+        for i, pair in enumerate(pairs):
+            pair = pair.strip()
+            if not pair:
+                continue
+            parts = pair.rsplit(' ', 1)
+            if len(parts) == 2:
+                brand = parts[0].strip()
+                price = parts[1].strip()
+            else:
+                brand = pair.strip()
+                price = ''
             
-            if result_id not in grouped_data:
-                grouped_data[result_id] = {
-                    'content': record.get('inquiry', ''),
-                    'create_time': record.get('create_date', ''),
-                    'groupname': record.get('group_name', ''),
-                    'id': str(result_id) if result_id else '',
-                    'nickname': record.get('user_name', ''),
-                    'oe_code_list': [],
-                    'result': [],
-                    'result_details': []
-                }
-            
-            # 添加数据
-            if record.get('oe_code'):
-                grouped_data[result_id]['oe_code_list'].append(record['oe_code'])
-            
-            if record.get('original_quote'):
-                grouped_data[result_id]['result'].append(record['original_quote'])
-            
-            # 构建 result_details
-            detail = {
-                'quote_number': record.get('quote_number'),
-                'is_out_of_stock': record.get('is_out_of_stock', False),
-                'item': record.get('original_quote', ''),
-                'oe_code': record.get('oe_code', ''),
-                'part_name': record.get('part_name', ''),
-                'quote_info': record.get('brand_price', ''),
-                'deal_customer': record.get('deal_customer'),
-                'deal_brand': record.get('deal_brand'),
-                'deal_amount': record.get('deal_amount'),
-                'deal_status': record.get('deal_status', 0)
-            }
-            grouped_data[result_id]['result_details'].append(detail)
+            new_record = record.copy()
+            new_record['brand'] = brand
+            new_record['price'] = price
+            # new_record['rowId'] = f"{record['rowId']}_{i}" if i > 0 else record['rowId']
+            expanded_result.append(new_record)
+
+    result['result'] = expanded_result
     
-    # 转换为列表
-    result_list = list(grouped_data.values())
-    
-    # 返回带分页信息的数据
-    return {
-        'result': result_list,
-        'total': total,
-        'page': page or 1,
-        'limit': limit or 20
-    }
+    return result
 
 
 
 
 
 
-def get_customer_list(oe_code=None, create_date=None):
+def fetch_groupname_list():
     """
-    根据 OE 号和创建日期获取客户列表
+    获取所有群名称列表（去重）
     
-    Args:
-        oe_code: OE 码
-        create_date: 创建日期
-        
     Returns:
-        客户列表
+        群名称列表
     """
     try:
         with orm_session() as session:

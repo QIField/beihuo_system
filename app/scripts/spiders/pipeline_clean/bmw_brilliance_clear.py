@@ -306,11 +306,11 @@ def clean_material_html(html_text, oe):
         else:
             result[key] = val
 
-    # 第四步：列名重命名（与原脚本一致）
-    if '零售价' in result:
-        result['4S含税售价'] = result.pop('零售价')
-    if '经销商净值(Stock)' in result:
-        result['4S含税进价'] = result.pop('经销商净值(Stock)')
+    # # 第四步：列名重命名（与原脚本一致）
+    # if '零售价' in result:
+    #     result['4S含税售价'] = result.pop('零售价')
+    # if '经销商净值(Stock)' in result:
+    #     result['4S含税进价'] = result.pop('经销商净值(Stock)')
 
     return result
 

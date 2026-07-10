@@ -20,7 +20,8 @@
             <div class="layui-inline">
                 <label class="layui-form-label" style="width: 80px;">业务员</label>
                 <div class="layui-input-inline" style="width: 200px;">
-                    <input type="text" name="nickname" id="nickname" placeholder="输入业务员名称" autocomplete="off" class="layui-input">
+                    <input type="text" name="nickname" id="nickname" placeholder="输入业务员名称" autocomplete="off"
+                        class="layui-input">
                 </div>
             </div>
             <div class="layui-inline">
@@ -42,656 +43,698 @@
                 <button class="layui-btn layui-btn-warm" id="updateDataBtn">
                     <i class="layui-icon layui-icon-upload-drag"></i> 更新数据
                 </button>
-                <button class="layui-btn layui-btn-normal" id="autoUpdateDealBtn">
-                    <i class="layui-icon layui-icon-template-1"></i> 自动匹配成交
-                </button>
             </div>
         </div>
         <table id="weixinDecodingResultTable" lay-filter="weixinDecodingResultTable"></table>
     </div>
 </div>
 
-<script type="text/html" id="tableToolBar">
-  <div class="layui-clear-space">
-    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
-  </div>
+<script type="text/html" id="toolbarTemplate">
+  <div></div>
 </script>
 
-<script type="text/html" id="editFormTemplate">
+<script type="text/html" id="editCustomerTemplate">
   <div style="padding: 20px;">
-    <form class="layui-form" lay-filter="editForm">
-     
+    <form class="layui-form" lay-filter="editCustomerForm">
       <div class="layui-form-item">
-        <label class="layui-form-label">成交客户</label>
-        <div class="layui-input-block">
-          <input type="text" name="deal_customer" value="" placeholder="请输入成交客户" autocomplete="off" class="layui-input" id="customerInput">
+        <label class="layui-form-label">询价客户</label>
+        <div class="layui-input-block" style="margin-left: 110px;">
+          <div style="display: flex; align-items: center;">
+            <input type="text" name="inquiry_customer" value="" placeholder="请输入客户名称" autocomplete="off" class="layui-input" id="inquiryCustomerInput" style="flex: 1;">
+            <button type="button" class="layui-btn" id="searchCustomerBtn" style="margin-left: 10px;">搜索</button>
+          </div>
         </div>
       </div>
       <div class="layui-form-item">
-        <label class="layui-form-label">成交品牌</label>
+        <label class="layui-form-label">搜索结果</label>
         <div class="layui-input-block">
-          <input type="text" name="deal_brand" value="" placeholder="请输入成交品牌" autocomplete="off" class="layui-input">
-        </div>
-      </div>
-      <div class="layui-form-item">
-        <label class="layui-form-label">成交金额</label>
-        <div class="layui-input-block">
-          <input type="text" name="deal_amount" value="" placeholder="请输入成交金额" autocomplete="off" class="layui-input">
-        </div>
-      </div>
-      
-       <div class="layui-form-item">
-        <label class="layui-form-label">成交状态</label>
-        <div class="layui-input-block">
-          <select name="deal_status" lay-verify="required">
-            <option value="0">未知</option>
-            <option value="1">成交</option>
-            <option value="2">未成交</option>
+          <select name="customer_select" id="customerSelect" lay-search>
+            <option value="">请选择客户</option>
           </select>
         </div>
       </div>
       <div class="layui-form-item">
         <div class="layui-input-block">
-          <button type="button" class="layui-btn" lay-submit lay-filter="saveEdit">保存</button>
-          <button type="button" class="layui-btn layui-btn-primary" lay-submit lay-filter="cancelEdit">取消</button>
+          <button type="button" class="layui-btn" lay-submit lay-filter="saveCustomerEdit">保存</button>
+          <button type="button" class="layui-btn layui-btn-primary" lay-submit lay-filter="cancelCustomerEdit">取消</button>
         </div>
       </div>
     </form>
   </div>
 </script>
 
+<link rel="stylesheet" href="/static/soulTable/soulTable.css">
 <style>
-/* 强制表格单元格不限制高度 */
-.layui-table-cell {
-    height: auto !important;
-    overflow: visible !important;
-    white-space: normal !important;
-    word-wrap: break-word !important;
-}
-.layui-table-cell .layui-table-cell-content {
-    height: auto !important;
-    overflow: visible !important;
-}
+    .layui-table-view {
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e8e8e8;
+    }
+
+    .layui-table-header {
+        background-color: #fafafa;
+        border-bottom: 2px solid #e8e8e8;
+    }
+
+    .layui-table th {
+        font-weight: 600;
+        color: #333;
+        font-size: 13px;
+        padding: 10px 5px;
+    }
+
+    .layui-table td {
+        padding: 6px 5px;
+        font-size: 13px;
+        line-height: 1.5;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .layui-table tbody tr:hover {
+        background-color: #f5f7fa;
+    }
+
+    .draft-link-text {
+        color: #1E9FFF;
+        cursor: pointer;
+        text-decoration: underline;
+        font-size: 12px;
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .draft-link-text:hover {
+        color: #0066CC;
+        text-decoration: none;
+    }
 </style>
 
 <script>
-layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown'], function(){
-    const table = layui.table;
-    const layer = layui.layer;
-    const form = layui.form;
-    const $ = layui.jquery;
-    const laydate = layui.laydate;
-    const dropdown = layui.dropdown;
-    
-    let currentGroupname = '全部';
-    let groupnameList = [];
-    let currentDealStatus = '';
-    let dealStatusList = [
-        {title: '全部', id: ''},
-        {title: '未知', id: '0'},
-        {title: '成交', id: '1'},
-        {title: '未成交', id: '2'}
-    ];
-    
-    // 原生JS合并单元格函数
-    function mergeCellsByField(fieldName) {
-        var tableBody = document.querySelector('#weixinDecodingResultTable + .layui-table-view .layui-table-body table');
-        if (!tableBody) return;
-        
-        var rows = tableBody.querySelectorAll('tr');
-        if (rows.length === 0) return;
-        
-        for (var i = 0; i < rows.length; ) {
-            var currentRow = rows[i];
-            var currentCell = currentRow.querySelector('td[data-field="' + fieldName + '"]');
-            
-            if (!currentCell) {
-                i++;
-                continue;
-            }
-            
-            var rowData = table.cache['weixinDecodingResultTable'][i];
-            var currentRowId = rowData ? rowData['rowId'] : null;
-            
-            if (!currentRowId) {
-                i++;
-                continue;
-            }
-            
-            var rowspanCount = 1;
-            for (var j = i + 1; j < rows.length; j++) {
-                var nextRowData = table.cache['weixinDecodingResultTable'][j];
-                var nextRowId = nextRowData ? nextRowData['rowId'] : null;
-                
-                if (nextRowId === currentRowId) {
-                    rowspanCount++;
-                } else {
-                    break;
-                }
-            }
-            
-            if (rowspanCount > 1) {
-                currentCell.setAttribute('rowspan', rowspanCount);
-                currentCell.style.verticalAlign = 'middle';
-                
-                for (var k = i + 1; k < i + rowspanCount; k++) {
-                    var nextRow = rows[k];
-                    var nextCell = nextRow.querySelector('td[data-field="' + fieldName + '"]');
-                    if (nextCell) {
-                        nextCell.style.display = 'none';
-                    }
-                }
-            }
-            
-            i += rowspanCount;
-        }
-    }
-    
-    // 固定操作列
-    function fixOperationColumn() {
-        var tableView = document.querySelector('#weixinDecodingResultTable + .layui-table-view');
-        if (!tableView) return;
-        
-        var tableBody = tableView.querySelector('.layui-table-body');
-        if (!tableBody) return;
-        
-        var operationCells = tableBody.querySelectorAll('td[data-field="operation"]');
-        operationCells.forEach(function(cell) {
-            cell.style.position = 'sticky';
-            cell.style.right = '0';
-            cell.style.zIndex = '2';
-            cell.style.backgroundColor = '#fff';
-        });
-        
-        // 同步表头
-        var tableHeader = tableView.querySelector('.layui-table-header');
-        if (tableHeader) {
-            var headerCell = tableHeader.querySelector('th[data-field="operation"]');
-            if (headerCell) {
-                headerCell.style.position = 'sticky';
-                headerCell.style.right = '0';
-                headerCell.style.zIndex = '2';
-                headerCell.style.backgroundColor = '#f2f2f2';
-            }
-        }
-    }
-    
-    // 获取今天的日期
-    function getTodayDate(){
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-    
-    const todayDate = getTodayDate();
-    $('#date').val(todayDate);
-    
-    // 加载群名称列表
-    function loadGroupnameList() {
-        $.ajax({
-            url: '/new/api/report_wx_quote_data/groupname_list_api',
-            type: 'GET',
-            success: function(res) {
-                if (res.code === 200 && res.data) {
-                    groupnameList = [{title: '全部', id: '全部'}];
-                    res.data.forEach(function(groupname) {
-                        groupnameList.push({title: groupname, id: groupname});
-                    });
-                    initGroupnameDropdown();
-                }
-            }
-        });
-    }
-    
-    // 初始化群名称下拉框
-    function initGroupnameDropdown() {
-        dropdown.render({
-            elem: '#groupnameBtn',
-            data: groupnameList,
-            click: function(obj){
-                this.elem.find('span').text(obj.title);
-                currentGroupname = obj.id;
-                reloadTable();
-            }
-        });
-    }
-    
-    // 初始化成交状态下拉框
-    function initDealStatusDropdown() {
-        dropdown.render({
-            elem: '#dealStatusBtn',
-            data: dealStatusList,
-            click: function(obj){
-                this.elem.find('span').text(obj.title);
-                currentDealStatus = obj.id;
-                reloadTable();
-            }
-        });
-    }
-    
-    // 加载群名称列表
-    loadGroupnameList();
-    // 初始化成交状态下拉框
-    initDealStatusDropdown();
-    
-    // 渲染日期选择器
-    laydate.render({
-        elem: '#date',
-        type: 'date'
+    layui.config({
+        version: 'v1.9.0'
+    }).extend({
+        soulTable: '/static/soulTable/soulTable.slim',
+        tableMerge: '/static/soulTable/tableMerge'
     });
-    
-    // 渲染表格 - 默认显示当天数据
-    table.render({
-        elem: '#weixinDecodingResultTable',
-        id: 'weixinDecodingResultTable',
-        url: '/new/api/report_wx_quote_data/weixin_decoding_result_list_api',
-        method: 'get',
-        page: true,
-        limits: [5, 10, 20, 50, 100],
-        limit: 5,
-        request: {
-            pageName: 'page',
-            limitName: 'limit'
-        },
-        where: {
-            start_date: todayDate,
-            end_date: todayDate,
-            groupname: '全部',
-            nickname: $('#nickname').val(),
-            deal_status: currentDealStatus
-        },
-        parseData: function(res){
-            const originalData = res.data.result || [];
-            const expandedData = [];
-            
-            // 截取日期格式：2026-01-10 18:02:20 -> 2026-01-10
-            function formatDate(dateStr) {
-                if (!dateStr) return '';
-                return dateStr.split(' ')[0];
-            }
-            
-            originalData.forEach(function(record) {
-                const resultDetails = record.result_details || [];
-                
-                if (resultDetails.length === 0) {
-                    expandedData.push({
-                        quote_number: null,
-                        weixin_decoding_result_id: record.id,
-                        rowId: record.id,
-                        create_time: formatDate(record.create_time),
-                        groupname: record.groupname,
-                        nickname: record.nickname,
-                        content: record.content,
-                        part_name: '',
-                        oe_code: '',
-                        quote_info: '',
-                        item: '',
-                        deal_customer: '',
-                        deal_brand: '',
-                        deal_amount: '',
-                        deal_status: 0,
-                        is_out_of_stock: false
-                    });
-                } else {
-                    resultDetails.forEach(function(detail) {
-                        expandedData.push({
-                            quote_number: detail.quote_number,
-                            weixin_decoding_result_id: record.id,
-                            rowId: record.id,
-                            create_time: formatDate(record.create_time),
-                            groupname: record.groupname,
-                            nickname: record.nickname,
-                            content: record.content,
-                            item: detail.item,
-                            part_name: detail.part_name,
-                            oe_code: detail.oe_code,
-                            quote_info: detail.quote_info,
-                            deal_customer: detail.deal_customer || '',
-                            deal_brand: detail.deal_brand || '',
-                            deal_amount: detail.deal_amount || '',
-                            deal_status: detail.deal_status !== undefined ? detail.deal_status : 0,
-                            is_out_of_stock: detail.is_out_of_stock
-                        });
-                    });
-                }
-            });
-            
-            return {
-                "code": res.code === 200 ? 0 : res.code,
-                "msg": res.msg,
-                "count": res.data.total,
-                "data": expandedData
-            };
-        },
-        cols: [[
-            {field: 'create_time', title: '创建日期', width: 120},
-            {field: 'groupname', title: '群名称', width: 160},
-            {field: 'nickname', title: '用户', width: 160},
-            {field: 'content', title: '询价', minWidth: 100},
-            {field: 'part_name', title: '配件名称', width: 200},
-            {field: 'oe_code', title: 'OE码', width: 150},
-            {
-                field: 'quote_info', 
-                title: '品牌价格', 
-                width: 300,
-                templet: function(d) {
-                    if (!d.quote_info) return '';
-                    return d.quote_info.split(/\s*\/\s*/).join('<br>');
-                }
-            },
-            {field: 'item', title: '原始报价', minWidth: 300},
-            {
-                title: '缺货', 
-                width: 80, 
-                templet: function(d){
-                    const color = d.is_out_of_stock ? 'red' : 'green';
-                    const text = d.is_out_of_stock ? '是' : '否';
-                    return '<span style="color: ' + color + ';">' + text + '</span>';
-                }
-            },
-            {
-                title: '成交状态', 
-                width: 100, 
-                templet: function(d){
-                    const statusMap = {0: '未知', 1: '成交', 2: '未成交'};
-                    const colorMap = {0: 'gray', 1: 'green', 2: 'red'};
-                    const status = d.deal_status !== undefined ? d.deal_status : 0;
-                    const color = colorMap[status];
-                    const text = statusMap[status];
-                    return '<span style="color: ' + color + ';">' + text + '</span>';
-                }
-            },
-            {field: 'deal_customer', title: '成交客户', minWidth: 120},
-            {field: 'deal_brand', title: '成交品牌', minWidth: 120},
-            {field: 'deal_amount', title: '成交金额', minWidth: 120, templet: function(d){
-                if(d.deal_amount){
-                    return d.deal_amount;
-                }
-                return '';
-            }},
-            {field: 'operation', title: '操作', width: 100, templet: '#tableToolBar'}
-        ]],
-        height: 'full-250',
-        done: function(res, curr, count) {
-            setTimeout(function() {
-                mergeCellsByField('create_time');
-                mergeCellsByField('groupname');
-                mergeCellsByField('nickname');
-                mergeCellsByField('content');
-                fixOperationColumn();
-            }, 100);
+
+    layui.use(['table', 'layer', 'form', 'jquery', 'laydate', 'dropdown', 'soulTable', 'tableMerge'], function () {
+        const table = layui.table;
+        const layer = layui.layer;
+        const form = layui.form;
+        const $ = layui.jquery;
+        const laydate = layui.laydate;
+        const dropdown = layui.dropdown;
+        const soulTable = layui.soulTable;
+        const tableMerge = layui.tableMerge;
+
+        let currentGroupname = '全部';
+        let groupnameList = [];
+        let currentDealStatus = '';
+        let dealStatusList = [
+            { title: '全部', id: '' },
+            { title: '未知', id: '0' },
+            { title: '成交', id: '1' },
+            { title: '未成交', id: '2' }
+        ];
+
+        function getTodayDate() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
-    });
-    
-    // 刷新表格（回到第一页）
-    function reloadTable(){
-        const selectedDate = $('#date').val();
-        table.reload('weixinDecodingResultTable', {
-            where: {
-                start_date: selectedDate,
-                end_date: selectedDate,
-                groupname: currentGroupname,
-                nickname: $('#nickname').val(),
-                deal_status: currentDealStatus
-            },
-            page: {
-                curr: 1
-            }
-        });
-    }
-    
-    // 刷新当前页（保持当前页码）
-    function reloadCurrentPage(){
-        const selectedDate = $('#date').val();
-        table.reload('weixinDecodingResultTable', {
-            where: {
-                start_date: selectedDate,
-                end_date: selectedDate,
-                groupname: currentGroupname,
-                nickname: $('#nickname').val(),
-                deal_status: currentDealStatus
-            }
-        });
-    }
-    
-    // 查询按钮
-    $('#searchBtn').off().on('click', function(){
-        reloadTable();
-    });
-    
-    // 重置按钮 - 恢复当天日期和全部群、清空业务员、清空成交状态
-    $('#resetBtn').off().on('click', function(){
-        const today = getTodayDate();
-        $('#date').val(today);
-        $('#groupnameBtn span').text('全部');
-        currentGroupname = '全部';
-        $('#nickname').val('');
-        $('#dealStatusBtn span').text('全部');
-        currentDealStatus = '';
-        reloadTable();
-    });
-    
-    // 更新数据按钮
-    $('#updateDataBtn').off().on('click', function(){
-        const selectedDate = $('#date').val();
-        
-        if (!selectedDate) {
-            layer.msg('请先选择日期', {icon: 2});
-            return;
-        }
-        
-        layer.confirm('确定要更新日期为 ' + selectedDate + ' 的数据吗？', {
-            icon: 3,
-            title: '确认更新'
-        }, function(index){
-            layer.close(index);
-            
-            // 显示加载层
-            const loadingIndex = layer.load(1, {
-                shade: [0.3, '#000']
-            });
-            
+
+        const todayDate = getTodayDate();
+        $('#date').val(todayDate);
+
+        // 加载群名称列表
+        function loadGroupnameList() {
             $.ajax({
-                url: '/new/api/report_wx_quote_data/fetch_data_and_save_to_database',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    start_date: selectedDate,
-                    end_date: selectedDate
-                }),
-                success: function(res) {
-                    layer.close(loadingIndex);
-                    if (res.code === 200) {
-                        layer.msg('数据更新成功', {icon: 1});
-                        // 刷新表格
-                        reloadTable();
-                    } else {
-                        layer.msg(res.msg || '数据更新失败', {icon: 2});
-                    }
-                },
-                error: function(xhr, status, error) {
-                    layer.close(loadingIndex);
-                    layer.msg('数据更新失败: ' + error, {icon: 2});
-                }
-            });
-        });
-    });
-    
-    // 自动匹配成交按钮
-    $('#autoUpdateDealBtn').off().on('click', function(){
-        const selectedDate = $('#date').val();
-        
-        if (!selectedDate) {
-            layer.msg('请先选择日期', {icon: 2});
-            return;
-        }
-        
-        layer.confirm('确定要对 ' + selectedDate + ' 的数据自动匹配成交信息吗？<br><br>处理规则：<br>1. 缺货的记录直接标记为未成交<br>2. 根据 OE 码和日期从 crmapp_sales_history_detail 表查找匹配记录<br>3. 找到且仅找到 1 条匹配记录时，自动回填成交信息（标记为成交）<br>4. 未找到匹配记录时，标记为未成交<br>5. 找到多条匹配记录时，保持状态不变<br>6. 无 OE 码的记录跳过处理', {
-            icon: 3,
-            title: '确认自动匹配'
-        }, function(index){
-            layer.close(index);
-            
-            // 显示加载层
-            const loadingIndex = layer.load(1, {
-                shade: [0.3, '#000']
-            });
-            
-            $.ajax({
-                url: '/new/api/report_wx_quote_data/batch_get_update_deal_info',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    start_date: selectedDate,
-                    end_date: selectedDate
-                }),
-                success: function(res) {
-                    layer.close(loadingIndex);
-                    if (res.code === 200) {
-                        const stats = res.data || {};
-                        const msg = `自动匹配成交完成！<br><br>总记录数：${stats.total || 0}<br>成功更新：${stats.updated || 0}<br>未找到匹配：${stats.not_found || 0}<br>多条匹配：${stats.multi_found || 0}<br>无OE码：${stats.no_oe_code || 0}<br>失败：${stats.failed || 0}`;
-                        layer.alert(msg, {icon: 1, title: '处理完成'});
-                        // 刷新表格
-                        reloadTable();
-                    } else {
-                        layer.msg(res.msg || '自动匹配成交失败', {icon: 2});
-                    }
-                },
-                error: function(xhr, status, error) {
-                    layer.close(loadingIndex);
-                    layer.msg('自动匹配成交失败: ' + error, {icon: 2});
-                }
-            });
-        });
-    });
-    
-    // 表格工具事件监听
-    table.on('tool(weixinDecodingResultTable)', function(obj){
-        const data = obj.data;
-        
-        if(obj.event === 'edit'){
-            // 先请求获取客户数据，再打开弹窗
-            $.ajax({
-                url: '/new/api/report_wx_quote_data/get_customer_list_api',
+                url: '/new/api/report_wx_quote_data/groupname_list_api',
                 type: 'GET',
-                data: {
-                    oe_code: data.oe_code || '',
-                    row_id: data.rowId || '',
-                    create_date: data.create_time || ''
+                success: function (res) {
+                    if (res.code === 200 && res.data) {
+                        groupnameList = [{ title: '全部', id: '全部' }];
+                        res.data.forEach(function (groupname) {
+                            groupnameList.push({ title: groupname, id: groupname });
+                        });
+                        initGroupnameDropdown();
+                    }
+                }
+            });
+        }
+
+        // 初始化群名称下拉框
+        function initGroupnameDropdown() {
+            dropdown.render({
+                elem: '#groupnameBtn',
+                data: groupnameList,
+                click: function (obj) {
+                    this.elem.find('span').text(obj.title);
+                    currentGroupname = obj.id;
+                    reloadTable();
+                }
+            });
+        }
+
+        // 初始化成交状态下拉框
+        function initDealStatusDropdown() {
+            dropdown.render({
+                elem: '#dealStatusBtn',
+                data: dealStatusList,
+                click: function (obj) {
+                    this.elem.find('span').text(obj.title);
+                    currentDealStatus = obj.id;
+                    reloadTable();
+                }
+            });
+        }
+
+        // 加载群名称列表
+        loadGroupnameList();
+        // 初始化成交状态下拉框
+        initDealStatusDropdown();
+
+        // 渲染日期选择器
+        laydate.render({
+            elem: '#date',
+            type: 'date'
+        });
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            return dateStr.split(' ')[0];
+        }
+
+        table.render({
+            elem: '#weixinDecodingResultTable',
+            id: 'weixinDecodingResultTable',
+            url: '/new/api/report_wx_quote_data/weixin_decoding_result_list_api',
+            method: 'get',
+            page: true,
+            limits: [5, 10, 20, 50, 100],
+            limit: 5,
+            toolbar: '#toolbarTemplate',
+            defaultToolbar: ['filter', 'exports'],
+            request: {
+                pageName: 'page',
+                limitName: 'limit'
+            },
+            where: {
+                start_date: todayDate,
+                end_date: todayDate,
+                groupname: '全部',
+                nickname: $('#nickname').val(),
+                deal_status: currentDealStatus
+            },
+            parseData: function (res) {
+                const originalData = res.data.result || [];
+                const formattedData = originalData.map(function (record) {
+                    record.rowId = record.rowId || (record.weixin_decoding_result_id ? String(record.weixin_decoding_result_id) : '');
+                    record.is_out_of_stock = record.is_out_of_stock || false;
+                    record.deal_status = record.deal_status !== undefined ? record.deal_status : 0;
+                    record.quantity = record.quantity || 0;
+                    return record;
+                });
+
+                return {
+                    "code": res.code === 200 ? 0 : res.code,
+                    "msg": res.msg,
+                    "count": res.data.total,
+                    "data": formattedData
+                };
+            },
+            cols: [[
+                { field: 'create_date', title: '创建日期', width: 120, merge: 'rowId', templet: function (d) { return formatDate(d.create_date); } },
+                { field: 'group_name', title: '群名称', width: 160, merge: 'rowId' },
+                { field: 'user_name', title: '用户', width: 160, merge: 'rowId' },
+                {
+                    field: 'inquiry_customer',
+                    title: '询价客户',
+                    minWidth: 200,
+                    merge: 'rowId',
+                    templet: function (d) {
+                        return '<div style="position:relative;min-height:24px;">' +
+                            '<a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="editCustomer" style="float:right;margin-left:5px;"><i class="layui-icon layui-icon-edit"></i></a>' +
+                            '<span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (d.inquiry_customer || '') + '</span>' +
+                            '</div>';
+                    }
                 },
-                success: function(res){
-                    // 打开编辑弹窗
-                    layer.open({
-                        title: '编辑报价明细 - ID: ' + data.rowId,
-                        type: 1,
-                        area: ['800px', '600px'],
-                        content: $('#editFormTemplate').html(),
-                        success: function(layero, index){
-                            // 设置表单值
-                            layero.find('select[name="deal_status"]').val(data.deal_status !== undefined ? data.deal_status : 0);
-                            layero.find('input[name="deal_customer"]').val(data.deal_customer || '');
-                            layero.find('input[name="deal_brand"]').val(data.deal_brand || '');
-                            layero.find('input[name="deal_amount"]').val(data.deal_amount || '');
-                            
-                            // 渲染表单
-                            form.render();
-                            
-                            // 成交客户选择 - 使用 dropdown 组件
-                            const customerInput = layero.find('#customerInput');
-                            
-                            // 从API返回获取客户数据
-                            let customerData = [];
-                            if(res.code === 200 && res.data && res.data.length > 0){
-                                // 转换数据格式，添加title字段供dropdown使用
-                                customerData = res.data.map(function(item){
-                                    return {
-                                        id: item.id,
-                                        title: item.fullname,
-                                        fullname: item.fullname,
-                                        total_price: item.total_price,
-                                        brand_name: item.brand_name
-                                    };
-                                });
-                            }
-                            
-                            // 输入框点击时显示下拉选择
-                            customerInput.on('click', function(){
-                                if(customerData.length > 0){
-                                    dropdown.render({
-                                        elem: customerInput,
-                                        data: customerData,
-                                        show: true,
-                                        click: function(obj){
-                                        customerInput.val(obj.fullname);
-                                        layero.find('input[name="deal_brand"]').val(obj.brand_name || '');
-                                        layero.find('input[name="deal_amount"]').val(obj.total_price || '');
-                                        layero.find('select[name="deal_status"]').val(1);  // 选择客户后自动设置为成交
-                                        form.render();  // 重新渲染表单
-                                        dropdown.close(customerInput);
-                                    }
-                                    });
-                                } else {
-                                    layer.msg('暂无客户数据');
-                                }
-                            });
-                            
-                            // 保存按钮事件
-                            form.on('submit(saveEdit)', function(formData){
-                                if(data.quote_number === null || data.weixin_decoding_result_id === null){
-                                    layer.msg('缺少必要参数，无法保存');
-                                    return false;
-                                }
-                                
-                                // 获取表单数据
-                                const deal_status = parseInt(layero.find('select[name="deal_status"]').val());
-                                const deal_customer = layero.find('input[name="deal_customer"]').val();
-                                const deal_brand = layero.find('input[name="deal_brand"]').val();
-                                const deal_amount = layero.find('input[name="deal_amount"]').val();
-                                
-                                // 调用API保存
-                                $.ajax({
-                                    url: '/new/api/report_wx_quote_data/update_deal_info',
-                                    type: 'POST',
-                                    contentType: 'application/json',
-                                    data: JSON.stringify({
-                                        quote_number: data.quote_number,
-                                        weixin_decoding_result_id: data.weixin_decoding_result_id,
-                                        deal_status: deal_status,
-                                        deal_customer: deal_customer,
-                                        deal_brand: deal_brand,
-                                        deal_amount: deal_amount
-                                    }),
-                                    success: function(res){
-                                        if(res.code === 200){
-                                            layer.msg('保存成功');
-                                            layer.close(index);
-                                            reloadCurrentPage();
-                                        } else {
-                                            layer.msg(res.msg || '保存失败');
-                                        }
-                                    },
-                                    error: function(){
-                                        layer.msg('保存失败');
-                                    }
-                                });
-                                
-                                return false;
-                            });
-                            
-                            // 取消按钮事件
-                            form.on('submit(cancelEdit)', function(){
-                                layer.close(index);
-                            });
+                { field: 'inquiry', title: '询价', minWidth: 100, merge: 'rowId' },
+                { field: 'original_quote', merge: ['rowId', 'original_quote'], title: '原始报价', minWidth: 300 },
+                {
+                    field: 'is_out_of_stock',
+                    title: '缺货',
+                    width: 80,
+                    merge: ['rowId', 'original_quote'],
+                    templet: function (d) {
+                        const color = d.is_out_of_stock ? 'red' : 'green';
+                        const text = d.is_out_of_stock ? '是' : '否';
+                        return '<span style="color: ' + color + ';">' + text + '</span>';
+                    }
+                },
+                { field: 'oe_code', title: 'OE码', width: 150, merge: ['rowId', 'original_quote'] },
+                { field: 'part_name', title: '配件名称', width: 200, merge: ['rowId', 'original_quote'] },
+
+
+                {
+                    field: 'brand',
+                    title: '品牌',
+                    width: 220,
+                    templet: function (d) {
+                        var index = d.LAY_TABLE_INDEX !== undefined ? d.LAY_TABLE_INDEX : (d.id || '');
+                        return '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+                            '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (d.brand || '') + '</span>' +
+                            '<div style="display:flex;align-items:center;margin-left:5px;">' +
+                            '<button class="layui-btn layui-btn-xs layui-btn-primary" style="width:22px;height:22px;line-height:20px;padding:0;" data-idx="' + index + '" data-action="minus">-</button>' +
+                            '<input type="text" value="' + (d.quantity || 0) + '" style="width:36px;height:22px;line-height:20px;text-align:center;border:1px solid #e6e6e6;border-left:none;border-right:none;font-size:12px;" data-idx="' + index + '" data-action="quantity" readonly>' +
+                            '<button class="layui-btn layui-btn-xs layui-btn-primary" style="width:22px;height:22px;line-height:20px;padding:0;" data-idx="' + index + '" data-action="plus">+</button>' +
+                            '</div>' +
+                            '</div>';
+                    }
+                },
+                { field: 'price', title: '价格', width: 100 },
+
+
+                {
+                    field: 'draft_link', title: '草稿链接', width: 400, merge: 'rowId', templet: function (d) {
+                        var html = '';
+                        if (d.draft_link) {
+                            html += '<span class="draft-link-text" data-link="' + d.draft_link + '" title="点击复制，双击打开">' + d.draft_link + '</span>';
                         }
-                    });
+                        html += '<button class="layui-btn layui-btn-xs layui-btn-normal" lay-event="generateDraftLink" style="margin-left:5px;">生成链接</button>';
+                        return html;
+                    }
                 },
-                error: function(){
-                    layer.msg('获取客户数据失败');
+
+                {
+                    field: 'deal_status',
+                    title: '成交状态',
+                    width: 100,
+                    merge: ['rowId', 'original_quote'],
+                    templet: function (d) {
+                        const statusMap = { 0: '未知', 1: '成交', 2: '未成交' };
+                        const colorMap = { 0: 'gray', 1: 'green', 2: 'red' };
+                        const status = d.deal_status !== undefined ? d.deal_status : 0;
+                        const color = colorMap[status];
+                        const text = statusMap[status];
+                        return '<span style="color: ' + color + ';">' + text + '</span>';
+                    }
+                },
+                { field: 'deal_customer', title: '成交客户', minWidth: 120, merge: ['rowId', 'original_quote'] },
+                { field: 'deal_brand', title: '成交品牌', minWidth: 120, merge: ['rowId', 'original_quote'] },
+                {
+                    field: 'deal_amount', title: '成交金额', minWidth: 120,
+                    merge: ['rowId', 'original_quote'],
+
+                    templet: function (d) {
+                        if (d.deal_amount) {
+                            return d.deal_amount;
+                        }
+                        return '';
+                    }
+                },
+
+
+            ]],
+            height: 'full-250',
+            done: function (res, curr, count) {
+                soulTable.render(this);
+                tableMerge.render(this);
+                bindQuantityEvents();
+                bindDraftLinkEvents();
+            }
+        });
+
+        function bindQuantityEvents() {
+            var tableElem = $('#weixinDecodingResultTable').next('.layui-table-view');
+
+            tableElem.off('click', '[data-action="plus"]').on('click', '[data-action="plus"]', function () {
+                var btn = $(this);
+                var tr = btn.closest('tr');
+                var index = tr.data('index');
+                var cache = layui.table.cache['weixinDecodingResultTable'];
+                if (cache[index]) {
+                    cache[index].quantity = (cache[index].quantity || 0) + 1;
+                    btn.siblings('[data-action="quantity"]').val(cache[index].quantity);
+                }
+            });
+
+            tableElem.off('click', '[data-action="minus"]').on('click', '[data-action="minus"]', function () {
+                var btn = $(this);
+                var tr = btn.closest('tr');
+                var index = tr.data('index');
+                var cache = layui.table.cache['weixinDecodingResultTable'];
+                if (cache[index]) {
+                    var qty = (cache[index].quantity || 0) - 1;
+                    if (qty < 0) qty = 0;
+                    cache[index].quantity = qty;
+                    btn.siblings('[data-action="quantity"]').val(qty);
+                }
+            });
+        }
+
+        function reloadTable() {
+            const selectedDate = $('#date').val();
+            table.reload('weixinDecodingResultTable', {
+                where: {
+                    start_date: selectedDate,
+                    end_date: selectedDate,
+                    groupname: currentGroupname,
+                    nickname: $('#nickname').val(),
+                    deal_status: currentDealStatus
+                },
+                page: {
+                    curr: 1
+                }
+            });
+        }
+
+        function reloadCurrentPage() {
+            const selectedDate = $('#date').val();
+            table.reload('weixinDecodingResultTable', {
+                where: {
+                    start_date: selectedDate,
+                    end_date: selectedDate,
+                    groupname: currentGroupname,
+                    nickname: $('#nickname').val(),
+                    deal_status: currentDealStatus
+                }
+            });
+        }
+
+        function bindDraftLinkEvents() {
+            var tableElem = $('#weixinDecodingResultTable').next('.layui-table-view');
+            tableElem.off('click', '.draft-link-text').on('click', '.draft-link-text', function (e) {
+                e.stopPropagation();
+                var link = $(this).attr('data-link');
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(link).then(function () {
+                        layer.msg('链接已复制', { icon: 1, time: 1500 });
+                    }).catch(function () {
+                        fallbackCopy(link);
+                    });
+                } else {
+                    fallbackCopy(link);
+                }
+            });
+            tableElem.off('dblclick', '.draft-link-text').on('dblclick', '.draft-link-text', function (e) {
+                e.stopPropagation();
+                var link = $(this).attr('data-link');
+                window.open(link, '_blank');
+            });
+        }
+
+        function fallbackCopy(text) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            textArea.style.top = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                var successful = document.execCommand('copy');
+                if (successful) {
+                    layer.msg('链接已复制', { icon: 1, time: 1500 });
+                } else {
+                    layer.msg('复制失败，请手动复制', { icon: 2 });
+                }
+            } catch (err) {
+                layer.msg('复制失败，请手动复制', { icon: 2 });
+            }
+            document.body.removeChild(textArea);
+        }
+
+        $('#searchBtn').off().on('click', function () {
+            reloadTable();
+        });
+
+        $('#resetBtn').off().on('click', function () {
+            const today = getTodayDate();
+            $('#date').val(today);
+            $('#groupnameBtn span').text('全部');
+            currentGroupname = '全部';
+            $('#nickname').val('');
+            $('#dealStatusBtn span').text('全部');
+            currentDealStatus = '';
+            reloadTable();
+        });
+
+        $('#updateDataBtn').off().on('click', function () {
+            const selectedDate = $('#date').val();
+
+            if (!selectedDate) {
+                layer.msg('请先选择日期', { icon: 2 });
+                return;
+            }
+
+            layer.confirm('确定要更新日期为 ' + selectedDate + ' 的数据吗？', {
+                icon: 3,
+                title: '确认更新'
+            }, function (index) {
+                layer.close(index);
+
+                const loadingIndex = layer.load(1, {
+                    shade: [0.3, '#000']
+                });
+
+                $.ajax({
+                    url: '/new/api/report_wx_quote_data/fetch_data_and_save_to_database',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        start_date: selectedDate,
+                        end_date: selectedDate
+                    }),
+                    success: function (res) {
+                        layer.close(loadingIndex);
+                        if (res.code === 200) {
+                            layer.msg('数据更新成功', { icon: 1 });
+                            reloadTable();
+                        } else {
+                            layer.msg(res.msg || '数据更新失败', { icon: 2 });
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        layer.close(loadingIndex);
+                        layer.msg('数据更新失败: ' + error, { icon: 2 });
+                    }
+                });
+            });
+        });
+
+        table.on('tool(weixinDecodingResultTable)', function (obj) {
+            const data = obj.data;
+
+            if (obj.event === 'editCustomer') {
+                layer.open({
+                    title: '编辑询价客户',
+                    type: 1,
+                    area: ['500px', '350px'],
+                    content: $('#editCustomerTemplate').html(),
+                    success: function (layero, index) {
+                        layero.find('input[name="inquiry_customer"]').val(data.inquiry_customer || '');
+
+                        form.render();
+
+                        const inquiryCustomerInput = layero.find('#inquiryCustomerInput');
+                        const searchCustomerBtn = layero.find('#searchCustomerBtn');
+                        const customerSelect = layero.find('#customerSelect');
+                        let selectedCustomerId = null;
+
+                        searchCustomerBtn.on('click', function () {
+                            const keyword = inquiryCustomerInput.val().trim();
+                            if (!keyword) {
+                                layer.msg('请输入客户名称');
+                                return;
+                            }
+
+                            $.ajax({
+                                url: '/new/api/report_wx_quote_data/search_crm_customer_api',
+                                type: 'GET',
+                                data: {
+                                    keyword: keyword
+                                },
+                                success: function (res) {
+                                    customerSelect.empty();
+                                    customerSelect.append('<option value="">请选择客户</option>');
+
+                                    if (res.code === 200 && res.data && res.data.length > 0) {
+                                        res.data.forEach(function (item) {
+                                            let displayText = item.fullname;
+                                            if (item.short_name) {
+                                                displayText += ' (' + item.short_name + ')';
+                                            }
+                                            if (item.contacts_phone) {
+                                                displayText += ' - ' + item.contacts_phone;
+                                            }
+                                            const optionValue = JSON.stringify({
+                                                partner_id: item.partner_id,
+                                                fullname: item.fullname
+                                            }).replace(/"/g, '&quot;');
+                                            customerSelect.append('<option value="' + optionValue + '">' + displayText + '</option>');
+                                        });
+                                    } else {
+                                        customerSelect.append('<option value="">未找到匹配客户</option>');
+                                    }
+                                    form.render('select');
+                                    if (res.code === 200 && res.data && res.data.length > 0) {
+                                        customerSelect.next('.layui-form-select').find('.layui-select-title').click();
+                                    }
+                                },
+                                error: function () {
+                                    layer.msg('搜索失败');
+                                }
+                            });
+                        });
+
+
+
+                        form.on('submit(saveCustomerEdit)', function () {
+                            if (data.weixin_decoding_result_id === null) {
+                                layer.msg('缺少必要参数，无法保存');
+                                return false;
+                            }
+
+                            const customerSelectValue = customerSelect.val();
+                            if (!customerSelectValue) {
+                                layer.msg('请先搜索并选择客户');
+                                return false;
+                            }
+
+                            let submitCustomerId = null;
+                            let submitCustomerName = '';
+                            try {
+                                const customerData = JSON.parse(customerSelectValue);
+                                submitCustomerId = customerData.partner_id;
+                                submitCustomerName = customerData.fullname;
+                            } catch (e) {
+                                submitCustomerName = customerSelectValue;
+                            }
+
+                            $.ajax({
+                                url: '/new/api/report_wx_quote_data/update_inquiry_customer_api',
+                                type: 'POST',
+                                contentType: 'application/json',
+                                data: JSON.stringify({
+                                    weixin_decoding_result_id: data.weixin_decoding_result_id,
+                                    inquiry_customer_id: submitCustomerId,
+                                    inquiry_customer: submitCustomerName
+                                }),
+                                success: function (res) {
+                                    if (res.code === 200) {
+                                        layer.msg('保存成功');
+                                        layer.close(index);
+                                        reloadCurrentPage();
+                                    } else {
+                                        layer.msg(res.msg || '保存失败');
+                                    }
+                                },
+                                error: function () {
+                                    layer.msg('保存失败');
+                                }
+                            });
+
+                            return false;
+                        });
+
+                        form.on('submit(cancelCustomerEdit)', function () {
+                            layer.close(index);
+                        });
+                    }
+                });
+            } else if (obj.event === 'generateDraftLink') {
+                handleGenerateDraftLink(obj);
+            }
+        });
+
+        function handleGenerateDraftLink(obj) {
+            var data = obj.data;
+            var weixinDecodingResultId = data.weixin_decoding_result_id;
+
+            var cache = layui.table.cache['weixinDecodingResultTable'];
+            var selectedItems = [];
+
+            for (var i = 0; i < cache.length; i++) {
+                var row = cache[i];
+                if (row.weixin_decoding_result_id === weixinDecodingResultId &&
+                    row.quantity && row.quantity > 0) {
+                    selectedItems.push({
+                        oe_code: row.oe_code,
+                        brand: row.brand,
+                        price: row.price,
+                        quantity: row.quantity,
+                        is_out_of_stock: row.is_out_of_stock
+                    });
+                }
+            }
+
+            if (selectedItems.length === 0) {
+                layer.msg('请先选择至少一个配件的数量', { icon: 2 });
+                return;
+            }
+
+            var hasDealStatus1 = false;
+            for (var i = 0; i < cache.length; i++) {
+                if (cache[i].weixin_decoding_result_id === weixinDecodingResultId) {
+                    if (cache[i].deal_status == 1) {
+                        hasDealStatus1 = true;
+                        break;
+                    }
+                }
+            }
+            if (hasDealStatus1) {
+                layer.msg('已成交的订单不能生成草稿链接', { icon: 2 });
+                return;
+            }
+
+            var hasOutOfStock = selectedItems.some(function(item) {
+                return item.is_out_of_stock == true;
+            });
+            if (hasOutOfStock) {
+                layer.msg('包含缺货的配件，不能生成草稿链接', { icon: 2 });
+                return;
+            }
+
+            var btn = obj.tr.find('[lay-event="generateDraftLink"]');
+            var originalText = btn.text();
+            btn.prop('disabled', true).text('生成中...').addClass('layui-btn-disabled');
+
+            $.ajax({
+                url: '/new/api/report_wx_quote_data/generate_draft_link_api',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    weixin_decoding_result_id: weixinDecodingResultId,
+                    items: selectedItems
+                }),
+                success: function (res) {
+                    btn.prop('disabled', false).text(originalText).removeClass('layui-btn-disabled');
+                    if (res.code === 200 && res.data && res.data.draft_link) {
+                        var draftLink = res.data.draft_link;
+                        for (var i = 0; i < cache.length; i++) {
+                            if (cache[i].weixin_decoding_result_id === weixinDecodingResultId) {
+                                cache[i].draft_link = draftLink;
+                            }
+                        }
+                        layer.msg('生成成功', { icon: 1 });
+                        reloadCurrentPage();
+                    } else {
+                        layer.msg(res.msg || '生成失败', { icon: 2 });
+                    }
+                },
+                error: function (xhr, status, error) {
+                    layer.msg('生成失败: ' + error, { icon: 2 });
+                    btn.prop('disabled', false).text(originalText).removeClass('layui-btn-disabled');
                 }
             });
         }
     });
-});
 </script>

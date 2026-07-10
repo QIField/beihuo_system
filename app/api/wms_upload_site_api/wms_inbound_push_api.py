@@ -109,7 +109,7 @@ def cassmall_product_list_search_api():
 @wms_upload_site_bp.route('/inventory_sync_api', methods=['GET'])
 def inventory_sync_api():
     """
-    同步卡思mall库存 API
+    同步开思mall库存 API
     :return: JSON 响应
     """
     try:
