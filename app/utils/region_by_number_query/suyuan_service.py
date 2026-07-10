@@ -100,7 +100,7 @@ def get_suyuan_statistics(md=None):
         dict_list = KsSuyuanma.list_to_dict_list(results)
         return dict_list
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
-    a=query_suyuan_data('fs','','')
-    print(a)
+#     a=query_suyuan_data('fs','','')
+#     print(a)
