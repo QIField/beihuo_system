@@ -3707,7 +3707,6 @@ function bindEventHandlers(myTable, form, table) {
                             .ep-tab { padding: 12px 4px; margin-right: 24px; cursor: pointer; font-size: 14px; color: #595959; border-bottom: 2px solid transparent; transition: all 0.2s; user-select: none; }
                             .ep-tab:hover { color: #262626; }
                             .ep-tab.active { color: #1890ff; border-bottom-color: #1890ff; font-weight: 500; }
-                            .ep-tab.disabled { color: #bfbfbf; cursor: not-allowed; }
                             .ep-body { flex: 1; padding: 24px; overflow-y: auto; }
                             .ep-panel { display: none; }
                             .ep-panel.active { display: block; }
@@ -3828,21 +3827,21 @@ function bindEventHandlers(myTable, form, table) {
                         var currentTaskId = null;
                         var currentTaskData = null;
 
-                        // 根据用户权限控制 Tab 显示
+                        // 根据用户权限控制 Tab 显示，无权限直接隐藏
                         var canProcessOrders = window.currentUserPermissions && window.currentUserPermissions.can_process_orders;
                         var canUpdateCrm = window.currentUserPermissions && window.currentUserPermissions.can_update_crm;
                         if (!canProcessOrders) {
-                            document.getElementById('tabOrder').classList.add('disabled');
+                            document.getElementById('tabOrder').style.display = 'none';
                         }
                         if (!canUpdateCrm) {
-                            document.getElementById('tabUpdateCrm').classList.add('disabled');
+                            document.getElementById('tabUpdateCrm').style.display = 'none';
                         }
 
                         // Tab 切换
                         var tabs = layero[0].querySelectorAll('.ep-tab');
                         tabs.forEach(function(tab) {
                             tab.addEventListener('click', function() {
-                                if (tab.classList.contains('disabled')) return;
+                                if (tab.style.display === 'none') return;
                                 var target = tab.getAttribute('data-tab');
                                 if (target === currentTab) return;
 

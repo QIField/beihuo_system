@@ -2494,7 +2494,7 @@ def get_users():
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
     # 获取所有用户信息（不包括密码）
-    cursor.execute("SELECT id, username, is_admin, store, can_delete_cart, can_process_orders, department, job_level, ip_records, allowed_orgs, can_inquiry_module, can_compare_module FROM crmapp_users ORDER BY id")
+    cursor.execute("SELECT id, username, is_admin, store, can_delete_cart, can_process_orders, department, job_level, ip_records, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm FROM crmapp_users ORDER BY id")
     users = cursor.fetchall()
     
     # 添加门店名称和处理权限字段
