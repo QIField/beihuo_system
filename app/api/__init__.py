@@ -57,6 +57,10 @@ api_bp.register_blueprint(system_management_bp)
 from .wms_kanban_api import wms_kanban_api_bp
 api_bp.register_blueprint(wms_kanban_api_bp)
 
+from .task_manager_api import task_manager_bp
+api_bp.register_blueprint(task_manager_bp)
+
+
 
 
 __all__ = ["api_bp"]
