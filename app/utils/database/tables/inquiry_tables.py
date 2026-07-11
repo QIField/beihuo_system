@@ -156,6 +156,8 @@ def init_price_inquiry_direct_table():
                 supplier VARCHAR(200) DEFAULT NULL COMMENT '供应商',
                 price DECIMAL(10,2) DEFAULT NULL COMMENT '价格（加价后）',
                 original_price DECIMAL(10,2) DEFAULT NULL COMMENT '原始价格',
+                markup_rate DECIMAL(6,4) DEFAULT 1.0000 COMMENT '加价率（倍数，如1.1表示加价10%）',
+                markup_amount DECIMAL(10,2) DEFAULT 0.00 COMMENT '加价金额（售价-原价）',
                 warehouse VARCHAR(200) DEFAULT NULL COMMENT '仓库',
                 expire_time DATETIME DEFAULT NULL COMMENT '失效时间',
                 remark TEXT COMMENT '备注',
@@ -175,6 +177,28 @@ def init_price_inquiry_direct_table():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='询价直接入库数据表';
             """
             cursor.execute(create_table_sql)
+
+            # 检查并添加加价率字段（兼容旧表）
+            try:
+                cursor.execute("""
+                    ALTER TABLE crmapp_price_inquiry_direct
+                    ADD COLUMN markup_rate DECIMAL(6,4) DEFAULT 1.0000 COMMENT '加价率（倍数，如1.1表示加价10%）'
+                """)
+                print("  [成功] 已添加列 markup_rate")
+            except Exception as e:
+                if "Duplicate column name" not in str(e):
+                    print(f"  ! 添加列 markup_rate 时出错: {str(e)}")
+
+            # 检查并添加加价金额字段（兼容旧表）
+            try:
+                cursor.execute("""
+                    ALTER TABLE crmapp_price_inquiry_direct
+                    ADD COLUMN markup_amount DECIMAL(10,2) DEFAULT 0.00 COMMENT '加价金额（售价-原价）'
+                """)
+                print("  [成功] 已添加列 markup_amount")
+            except Exception as e:
+                if "Duplicate column name" not in str(e):
+                    print(f"  ! 添加列 markup_amount 时出错: {str(e)}")
 
             # 检查并添加唯一索引（兼容旧表）
             try:
