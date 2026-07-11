@@ -392,6 +392,10 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
             supplier = item.get('supplier') or None
             price = item.get('price', 0)
             original_price = item.get('original_price', price)
+            try:
+                markup_amount = round(float(price) - float(original_price), 2) if price and original_price else 0
+            except (ValueError, TypeError):
+                markup_amount = 0
             warehouse = item.get('warehouse') or None
             expire_time = item.get('expire_time')
             remark = item.get('remark')
@@ -420,7 +424,9 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
             
             insert_data.append({
                 'oe': oe, 'brand': brand, 'supplier': supplier, 'price': price,
-                'original_price': original_price, 'warehouse': warehouse,
+                'original_price': original_price, 'markup_rate': markup_rate,
+                'markup_amount': markup_amount,
+                'warehouse': warehouse,
                 'expire_time': expire_time, 'remark': remark,
                 'stock_quantity': stock_quantity, 'common_number': None,
                 'company': company
@@ -450,7 +456,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
                     sync_ks_sync = 0
                 
                 batch_insert_data.append((
-                    data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['warehouse'],
+                    data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['markup_rate'], data['markup_amount'], data['warehouse'],
                     data['expire_time'], data['remark'], data['stock_quantity'],
                     sync_common_number, sync_ks_sync, data['company']
                 ))
@@ -459,11 +465,13 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
             for row_data in batch_insert_data:
                 cursor.execute("""
                     INSERT INTO crmapp_price_inquiry
-                    (oe, brand, supplier, price, original_price, warehouse, expire_time, remark,
+                    (oe, brand, supplier, price, original_price, markup_rate, markup_amount, warehouse, expire_time, remark,
                      stock_quantity, common_number, ks_sync, company)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
                         original_price = VALUES(original_price),
+                        markup_rate = VALUES(markup_rate),
+                        markup_amount = VALUES(markup_amount),
                         warehouse = VALUES(warehouse),
                         expire_time = VALUES(expire_time),
                         remark = VALUES(remark),
@@ -565,6 +573,10 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
         supplier = item.get('supplier') or None
         price = item.get('price', 0)
         original_price = item.get('original_price', price)
+        try:
+            markup_amount = round(float(price) - float(original_price), 2) if price and original_price else 0
+        except (ValueError, TypeError):
+            markup_amount = 0
         warehouse = item.get('warehouse') or None
         expire_time = item.get('expire_time')
         remark = item.get('remark')
@@ -593,7 +605,9 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
         
         insert_data.append({
             'oe': oe, 'brand': brand, 'supplier': supplier, 'price': price,
-            'original_price': original_price, 'warehouse': warehouse,
+            'original_price': original_price, 'markup_rate': markup_rate,
+            'markup_amount': markup_amount,
+            'warehouse': warehouse,
             'expire_time': expire_time, 'remark': remark,
             'stock_quantity': stock_quantity, 'common_number': None,
             'company': company, 'creator': creator,
@@ -625,7 +639,7 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
                 sync_ks_sync = 0
             
             batch_insert_data.append((
-                data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['warehouse'],
+                data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['markup_rate'], data['markup_amount'], data['warehouse'],
                 data['expire_time'], data['remark'], data['stock_quantity'],
                 sync_common_number, sync_ks_sync, data['company'], data['creator'], data['source_file']
             ))
@@ -634,11 +648,13 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
         for row_data in batch_insert_data:
             cursor.execute("""
                 INSERT INTO crmapp_price_inquiry_direct
-                (oe, brand, supplier, price, original_price, warehouse, expire_time, remark,
+                (oe, brand, supplier, price, original_price, markup_rate, markup_amount, warehouse, expire_time, remark,
                  stock_quantity, common_number, ks_sync, company, creator, source_file)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     original_price = VALUES(original_price),
+                    markup_rate = VALUES(markup_rate),
+                    markup_amount = VALUES(markup_amount),
                     warehouse = VALUES(warehouse),
                     expire_time = VALUES(expire_time),
                     remark = VALUES(remark),
@@ -801,7 +817,7 @@ def get_inquiry_list():
 
         # 查询所有数据
         data_sql = f"""
-            SELECT id, oe, brand, supplier, price, original_price, warehouse, expire_time, remark, stock_quantity, common_number, ks_sync, import_time
+            SELECT id, oe, brand, supplier, price, original_price, markup_rate, markup_amount, warehouse, expire_time, remark, stock_quantity, common_number, ks_sync, import_time
             FROM crmapp_price_inquiry
             {where_clause}
             ORDER BY oe, brand, id DESC
@@ -904,7 +920,7 @@ def get_direct_inquiry_list():
 
         # 查询所有数据
         data_sql = f"""
-            SELECT id, oe, brand, supplier, price, original_price, warehouse, expire_time, remark, stock_quantity, common_number, ks_sync, import_time
+            SELECT id, oe, brand, supplier, price, original_price, markup_rate, markup_amount, warehouse, expire_time, remark, stock_quantity, common_number, ks_sync, import_time
             FROM crmapp_price_inquiry_direct
             {where_clause}
             ORDER BY oe, brand, id DESC

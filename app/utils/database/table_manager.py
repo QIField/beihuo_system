@@ -564,6 +564,8 @@ def init_price_inquiry_table():
                 brand VARCHAR(50) COMMENT '品牌',
                 price DECIMAL(10,2) DEFAULT 0.00 COMMENT '单价（加价后）',
                 original_price DECIMAL(10,2) DEFAULT 0.00 COMMENT '原始单价（加价前）',
+                markup_rate DECIMAL(6,4) DEFAULT 1.0000 COMMENT '加价率（倍数，如1.1表示加价10%）',
+                markup_amount DECIMAL(10,2) DEFAULT 0.00 COMMENT '加价金额（售价-原价）',
                 supplier VARCHAR(50) COMMENT '供应商',
                 warehouse VARCHAR(255) COMMENT '仓库',
                 expire_time DATETIME COMMENT '失效时间',
@@ -596,7 +598,9 @@ def init_price_inquiry_table():
                 ("ks_sync", "TINYINT(1) DEFAULT 0 COMMENT '开思是否同步，0=未同步，1=已同步'"),
                 ("company", "VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码'"),
                 ("import_time", "DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '导入时间'"),
-                ("original_price", "DECIMAL(10,2) DEFAULT 0.00 COMMENT '原始单价（加价前）'")
+                ("original_price", "DECIMAL(10,2) DEFAULT 0.00 COMMENT '原始单价（加价前）'"),
+                ("markup_rate", "DECIMAL(6,4) DEFAULT 1.0000 COMMENT '加价率（倍数，如1.1表示加价10%）'"),
+                ("markup_amount", "DECIMAL(10,2) DEFAULT 0.00 COMMENT '加价金额（售价-原价）'")
             ]
             
             for col_name, col_def in alter_columns:
