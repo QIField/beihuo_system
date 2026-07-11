@@ -18,8 +18,8 @@ def wms_get_return_items_data():
     """
     WMS 状态订单爬虫服务 - 重新爬取数据
     """
-    return_items = wms_get_return_items_service(type_param=None, status_param=0, page_num=None)
-    return_items = wms_get_return_items_service(type_param=None, status_param=1, page_num=None)
+    return_items = wms_get_return_items_service(type_param=5, status_param=0, page_num=None)
+    return_items = wms_get_return_items_service(type_param=5, status_param=1, page_num=None)
 
     return return_items
 
@@ -35,8 +35,8 @@ def wms_get_return_items_from_db(page=1, limit=20, has_pushed_ks=''):
     """
     try:
         with orm_session() as session:
-            # 查询条件：只返回status=0的数据
-            query = session.query(WmsReturnItems).filter(WmsReturnItems.status == 0)
+            # 查询条件：返回status为0或1的数据（status=3表示历史数据）
+            query = session.query(WmsReturnItems).filter(WmsReturnItems.status.in_([0, 1]))
             
             # 添加has_pushed_ks筛选条件
             if has_pushed_ks in ['0', '1']:
