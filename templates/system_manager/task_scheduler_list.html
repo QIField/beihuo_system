@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定时任务管理 - 巴博瑞科技</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .page-header {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .page-header h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #333;
+        }
+        
+        .layui-table-view {
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        
+        .status-badge {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: normal;
+            display: inline-block;
+        }
+        
+        .status-badge.success {
+            background: #f6ffed;
+            color: #52c41a;
+            border: 1px solid #b7eb8f;
+        }
+        
+        .status-badge.warning {
+            background: #fffbe6;
+            color: #faad14;
+            border: 1px solid #ffe58f;
+        }
+        
+        .status-badge.error {
+            background: #fff2f0;
+            color: #ff4d4f;
+            border: 1px solid #ffccc7;
+        }
+        
+        .status-badge.info {
+            background: #e6f7ff;
+            color: #1890ff;
+            border: 1px solid #91d5ff;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #999;
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            display: block;
+        }
+        
+        .toolbar {
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="page-header">
+            <h2><i class="layui-icon layui-icon-clock"></i> 定时任务管理</h2>
+            <div class="toolbar">
+                <button class="layui-btn layui-btn-normal" onclick="loadTasks()">
+                    <i class="layui-icon layui-icon-refresh"></i> 刷新列表
+                </button>
+            </div>
+        </div>
+
+        <table id="taskTable" lay-filter="taskTable"></table>
+    </div>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+        layui.use(['table', 'layer'], function(){
+            var table = layui.table;
+            var layer = layui.layer;
+
+            table.render({
+                elem: '#taskTable',
+                url: '/new/api/tasks/list',
+                method: 'get',
+                page: false,
+                parseData: function(res){
+                    return {
+                        "code": res.code === 200 ? 0 : res.code,
+                        "msg": res.msg,
+                        "count": res.data ? res.data.length : 0,
+                        "data": res.data || []
+                    };
+                },
+                toolbar: false,
+                defaultToolbar: ['exports', 'print'],
+                cols: [[
+                    {field: 'job_id', title: '任务ID', width: 180, sort: true},
+                    {field: 'name', title: '任务名称', width: 150},
+                    {field: 'description', title: '描述', minWidth: 200},
+                    {field: 'enabled', title: '启用状态', width: 100, templet: function(d){
+                        return d.enabled ? 
+                            '<span class="status-badge success">启用</span>' : 
+                            '<span class="status-badge error">禁用</span>';
+                    }},
+                    {field: 'paused', title: '运行状态', width: 100, templet: function(d){
+                        return d.paused ? 
+                            '<span class="status-badge warning">暂停</span>' : 
+                            '<span class="status-badge success">运行中</span>';
+                    }},
+                    {field: 'demand_driven', title: '按需模式', width: 100, templet: function(d){
+                        return d.demand_driven ? 
+                            '<span class="status-badge info">开启</span>' : 
+                            '<span class="status-badge">关闭</span>';
+                    }},
+                    {field: 'next_run_time', title: '下次执行时间', width: 200, sort: true},
+                    {field: 'last_request_time', title: '最后请求时间', width: 200}
+                ]],
+                height: 'full-130',
+                text: {
+                    none: '<div class="empty-state"><i class="layui-icon layui-icon-face-surprised"></i><p>暂无定时任务数据</p></div>'
+                }
+            });
+
+            window.loadTasks = function() {
+                table.reload('taskTable');
+                layer.msg('已刷新', {icon: 1, time: 1000});
+            }
+        });
+    </script>
+</body>
+</html>
