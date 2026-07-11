@@ -191,7 +191,7 @@ class WechatDailyQuoteDetailDao:
         update_dict = {}
         for column in WechatDailyQuoteDetail.__table__.columns:
             col_name = column.name
-            if col_name not in ['id', 'created_at', 'deal_customer_id', 'deal_customer', 'deal_brand', 'deal_amount', 'deal_status', 'inquiry_customer_id', 'inquiry_customer']:
+            if col_name not in ['id', 'created_at', 'deal_customer_id', 'deal_customer', 'deal_brand', 'deal_amount', 'deal_status', 'inquiry_customer_id', 'inquiry_customer','draft_link']:
                 update_dict[col_name] = getattr(stmt.inserted, col_name)
 
         stmt = stmt.on_duplicate_key_update(update_dict)

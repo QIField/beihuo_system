@@ -18,7 +18,9 @@ def wms_get_return_items_data():
     """
     WMS 状态订单爬虫服务 - 重新爬取数据
     """
-    return_items = wms_get_return_items_service(type_param=5, status_param=0, page_num=None)
+    return_items = wms_get_return_items_service(type_param=None, status_param=0, page_num=None)
+    return_items = wms_get_return_items_service(type_param=None, status_param=1, page_num=None)
+
     return return_items
 
 
