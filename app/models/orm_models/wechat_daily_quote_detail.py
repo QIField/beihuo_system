@@ -44,6 +44,7 @@ class WechatDailyQuoteDetail(BaseModels):
     deal_brand = Column(String(255), nullable=True, comment="成交品牌")
     deal_amount = Column(DECIMAL(10, 2), nullable=True, comment="成交金额")
     deal_status = Column(Integer, nullable=True, default=0, comment="成交状态：0-未知，1-成交，2-未成交")
+    inquiry_type = Column(Integer, nullable=True, comment="询价类型：1-车架号询价，2-OE号询价，3-未知")
     created_at = Column(DateTime, nullable=True, default=datetime.now, comment="数据创建时间")
     updated_at = Column(DateTime, nullable=True, default=datetime.now, onupdate=datetime.now, comment="数据更新时间")
 
@@ -84,6 +85,7 @@ class WechatDailyQuoteDetail(BaseModels):
             "deal_brand": self.deal_brand,
             "deal_amount": float(self.deal_amount) if self.deal_amount else None,  # pyright: ignore[reportArgumentType, reportGeneralTypeIssues]
             "deal_status": self.deal_status,
+            "inquiry_type": self.inquiry_type,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,  # pyright: ignore[reportGeneralTypeIssues]
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,  # pyright: ignore[reportGeneralTypeIssues]
         }

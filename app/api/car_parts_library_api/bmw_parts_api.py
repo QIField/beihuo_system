@@ -120,7 +120,7 @@ def get_parts_list():
     """
     try:
         page = int(request.args.get('page', 1))
-        page_size = int(request.args.get('page_size', 20))
+        page_size = int(request.args.get('limit', 20))
         part_number = request.args.get('part_number')
 
         result = get_parts_list_page(

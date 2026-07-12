@@ -73,7 +73,7 @@ def get_bmw_favorites_api():
     """
     try:
         page = int(request.args.get('page', 1))
-        page_size = int(request.args.get('page_size', 10))
+        page_size = int(request.args.get('limit', 10))
         category = request.args.get('category') or '宝马主收藏'
 
         favorites = get_bmw_favorites(category, page, page_size)

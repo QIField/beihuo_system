@@ -27,7 +27,7 @@ def clean_return_items(data_list):
         'brand_code', 'brand_name_en', 'suffix', 'return_qty',
         'frey_no', 'number', 'qty', 'kw_no', 'warehouse_name',
         'kc', 'brandname', 'l_name_zh', 'product_remark',
-        'pono', 'orders_no', 'orders_id','needqty','status','type_param'
+        'pono', 'orders_no', 'orders_id','needqty','status','type_param','fullname'
     ]
 
     if not data_list:

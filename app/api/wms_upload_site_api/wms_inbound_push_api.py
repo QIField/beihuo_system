@@ -47,9 +47,10 @@ def get_return_items_from_db_api():
         limit = request.args.get('limit', type=int, default=20)
         # 获取筛选参数
         has_pushed_ks = request.args.get('has_pushed_ks', type=str, default='')
+        fullname = request.args.get('fullname', type=str, default='')
         
         # 调用 service 层从数据库获取数据
-        return_items, total = wms_get_return_items_from_db(page=page, limit=limit, has_pushed_ks=has_pushed_ks)
+        return_items, total = wms_get_return_items_from_db(page=page, limit=limit, has_pushed_ks=has_pushed_ks, fullname=fullname)
         
         return jsonify({
             'code': 200,

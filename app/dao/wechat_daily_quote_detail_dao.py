@@ -54,7 +54,7 @@ class WechatDailyQuoteDetailDao:
         if deal_status is not None:
             id_query = id_query.filter(WechatDailyQuoteDetail.deal_status == deal_status)
 
-        id_query = id_query.order_by(WechatDailyQuoteDetail.weixin_decoding_result_id.desc())
+        id_query = id_query.order_by(WechatDailyQuoteDetail.weixin_decoding_result_id.asc())
 
         total = id_query.count()
 
@@ -74,7 +74,7 @@ class WechatDailyQuoteDetailDao:
             if deal_status is not None:
                 query = query.filter(WechatDailyQuoteDetail.deal_status == deal_status)
             query = query.order_by(
-                WechatDailyQuoteDetail.weixin_decoding_result_id.desc(),
+                WechatDailyQuoteDetail.weixin_decoding_result_id.asc(),
                 WechatDailyQuoteDetail.quote_number.asc()
             )
             items = query.all()
@@ -191,7 +191,7 @@ class WechatDailyQuoteDetailDao:
         update_dict = {}
         for column in WechatDailyQuoteDetail.__table__.columns:
             col_name = column.name
-            if col_name not in ['id', 'created_at', 'deal_customer_id', 'deal_customer', 'deal_brand', 'deal_amount', 'deal_status', 'inquiry_customer_id', 'inquiry_customer']:
+            if col_name not in ['id', 'created_at', 'deal_customer_id', 'deal_customer', 'deal_brand', 'deal_amount', 'deal_status', 'inquiry_customer_id', 'inquiry_customer','draft_link']:
                 update_dict[col_name] = getattr(stmt.inserted, col_name)
 
         stmt = stmt.on_duplicate_key_update(update_dict)

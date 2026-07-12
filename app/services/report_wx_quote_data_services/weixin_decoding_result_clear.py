@@ -41,6 +41,44 @@ def parse_lines(text):
     return items
 
 
+def detect_inquiry_type(content, result_array):
+    """
+    检测询价类型
+
+    判断规则：
+    - content 含中文字符，或 result 第一行与 content 第一行相同 → 车架号询价(1)
+    - 否则 → OE号询价(2)
+    - content 为空或 result 为空 → 未分类(3)
+
+    Args:
+        content: 查询内容字符串
+        result_array: result 行数组
+
+    Returns:
+        询价类型整数：1-车架号询价，2-OE号询价，3-未分类
+    """
+    if not content or not result_array:
+        return 3
+
+    content_lines = parse_lines(content)
+    if not content_lines:
+        return 3
+
+    first_content_line = content_lines[0].strip()
+    first_result_line = result_array[0].strip()
+
+    # 条件1：content 含中文字符
+    has_chinese = bool(re.search(r'[\u4e00-\u9fff]', content))
+
+    # 条件2：result 第一行与 content 第一行相同
+    result_matches_content = (first_result_line == first_content_line)
+
+    if has_chinese or result_matches_content:
+        return 1  # 车架号询价
+    else:
+        return 2  # OE号询价
+
+
 def convert_to_database_format(records):
     """
     将 weixin_decoding_result 字典列表转换为 wechat_daily_quote_detail 表格式
@@ -59,19 +97,17 @@ def convert_to_database_format(records):
         result_text = record.get('result', '')
         result_array = parse_lines(result_text) if result_text else []
         
-        should_skip_first = True
+        # ============================================================
+        # 步骤1：检测询价类型
+        # 步骤2：根据类型决定是否跳过 result 第一行
+        # - 车架号询价(1)：result 第一行是车架号，非报价数据，跳过
+        # - OE号询价(2)：result 第一行直接是报价数据，不跳过
+        # - 未分类(3)：无法判断，保守不跳过，避免丢失数据
+        # ============================================================
         content = record.get('content', '')
-        if content:
-            content_lines = parse_lines(content)
-            if content_lines:
-                first_content_line = content_lines[0].strip()
-                
-                if len(result_array) > 0 and result_array[0].strip() == first_content_line:
-                    should_skip_first = True
-                
-                elif re.match(r'^[A-Za-z0-9]+$', first_content_line):
-                    should_skip_first = False
-        
+        inquiry_type = detect_inquiry_type(content, result_array)
+
+        should_skip_first = (inquiry_type == 1)
         if should_skip_first and len(result_array) > 0:
             result_array = result_array[1:]
         
@@ -117,7 +153,8 @@ def convert_to_database_format(records):
                 'deal_customer': None,
                 'deal_brand': None,
                 'deal_amount': None,
-                'deal_status': 0
+                'deal_status': 0,
+                'inquiry_type': inquiry_type
             }
             
             database_data.append(db_item)

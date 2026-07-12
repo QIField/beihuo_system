@@ -62,6 +62,8 @@ class WmsReturnItems(BaseModels):
     status = Column(Integer, nullable=True, comment="状态")
     # 类型
     type_param = Column(Integer, nullable=True, comment="类型")
+    # 供应商名称
+    fullname = Column(String(255), nullable=True, comment="供应商名称")
     # 是否已推送至快手
     has_pushed_ks = Column(Integer, nullable=True, default=0, comment="是否已推送至快手（0:未推送，1:已推送）")
     # 创建时间
@@ -199,6 +201,7 @@ class WmsReturnItems(BaseModels):
             "pono": self.pono,
             "orders_no": self.orders_no,
             "orders_id": self.orders_id,
+            "fullname": self.fullname,
             "status": self.status,
             "type_param": self.type_param,
             "has_pushed_ks": self.has_pushed_ks,
