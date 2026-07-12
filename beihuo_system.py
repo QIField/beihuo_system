@@ -1663,43 +1663,45 @@ def api_car_brands():
 @app.route('/api/cart', methods=['GET'])
 @login_required
 def get_cart():
-    """获取购物车数据 - 集成自动清理功能"""
-    from datetime import datetime
-    start_time = datetime.now()
-    
+    """获取购物车数据"""
     try:
-        # 获取当前用户门店 - 统一使用 get_user_store() 函数
         current_store = get_user_store()
         is_admin = session.get('is_admin', False)
-        
-        print(f"[{start_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 收到获取购物车请求: 用户={session.get('username', 'default_user')}, 门店={current_store}")
-        
-        # ========== 新增：调用新的请求处理器（包含自动清理）==========
+
         from app.services.cart_service.cart_request_handler import CartRequestHandler
         handler = CartRequestHandler()
         result = handler.handle_get_cart_request(current_store, is_admin, request.args)
-        
-        end_time = datetime.now()
-        elapsed = (end_time - start_time).total_seconds()
-        print(f"[{end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 获取购物车完成，数量: {result.get('count', 0)}, 耗时: {elapsed:.3f}s")
-        
-        # 直接返回处理结果（已包含所有原有功能）
+
         return jsonify({
             'code': result['code'],
             'msg': result['msg'],
             'count': result['count'],
             'data': result['data']
         })
-        # =======================================================
-        
     except Exception as e:
-        error_time = datetime.now()
-        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 获取购物车失败: {str(e)}")  # 添加错误调试信息
-        import traceback
-        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 错误堆栈: {traceback.format_exc()}")  # 添加完整堆栈跟踪
         return jsonify({'code': 1, 'msg': f'获取购物车数据失败：{str(e)}'})
 
-    
+
+@app.route('/api/cart/filter_values', methods=['GET'])
+@login_required
+def get_cart_filter_values():
+    """获取购物车指定列的全部去重值，供筛选面板使用"""
+    try:
+        current_store = get_user_store()
+        is_admin = session.get('is_admin', False)
+
+        from app.services.cart_service.cart_request_handler import CartRequestHandler
+        handler = CartRequestHandler()
+        result = handler.handle_get_cart_filter_values_request(current_store, is_admin, request.args)
+
+        return jsonify({
+            'code': result['code'],
+            'msg': result['msg'],
+            'data': result['data']
+        })
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取筛选值失败：{str(e)}', 'data': []})
+
 
 def parse_supplier_string(supplier_str):
     if not supplier_str or not isinstance(supplier_str, str):
@@ -2199,28 +2201,6 @@ def get_current_user():
         'ip_records_formatted': ip_records_formatted
     })
 
-def get_cart_items(store, is_admin):
-    """获取购物车数据的辅助函数 - 不再实时更新购物车数据，只查询现有数据"""
-    conn = get_db_connection()
-    cursor = conn.cursor(pymysql.cursors.DictCursor)
-
-    # 统一使用传入的store参数，确保门店数据隔离
-    sql = "SELECT * FROM crmapp_cart WHERE store = %s ORDER BY added_time DESC"
-    cursor.execute(sql, (store,))
-
-    result = cursor.fetchall()
-
-    # 确保时间格式正确
-    for item in result:
-        if isinstance(item['added_time'], datetime):
-            item['added_time'] = item['added_time'].strftime('%Y-%m-%d %H:%M:%S')
-        elif item['added_time'] and isinstance(item['added_time'], str):
-            # 如果已经是字符串格式，保持不变
-            pass
-
-    conn.close()
-    return result
-
 @app.route('/api/cart/clear', methods=['POST'])
 @login_required
 def clear_cart():
@@ -2449,17 +2429,6 @@ def update_cart_quantity():
         existing_item = cursor.fetchone()
         
         if not existing_item:
-            # 检查商品是否存在于其他门店，用于调试
-            debug_sql = "SELECT id, store FROM crmapp_cart WHERE oe = %s"
-            cursor.execute(debug_sql, (item_oe,))
-            debug_result = cursor.fetchall()
-            print("调试：在所有门店中查找OE为 '{}' 的商品，找到 {} 条记录".format(item_oe, len(debug_result)))  # 修复格式化错误
-            if debug_result:
-                for item in debug_result:
-                    print("  - ID: {}, 门店: {}".format(item[0], item[1]))  # 修复格式化错误
-            else:
-                print("  - 未找到 OE 为 '{}' 的商品".format(item_oe))  # 修复格式化错误
-            
             conn.close()
             return jsonify({'code': 1, 'msg': '购物车中未找到该商品'})
         

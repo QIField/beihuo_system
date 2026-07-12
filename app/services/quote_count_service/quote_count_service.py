@@ -520,10 +520,15 @@ class QuoteCountSyncService:
                 resolve_parts_num = resolve_parts.get('partsNum', '')
                 resolve_parts_name = resolve_parts.get('partsName', '')
 
-                has_ordered_in_content = any(
-                    sqir.get('sellerStatus') == 'ORDERED'
-                    for sqir in store_quote_item_results
-                )
+                ordered_item_keys = set()
+                has_ordered_in_content = False
+                for sqir in store_quote_item_results:
+                    if sqir.get('sellerStatus') == 'ORDERED':
+                        has_ordered_in_content = True
+                        ordered_item_keys.add((
+                            sqir.get('brandName', '').strip(),
+                            sqir.get('partsNum', '').strip().upper().replace(' ', '')
+                        ))
 
                 if content_order_status == '未下单':
                     content_display_status = '未下单'
@@ -562,6 +567,10 @@ class QuoteCountSyncService:
 
                     # 只保存有完整数据的记录
                     if parts_num and brand_name and parts_name:
+                        item_display_status = content_display_status
+                        if content_display_status == '本店下单' and (brand_name, parts_num) in ordered_item_keys:
+                            item_display_status = '本店下单！'
+
                         items.append({
                             'inquiryId': inquiry_id,
                             'partsNum': parts_num,
@@ -576,7 +585,7 @@ class QuoteCountSyncService:
                             'sellerPrice': item.get('sellerPrice', ''),
                             'sellerStatus': item.get('sellerStatus', ''),
                             'orderStatus': content_order_status,
-                            'displaySellerStatus': content_display_status,
+                            'displaySellerStatus': item_display_status,
                             'vin': vin or '',
                             'engine': car_config.get('engine', ''),
                             'productionDate': car_config.get('production_date', ''),

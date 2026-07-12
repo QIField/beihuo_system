@@ -1140,3 +1140,288 @@ def use_replace_number(product_ids: List[str], replace_number: str, store_code: 
     一键使用替换号，循环更新多个产品
     """
     return CompareDataService.use_replace_number(product_ids, replace_number, store_code)
+
+
+# 原厂/4S 品牌定义
+ORIGINAL_BRANDS = ['原厂', '原厂国内4S件']
+
+
+def _parse_replace_numbers(number_str: str) -> set:
+    """将替换号字符串解析为集合，支持中英文逗号"""
+    if not number_str:
+        return set()
+    return {n.strip() for n in str(number_str).replace('，', ',').split(',') if n.strip()}
+
+
+def _format_replace_numbers(number_set: set) -> str:
+    """将替换号集合格式化为逗号分隔字符串"""
+    return ', '.join(sorted(number_set))
+
+
+class ReplaceNumberEditService:
+    """替换号编辑列表服务"""
+
+    @staticmethod
+    def get_replace_number_edit_list(
+        oe: str = '',
+        company: str = '',
+        page: int = 1,
+        limit: int = 10,
+        start_date: str = '',
+        end_date: str = '',
+    ) -> Tuple[List[Dict], int]:
+        """
+        查询替换号编辑列表（按 OE 聚合）
+
+        列说明：
+        - oe: OE 号
+        - original_numbers: 原厂/4S 替换号，去重
+        - other_numbers: 其他品牌替换号去重后，再减去原厂/4S 的替换号
+        - is_upload: 是否上传，默认 1
+
+        返回: (数据列表, 总记录数)
+        """
+        if not company:
+            return [], 0
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
+                where_conditions = ["company = %s"]
+                params = [company]
+
+                # 处理日期范围筛选：从 WMS 入库明细获取 number_clean 精确匹配 oe
+                if start_date and end_date:
+                    number_clean_list = get_distinct_number_clean_by_date_range(
+                        start_date, end_date
+                    )
+                    if not number_clean_list:
+                        return [], 0
+                    CompareDataService._build_in_clause(
+                        'oe', number_clean_list, where_conditions, params
+                    )
+
+                oe_list = parse_space(oe) if oe else []
+                CompareDataService._build_like_conditions(
+                    'oe', oe_list, where_conditions, params
+                )
+
+                where_clause = "WHERE " + " AND ".join(where_conditions)
+
+                # 1. 获取符合筛选条件的 OE 总数
+                count_sql = f"""
+                    SELECT COUNT(DISTINCT oe) FROM {CompareDataService.TABLE_NAME}
+                    {where_clause}
+                """
+                cursor.execute(count_sql, params)
+                total = cursor.fetchone()[0]
+
+                if total == 0:
+                    return [], 0
+
+                # 2. 分页获取 OE 列表
+                offset = (page - 1) * limit
+                oe_sql = f"""
+                    SELECT DISTINCT oe FROM {CompareDataService.TABLE_NAME}
+                    {where_clause}
+                    ORDER BY oe
+                    LIMIT %s OFFSET %s
+                """
+                cursor.execute(oe_sql, params + [limit, offset])
+                oe_rows = cursor.fetchall()
+                oe_list_paged = [row[0] for row in oe_rows]
+
+                # 3. 获取这些 OE 的所有数据
+                in_placeholders = ', '.join(['%s'] * len(oe_list_paged))
+                data_sql = f"""
+                    SELECT oe, brand, replace_number, product_id
+                    FROM {CompareDataService.TABLE_NAME}
+                    WHERE company = %s AND oe IN ({in_placeholders})
+                    ORDER BY oe, brand
+                """
+                cursor.execute(data_sql, [company] + oe_list_paged)
+                rows = cursor.fetchall()
+
+                # 4. 按 OE 聚合
+                oe_map: Dict[str, Dict] = {}
+                for row in rows:
+                    oe_val, brand, replace_number, product_id = row
+                    if oe_val not in oe_map:
+                        oe_map[oe_val] = {
+                            'oe': oe_val,
+                            'original_set': set(),      # 原厂
+                            'fs_set': set(),            # 原厂国内4S件
+                            'other_set': set(),         # 其他品牌
+                            'product_ids': set(),
+                        }
+                    oe_map[oe_val]['product_ids'].add(str(product_id) if product_id else '')
+
+                    number_set = _parse_replace_numbers(replace_number or '')
+                    if brand == '原厂':
+                        oe_map[oe_val]['original_set'].update(number_set)
+                    elif brand == '原厂国内4S件':
+                        oe_map[oe_val]['fs_set'].update(number_set)
+                    else:
+                        oe_map[oe_val]['other_set'].update(number_set)
+
+                # 5. 组装结果
+                data = []
+                for oe_val in oe_list_paged:
+                    item = oe_map.get(oe_val, {
+                        'oe': oe_val,
+                        'original_set': set(),
+                        'fs_set': set(),
+                        'other_set': set(),
+                        'product_ids': set(),
+                    })
+                    original_set = item['original_set']
+                    fs_set = item['fs_set']
+                    original_combined = original_set | fs_set
+                    other_set = item['other_set'] - original_combined
+
+                    data.append({
+                        'oe': oe_val,
+                        'original_numbers': _format_replace_numbers(original_set),
+                        'fs_numbers': _format_replace_numbers(fs_set),
+                        'other_numbers': _format_replace_numbers(other_set),
+                        'is_upload': 1,
+                        'product_ids': sorted([pid for pid in item['product_ids'] if pid]),
+                    })
+
+                return data, total
+
+        except Exception as e:
+            print(f"查询替换号编辑列表时出错: {str(e)}")
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def bulk_update_replace_numbers(
+        updates: List[Dict],
+        company: str
+    ) -> Dict:
+        """
+        批量更新替换号
+
+        Args:
+            updates: 更新项列表，每项包含 {oe, original_numbers, other_numbers, is_upload}
+            company: 门店代码
+
+        Returns:
+            {success: bool, total: int, updated: int, failed: int, details: [...]}
+        """
+        from app.utils.Crm_Updatenumber.api_client import update_product_numbers
+
+        if not company:
+            return {'success': False, 'message': '缺少门店参数', 'total': 0, 'updated': 0, 'failed': 0, 'details': []}
+
+        results = {
+            'success': True,
+            'total': 0,
+            'updated': 0,
+            'failed': 0,
+            'details': []
+        }
+
+        for update_item in updates:
+            if not update_item.get('is_upload'):
+                continue
+
+            oe = update_item.get('oe', '')
+            original_numbers = update_item.get('original_numbers', '')
+            fs_numbers = update_item.get('fs_numbers', '')
+            other_numbers = update_item.get('other_numbers', '')
+
+            # 合并替换号（原厂 + 4S + 其他品牌）后去重
+            combined_set = _parse_replace_numbers(original_numbers)
+            combined_set.update(_parse_replace_numbers(fs_numbers))
+            combined_set.update(_parse_replace_numbers(other_numbers))
+
+            if not combined_set:
+                results['details'].append({
+                    'oe': oe,
+                    'success': False,
+                    'message': '没有要更新的替换号'
+                })
+                results['failed'] += 1
+                continue
+
+            number_list = sorted(combined_set)
+
+            # 查询该 OE 下的所有 product_id
+            conn = get_db_connection()
+            try:
+                with conn.cursor(pymysql.cursors.Cursor) as cursor:
+                    cursor.execute(
+                        f"SELECT product_id FROM {CompareDataService.TABLE_NAME} WHERE company = %s AND oe = %s",
+                        [company, oe]
+                    )
+                    product_ids = [str(row[0]) for row in cursor.fetchall() if row[0]]
+            finally:
+                conn.close()
+
+            if not product_ids:
+                results['details'].append({
+                    'oe': oe,
+                    'success': False,
+                    'message': '未找到对应产品'
+                })
+                results['failed'] += 1
+                continue
+
+            # 更新每个产品
+            oe_success = True
+            oe_failed_count = 0
+            for product_id in product_ids:
+                try:
+                    result = update_product_numbers(
+                        product_id=product_id,
+                        numbers=number_list,
+                        store_code=company
+                    )
+                    if result.get('status') != 200 and result.get('code') != 0:
+                        oe_success = False
+                        oe_failed_count += 1
+                except Exception as e:
+                    oe_success = False
+                    oe_failed_count += 1
+                    print(f"更新 OE {oe} 产品 {product_id} 失败: {e}")
+
+            results['total'] += len(product_ids)
+            if oe_success and oe_failed_count == 0:
+                results['updated'] += len(product_ids)
+                results['details'].append({
+                    'oe': oe,
+                    'success': True,
+                    'message': f'成功更新 {len(product_ids)} 个产品'
+                })
+            else:
+                results['failed'] += oe_failed_count
+                results['details'].append({
+                    'oe': oe,
+                    'success': False,
+                    'message': f'部分更新失败，失败 {oe_failed_count}/{len(product_ids)}'
+                })
+
+        return results
+
+
+def get_replace_number_edit_list(
+    oe: str = '',
+    company: str = '',
+    page: int = 1,
+    limit: int = 10,
+    start_date: str = '',
+    end_date: str = '',
+) -> Tuple[List[Dict], int]:
+    """查询替换号编辑列表（按 OE 聚合）"""
+    return ReplaceNumberEditService.get_replace_number_edit_list(
+        oe=oe, company=company, page=page, limit=limit,
+        start_date=start_date, end_date=end_date
+    )
+
+
+def bulk_update_replace_numbers(updates: List[Dict], company: str) -> Dict:
+    """批量更新替换号"""
+    return ReplaceNumberEditService.bulk_update_replace_numbers(updates, company)

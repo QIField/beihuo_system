@@ -118,7 +118,12 @@ class KsInquiryRecordsService:
         if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
-        if seller_status: conditions.append("display_seller_status = %s"); params.append(seller_status)
+        if seller_status:
+            if seller_status == '本店下单':
+                conditions.append("display_seller_status IN ('本店下单', '本店下单！')")
+            else:
+                conditions.append("display_seller_status = %s")
+                params.append(seller_status)
         if car_brand_name: conditions.append("car_brand_name = %s");        params.append(car_brand_name)
         if garage_name:   conditions.append("garage_company_name LIKE %s");  params.append(f"%{garage_name}%")
         if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
@@ -264,8 +269,12 @@ class KsInquiryRecordsService:
 
         # 按订单状态过滤：只保留包含该状态的订单
         if seller_status:
-            conditions.append("inquiryId IN (SELECT DISTINCT inquiryId FROM crmapp_ks_inquiry_detail WHERE display_seller_status = %s)")
-            params.append(seller_status)
+            if seller_status == '本店下单':
+                status_condition = "display_seller_status IN ('本店下单', '本店下单！')"
+            else:
+                status_condition = "display_seller_status = %s"
+                params.append(seller_status)
+            conditions.append(f"inquiryId IN (SELECT DISTINCT inquiryId FROM crmapp_ks_inquiry_detail WHERE {status_condition})")
 
         KsInquiryRecordsService._apply_filters(column_filters, KsInquiryRecordsService._MASTER_FILTER_MAP, conditions, params)
         where = " AND ".join(conditions) if conditions else "1=1"
@@ -331,7 +340,12 @@ class KsInquiryRecordsService:
         if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
-        if seller_status: conditions.append("display_seller_status = %s"); params.append(seller_status)
+        if seller_status:
+            if seller_status == '本店下单':
+                conditions.append("display_seller_status IN ('本店下单', '本店下单！')")
+            else:
+                conditions.append("display_seller_status = %s")
+                params.append(seller_status)
         if car_brand_name: conditions.append("car_brand_name LIKE %s");     params.append(f"%{car_brand_name}%")
         if garage_name:   conditions.append("garage_company_name LIKE %s");  params.append(f"%{garage_name}%")
         if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)

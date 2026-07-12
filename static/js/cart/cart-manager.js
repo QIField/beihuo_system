@@ -60,12 +60,8 @@ var CartManager = (function() {
         removeMultiple: function(itemDetails) {
             if (!itemDetails || itemDetails.length === 0) return;
 
-            // 1. 前端立即删除（逐个删除）
-            var removedCount = 0;
-            itemDetails.forEach(function(item) {
-                var removed = CartTable.removeRowLocal(item.item_oe, item.item_barcode);
-                if (removed) removedCount++;
-            });
+            // 1. 前端立即删除
+            var removedCount = CartTable.removeRowsLocal(itemDetails);
 
             if (removedCount > 0) {
                 showMsg('已删除 ' + removedCount + ' 个商品', 1);

@@ -499,6 +499,14 @@ var FilterPanel = (function() {
      */
     function updateData(newData) {
         filterConfig.data = newData;
+
+        // 如果筛选面板当前正在显示，刷新其内容
+        if (currentPanel && currentMode === 'filter' && currentField) {
+            var btn = document.querySelector('.filter-btn[data-field="' + currentField + '"].active');
+            if (btn) {
+                createFilterPanel(currentField, btn);
+            }
+        }
     }
 
     // ==================== 外部选项筛选面板功能 ====================

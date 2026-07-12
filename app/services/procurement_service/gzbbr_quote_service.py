@@ -9,6 +9,10 @@ from app.scripts.spiders.spider_entities.data_gzbbr import DataGzbbrSpider
 from app.utils.database_connection import get_db_connection
 
 
+import logging
+logger = logging.getLogger('data_gzbbr')
+
+
 class GzbbrQuoteService:
     """
     data.gzbbr.com 报价管理服务
@@ -31,6 +35,8 @@ class GzbbrQuoteService:
                 offset=0
             )
             resp.raise_for_status()
+            logger.info(f"【搜索响应状态】{resp.status_code}")
+            logger.info(f"【搜索响应文本】{resp.text[:1000]}")
             data = resp.json()
             rows = data.get('rows') or data.get('list') or data.get('data') or []
             return rows

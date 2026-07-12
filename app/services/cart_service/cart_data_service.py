@@ -3,7 +3,6 @@
 处理购物车数据的查询和基础处理逻辑
 """
 
-import pymysql
 import re
 from typing import List, Dict, Any, Tuple
 from app.utils.database_connection import get_db_connection, db_cursor
@@ -20,6 +19,7 @@ class CartDataService:
         'material_name': 'material_name',
         'barcode': 'barcode',
         'brand_code': 'brand_code',
+        'replace_no': 'replace_no',
         'car_brand': 'car_brand',
         'tag': 'tag',
         'car_model': 'car_model',
@@ -44,7 +44,7 @@ class CartDataService:
         'avg_sales_12m': 'avg_sales_12m',
     }
 
-    def get_cart_data(self, store: str, is_admin: bool = False, dimension: str = 'product',
+    def get_cart_data(self, store: str, dimension: str = 'product',
                       search_params: Dict = None, page: int = 1, limit: int = 50,
                       sort_field: str = None, sort_order: str = None) -> Tuple[List[Dict[str, Any]], int]:
         """
@@ -52,7 +52,6 @@ class CartDataService:
 
         Args:
             store: 门店代码
-            is_admin: 是否为管理员
             dimension: 维度类型，'product' 或 'supplier'
             search_params: 搜索参数字典，可包含 cart_barcode, cart_oe, cart_material_name, cart_brand, cart_tag
             page: 页码，从1开始
@@ -71,121 +70,9 @@ class CartDataService:
             params = [store]
             count_params = [store]
 
-            # 添加搜索条件
-            if search_params:
-                # 物料条码或品牌号码搜索 (cart_barcode) - 支持多行
-                if search_params.get('cart_barcode'):
-                    barcode_list = parse_space(search_params['cart_barcode'])
-                    if barcode_list:
-                        or_conditions = []
-                        for barcode in barcode_list:
-                            or_conditions.append("(barcode LIKE %s OR oe LIKE %s)")
-                            params.extend([f'%{barcode}%', f'%{barcode}%'])
-                            count_params.extend([f'%{barcode}%', f'%{barcode}%'])
-                        sql += " AND (" + " OR ".join(or_conditions) + ")"
-                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
-
-                # OE号搜索 (cart_oe) - 支持多行
-                if search_params.get('cart_oe'):
-                    oe_list = parse_space(search_params['cart_oe'])
-                    if oe_list:
-                        or_conditions = []
-                        for oe in oe_list:
-                            or_conditions.append("oe LIKE %s")
-                            params.append(f'%{oe}%')
-                            count_params.append(f'%{oe}%')
-                        sql += " AND (" + " OR ".join(or_conditions) + ")"
-                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
-
-                # 物料名称搜索 (cart_material_name) - 支持多行
-                if search_params.get('cart_material_name'):
-                    name_list = parse_comma(search_params['cart_material_name'])
-                    if name_list:
-                        or_conditions = []
-                        for name in name_list:
-                            or_conditions.append("material_name LIKE %s")
-                            params.append(f'%{name}%')
-                            count_params.append(f'%{name}%')
-                        sql += " AND (" + " OR ".join(or_conditions) + ")"
-                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
-
-                # 品牌搜索 (cart_brand) - 支持多行
-                if search_params.get('cart_brand'):
-                    brand_list = parse_space(search_params['cart_brand'])
-                    if brand_list:
-                        or_conditions = []
-                        for brand in brand_list:
-                            or_conditions.append("brand LIKE %s")
-                            params.append(f'%{brand}%')
-                            count_params.append(f'%{brand}%')
-                        sql += " AND (" + " OR ".join(or_conditions) + ")"
-                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
-
-                # 标签搜索 (cart_tag) - 支持多行
-                if search_params.get('cart_tag'):
-                    tag_list = parse_space(search_params['cart_tag'])
-                    if tag_list:
-                        or_conditions = []
-                        for tag in tag_list:
-                            or_conditions.append("tag LIKE %s")
-                            params.append(f'%{tag}%')
-                            count_params.append(f'%{tag}%')
-                        sql += " AND (" + " OR ".join(or_conditions) + ")"
-                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
-
-                # 车型搜索 (cart_car_model) - 支持多行
-                if search_params.get('cart_car_model'):
-                    car_model_list = parse_space(search_params['cart_car_model'])
-                    if car_model_list:
-                        or_conditions = []
-                        for car_model in car_model_list:
-                            or_conditions.append("car_model LIKE %s")
-                            params.append(f'%{car_model}%')
-                            count_params.append(f'%{car_model}%')
-                        sql += " AND (" + " OR ".join(or_conditions) + ")"
-                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
-
-                # 车型品牌搜索 (cart_car_brand) - 支持多行
-                if search_params.get('cart_car_brand'):
-                    car_brand_list = parse_space(search_params['cart_car_brand'])
-                    if car_brand_list:
-                        or_conditions = []
-                        for car_brand in car_brand_list:
-                            or_conditions.append("car_brand LIKE %s")
-                            params.append(f'%{car_brand}%')
-                            count_params.append(f'%{car_brand}%')
-                        sql += " AND (" + " OR ".join(or_conditions) + ")"
-                        count_sql += " AND (" + " OR ".join(or_conditions) + ")"
-
-                # 筛选参数 - 品牌筛选 (filter_brand) - 精确匹配多个值
-                if search_params.get('filter_brand'):
-                    brand_list = search_params['filter_brand'].split(',')
-                    if brand_list:
-                        placeholders = ','.join(['%s'] * len(brand_list))
-                        sql += f" AND brand IN ({placeholders})"
-                        count_sql += f" AND brand IN ({placeholders})"
-                        params.extend(brand_list)
-                        count_params.extend(brand_list)
-
-                # 筛选参数 - 车型品牌筛选 (filter_car_brand) - 精确匹配多个值
-                if search_params.get('filter_car_brand'):
-                    car_brand_list = search_params['filter_car_brand'].split(',')
-                    if car_brand_list:
-                        placeholders = ','.join(['%s'] * len(car_brand_list))
-                        sql += f" AND car_brand IN ({placeholders})"
-                        count_sql += f" AND car_brand IN ({placeholders})"
-                        params.extend(car_brand_list)
-                        count_params.extend(car_brand_list)
-
-                # 筛选参数 - 标签筛选 (filter_tag) - 精确匹配多个值
-                if search_params.get('filter_tag'):
-                    tag_list = search_params['filter_tag'].split(',')
-                    if tag_list:
-                        placeholders = ','.join(['%s'] * len(tag_list))
-                        sql += f" AND tag IN ({placeholders})"
-                        count_sql += f" AND tag IN ({placeholders})"
-                        params.extend(tag_list)
-                        count_params.extend(tag_list)
+            # 复用搜索/筛选条件拼接逻辑
+            sql, params = self._apply_search_conditions(sql, params, search_params)
+            count_sql, count_params = self._apply_search_conditions(count_sql, count_params, search_params)
 
             # 处理排序
             order_clause = self._build_order_clause(sort_field, sort_order)
@@ -228,6 +115,151 @@ class CartDataService:
                     pass
 
         return list(result), total_count
+
+    def get_cart_filter_values(self, store: str, dimension: str,
+                               search_params: Dict, column: str) -> List[Any]:
+        """
+        获取指定列的全部去重值，供前端筛选面板使用
+
+        Args:
+            store: 门店代码
+            dimension: 维度类型
+            search_params: 搜索/筛选参数（会自动排除当前列的 filter_<column>）
+            column: 要取去重值的字段名
+
+        Returns:
+            去重值列表
+        """
+        if not column:
+            return []
+
+        # 排除当前列自身的筛选条件，避免自己被自己过滤
+        filtered_search_params = {k: v for k, v in (search_params or {}).items()
+                                  if k != 'filter_' + column}
+
+        # 供应商维度的 supplier 列需要从展开后的数据中取
+        if dimension == 'supplier' and column == 'supplier':
+            with db_cursor(dict_cursor=True) as cursor:
+                sql = "SELECT supplier FROM crmapp_cart WHERE store = %s"
+                params = [store]
+                sql, params = self._apply_search_conditions(sql, params, filtered_search_params)
+                cursor.execute(sql, tuple(params))
+                rows = cursor.fetchall()
+
+            value_set = set()
+            for row in rows:
+                supplier_raw = row.get('supplier', '')
+                suppliers = self._parse_supplier_string(supplier_raw)
+                for name, price in suppliers:
+                    value_set.add(f"{name}：{price}")
+            return sorted(list(value_set))
+
+        # 其他列直接从基础表取去重值
+        db_field = self.FIELD_MAPPING.get(column)
+        if not db_field:
+            return []
+
+        with db_cursor(dict_cursor=True) as cursor:
+            sql = f"SELECT DISTINCT {db_field} AS col_value FROM crmapp_cart WHERE store = %s"
+            params = [store]
+            sql, params = self._apply_search_conditions(sql, params, filtered_search_params)
+            sql += f" ORDER BY {db_field}"
+
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+
+        values = []
+        for row in rows:
+            val = row.get('col_value')
+            if val is not None and val != '':
+                values.append(val)
+        return values
+
+    def _apply_search_conditions(self, sql: str, params: List, search_params: Dict) -> Tuple[str, List]:
+        """
+        通用搜索/筛选条件拼接，用于复用 get_cart_data 和 get_cart_filter_values 的过滤逻辑
+        """
+        if not search_params:
+            return sql, params
+
+        # 搜索参数
+        if search_params.get('cart_barcode'):
+            barcode_list = parse_space(search_params['cart_barcode'])
+            if barcode_list:
+                or_conditions = []
+                for barcode in barcode_list:
+                    or_conditions.append("(barcode LIKE %s OR oe LIKE %s)")
+                    params.extend([f'%{barcode}%', f'%{barcode}%'])
+                sql += " AND (" + " OR ".join(or_conditions) + ")"
+
+        if search_params.get('cart_oe'):
+            oe_list = parse_space(search_params['cart_oe'])
+            if oe_list:
+                or_conditions = []
+                for oe in oe_list:
+                    or_conditions.append("oe LIKE %s")
+                    params.append(f'%{oe}%')
+                sql += " AND (" + " OR ".join(or_conditions) + ")"
+
+        if search_params.get('cart_material_name'):
+            name_list = parse_comma(search_params['cart_material_name'])
+            if name_list:
+                or_conditions = []
+                for name in name_list:
+                    or_conditions.append("material_name LIKE %s")
+                    params.append(f'%{name}%')
+                sql += " AND (" + " OR ".join(or_conditions) + ")"
+
+        if search_params.get('cart_brand'):
+            brand_list = parse_space(search_params['cart_brand'])
+            if brand_list:
+                or_conditions = []
+                for brand in brand_list:
+                    or_conditions.append("brand LIKE %s")
+                    params.append(f'%{brand}%')
+                sql += " AND (" + " OR ".join(or_conditions) + ")"
+
+        if search_params.get('cart_tag'):
+            tag_list = parse_space(search_params['cart_tag'])
+            if tag_list:
+                or_conditions = []
+                for tag in tag_list:
+                    or_conditions.append("tag LIKE %s")
+                    params.append(f'%{tag}%')
+                sql += " AND (" + " OR ".join(or_conditions) + ")"
+
+        if search_params.get('cart_car_model'):
+            car_model_list = parse_space(search_params['cart_car_model'])
+            if car_model_list:
+                or_conditions = []
+                for car_model in car_model_list:
+                    or_conditions.append("car_model LIKE %s")
+                    params.append(f'%{car_model}%')
+                sql += " AND (" + " OR ".join(or_conditions) + ")"
+
+        if search_params.get('cart_car_brand'):
+            car_brand_list = parse_space(search_params['cart_car_brand'])
+            if car_brand_list:
+                or_conditions = []
+                for car_brand in car_brand_list:
+                    or_conditions.append("car_brand LIKE %s")
+                    params.append(f'%{car_brand}%')
+                sql += " AND (" + " OR ".join(or_conditions) + ")"
+
+        # 筛选参数 - 通用 filter_<field>
+        for key in list(search_params.keys()):
+            if key.startswith('filter_') and search_params.get(key):
+                field = key[7:]
+                db_field = self.FIELD_MAPPING.get(field)
+                if not db_field:
+                    continue
+                value_list = search_params[key].split(',')
+                if value_list:
+                    placeholders = ','.join(['%s'] * len(value_list))
+                    sql += f" AND {db_field} IN ({placeholders})"
+                    params.extend(value_list)
+
+        return sql, params
 
     def _build_order_clause(self, sort_field: str, sort_order: str) -> str:
         """

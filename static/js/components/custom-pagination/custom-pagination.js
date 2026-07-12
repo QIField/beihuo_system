@@ -24,6 +24,8 @@
             this.currentPageSize = this.options.defaultPageSize;
             this.totalRecords = 0;
             this.container = null;
+            // 标记容器是否由外部传入，外部容器销毁时不移除 DOM
+            this.externalContainer = !!this.options.container;
 
             this.init();
         }
@@ -253,8 +255,13 @@
         }
 
         destroy() {
-            if (this.container && this.container.parentNode) {
-                this.container.parentNode.removeChild(this.container);
+            if (this.container) {
+                if (this.externalContainer) {
+                    // 外部传入的容器只清空内容，不移除 DOM
+                    this.container.innerHTML = '';
+                } else if (this.container.parentNode) {
+                    this.container.parentNode.removeChild(this.container);
+                }
             }
             this.container = null;
         }
