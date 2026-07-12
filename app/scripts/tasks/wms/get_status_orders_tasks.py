@@ -307,3 +307,29 @@ def get_wms_picking_list_by_keywd_all_time_register():
 
 
 
+def get_wms_picking_list_half_hour_register():
+    """
+    任务函数：根据爬取WMS拣货订单（每半小时执行）
+    """
+    def get_wms_picking_list_by_half_hour_tasks():
+        """
+        任务函数：根据爬取WMS拣货订单（每半小时执行）
+        """
+        get_status_orders_by_page_service(status=0)
+        get_status_orders_by_page_service(status=1)
+        get_status_orders_by_page_service(page_num=10, status=None, store='fsbbr')
+
+    from app.core.task_enhancer import get_task_manager
+    task_manager=get_task_manager()
+    try:
+        task_manager.schedule(
+            func=get_wms_picking_list_by_half_hour_tasks,
+            trigger='interval',
+            job_id='get_wms_picking_list_by_half_hour_tasks',
+            minutes=30,
+            replace_existing=True
+        )
+        print("[任务] get_wms_picking_list_by_half_hour_tasks 已注册（每半小时执行）")
+    except Exception as e:
+        print(f"[任务get_wms_picking_list_by_half_hour_tasks] 注册失败: {e}")
+

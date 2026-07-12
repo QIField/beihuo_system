@@ -58,3 +58,8 @@ def expansion_tasks(task_manager):
     # 注册区域溯源数据定时任务
     from app.scripts.tasks.region_by_number_query_tasks import query_suyuan_data_register
     query_suyuan_data_register()
+
+
+    # 注册wms拣货订单定时任务
+    from app.scripts.tasks.wms.get_status_orders_tasks import get_wms_picking_list_half_hour_register
+    get_wms_picking_list_half_hour_register()
