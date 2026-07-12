@@ -313,8 +313,10 @@ def get_wms_picking_list_half_hour_register():
     """
     def get_wms_picking_list_by_half_hour_tasks():
         """
-        任务函数：根据爬取WMS拣货订单（每半小时执行）
+        任务函数：爬取WMS拣货订单和crm销售订单表（每半小时执行）
         """
+        from app.scripts.tasks.crm.get_merge_order_list_tasks import get_merge_order_list_by_time_tasks
+        get_merge_order_list_by_time_tasks()
         get_status_orders_by_page_service(status=0)
         get_status_orders_by_page_service(status=1)
         get_status_orders_by_page_service(page_num=10, status=None, store='fsbbr')
