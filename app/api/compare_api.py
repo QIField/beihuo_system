@@ -11,6 +11,8 @@ from app.services.compare_service.compare_data_service import (
     CompareDataService,
     get_oe_with_different_replace_numbers,
     use_replace_number,
+    get_replace_number_edit_list,
+    bulk_update_replace_numbers,
 )
 from app.services.compare_service.crm_sync_service import sync_oe_list_from_crm
 
@@ -418,5 +420,146 @@ def api_sync_oe_list():
         return jsonify({
             'code': -1,
             'message': f'同步失败: {str(e)}',
+            'data': None
+        }), 500
+
+
+@bp.route('/replace-number-edit-list', methods=['GET'])
+@login_required
+def api_get_replace_number_edit_list():
+    """
+    获取替换号编辑列表（按 OE 聚合）
+
+    请求参数:
+        - oe: OE号筛选（可选，支持空格分隔多值）
+        - page: 页码（可选，默认1）
+        - limit: 每页条数（可选，默认10）
+
+    返回:
+        {
+            "code": 0,
+            "message": "success",
+            "data": {
+                "list": [
+                    {
+                        "oe": "xxx",
+                        "original_numbers": "A,B",
+                        "other_numbers": "C,D",
+                        "is_upload": 1
+                    }
+                ],
+                "total": 100,
+                "page": 1,
+                "limit": 10
+            }
+        }
+    """
+    try:
+        oe = request.args.get('oe', '').strip()
+        page = request.args.get('page', '1').strip()
+        limit = request.args.get('limit', '10').strip()
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+
+        try:
+            page = int(page) if page else 1
+            limit = int(limit) if limit else 10
+        except ValueError:
+            return jsonify({
+                'code': -1,
+                'message': '页码和每页条数必须是整数',
+                'data': None
+            }), 400
+
+        if limit > 100:
+            limit = 100
+        if limit < 1:
+            limit = 10
+        if page < 1:
+            page = 1
+
+        company = get_user_company()
+
+        data_list, total = get_replace_number_edit_list(
+            oe=oe,
+            company=company,
+            page=page,
+            limit=limit,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return jsonify({
+            'code': 0,
+            'message': 'success',
+            'data': {
+                'list': data_list,
+                'total': total,
+                'page': page,
+                'limit': limit
+            }
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': -1,
+            'message': f'查询失败: {str(e)}',
+            'data': None
+        }), 500
+
+
+@bp.route('/bulk-update-replace-numbers', methods=['POST'])
+@login_required
+def api_bulk_update_replace_numbers():
+    """
+    批量更新替换号
+
+    请求参数:
+        {
+            "updates": [
+                {
+                    "oe": "xxx",
+                    "original_numbers": "A,B",
+                    "other_numbers": "C,D",
+                    "is_upload": 1
+                }
+            ]
+        }
+
+    返回:
+        {
+            "code": 0,
+            "message": "success",
+            "data": {
+                "total": 10,
+                "updated": 8,
+                "failed": 2,
+                "details": [...]
+            }
+        }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'code': -1, 'message': '请求体不能为空', 'data': None}), 400
+
+        updates = data.get('updates', [])
+        if not isinstance(updates, list):
+            return jsonify({'code': -1, 'message': 'updates 必须是数组', 'data': None}), 400
+
+        company = get_user_company()
+
+        result = bulk_update_replace_numbers(updates=updates, company=company)
+
+        return jsonify({
+            'code': 0,
+            'message': 'success',
+            'data': result
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': -1,
+            'message': f'批量更新失败: {str(e)}',
             'data': None
         }), 500

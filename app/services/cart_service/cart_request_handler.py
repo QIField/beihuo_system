@@ -10,8 +10,30 @@ from app.services.cart_service.cart_data_service import CartDataService
 class CartRequestHandler:
     """购物车请求处理器"""
 
+    SEARCH_KEYS = [
+        'cart_barcode', 'cart_oe', 'cart_material_name',
+        'cart_brand', 'cart_tag', 'cart_car_model', 'cart_car_brand'
+    ]
+
     def __init__(self):
         self.cart_data_service = CartDataService()
+
+    def _extract_search_params(self, args: Dict) -> Dict:
+        """从请求参数中提取搜索和筛选条件"""
+        search_params = {}
+        if not args or not isinstance(args, dict):
+            return search_params
+
+        for key in self.SEARCH_KEYS:
+            if args.get(key):
+                search_params[key] = args.get(key)
+
+        # 筛选参数（支持任意 filter_<field>）
+        for key in args.keys():
+            if key.startswith('filter_') and args.get(key):
+                search_params[key] = args.get(key)
+
+        return search_params
 
     def handle_get_cart_request(self, store: str, is_admin: bool, args: Dict = None) -> Dict[str, Any]:
         """
@@ -24,8 +46,6 @@ class CartRequestHandler:
         """
         # 从参数中获取维度，默认为产品维度
         dimension = 'product'
-        # 提取搜索参数
-        search_params = {}
         # 分页参数
         page = 1
         limit = 50
@@ -55,23 +75,14 @@ class CartRequestHandler:
             sort_field = args.get('field')  # 排序字段
             sort_order = args.get('order')  # 排序方向：asc 或 desc
 
-            # 提取搜索参数
-            search_keys = ['cart_barcode', 'cart_oe', 'cart_material_name', 'cart_brand', 'cart_tag', 'cart_car_model', 'cart_car_brand']
-            for key in search_keys:
-                if args.get(key):
-                    search_params[key] = args.get(key)
-            
-            # 提取筛选参数
-            filter_keys = ['filter_brand', 'filter_car_brand', 'filter_tag']
-            for key in filter_keys:
-                if args.get(key):
-                    search_params[key] = args.get(key)
+        # 提取搜索和筛选参数
+        search_params = self._extract_search_params(args)
 
         # 获取购物车数据
         try:
             # 使用CartDataService中的get_cart_data方法，传入维度参数、搜索参数、分页参数和排序参数
             cart_data, total_count = self.cart_data_service.get_cart_data(
-                store, is_admin, dimension, search_params, page, limit, sort_field, sort_order
+                store, dimension, search_params, page, limit, sort_field, sort_order
             )
 
             # 返回符合API接口格式的结果（包含分页信息）
@@ -91,56 +102,32 @@ class CartRequestHandler:
                 'data': []
             }
 
-    def handle_add_to_cart_request(self, store: str, item_details: Dict) -> Dict[str, Any]:
-        """处理添加到购物车的请求"""
+    def handle_get_cart_filter_values_request(self, store: str, is_admin: bool, args: Dict = None) -> Dict[str, Any]:
+        """
+        处理获取购物车某列全部去重值的请求
+        """
         try:
-            return self.cart_data_service.add_to_cart(store, item_details)
-        except Exception as e:
-            return {
-                'code': 1,
-                'msg': f'添加购物车失败: {str(e)}'
-            }
+            dimension = 'product'
+            column = ''
 
-    def handle_remove_from_cart_request(self, store: str, item_details: Dict) -> Dict[str, Any]:
-        """处理从购物车移除的请求"""
-        try:
-            return self.cart_data_service.remove_from_cart(store, item_details)
-        except Exception as e:
-            return {
-                'code': 1,
-                'msg': f'移除购物车失败: {str(e)}'
-            }
+            if args and isinstance(args, dict):
+                dimension = args.get('dimension', 'product')
+                column = args.get('column', '')
 
-    def handle_clear_cart_request(self, store: str, can_delete_cart: bool) -> Dict[str, Any]:
-        """处理清空购物车的请求"""
-        try:
-            return self.cart_data_service.clear_cart(store, can_delete_cart)
-        except Exception as e:
-            return {
-                'code': 1,
-                'msg': f'清空购物车失败: {str(e)}'
-            }
+            search_params = self._extract_search_params(args)
 
-    def handle_get_cart_summary(self, store: str, is_admin: bool) -> Dict[str, Any]:
-        """获取购物车摘要信息"""
-        try:
-            # 使用CartDataService中现有的get_cart_data方法，不分页获取总数
-            cart_data, total_count = self.cart_data_service.get_cart_data(store, is_admin, 'product', None, 1, 1)
-
-            # 添加清理结果信息
-            summary = {
-                'total_items': total_count,
-                'store': store,
-                'is_admin': is_admin
-            }
+            values = self.cart_data_service.get_cart_filter_values(store, dimension, search_params, column)
 
             return {
                 'code': 0,
-                'msg': '获取摘要成功',
-                'data': summary
+                'msg': '查询成功',
+                'data': values
             }
         except Exception as e:
             return {
                 'code': 1,
-                'msg': f'获取摘要失败: {str(e)}'
+                'msg': f'获取筛选值失败: {str(e)}',
+                'data': []
             }
+
+

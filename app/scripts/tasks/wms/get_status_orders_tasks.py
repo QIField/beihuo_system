@@ -14,7 +14,7 @@ from app.models.orm_models.wms.wms_picking_list import WmsPickingList
 from sqlalchemy.dialects.mysql import insert
 
 
-def get_status_orders_by_page_service(page_num=None, status=None, store='fsbbr', keywd=None, type=3, persist=True, logger=None):
+def get_status_orders_by_page_service(page_num=None, status=None, store='fsbbr', keywd=None, type=3, persist=True, logger=None, extra_fields=None):
     """
     分页爬取状态订单并清洗（while 循环版本）
 
@@ -36,6 +36,7 @@ def get_status_orders_by_page_service(page_num=None, status=None, store='fsbbr',
     :param keywd: 搜索关键字，默认 None
     :param persist: 是否入库，默认 True；False 时返回清洗后的数据列表
     :param logger: 可选日志器，外部传入则使用外部日志器
+    :param extra_fields: 可选，额外保留的字段名列表（仅供返回，不入库）
     :return: persist=True 返回 bool；persist=False 返回 list[dict]
     """
     import logging
@@ -55,12 +56,19 @@ def get_status_orders_by_page_service(page_num=None, status=None, store='fsbbr',
             logger.info("第 %s 页无数据，爬取结束", current_page)
             break
 
-        page_data_clean = get_status_orders_clean(page_data, store=store)
+        page_data_clean = get_status_orders_clean(page_data, store=store, extra_fields=extra_fields)
 
         if persist and page_data_clean:
+            # 入库时过滤掉 extra_fields，避免 DB 表不存在这些字段导致报错
+            extra_fields_set = set(extra_fields or [])
+            db_data = [
+                {k: v for k, v in row.items() if k not in extra_fields_set}
+                for row in page_data_clean
+            ]
+
             ##入库
             with orm_session() as session:
-                insert_stmt = insert(WmsPickingList.__table__).values(page_data_clean)
+                insert_stmt = insert(WmsPickingList.__table__).values(db_data)
 
                 # 改为从数据表取字段，避免多余字段KeyError
                 skip_cols = {'created_at', 'updated_at', 'data_flag', 'pono'}

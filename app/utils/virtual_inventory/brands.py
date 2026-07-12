@@ -68,13 +68,13 @@ def clear_brand_cache():
 def process_price_by_brand(price, brand, is_wantuo=False, is_changsheng_special=False, company='fsbbr'):
     """
     根据品牌精准匹配处理价格：
-    - 所有公司统一规则：原厂+5%，品牌+6%，其他+8%
-    - 万拓额外+15%，昌盛特殊产品额外+6%
+    - 所有公司统一规则：原厂+6%，品牌+8%，其他+10%
+    - 万拓额外+16%，昌盛特殊产品额外+7%
 
     :param price: 原始价格
     :param brand: 品牌名称
-    :param is_wantuo: 是否为万拓数据，如果是则额外加15%
-    :param is_changsheng_special: 是否为昌盛特殊产品（尾号80结尾+原厂再制造），如果是则额外加10%
+    :param is_wantuo: 是否为万拓数据，如果是则额外加16%
+    :param is_changsheng_special: 是否为昌盛特殊产品（尾号80结尾+备注含"是惠选件"），如果是则额外加7%
     :param company: 公司标识（保留参数，不再区分规则）
     """
     if not price or price == '':
@@ -94,23 +94,23 @@ def process_price_by_brand(price, brand, is_wantuo=False, is_changsheng_special=
             type_cn = brand_dict[brand]
             # 原厂品牌
             if type_cn == '原厂':
-                base_rate = 0.05
+                base_rate = 0.06
             # type_cn='品牌'
             elif type_cn == '品牌':
-                base_rate = 0.06
+                base_rate = 0.08
             # type_cn='其他品牌'
             else:
-                base_rate = 0.08
+                base_rate = 0.10
         else:
             # 品牌不在 crm_brand_list 中
-            base_rate = 0.08
+            base_rate = 0.10
 
-        # 额外加点率（万拓+15%，昌盛特殊+6%）
+        # 额外加点率（万拓+16%，昌盛特殊+7%）
         extra_rate = 0.0
         if is_wantuo:
-            extra_rate += 0.15
+            extra_rate += 0.16
         elif is_changsheng_special:
-            extra_rate += 0.06
+            extra_rate += 0.07
 
         # 总加点率 = 基础加点 + 额外加点
         total_rate = base_rate + extra_rate

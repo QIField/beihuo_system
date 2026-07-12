@@ -4,15 +4,16 @@
 # @Project : beihuo_system
 # @File    : ks_nonself_report_service.py
 # @Software: PyCharm
-# @Desc    : 开思非本店下单业务汇报服务
-#            每日定时任务运行结束后调用，统计昨日 display_seller_status='非本店下单' 的数据，
-#            生成 Excel 文件并通过微信推送下载链接。
+# @Desc    : 开思下单业务汇报服务
+#            每日定时任务运行结束后调用，统计昨日数据，
+#            生成 Excel（非本店下单 / 本店下单 两个工作表）并通过微信推送下载链接。
 
 import os
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 
 import pandas as pd
+from openpyxl.styles import Alignment
 
 from app.utils.database_connection import db_cursor
 from app.utils.common_util_module.server_push import message_push
@@ -31,12 +32,34 @@ CATEGORY = "ks_nonself"
 EXPORT_DIR = os.path.join("static", "exports")
 DOWNLOAD_URL_TEMPLATE = "http://x.fsbbr.net/web/download_excel/{category}/{company}/{date_str}"
 
+# 按 inquiryId 合并的列名
+MERGE_BY_INQUIRYID_COLUMNS = [
+    "inquiryId",
+    "garage_company_name",
+    "vin",
+    "engine",
+    "production_date",
+    "chassis",
+]
 
-def _fetch_nonself_records(company: str, date_str: str):
+# Excel 列顺序
+EXCEL_COLUMNS = [
+    "inquiryId", "garage_company_name", "partsNum", "partsName",
+    "brandName", "brandNormalized", "brandId", "sellerPrice", "sellerBtPrice",
+    "display_seller_status", "remark", "vin", "engine", "production_date", "chassis",
+    "car_brand_name", "location_name", "arrival_time"
+]
+
+
+def _fetch_records(company: str, date_str: str, statuses: Tuple[str, ...]) -> List[Dict[str, Any]]:
     """
-    查询指定门店、指定日期的「非本店下单」明细
+    查询指定门店、指定日期、指定状态的明细
     """
-    sql = """
+    if not statuses:
+        return []
+
+    placeholders = ', '.join(['%s'] * len(statuses))
+    sql = f"""
         SELECT
             inquiryId,
             garage_company_name,
@@ -45,6 +68,8 @@ def _fetch_nonself_records(company: str, date_str: str):
             brandName,
             brandNormalized,
             brandId,
+            sellerPrice,
+            sellerBtPrice,
             display_seller_status,
             remark,
             vin,
@@ -55,27 +80,123 @@ def _fetch_nonself_records(company: str, date_str: str):
             location_name,
             arrival_time
         FROM crmapp_ks_inquiry_detail
-        WHERE display_seller_status = %s
+        WHERE display_seller_status IN ({placeholders})
           AND company = %s
           AND quote_date = %s
         ORDER BY created_at DESC
     """
+    params = statuses + (company, date_str)
     with db_cursor(dict_cursor=True) as cursor:
-        cursor.execute(sql, ("非本店下单", company, date_str))
+        cursor.execute(sql, params)
         return cursor.fetchall()
 
 
-def _export_to_excel(records, company: str, date_str: str) -> str:
+def _build_sheet_data(records: List[Dict[str, Any]]) -> Tuple[pd.DataFrame, List[Tuple[int, int]]]:
     """
-    将记录导出到 static/exports/{category}_{company}_{date_str}.xlsx
-    返回生成的文件绝对路径
+    按 inquiryId 排序、分组，组间插入空行，返回 DataFrame 和合并范围
+
+    :param records: 原始记录列表
+    :return: (DataFrame, 合并范围列表[(start_excel_row, end_excel_row)])
+    """
+    if not records:
+        return pd.DataFrame(columns=EXCEL_COLUMNS), []
+
+    # 按 inquiryId 排序
+    sorted_records = sorted(records, key=lambda r: r.get("inquiryId", ""))
+
+    data_rows: List[Dict[str, Any]] = []
+    merge_ranges: List[Tuple[int, int]] = []
+    current_inquiry_id: Any = None
+    group_start_row: int = 0
+    excel_row = 2  # 第 1 行为表头，数据从第 2 行开始
+
+    for record in sorted_records:
+        inquiry_id = record.get("inquiryId")
+        if inquiry_id != current_inquiry_id:
+            if current_inquiry_id is not None:
+                # 结束上一个 inquiryId 分组
+                if group_start_row > 0:
+                    merge_ranges.append((group_start_row, excel_row - 1))
+                # 不同 inquiryId 之间插入空行
+                data_rows.append({col: "" for col in EXCEL_COLUMNS})
+                excel_row += 1
+            current_inquiry_id = inquiry_id
+            group_start_row = excel_row
+
+        data_rows.append({col: record.get(col, "") for col in EXCEL_COLUMNS})
+        excel_row += 1
+
+    # 结束最后一个分组
+    if group_start_row > 0:
+        merge_ranges.append((group_start_row, excel_row - 1))
+
+    df = pd.DataFrame(data_rows, columns=EXCEL_COLUMNS)
+    return df, merge_ranges
+
+
+def _apply_inquiryid_merges(ws, merge_ranges: List[Tuple[int, int]]) -> None:
+    """
+    对 MERGE_BY_INQUIRYID_COLUMNS 列按 inquiryId 行范围纵向合并单元格
+    """
+    merge_col_indices = []
+    for col_name in MERGE_BY_INQUIRYID_COLUMNS:
+        if col_name in EXCEL_COLUMNS:
+            merge_col_indices.append(EXCEL_COLUMNS.index(col_name) + 1)
+
+    for start_row, end_row in merge_ranges:
+        if start_row >= end_row:
+            continue
+        for col_idx in merge_col_indices:
+            ws.merge_cells(start_row=start_row, start_column=col_idx, end_row=end_row, end_column=col_idx)
+            ws.cell(row=start_row, column=col_idx).alignment = Alignment(vertical="center")
+
+
+def _auto_fit_columns(ws) -> None:
+    """
+    根据单元格内容自动调整列宽
+    """
+    for column in ws.columns:
+        column_letter = column[0].column_letter
+        max_length = 0
+        for cell in column:
+            value = cell.value
+            if value is None:
+                continue
+            try:
+                cell_length = len(str(value))
+                if cell_length > max_length:
+                    max_length = cell_length
+            except Exception:
+                continue
+        adjusted_width = max_length + 2
+        if adjusted_width > 0:
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+
+def _export_to_excel(nonself_records, self_records, company: str, date_str: str) -> str:
+    """
+    将记录按状态分两个工作表导出：
+    - 非本店下单
+    - 本店下单（含本店下单！）
     """
     os.makedirs(EXPORT_DIR, exist_ok=True)
     file_name = f"{CATEGORY}_{company}_{date_str}.xlsx"
     file_path = os.path.join(EXPORT_DIR, file_name)
 
-    df = pd.DataFrame(records)
-    df.to_excel(file_path, index=False)
+    with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
+        for sheet_name, records in [("非本店下单", nonself_records), ("本店下单", self_records)]:
+            df, merge_ranges = _build_sheet_data(records)
+            df = df.rename(columns={
+                "sellerPrice": "含税价",
+                "sellerBtPrice": "不含税价",
+            })
+
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+            ws = writer.sheets[sheet_name]
+            _apply_inquiryid_merges(ws, merge_ranges)
+            ws.freeze_panes = "A2"
+            _auto_fit_columns(ws)
+
     return file_path
 
 
@@ -85,20 +206,21 @@ def _build_download_url(company: str, date_str: str) -> str:
     )
 
 
-def _build_message(now_str: str, date_str: str, store_name: str, count: int, download_url: str) -> str:
+def _build_message(now_str: str, date_str: str, store_name: str, nonself_count: int, self_count: int, download_url: str) -> str:
     return (
-        "===【开思非本店下单业务汇报】===\n"
+        "===【开思下单业务汇报】===\n"
         f"统计时间：{now_str}\n"
         f"数据日期范围：{date_str}\n"
         f"门店：{store_name}\n"
-        f"数据条数：{count}\n"
+        f"非本店下单：{nonself_count} 条\n"
+        f"本店下单：{self_count} 条\n"
         f"文件下载链接：{download_url}"
     )
 
 
 def run_ks_nonself_daily_report() -> Dict[str, Any]:
     """
-    执行开思非本店下单业务汇报
+    执行开思下单业务汇报
     - 数据范围：当前日期的前一天（昨天一整天）
     - 遍历 KS_NONSELF_STORE_MAP 中配置的门店
     - 有数据则导出 Excel 并推送消息；无数据跳过推送
@@ -111,36 +233,42 @@ def run_ks_nonself_daily_report() -> Dict[str, Any]:
     date_str = yesterday.strftime("%Y-%m-%d")
     now_str = now.strftime("%Y-%m-%d %H:%M")
 
-    print(f"\n[开思非本店下单汇报] 开始执行，数据日期：{date_str}")
+    print(f"\n[开思下单汇报] 开始执行，数据日期：{date_str}")
 
     summary = {"date": date_str, "stores": []}
 
     for company, store_name in KS_NONSELF_STORE_MAP.items():
-        records = _fetch_nonself_records(company, date_str)
-        count = len(records)
+        nonself_records = _fetch_records(company, date_str, ("非本店下单",))
+        self_records = _fetch_records(company, date_str, ("本店下单", "本店下单！"))
+        nonself_count = len(nonself_records)
+        self_count = len(self_records)
+        total_count = nonself_count + self_count
+
         store_result = {
             "company": company,
             "store_name": store_name,
-            "count": count,
+            "nonself_count": nonself_count,
+            "self_count": self_count,
+            "count": total_count,
             "pushed": False,
             "file_path": None,
         }
 
-        if count == 0:
-            print(f"[开思非本店下单汇报] {store_name}({company}) 无数据，跳过推送")
+        if total_count == 0:
+            print(f"[开思下单汇报] {store_name}({company}) 无数据，跳过推送")
         else:
-            file_path = _export_to_excel(records, company, date_str)
+            file_path = _export_to_excel(nonself_records, self_records, company, date_str)
             store_result["file_path"] = file_path
 
             download_url = _build_download_url(company, date_str)
-            message = _build_message(now_str, date_str, store_name, count, download_url)
+            message = _build_message(now_str, date_str, store_name, nonself_count, self_count, download_url)
 
             push_resp = message_push("开思", message)
             store_result["pushed"] = True
-            print(f"[开思非本店下单汇报] {store_name}({company}) 推送成功，{count} 条，"
+            print(f"[开思下单汇报] {store_name}({company}) 推送成功，非本店{nonself_count} 条，本店{self_count} 条，"
                   f"文件：{file_path}，响应：{push_resp}")
 
         summary["stores"].append(store_result)
 
-    print(f"[开思非本店下单汇报] 执行完成\n")
+    print(f"[开思下单汇报] 执行完成\n")
     return summary

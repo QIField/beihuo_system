@@ -659,7 +659,7 @@
                 直接入库数据<span class="tab-badge" id="directBadge">0</span>
             </button>
             <button class="data-tab" id="tabGzbbr" data-type="gzbbr">
-                失效时间调整(data.gzbbr)<span class="tab-badge" id="gzbbrBadge">0</span>
+                失效时间调整<span class="tab-badge" id="gzbbrBadge">0</span>
             </button>
         </div>
 
@@ -692,9 +692,9 @@
         </div>
 
         <!-- data.gzbbr 失效时间调整 -->
-        <div class="data-container" id="gzbbrContainer" style="display: none;">
+        <div class="data-container" id="gzbbrContainer" style="display: none; flex-direction: column; flex: 1; min-height: 0;">
             <div class="data-header">
-                <span>data.gzbbr 报价失效时间调整</span>
+                <span>报价失效时间调整</span>
                 <div class="search-bar">
                     <input type="text" class="search-input" id="gzbbrSearchOe" placeholder="OE号">
                     <input type="text" class="search-input" id="gzbbrSearchSupplier" placeholder="供应商">
@@ -712,11 +712,35 @@
                     </label>
                 </div>
             </div>
-            <div id="gzbbrHandsontableContainer" style="margin-top: 10px;"></div>
+            <div id="gzbbrHandsontableContainer" style="margin-top: 10px; flex: 1; min-height: 0;"></div>
         </div>
     </div>
 
+    <!-- 批量更新 loading 提示 -->
+    <div id="gzbbrLoadingMask" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+        <div style="background: #fff; padding: 30px 50px; border-radius: 8px; text-align: center; font-size: 16px; color: #333;">
+            <div style="margin-bottom: 15px;">正在更新，请稍候...</div>
+            <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #1890ff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
     <script>
+        // 抑制 Handsontable 14.1.0 内部事件兼容性问题（不影响功能）
+        window.addEventListener('error', function(e) {
+            const msg = e.message || '';
+            if (msg.includes("Cannot read properties of undefined (reading 'toLowerCase')") &&
+                e.filename && e.filename.includes('handsontable')) {
+                e.preventDefault();
+            }
+        });
+
         let hot;
         let allData = [];
         let currentPage = 1;
@@ -1117,9 +1141,12 @@
                     tabGzbbr.classList.add('active');
                     tabNormal.classList.remove('active');
                     tabDirect.classList.remove('active');
-                    dataTitle.textContent = 'data.gzbbr 报价失效时间调整';
+                    dataTitle.textContent = '报价失效时间调整';
                     mainContainer.style.display = 'none';
-                    gzbbrContainer.style.display = 'block';
+                    gzbbrContainer.style.display = 'flex';
+                    if (gzbbrHot) {
+                        setTimeout(() => gzbbrHot.render(), 0);
+                    }
                 }
             });
         }
@@ -1239,7 +1266,7 @@
                 data: data,
                 colHeaders: ['选择', 'OE号', '品牌', '供应商', '仓库', '价格', '库存', '原失效时间', '备注'],
                 columns: [
-                    { data: 'selected', type: 'checkbox', width: 50 },
+                    { data: 'selected', type: 'checkbox', renderer: 'checkbox', width: 50 },
                     { data: 'number', readOnly: true },
                     { data: 'brand_name', readOnly: true },
                     { data: 'supplier_name', readOnly: true },
@@ -1262,9 +1289,12 @@
         function toggleGzbbrSelectAll(e) {
             const checked = e.target.checked;
             if (!gzbbrHot) return;
-            const data = gzbbrHot.getSourceData();
-            data.forEach(row => row.selected = checked);
-            gzbbrHot.render();
+            const rowCount = gzbbrHot.countRows();
+            const changes = [];
+            for (let i = 0; i < rowCount; i++) {
+                changes.push([i, 0, checked]);
+            }
+            gzbbrHot.setDataAtCell(changes);
         }
 
         function batchUpdateGzbbrLoseDate() {
@@ -1278,18 +1308,22 @@
                 return;
             }
 
-            const selectedRows = gzbbrHot.getSourceData().filter(row => row.selected);
+            const selectedFlags = gzbbrHot.getDataAtCol(0);
+            const selectedRows = gzbbrAllData.filter((_, index) => selectedFlags[index]);
             if (selectedRows.length === 0) {
                 alert('请选择要更新的记录');
                 return;
             }
 
-            const records = selectedRows.map(row => row._raw);
+            const records = selectedRows.map(item => item);
             const formattedDate = loseDateInput.replace('T', ' ') + ':00';
 
             if (!confirm(`确定更新选中的 ${records.length} 条记录失效时间为 ${formattedDate} 吗？`)) {
                 return;
             }
+
+            const loadingMask = document.getElementById('gzbbrLoadingMask');
+            loadingMask.style.display = 'flex';
 
             fetch('/api/purchase_plan/inquiry/gzbbr_quote_update', {
                 method: 'POST',
@@ -1298,6 +1332,7 @@
             })
             .then(r => r.json())
             .then(res => {
+                loadingMask.style.display = 'none';
                 if (res.code !== 0) {
                     alert(res.msg);
                     return;
@@ -1305,7 +1340,10 @@
                 alert(`更新完成：成功 ${res.data.success_count} 条，失败 ${res.data.failed_count} 条，本地同步 ${res.data.total_synced_rows || 0} 条`);
                 loadGzbbrQuotes();
             })
-            .catch(err => alert('更新失败: ' + err));
+            .catch(err => {
+                loadingMask.style.display = 'none';
+                alert('更新失败: ' + err);
+            });
         }
 
         // 临时存储待上传的文件

@@ -61,7 +61,12 @@ class KsInquiryStatsService:
         if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
-        if seller_status: conditions.append("display_seller_status LIKE %s"); params.append(f"%{seller_status}%")
+        if seller_status:
+            if seller_status == '本店下单':
+                conditions.append("display_seller_status IN ('本店下单', '本店下单！')")
+            else:
+                conditions.append("display_seller_status = %s")
+                params.append(seller_status)
         if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
         if end_date:      conditions.append("quote_date <= %s");            params.append(end_date)
         if company:       conditions.append("company = %s");                params.append(company)
@@ -206,7 +211,12 @@ class KsInquiryStatsService:
         if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
-        if seller_status: conditions.append("display_seller_status LIKE %s"); params.append(f"%{seller_status}%")
+        if seller_status:
+            if seller_status == '本店下单':
+                conditions.append("display_seller_status IN ('本店下单', '本店下单！')")
+            else:
+                conditions.append("display_seller_status = %s")
+                params.append(seller_status)
         if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
         if end_date:      conditions.append("quote_date <= %s");            params.append(end_date)
         if company:       conditions.append("company = %s");                params.append(company)

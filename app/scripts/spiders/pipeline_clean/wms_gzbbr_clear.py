@@ -10,42 +10,51 @@
 import pandas as pd
 
 
-def get_status_orders_clean(data_list,store='fsbbr'):
+def get_status_orders_clean(data_list, store='fsbbr', extra_fields=None):
     """
     去重和数据清洗函数
-    
+
     该函数执行以下操作：
     1. 将数据列表转换为 DataFrame
     2. 删除 pono（拣货单号）为空的记录
     3. 将清洗后的数据转换回字典列表
     4. 过滤只保留数据库模型定义的字段
-    
+    5. 可选保留 extra_fields 中指定的额外字段（不入库，仅供上层任务使用）
+
     :param data_list: 原始数据列表，每个元素为一个订单数据字典
-    :return: 过滤后的订单数据列表（已删除 pono 为空的记录，且只保留模型字段）
+    :param store: 门店标识
+    :param extra_fields: 可选，额外需要保留的字段名列表
+    :return: 过滤后的订单数据列表
     """
     # 要保留的字段
     model_fields = [
         'type', 'is_checkupdate', 'orders_id', 'orders_no', 'pono',
         'rid', 'frey_no', 'status', 'partner_sapno', 'fullname',
         'orderdate', 'name', 'dhdate', 'jhdate', 'qty', 'toqty',
-        'l_name_zh','supplier_short_name', 'wait_pick_num', 'already_pick_num'
+        'l_name_zh', 'supplier_short_name', 'wait_pick_num', 'already_pick_num'
     ]
+
+    extra_fields = extra_fields or []
+    keep_fields = list(model_fields)
+    for field in extra_fields:
+        if field not in keep_fields:
+            keep_fields.append(field)
 
     # 将数据列表转换为 DataFrame
     df = pd.DataFrame(data_list)
-    
+
     # 删除 pono（拣货单号）为空的记录，使用 copy() 避免 SettingWithCopyWarning
     df = df.dropna(subset=['pono']).copy()
 
-    # 只保留模型字段
-    df = df[model_fields]
-    
-    #添加门店store字段
+    # 只保留需要的字段（模型字段 + 可选额外字段）
+    available_fields = [col for col in keep_fields if col in df.columns]
+    df = df[available_fields]
+
+    # 添加门店store字段
     df['store'] = store
 
     # 处理空值，将空字符串 / 空格 / None / NaN 替换为 None
-    cols = model_fields
-    for col in cols:
+    for col in available_fields:
         df[col] = df[col].replace(['', r'^\s*$'], None, regex=True)  # pyright: ignore[reportAttributeAccessIssue]
 
     # 将清洗后的 DataFrame 转换为字典列表

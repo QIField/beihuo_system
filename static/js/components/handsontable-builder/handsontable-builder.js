@@ -139,6 +139,7 @@ var HandsontableBuilder = (function() {
         }
 
         builder.pagination = CustomPagination.init({
+            container: pgConfig.container || null,
             gridSelector: builder.selector,
             pageSizeOptions: pgConfig.pageSizeOptions || [50, 100, 200, 500],
             defaultPageSize: pgConfig.defaultPageSize || 100,
@@ -266,8 +267,18 @@ var HandsontableBuilder = (function() {
                     return;
                 }
 
-                var list = result.data.list || [];
-                var total = result.data.total || 0;
+                // 兼容两种返回格式：
+                // 1. { code: 0, data: { list: [], total: N } }
+                // 2. { code: 0, data: [], count: N }（旧版 LayUI 风格）
+                var list = [];
+                var total = 0;
+                if (result.data && Array.isArray(result.data.list)) {
+                    list = result.data.list;
+                    total = result.data.total || 0;
+                } else if (Array.isArray(result.data)) {
+                    list = result.data;
+                    total = result.count || list.length;
+                }
 
                 if (typeof config.dataTransform === 'function') {
                     list = config.dataTransform(list) || list;
@@ -314,6 +325,7 @@ var HandsontableBuilder = (function() {
         var enableDoubleClickCopy = isEnabled(components, 'doubleClickCopy');
         var enableContextMenu = isEnabled(components, 'contextMenu');
         var enableShortcuts = isEnabled(components, 'shortcuts');
+        var enableVirtualScroll = isEnabled(components, 'virtualScroll');
 
         var userAfterGetColHeader = null;
         if (config.handsontableOptions && typeof config.handsontableOptions.afterGetColHeader === 'function') {
@@ -334,7 +346,7 @@ var HandsontableBuilder = (function() {
             autoRowSize: false,
             autoColumnSize: false,
             autoWrapRow: false,
-            renderAllRows: true,
+            renderAllRows: !enableVirtualScroll,
             readOnly: config.readOnly !== false,
             disableVisualSelection: false,
             selectionMode: config.selectionMode || 'multiple',
