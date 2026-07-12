@@ -39,6 +39,10 @@
             <div class="toolbar">
                 <form class="layui-form" lay-filter="searchForm">
                     <div class="layui-form-item" style="margin-bottom: 0;">
+                        <label class="layui-form-label">供应商名称</label>
+                        <div class="layui-input-inline" style="width: 200px;">
+                            <input type="text" name="fullname" placeholder="请输入供应商名称" class="layui-input">
+                        </div>
                         <label class="layui-form-label">推送状态</label>
                         <div class="layui-input-inline" style="width: 150px;">
                             <select name="has_pushed_ks" lay-filter="has_pushed_ks">
@@ -228,7 +232,7 @@
                     url: '/new/api/wms_upload_site/get_return_items_from_db_api',
                     method: 'GET',
                     where: {
-                        // 默认参数
+                        fullname: '',
                         has_pushed_ks: ''
                     },
                     parseData: function(res){
@@ -276,7 +280,8 @@
                         {field: 'frey_no', title: 'FREY编号', width: 180},
                         {field: 'needqty', title: '数量', width: 80, sort: true},
                         {field: 'warehouse_name', title: '仓库名称', width: 120},
-                        {field: 'has_pushed_ks', title: '是否已推送至快手', width: 120, templet: function(d){
+                        {field: 'fullname', title: '供应商名称', width: 200},
+                        {field: 'has_pushed_ks', title: '是否已推送至快手', width: 200, templet: function(d){
                             if(d.has_pushed_ks == 1){
                                 return '<span style="color: #5FB878;">是</span>';
                             } else {
@@ -533,17 +538,25 @@
 
             // 搜索按钮点击事件
             $('#searchBtn').click(function(){
+                var fullname = $('input[name="fullname"]').val();
                 var has_pushed_ks = $('select[name="has_pushed_ks"]').val();
                 
-                // 重新加载表格，传递筛选参数
                 tableIns.reload({
                     where: {
+                        fullname: fullname,
                         has_pushed_ks: has_pushed_ks
                     },
                     page: {
-                        curr: 1 // 重新从第1页开始
+                        curr: 1
                     }
                 });
+            });
+
+            // 供应商名称输入框回车触发搜索
+            $('input[name="fullname"]').keydown(function(e){
+                if(e.keyCode === 13){
+                    $('#searchBtn').click();
+                }
             });
 
             // 设置按钮点击事件

@@ -109,6 +109,8 @@ def wms_get_return_items(orders_no_list=None,type_param=None,status_param=None):
             po_info = json_data.get('data', {}).get('po', {})
             pono = po_info.get('pono')
             orders_id = po_info.get('orders_id')
+            fullname = po_info.get('fullname')
+          
             
             # 为每个商品添加订单信息
             for item in return_items:
@@ -117,6 +119,8 @@ def wms_get_return_items(orders_no_list=None,type_param=None,status_param=None):
                 item['orders_id'] = orders_id
                 item['type_param'] = type_param
                 item['status']=status_param
+                item['fullname']=fullname
+      
             
             all_return_items.extend(return_items)
             print(f"订单 {orders_no} 查询完成，获取到 {len(return_items)} 条采购入库单")

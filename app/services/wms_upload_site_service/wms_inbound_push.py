@@ -24,13 +24,14 @@ def wms_get_return_items_data():
     return return_items
 
 
-def wms_get_return_items_from_db(page=1, limit=20, has_pushed_ks=''):
+def wms_get_return_items_from_db(page=1, limit=20, has_pushed_ks='', fullname=''):
     """
     从数据库获取采购入库单数据（分页，只返回status=0的数据）
     
     :param page: 页码，从1开始
     :param limit: 每页数量
     :param has_pushed_ks: 推送状态筛选（''表示全部，'0'表示未推送，'1'表示已推送）
+    :param fullname: 供应商名称模糊搜索
     :return: (数据列表, 总条数)
     """
     try:
@@ -41,6 +42,11 @@ def wms_get_return_items_from_db(page=1, limit=20, has_pushed_ks=''):
             # 添加has_pushed_ks筛选条件
             if has_pushed_ks in ['0', '1']:
                 query = query.filter(WmsReturnItems.has_pushed_ks == int(has_pushed_ks))
+            
+            # 添加供应商名称模糊搜索条件
+            if fullname and fullname.strip():
+                escaped_fullname = fullname.strip().replace('%', '\\%').replace('_', '\\_')
+                query = query.filter(WmsReturnItems.fullname.like(f'%{escaped_fullname}%', escape='\\'))
             
             # 获取总条数
             total = query.count()
