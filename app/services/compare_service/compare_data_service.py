@@ -1208,28 +1208,60 @@ class ReplaceNumberEditService:
 
                 where_clause = "WHERE " + " AND ".join(where_conditions)
 
-                # 1. 获取符合筛选条件的 OE 总数
-                count_sql = f"""
-                    SELECT COUNT(DISTINCT oe) FROM {CompareDataService.TABLE_NAME}
-                    {where_clause}
-                """
-                cursor.execute(count_sql, params)
-                total = cursor.fetchone()[0]
+                # 无 OE 条件时：只展示 replace_number 有差异的 OE
+                specific_oe_filter = bool(oe_list)
 
-                if total == 0:
-                    return [], 0
+                if not specific_oe_filter:
+                    # 1. 获取有差异的 OE 总数
+                    count_sql = f"""
+                        SELECT COUNT(*) FROM (
+                            SELECT oe FROM {CompareDataService.TABLE_NAME}
+                            {where_clause}
+                            GROUP BY oe
+                            HAVING COUNT(DISTINCT IFNULL(replace_number, '')) > 1
+                        ) AS diff_oes
+                    """
+                    cursor.execute(count_sql, params)
+                    total = cursor.fetchone()[0]
 
-                # 2. 分页获取 OE 列表
-                offset = (page - 1) * limit
-                oe_sql = f"""
-                    SELECT DISTINCT oe FROM {CompareDataService.TABLE_NAME}
-                    {where_clause}
-                    ORDER BY oe
-                    LIMIT %s OFFSET %s
-                """
-                cursor.execute(oe_sql, params + [limit, offset])
-                oe_rows = cursor.fetchall()
-                oe_list_paged = [row[0] for row in oe_rows]
+                    if total == 0:
+                        return [], 0
+
+                    # 2. 分页获取有差异的 OE 列表
+                    offset = (page - 1) * limit
+                    oe_sql = f"""
+                        SELECT oe FROM {CompareDataService.TABLE_NAME}
+                        {where_clause}
+                        GROUP BY oe
+                        HAVING COUNT(DISTINCT IFNULL(replace_number, '')) > 1
+                        ORDER BY oe
+                        LIMIT %s OFFSET %s
+                    """
+                    cursor.execute(oe_sql, params + [limit, offset])
+                    oe_rows = cursor.fetchall()
+                    oe_list_paged = [row[0] for row in oe_rows]
+                else:
+                    # 有 OE 条件时：直接展示指定 OE，不判断是否差异
+                    count_sql = f"""
+                        SELECT COUNT(DISTINCT oe) FROM {CompareDataService.TABLE_NAME}
+                        {where_clause}
+                    """
+                    cursor.execute(count_sql, params)
+                    total = cursor.fetchone()[0]
+
+                    if total == 0:
+                        return [], 0
+
+                    offset = (page - 1) * limit
+                    oe_sql = f"""
+                        SELECT DISTINCT oe FROM {CompareDataService.TABLE_NAME}
+                        {where_clause}
+                        ORDER BY oe
+                        LIMIT %s OFFSET %s
+                    """
+                    cursor.execute(oe_sql, params + [limit, offset])
+                    oe_rows = cursor.fetchall()
+                    oe_list_paged = [row[0] for row in oe_rows]
 
                 # 3. 获取这些 OE 的所有数据
                 in_placeholders = ', '.join(['%s'] * len(oe_list_paged))

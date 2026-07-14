@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timedelta
 import pandas as pd
 from app.utils.logger_config import get_task_logger
+from ..brands import normalize_brand
 
 
 logger = get_task_logger('virtual_inventory')
@@ -169,10 +170,7 @@ def start():
     df['备注'] = ''
     df = df[['供应商名称', '原厂OE码', '品牌', '价格', '失效时间', '仓库名称', '库存', '备注']]
 
-    df.loc[df['品牌'] == '原厂国外', '品牌'] = '原厂'
-    df.loc[df['品牌'] == '原厂大库', '品牌'] = '原厂国内4s件'
-    df.loc[df['品牌'] == '赛多夫', '品牌'] = '巴博瑞'
-    df.loc[df['品牌'] == '猫头鹰', '品牌'] = '伦福德(猫)'
+    df['品牌'] = df['品牌'].apply(normalize_brand)
 
     # OE以80结尾且品牌为"原厂再制造"的，映射为"原厂国内4s件"，并在备注插入"是惠选件！！！"
     mask = (df['原厂OE码'].str.endswith('80')) & (df['品牌'] == '原厂再制造')

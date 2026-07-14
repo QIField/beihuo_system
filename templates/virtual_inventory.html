@@ -285,20 +285,19 @@
             });
         },
 
-        // 加载更新信息选项（固定8种中文状态）
+        // 加载更新信息选项
         loadUpdateMsgOptions: function() {
             layui.use(['jquery'], function() {
                 var $ = layui.jquery;
-                console.log('[⏱️ 计时] 开始加载更新信息选项（固定8种状态）...');
+                console.log('[⏱️ 计时] 开始加载更新信息选项...');
 
-                // 固定的8种中文状态（不显示汇总分类）
+                // 固定的更新状态分类（不显示汇总分类）
                 var statusOptions = [
                     { value: '', label: '选择更新信息分类' },
                     { value: '上传成功', label: '上传成功' },
                     { value: '新建成功-已存在', label: '新建成功-已存在' },
                     { value: '新建成功-新创建', label: '新建成功-新创建' },
-                    { value: '新建失败-未找到产品名称', label: '新建失败-未找到产品名称' },
-                    { value: '新建失败-车型不能为空', label: '新建失败-车型不能为空' },
+                    { value: '新建失败', label: '新建失败' },
                     { value: '上传失败-过期时间错误', label: '上传失败-过期时间错误' },
                     { value: '上传失败-品牌不存在', label: '上传失败-品牌不存在' },
                     { value: '上传失败-产品不存在', label: '上传失败-产品不存在' },
@@ -318,7 +317,7 @@
                     layui.form.render('select');
                 }
 
-                console.log('[⏱️ 计时] 更新信息选项加载完成（固定8种状态）');
+                console.log('[⏱️ 计时] 更新信息选项加载完成');
             });
         },
         

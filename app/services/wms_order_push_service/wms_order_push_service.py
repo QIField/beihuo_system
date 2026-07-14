@@ -10,6 +10,7 @@
 import logging
 import os
 import re
+from collections import Counter
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -44,11 +45,11 @@ CRAWL_COMBINATIONS = [
     (5, 1),
 ]
 
-# 订单列表接口需要额外保留的字段（不入库，仅用于 Excel）
-EXTRA_ORDER_FIELDS = ["handler_name", "real_name"]
-
-# 01-09 开头库位：第一次保存不推送，第二次才推送
+# 01-09 开头库位：第一次保存不推送，第二次才推送（仅 status=1 使用）
 KWNOS_PATTERN = re.compile(r"^0[1-9]-")
+
+# status=1 时订单列表需要额外保留的字段（不入库，仅用于 Excel）
+PICK_WORK_EXTRA_FIELDS = ["handler_name", "real_name"]
 
 # type 显示映射
 TYPE_NAME_MAP = {
@@ -68,13 +69,16 @@ MERGE_COLS = [1, 2, 3, 4, 5, 6]
 
 def _fetch_orders(company: str, logger: logging.Logger) -> List[Dict[str, Any]]:
     """
-    按 (type, status) 组合爬取订单列表，按 orders_id 去重
+    按 (type, status) 组合爬取订单列表，按 orders_no 去重
     """
-    seen_order_ids = set()
+    seen_order_nos = set()
     orders = []
 
     for order_type, status in CRAWL_COMBINATIONS:
         logger.info("[wms_order_push] 开始爬取 type=%s, status=%s", order_type, status)
+
+        # status=1 仍需 handler_name/real_name，status=0 不需要
+        extra_fields = PICK_WORK_EXTRA_FIELDS if status == 1 else None
 
         records = get_status_orders_by_page_service(
             type=order_type,
@@ -82,7 +86,7 @@ def _fetch_orders(company: str, logger: logging.Logger) -> List[Dict[str, Any]]:
             store=company,
             persist=False,
             logger=logger,
-            extra_fields=EXTRA_ORDER_FIELDS,
+            extra_fields=extra_fields,
         )
 
         if not records:
@@ -90,10 +94,11 @@ def _fetch_orders(company: str, logger: logging.Logger) -> List[Dict[str, Any]]:
             continue
 
         for record in records:
-            orders_id = record.get("orders_id")
-            if orders_id in seen_order_ids:
+            orders_no = record.get("orders_no")
+            if not orders_no or orders_no in seen_order_nos:
                 continue
-            seen_order_ids.add(orders_id)
+            seen_order_nos.add(orders_no)
+            record["status"] = status
             orders.append(record)
 
         logger.info("[wms_order_push] type=%s, status=%s 获取 %s 条", order_type, status, len(records))
@@ -101,28 +106,71 @@ def _fetch_orders(company: str, logger: logging.Logger) -> List[Dict[str, Any]]:
     return orders
 
 
-def _parse_pick_work_items(spider: WmsGzbbrSpider, orders_id: Any, order_type: int) -> List[Dict[str, Any]]:
+def _parse_pick_work_items(spider: WmsGzbbrSpider, orders_id: Any) -> List[Dict[str, Any]]:
     """
-    调用 git_pick_work 接口，按 type 解析商品明细
+    调用 git_pick_work 接口，解析商品明细
     """
     resp = spider.get_pick_work(orders_id)
     data = resp.json()
     items = data.get("data", {}).get("data", [])
 
-    result = []
-    for item in items:
-        if order_type == 3 and item.get("is_grey_out_cn") == "已出库":
-            continue
-
-        result.append({
+    return [
+        {
             "oe_number": item.get("oe_number"),
             "product_name": item.get("name"),
             "kwno": item.get("kwno"),
             "needqty": item.get("needqty"),
             "qty": item.get("qty"),
-        })
+        }
+        for item in items
+    ]
 
-    return result
+
+def _format_podt(podt: Any) -> Optional[str]:
+    """
+    将 data.po.podt 截取为 YYYY-MM-DD
+    """
+    if not podt:
+        return None
+    text = str(podt)
+    if ' ' in text:
+        return text.split(' ', 1)[0]
+    return text
+
+
+def _parse_return_items(spider: WmsGzbbrSpider, orders_no: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    调用 get_return_items 接口，返回订单头信息和商品明细
+    """
+    resp = spider.get_return_items(orders_no)
+    data = resp.json()
+
+    po_info = data.get("data", {}).get("po", {})
+    order_header = {
+        "pono": po_info.get("pono"),
+        "orders_id": po_info.get("orders_id"),
+        "fullname": po_info.get("fullname"),
+        "orderdate": _format_podt(po_info.get("podt")),
+    }
+
+    items_by_group = data.get("data", {}).get("data", {})
+    if not isinstance(items_by_group, dict):
+        return order_header, []
+
+    items = items_by_group.get(orders_no, []) or []
+
+    detail = [
+        {
+            "oe_number": item.get("number"),
+            "product_name": item.get("l_name_zh"),
+            "kwno": item.get("kw_no"),
+            "needqty": item.get("needqty"),
+            "qty": item.get("qty"),
+        }
+        for item in items
+    ]
+
+    return order_header, detail
 
 
 def _load_seen_keys(pono_list: List[str]) -> Set[Tuple[str, str, str]]:
@@ -182,9 +230,17 @@ def _get_purchaser_or_salesperson(order: Dict[str, Any], order_type: int) -> Opt
     return None
 
 
-def _build_excel_row(order: Dict[str, Any], item: Dict[str, Any], order_type: int, seq: int) -> Dict[str, Any]:
+def _build_excel_row(
+    order: Dict[str, Any],
+    item: Dict[str, Any],
+    order_type: int,
+    seq: int,
+    status: int,
+) -> Dict[str, Any]:
     """
     组装 Excel 行数据，使用中文表头
+    - status=0 时操作人/采购员为空
+    - status=1 时保留原值
     """
     pono = order.get("pono")
     needqty = item.get("needqty")
@@ -194,9 +250,9 @@ def _build_excel_row(order: Dict[str, Any], item: Dict[str, Any], order_type: in
         "状态": TYPE_NAME_MAP.get(order_type, order_type),
         "订单": pono,
         "客户名称": order.get("fullname"),
-        "采购员/业务员": _get_purchaser_or_salesperson(order, order_type),
+        "采购员/业务员": _get_purchaser_or_salesperson(order, order_type) if status == 1 else "",
         "订单日期": order.get("orderdate"),
-        "操作人": order.get("name"),
+        "操作人": order.get("name") if status == 1 else "",
         "序号": seq,
         "oe_number": item.get("oe_number"),
         "名称": item.get("product_name"),
@@ -331,20 +387,25 @@ def _build_message(now_str: str, company: str, count: int, download_url: str) ->
     )
 
 
-def run_wms_order_push(company: str = DEFAULT_COMPANY, logger: Optional[logging.Logger] = None) -> Dict[str, Any]:
+def run_wms_order_push(
+    company: str = DEFAULT_COMPANY,
+    logger: Optional[logging.Logger] = None,
+    push: bool = True,
+) -> Dict[str, Any]:
     """
     执行 WMS 订单推送
 
     流程：
-    1. 爬取订单列表
-    2. 对每个订单调用 git_pick_work 获取明细
-    3. 按 type 过滤明细
-    4. 01-09 仓位：第一次保存不推送，第二次才推送
+    1. 爬取订单列表，按 orders_no 去重
+    2. status=0 的订单调用 get_return_items 获取明细
+    3. status=1 的订单调用 git_pick_work 获取明细
+    4. status=1 的订单执行 01-09 仓位过滤（第一次保存不推送，第二次才推送）
     5. 生成 Excel
-    6. 推送下载链接
+    6. 推送下载链接（push=True 时）
 
     :param company: 门店代码
     :param logger: 可选日志器，外部传入则使用外部日志器
+    :param push: 是否执行推送，默认 True；测试时可传 False 只生成 Excel
     :return: 执行结果
     """
     logger = logger or get_task_logger('wms_order_push')
@@ -360,41 +421,60 @@ def run_wms_order_push(company: str = DEFAULT_COMPANY, logger: Optional[logging.
         logger.info("[wms_order_push] 无订单数据，跳过")
         return {"company": company, "count": 0, "file_path": None, "pushed": False}
 
+    combo_order_counts = Counter((order.get("type"), order.get("status")) for order in orders)
+    logger.info("[wms_order_push] 各组合订单数: %s", dict(combo_order_counts))
+
     spider = WmsGzbbrSpider(logger=logger)
-    pono_list = [order.get("pono") for order in orders]
+
+    # 仓位过滤仅对 status=1 的订单生效
+    pick_work_orders = [order for order in orders if order.get("status") == 1]
+    pono_list = [order.get("pono") for order in pick_work_orders]
     seen_keys = _load_seen_keys(pono_list)
     running_seen = seen_keys.copy()
     new_seen_keys: Set[Tuple[str, str, str]] = set()
     excel_rows = []
+    combo_row_counts: Dict[Tuple[int, int], int] = {}
 
     try:
         for order in orders:
-            orders_id = order.get("orders_id")
+            orders_no = order.get("orders_no")
             order_type_raw = order.get("type")
             order_type = int(order_type_raw) if order_type_raw is not None else None
+            status = order.get("status")
+            combo_key = (order_type, status)
 
-            items = _parse_pick_work_items(spider, orders_id, order_type)
+            if status == 0:
+                header, items = _parse_return_items(spider, orders_no)
+                current_order = header
+            else:
+                orders_id = order.get("orders_id")
+                items = _parse_pick_work_items(spider, orders_id)
+                current_order = order
 
             for seq, item in enumerate(items, start=1):
-                kwno = item.get("kwno") or ""
-                pono = order.get("pono")
-                oe_number = item.get("oe_number")
-                detail_key = (pono, kwno, oe_number)
+                if status == 1:
+                    kwno = item.get("kwno") or ""
+                    pono = current_order.get("pono")
+                    oe_number = item.get("oe_number")
+                    detail_key = (pono, kwno, oe_number)
 
-                is_new = detail_key not in running_seen
-                running_seen.add(detail_key)
+                    is_new = detail_key not in running_seen
+                    running_seen.add(detail_key)
 
-                # 01-09 开头仓位：第一次保存不推送，第二次才推送
-                if KWNOS_PATTERN.match(kwno):
-                    if is_new:
-                        new_seen_keys.add(detail_key)
-                        continue
+                    # 01-09 开头仓位：第一次保存不推送，第二次才推送
+                    if KWNOS_PATTERN.match(kwno):
+                        if is_new:
+                            new_seen_keys.add(detail_key)
+                            continue
 
-                excel_rows.append(_build_excel_row(order, item, order_type, seq))
+                excel_rows.append(_build_excel_row(current_order, item, order_type, seq, status))
+                combo_row_counts[combo_key] = combo_row_counts.get(combo_key, 0) + 1
     finally:
         spider.close()
 
     _save_seen_keys(new_seen_keys)
+
+    logger.info("[wms_order_push] 各组合明细行数: %s", combo_row_counts)
 
     count = len(excel_rows)
     result = {
@@ -414,10 +494,12 @@ def run_wms_order_push(company: str = DEFAULT_COMPANY, logger: Optional[logging.
     download_url = _build_download_url(company, date_str)
     message = _build_message(now_str, company, count, download_url)
 
-    push_resp = message_push("WMS", message)
-    result["pushed"] = True
-    result["push_response"] = push_resp
-
-    logger.info("[wms_order_push] 推送成功，%s 条，文件：%s", count, file_path)
+    if push:
+        push_resp = message_push("WMS", message)
+        result["pushed"] = True
+        result["push_response"] = push_resp
+        logger.info("[wms_order_push] 推送成功，%s 条，文件：%s", count, file_path)
+    else:
+        logger.info("[wms_order_push] 已生成 Excel（未推送），%s 条，文件：%s", count, file_path)
 
     return result

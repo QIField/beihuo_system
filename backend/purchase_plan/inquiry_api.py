@@ -23,7 +23,7 @@ from app.services.procurement_service import add_inquiry_record, GzbbrQuoteServi
 from app.utils.search.parser import parse_space, parse_comma
 
 # 导入B2B上传模块
-from app.utils.b2b_inquiry_upload import start_upload_task, get_recent_results
+from app.utils.b2b_inquiry_upload import get_recent_results
 
 # 创建蓝图
 inquiry_bp = Blueprint('inquiry', __name__)
@@ -283,11 +283,19 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     # 步骤3：CRM新建
     create_results = {}
     if need_create_items:
-        from app.utils.crm_product.crm_productAdd.main import load_alias_data, load_product_data, _process_with_loop
+        from config import create_crm_session
+        from app.utils.crm_product.crm_productAdd.excel_data_loader import load_alias_data, load_product_data
+        from app.utils.crm_product.crm_productAdd.crm_processor import process_items, _format_result_message
+
         alias_df = load_alias_data()
         product_df = load_product_data()
-        create_results = _process_with_loop(need_create_items, product_df, alias_df, None)
-        
+        session = create_crm_session()
+        try:
+            raw_results = process_items(need_create_items, product_df, alias_df, session)
+            create_results = {oe: _format_result_message(result) for oe, result in raw_results.items()}
+        finally:
+            session.close()
+
         if progress_callback:
             progress_callback(total, total, "CRM新建完成")
     
@@ -310,7 +318,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     # 步骤5：九分类判断
     category_count = {
         '上传成功': 0, '新建成功-已存在': 0, '新建成功-新创建': 0,
-        '新建失败-未找到产品名称': 0, '新建失败-车型不能为空': 0,
+        '新建失败-未返回产品名称': 0, '新建失败-未返回车型': 0, '新建失败-未返回原厂品牌': 0,
         '上传失败-过期时间错误': 0, '上传失败-品牌不存在': 0,
         '上传失败-产品不存在': 0, '其他': 0
     }
@@ -737,10 +745,12 @@ def _classify_nine_category(update_msg: str, create_result: str) -> str:
         return '新建成功-已存在'
     elif '新建成功' in create_result and '失败' not in create_result:
         return '新建成功-新创建'
-    elif '未找到产品名称' in create_result:
-        return '新建失败-未找到产品名称'
-    elif '车型不能为空' in create_result:
-        return '新建失败-车型不能为空'
+    elif '未返回产品名称' in create_result:
+        return '新建失败-未返回产品名称'
+    elif '未返回车型' in create_result:
+        return '新建失败-未返回车型'
+    elif '未返回原厂品牌' in create_result:
+        return '新建失败-未返回原厂品牌'
     elif '过期时间' in update_msg and '错误' in update_msg:
         return '上传失败-过期时间错误'
     elif '品牌不存在' in update_msg:

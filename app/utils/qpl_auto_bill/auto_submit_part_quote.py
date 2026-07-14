@@ -11,6 +11,8 @@ import math
 import logging
 from contextlib import redirect_stdout
 
+from pymysql.cursors import DictCursor
+
 # 关闭 urllib3 HTTPS 证书验证警告（奔驰接口使用 verify=False）
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -196,7 +198,8 @@ def _filter_processed_orders(order_nos, company, begin_date, end_date):
     conn = None
     try:
         conn = get_db_connection()
-        with conn.cursor() as cursor:
+        # 显式指定 DictCursor，按列名取值（不要依赖默认游标类型）
+        with conn.cursor(DictCursor) as cursor:
             placeholders = ','.join(['%s'] * len(order_nos))
             sql = f"""
                 SELECT DISTINCT supplier_enquiry_no
@@ -208,13 +211,17 @@ def _filter_processed_orders(order_nos, company, begin_date, end_date):
             """
             params = [company] + list(order_nos) + [f"{begin_date} 00:00:00", f"{end_date} 23:59:59"]
             cursor.execute(sql, params)
-            return set(row[0] for row in cursor.fetchall())
+            rows = cursor.fetchall()
+            return set(row['supplier_enquiry_no'] for row in rows)
     except Exception as e:
         qpl_log(f"[{company}] 查询已处理订单失败: {e}")
         return set()
     finally:
         if conn:
-            conn.close()
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def query_bmw_service_all(oe_list):

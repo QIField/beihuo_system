@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timedelta
 import pandas as pd
 from app.utils.logger_config import get_task_logger
+from ..brands import normalize_brand
 
 
 logger = get_task_logger('virtual_inventory')
@@ -166,14 +167,7 @@ def start():
     df['供应商名称'] = '佛山万拓'
     df['原厂OE码'] = df['pjcode'].apply(clean_oecode)
 
-    # 品牌映射
-    brand_mapping = {
-        'WANTUO': '巴博瑞',
-        '菲儿': '菲尔',
-        '品牌': '巴博瑞'
-    }
-    df['品牌'] = df['pjfactory'].fillna('')
-    df['品牌'] = df['品牌'].replace(brand_mapping)
+    df['品牌'] = df['pjfactory'].fillna('').apply(normalize_brand)
 
     # 只保留品牌为'菲尔'和'巴博瑞'的数据
     df = df[df['品牌'].isin(['菲尔', '巴博瑞'])]

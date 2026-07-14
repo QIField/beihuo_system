@@ -125,7 +125,7 @@ def main_process():
     logger.info("开始运行CRM产品新建（数据库模式）")
     logger.info("="*60)
     try:
-        from app.utils.crm_product.crm_productAdd.main import process_database_mode_api
+        from app.utils.crm_product.crm_productAdd.database_mode import process_database_mode_api
         process_database_mode_api()
         logger.info("="*60)
         logger.info("CRM产品新建完成")

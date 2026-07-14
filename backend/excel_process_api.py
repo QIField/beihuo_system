@@ -10,117 +10,9 @@ import importlib.util
 from flask import request, jsonify, send_file, session
 from datetime import datetime
 
-# 导入新的 API 函数
-from app.utils.crm_product import (
-    process_excel_two_column_mode_api,
-    process_excel_three_column_mode_api
-)
-
 def register_excel_process_routes(app):
     """注册Excel处理相关的路由"""
-    
-    @app.route('/api/excel/process', methods=['POST'])
-    def process_excel_file():
-        """
-        处理前端上传的Excel文件
-        支持两列模式和三列模式
-        参数:
-        - file: 上传的Excel文件
-        - mode: 处理模式 ('two_column' 或 'three_column')
-        """
-        try:
-            print("=== Excel处理API调用开始 ===")
-            print(f"请求表单数据: {list(request.form.keys())}")
-            print(f"请求文件字段: {list(request.files.keys())}")
-            
-            # 检查是否有文件上传
-            if 'file' not in request.files:
-                print("错误: 请求中没有'file'字段")
-                return jsonify({
-                    'code': 1,
-                    'msg': '没有上传文件，请确保使用file字段上传'
-                }), 400
-            
-            file = request.files['file']
-            print(f"接收到文件: {file.filename}")
-            
-            if file.filename == '':
-                print("错误: 文件名为空")
-                return jsonify({
-                    'code': 1,
-                    'msg': '文件名为空'
-                }), 400
-            
-            # 获取处理模式参数，默认为两列模式
-            mode = request.form.get('mode', 'two_column')
-            if mode not in ['two_column', 'three_column']:
-                return jsonify({
-                    'code': 1,
-                    'msg': '无效的处理模式，支持: two_column, three_column'
-                }), 400
-            
-            # 验证文件类型
-            allowed_extensions = {'.xlsx', '.xls', '.csv'}
-            file_ext = os.path.splitext(file.filename)[1].lower()
-            if file_ext not in allowed_extensions:
-                return jsonify({
-                    'code': 1,
-                    'msg': f'不支持的文件格式，仅支持: {", ".join(allowed_extensions)}'
-                }), 400
-            
-            # 保存上传的文件到临时目录
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            temp_filename = f"upload_{timestamp}_{file.filename}"
-            temp_file_path = os.path.join(tempfile.gettempdir(), temp_filename)
-            
-            file.save(temp_file_path)
-            print(f"文件已保存到临时路径: {temp_file_path}")
-            print(f"处理模式: {mode}")
-            
-            try:
-                # 根据模式选择不同的处理函数（使用新的 API）
-                if mode == 'two_column':
-                    result_file_path = process_excel_two_column_mode_api(temp_file_path)
-                else:  # three_column
-                    result_file_path = process_excel_three_column_mode_api(temp_file_path)
-                
-                # 检查结果文件是否成功创建
-                if os.path.exists(result_file_path):
-                    # 返回文件下载
-                    return send_file(
-                        result_file_path,
-                        as_attachment=True,
-                        download_name=f"处理结果_{mode}_{timestamp}{os.path.splitext(result_file_path)[1]}",
-                        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                    )
-                else:
-                    return jsonify({
-                        'code': 1,
-                        'msg': f'{mode}模式处理失败：结果文件未生成'
-                    }), 500
-                    
-            except Exception as e:
-                print(f"{mode}模式处理过程中发生错误: {e}")
-                return jsonify({
-                    'code': 1,
-                    'msg': f'{mode}模式处理失败: {str(e)}'
-                }), 500
-            finally:
-                # 清理临时文件
-                try:
-                    if os.path.exists(temp_file_path):
-                        os.remove(temp_file_path)
-                        print(f"临时文件已清理: {temp_file_path}")
-                except Exception as e:
-                    print(f"清理临时文件时出错: {e}")
-                    
-        except Exception as e:
-            print(f"API处理过程中发生错误: {e}")
-            return jsonify({
-                'code': 1,
-                'msg': f'服务器内部错误: {str(e)}'
-            }), 500
-    
+
     @app.route('/api/excel/columns/check', methods=['POST'])
     def check_excel_columns():
         """
@@ -150,7 +42,7 @@ def register_excel_process_routes(app):
                 df = pd.read_excel(temp_file_path) if temp_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(temp_file_path)
                 
                 # 检查支持的列组合
-                from app.utils.crm_product import identify_columns, identify_columns_extended
+                from app.utils.crm_product.crm_productAdd.excel_reader import identify_columns, identify_columns_extended
                 
                 result = {
                     'code': 0,
@@ -163,8 +55,8 @@ def register_excel_process_routes(app):
                 }
                 
                 # 检查两列模式支持
-                try:
-                    oe_col, brand_col = identify_columns(df)
+                oe_col, brand_col = identify_columns(df)
+                if oe_col and brand_col:
                     result['data']['supported_modes'].append({
                         'mode': 'two_column',
                         'description': '两列模式(oe + brand)',
@@ -173,24 +65,19 @@ def register_excel_process_routes(app):
                             'brand_column': brand_col
                         }
                     })
-                except ValueError:
-                    pass  # 不支持两列模式
                 
                 # 检查三列模式支持
-                try:
-                    oe_col, brand_col, brand_code_col = identify_columns_extended(df)
-                    if brand_code_col:  # 必须有brand_code列
-                        result['data']['supported_modes'].append({
-                            'mode': 'three_column',
-                            'description': '三列模式(oe + brand + brand_code)',
-                            'columns': {
-                                'oe_column': oe_col,
-                                'brand_column': brand_col,
-                                'brand_code_column': brand_code_col
-                            }
-                        })
-                except ValueError:
-                    pass  # 不支持三列模式
+                oe_col, brand_col, brand_code_col = identify_columns_extended(df)
+                if oe_col and brand_col and brand_code_col:
+                    result['data']['supported_modes'].append({
+                        'mode': 'three_column',
+                        'description': '三列模式(oe + brand + brand_code)',
+                        'columns': {
+                            'oe_column': oe_col,
+                            'brand_column': brand_col,
+                            'brand_code_column': brand_code_col
+                        }
+                    })
                 
                 if not result['data']['supported_modes']:
                     result['code'] = 1

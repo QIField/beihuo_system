@@ -12,6 +12,7 @@ import re
 from datetime import datetime, timedelta
 import pandas as pd
 from app.utils.logger_config import get_task_logger
+from ..brands import normalize_brand
 
 
 logger = get_task_logger('virtual_inventory')
@@ -30,19 +31,6 @@ ALLOWED_BRANDS = [
     '京西重工', '法雷奥', '博世', '索恩格', 'FC', '博格华纳BORG', 'TRW', '德尔福',
     '博世(BOSCH)BS', '岱高进口'
 ]
-
-
-# 品牌映射
-BRAND_MAPPING = {
-    'FC': '巴博瑞',
-    'TRW': '天合',
-    'VDO': '威迪欧',
-    '博格华纳BORG': '博格华纳',
-    '博世(BOSCH)BS': '博世',
-    '岱高进口': '岱高',
-    '进口威巴克': '威巴克',
-    '原厂(SJZX)': '原厂'
-}
 
 
 def clean_oecode(code):
@@ -184,7 +172,7 @@ def start():
     # 5. 字段映射和转换
     df['供应商名称'] = '盛旻'
     df['原厂OE码'] = df['pjcode'].apply(clean_oecode)
-    df['品牌'] = df['pjbrand'].replace(BRAND_MAPPING)
+    df['品牌'] = df['pjbrand'].apply(normalize_brand)
     df['价格'] = df['sxpfprice'].fillna(0)
     df['失效时间'] = str(tomorrow_ts)
     df['仓库名称'] = '广州越秀仓'

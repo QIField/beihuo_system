@@ -51,12 +51,13 @@ def get_update_status(update_msg):
       2. 上传成功                   - 包含 update 或等于 add
       3. 新建成功-已存在            - CRM 反馈：物料已关联当前组织
       4. 新建成功-新创建            - CRM 反馈：成功创建产品
-      5. 新建失败-未找到产品名称    - CRM 反馈
-      6. 新建失败-车型不能为空      - CRM 反馈
-      7. 上传失败-过期时间错误      - B2B 接口报错
-      8. 上传失败-品牌不存在        - B2B 接口报错
-      9. 上传失败-产品不存在        - B2B 接口报错
-     10. 其他                       - 兜底
+      5. 新建失败-未返回产品名称    - CRM 反馈
+      6. 新建失败-未返回车型        - CRM 反馈
+      7. 新建失败-未返回原厂品牌    - CRM 反馈
+      8. 上传失败-过期时间错误      - B2B 接口报错
+      9. 上传失败-品牌不存在        - B2B 接口报错
+     10. 上传失败-产品不存在        - B2B 接口报错
+     11. 其他                       - 兜底
     """
     if not update_msg:
         return None  # NULL
@@ -74,10 +75,12 @@ def get_update_status(update_msg):
             return '新建成功-已存在'
         if '】处理结果：成功 - product_id:' in msg:
             return '新建成功-新创建'
-        if '】处理结果：失败 - 未找到产品名称' in msg:
-            return '新建失败-未找到产品名称'
-        if '】处理结果：失败 - 车型不能为空' in msg:
-            return '新建失败-车型不能为空'
+        if '】处理结果：失败 - 未返回产品名称' in msg:
+            return '新建失败-未返回产品名称'
+        if '】处理结果：失败 - 未返回车型' in msg:
+            return '新建失败-未返回车型'
+        if '】处理结果：失败 - 未返回原厂品牌' in msg:
+            return '新建失败-未返回原厂品牌'
         # 其他 OE号【】开头的失败统一归到"其他"
         return '其他'
 
@@ -682,11 +685,12 @@ def get_virtual_inventory_by_msg_pattern():
             except ValueError:
                 return jsonify({'code': 1, 'msg': '日期格式错误，请使用 YYYY-MM-DD 格式'}), 400
 
-        # 根据模式筛选数据 - 使用 update_status 字段（支持8种中文状态）
+        # 根据模式筛选数据 - 使用 update_status 字段
         if pattern:
-            # 8种精确匹配的状态
+            # 精确匹配的状态（保留旧状态兼容历史数据）
             exact_statuses = [
                 '上传成功', '新建成功-已存在', '新建成功-新创建',
+                '新建失败-未返回产品名称', '新建失败-未返回车型', '新建失败-未返回原厂品牌',
                 '新建失败-未找到产品名称', '新建失败-车型不能为空',
                 '上传失败-过期时间错误', '上传失败-品牌不存在', '上传失败-产品不存在',
                 '其他'
@@ -703,11 +707,11 @@ def get_virtual_inventory_by_msg_pattern():
                 # 新建成功：包含两种成功状态
                 where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建')")
             elif pattern == "新建失败":
-                # 新建失败：包含三种失败状态
-                where_conditions.append("update_status IN ('新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
+                # 新建失败：包含历史状态和新状态
+                where_conditions.append("update_status IN ('新建失败-未返回产品名称', '新建失败-未返回车型', '新建失败-未返回原厂品牌', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
             elif pattern == "没有档案":
-                # 没有档案：包含五种状态
-                where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
+                # 没有档案：包含历史状态和新状态
+                where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建', '新建失败-未返回产品名称', '新建失败-未返回车型', '新建失败-未返回原厂品牌', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
 
         # 无论是否有pattern，都要添加其他搜索条件
         if supplier_name:
@@ -854,11 +858,12 @@ def get_virtual_inventory_statistics_by_pattern():
             where_conditions.append("fetch_time >= %s AND fetch_time < %s")
             params.extend([start_time, end_time])
 
-        # 根据模式筛选数据 - 使用 update_status 字段优化查询（支持8种中文状态）
+        # 根据模式筛选数据 - 使用 update_status 字段优化查询
         if pattern:
-            # 8种精确匹配的状态
+            # 精确匹配的状态（保留旧状态兼容历史数据）
             exact_statuses = [
                 '上传成功', '新建成功-已存在', '新建成功-新创建',
+                '新建失败-未返回产品名称', '新建失败-未返回车型', '新建失败-未返回原厂品牌',
                 '新建失败-未找到产品名称', '新建失败-车型不能为空',
                 '上传失败-过期时间错误', '上传失败-品牌不存在', '上传失败-产品不存在',
                 '其他'
@@ -875,11 +880,11 @@ def get_virtual_inventory_statistics_by_pattern():
                 # 新建成功：包含两种成功状态
                 where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建')")
             elif pattern == "新建失败":
-                # 新建失败：包含三种失败状态
-                where_conditions.append("update_status IN ('新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
+                # 新建失败：包含历史状态和新状态
+                where_conditions.append("update_status IN ('新建失败-未返回产品名称', '新建失败-未返回车型', '新建失败-未返回原厂品牌', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
             elif pattern == "没有档案":
-                # 没有档案：包含五种状态
-                where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
+                # 没有档案：包含历史状态和新状态
+                where_conditions.append("update_status IN ('新建成功-已存在', '新建成功-新创建', '新建失败-未返回产品名称', '新建失败-未返回车型', '新建失败-未返回原厂品牌', '新建失败-未找到产品名称', '新建失败-车型不能为空', '上传失败-产品不存在')")
 
         where_clause = " AND ".join(where_conditions)
 
@@ -1015,7 +1020,7 @@ def refresh_update_status_sync():
     detail_keys = [
         '上传成功',
         '新建成功-已存在', '新建成功-新创建',
-        '新建失败-未找到产品名称', '新建失败-车型不能为空',
+        '新建失败-未返回产品名称', '新建失败-未返回车型', '新建失败-未返回原厂品牌',
         '上传失败-过期时间错误', '上传失败-品牌不存在', '上传失败-产品不存在',
         '其他', 'NULL'
     ]

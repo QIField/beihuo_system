@@ -121,15 +121,35 @@ def process_price_by_brand(price, brand, is_wantuo=False, is_changsheng_special=
         return 0.0
 
 
+def _get_project_root():
+    """
+    查找项目根目录。
+
+    从当前文件所在目录开始向上逐级查找，直到找到包含 beihuo_system.py 的目录。
+    这种实现不依赖固定的目录层级，本地和线上部署都能自适应。
+    """
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    while True:
+        if os.path.exists(os.path.join(current_dir, "beihuo_system.py")):
+            return current_dir
+        parent = os.path.dirname(current_dir)
+        if parent == current_dir:
+            # 已到文件系统根目录仍未找到，fallback 到原来的固定层级
+            break
+        current_dir = parent
+
+    # fallback：按原来的相对层级计算
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.dirname(current_dir))
+
+
 def load_crm_aliases_mapping():
     """
     加载CRM可用别名映射关系
     从static/excel/crm可用别名.xlsx读取数据
     """
     try:
-        # 获取当前脚本所在目录，向上两级到达项目根目录，然后进入static/excel目录
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(current_dir))
+        project_root = _get_project_root()
         excel_path = os.path.join(project_root, "static", "excel", "crm可用别名.xlsx")
 
         # 检查文件是否存在
@@ -182,3 +202,59 @@ def load_brands_from_json():
     except Exception as e:
         logger.exception(f"读取brands.json文件时出错")
         return None
+
+
+# 全局品牌标准化映射表：集中管理所有供应商的硬编码品牌映射
+BRAND_NORMALIZATION_MAPPING = {
+    'FC': '巴博瑞',
+    'TRW': '天合',
+    'VDO': '威迪欧',
+    '博格华纳BORG': '博格华纳',
+    '博世(BOSCH)BS': '博世',
+    '岱高进口': '岱高',
+    '进口威巴克': '威巴克',
+    '原厂(SJZX)': '原厂',
+    'WANTUO': '巴博瑞',
+    '菲儿': '菲尔',
+    '品牌': '巴博瑞',
+    '原厂国外': '原厂',
+    '原厂大库': '原厂国内4s件',
+    '赛多夫': '巴博瑞',
+    '猫头鹰': '伦福德(猫)',
+    '下线': 'XX',
+    '原厂件': '原厂',
+    '其它': '其他',
+    '尼兰': '其他',
+    '陆地卫士': '其他',
+    '曼克马利': '巴博瑞',
+    '伦福德': '伦福德(猫)',
+    '科尔本施密特': '科尔本',
+    '路爵士': '巴博瑞',
+    '优宾': '巴博瑞',
+    '卡玛伦': '巴博瑞',
+    '汉科再生': '巴博瑞',
+    '长虹': '巴博瑞',
+    '都得利': '巴博瑞',
+    '台湾提维西': '巴博瑞',
+    '台湾维仑': '巴博瑞',
+    '维轮AP': '巴博瑞',
+    '亿升钣金': '巴博瑞',
+    'ANHUO': '巴博瑞',
+    '隆丰': '巴博瑞',
+    '鹰眼': '巴博瑞',
+}
+
+
+def normalize_brand(brand, supplier=None):
+    """
+    标准化品牌名称。
+
+    :param brand: 原始品牌名称
+    :param supplier: 已废弃，保留参数仅用于兼容旧调用
+    :return: 标准化后的品牌名称；若未匹配则返回原值
+    """
+    if not brand:
+        return brand
+
+    normalized = BRAND_NORMALIZATION_MAPPING.get(str(brand).strip(), brand)
+    return normalized

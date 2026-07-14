@@ -131,32 +131,3 @@ def process_excel_async_wrapper(file_path: str, mode: str, company: str = 'fsbbr
     }
 
 
-def process_excel_mode_api(file_path: str, mode: str, company: str = 'fsbbr') -> str:
-    """
-    Excel 处理 API 接口（两列/三列通用）
-
-    Args:
-        file_path: Excel 文件路径
-        mode: two_column 或 three_column
-        company: 门店/组织代码
-
-    Returns:
-        结果文件路径
-    """
-    mode_label = '两列' if mode == 'two_column' else '三列'
-    print(f"\n=== CRM Product Add - {mode_label}模式 ===")
-    print(f"文件: {file_path}")
-
-    result_path, _ = _process_excel_file(file_path, mode, company)
-    print(f"\n{mode_label}模式处理完毕，结果: {result_path}")
-    return result_path
-
-
-def process_excel_two_column_mode_api(file_path: str, company: str = 'fsbbr') -> str:
-    """两列模式 API 接口（兼容旧调用）"""
-    return process_excel_mode_api(file_path, 'two_column', company)
-
-
-def process_excel_three_column_mode_api(file_path: str, company: str = 'fsbbr') -> str:
-    """三列模式 API 接口（兼容旧调用）"""
-    return process_excel_mode_api(file_path, 'three_column', company)

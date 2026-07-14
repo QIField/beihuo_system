@@ -77,7 +77,7 @@ def update_product_numbers(product_id, numbers, each_numbers="", store_code=None
     Args:
         product_id: 产品ID
         numbers: 替换号列表，如 ["A000000001119"]
-        each_numbers: 每个替换号（可选）
+        each_numbers: 已废弃，不再传给 CRM
         store_code: 门店代码，如 fsbbr, zs, zh等，不传则默认使用fs
     
     Returns:
@@ -91,8 +91,7 @@ def update_product_numbers(product_id, numbers, each_numbers="", store_code=None
     
     payload = {
         "product_id": str(product_id),
-        "numbers": numbers,
-        "each_numbers": each_numbers
+        "numbers": numbers
     }
     
     headers = {

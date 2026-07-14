@@ -15,7 +15,7 @@ import pymysql
 import requests
 import pandas as pd
 
-from ..brands import process_price_by_brand
+from ..brands import process_price_by_brand, normalize_brand
 from ..database import get_db_connection
 from ..persistence import save_to_company_tables
 from app.utils.logger_config import get_task_logger
@@ -212,34 +212,8 @@ def fetch_and_process_latest_data():
             logger.info(f"在 {latest_date} 没有找到数据")
             return None
 
-        # 品牌名称映射
-        brand_mapping = {
-            "下线": "XX",
-            "原厂件": "原厂",
-            "其它": "其他",
-            "尼兰": "其他",
-            "陆地卫士": "其他",
-            "曼克马利": "巴博瑞",
-            "伦福德": "伦福德(猫)",
-            "VDO": "威迪欧",
-            "科尔本施密特": "科尔本",
-            "路爵士": "巴博瑞",
-            "优宾": "巴博瑞",
-            "卡玛伦": "巴博瑞",
-            "汉科再生": "巴博瑞",
-            "长虹": "巴博瑞",
-            "都得利": "巴博瑞",
-            "台湾提维西": "巴博瑞",
-            "台湾维仑": "巴博瑞",
-            "维轮AP": "巴博瑞",
-            "亿升钣金": "巴博瑞",
-            "ANHUO": "巴博瑞",
-            "隆丰": "巴博瑞",
-            "鹰眼": "巴博瑞",
-        }
-
         # 应用品牌名称映射
-        df['brand_name1'] = df['brand_name1'].replace(brand_mapping)
+        df['brand_name1'] = df['brand_name1'].apply(normalize_brand)
 
         # 仓库名称映射
         city_mapping = {
