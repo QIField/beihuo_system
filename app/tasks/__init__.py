@@ -15,6 +15,7 @@ from .vin_vehicle_info_sync_task import register_vin_vehicle_info_sync_tasks
 from .wms_order_push_task import register_wms_order_push_tasks
 from .wms_return_items_detail_task import register_wms_return_items_detail_tasks
 from .crm_price_sync_task import register_crm_price_sync_tasks
+from .mercedes_replace_number_sync_task import register_mercedes_replace_number_sync_tasks
 from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
 
 
@@ -60,6 +61,9 @@ def register_all_tasks(task_manager):
 
     # 12. 注册CRM产品价格同步定时任务（每天03:00）
     register_crm_price_sync_tasks(task_manager)
+
+    # 13. 注册奔驰报价OE替换号自动同步定时任务（每天04:00）
+    register_mercedes_replace_number_sync_tasks(task_manager)
 
 
 __all__ = ['execute_daily_pipeline', 'register_all_tasks']

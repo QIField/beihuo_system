@@ -14,65 +14,21 @@ def is_all_part_quote(detail_data):
 
 
 def construct_quote_item(quote_info):
-    """从 supplierQuoteItemList 转换为报价请求体中的报价项格式"""
-    item_pid = quote_info.get('pid', '')
-    product_name = quote_info.get('displaceProductName') or quote_info.get('standardItemName', '')
+    """从 supplierQuoteItemList 转换为报价请求体中的报价项格式。
 
-    # 安全转换为 int
-    def to_int(val):
-        if val is None:
-            return None
-        try:
-            return int(float(val))
-        except (ValueError, TypeError):
-            return val
+    以平台详情接口返回的原字段为基准，尽量保留完整信息，避免类型转换和字段覆盖。
+    """
+    item = dict(quote_info)
 
-    return {
-        "brandId": to_int(quote_info.get('brandId')),
-        "brandName": quote_info.get('brandName'),
-        "deliveryAging": to_int(quote_info.get('deliveryAging', 1)),
-        "prepareGoodTimespan": to_int(quote_info.get('prepareGoodTimespan')),
-        "prepareGoodTimespanUnit": quote_info.get('prepareGoodTimespanUnit', ''),
-        "itemQuality": to_int(quote_info.get('itemQuality')),
-        "itemRemark": quote_info.get('itemRemark', ''),
-        "itemSellPrice": to_int(quote_info.get('itemSellPrice')),
-        "partsNo": quote_info.get('partsNo') or '',
-        "quoteImageList": [],
-        "supplierQuoteItemId": quote_info.get('supplierQuoteItemId'),
-        "standardName": product_name,
-        "supplierQuoteProductId": '',
-        "pid": item_pid,
-        "pidSrcList": quote_info.get('pidSrcList', []) if quote_info.get('pidSrcList') else ['SUPPLIER_EPC_OE_MATCH'],
-        "checkPriceSrc": None,
-        "transferDay": '',
-        "itemPerhapsReplaceOe": quote_info.get('itemPerhapsReplaceOe'),
-        "brandType": quote_info.get('brandTypeEnum') or quote_info.get('brandType'),
-        "qualityType": quote_info.get('qualityTypeCode'),
-        "qualityTypeDesc": quote_info.get('qualityTypeDesc'),
-        "qualityTypeId": to_int(quote_info.get('qualityTypeId')),
-        "quoteTaxType": quote_info.get('quoteTaxType') or 'INCLUSIVE',
-        "originTire": None,
-        "packageAmount": None,
-        "packageUnit": '',
-        "quoteExtraInfoVo": {"originTire": None},
-        "priceCheckSnapshot": quote_info.get('priceCheckSnapshot'),
-        "quoteItemSalesAttribute": quote_info.get('quoteItemSalesAttribute') or {
-            "categoryId": "/5/",
-            "attributeList": [],
-            "productionAttribute": ""
-        },
-        "quoteStatus": quote_info.get('quoteStatus') or 'QUOTED',
-        "productList": quote_info.get('productList') or [{
-            "adaptStrategyList": ["OE"],
-            "productName": product_name,
-            "productKey": item_pid,
-            "imgList": [],
-            "partNoe": "",
-            "pid": item_pid,
-            "supplierProductId": None,
-            "supplierSalesPrice": None
-        }]
-    }
+    # 仅对缺失字段做最小兜底，不覆盖平台原值
+    if not item.get('quoteStatus'):
+        item['quoteStatus'] = 'QUOTED'
+    if not item.get('quoteTaxType'):
+        item['quoteTaxType'] = 'INCLUSIVE'
+    if item.get('standardName') is None:
+        item['standardName'] = item.get('displaceProductName') or item.get('standardItemName', '')
+
+    return item
 
 
 # 奔驰仓库映射

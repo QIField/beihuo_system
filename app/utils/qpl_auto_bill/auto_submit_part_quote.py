@@ -156,6 +156,20 @@ FAIL_PART_NO_MISMATCH = "partNo未匹配"
 FAIL_NO_EFFECTIVE_PRICE = "无有效价格"
 FAIL_PRICE_CHECK_FAILED = "价格检测失败"
 
+# 失败分类常量
+FAILURE_CATEGORY_BUSINESS = "business"
+FAILURE_CATEGORY_TEMPORARY = "temporary"
+FAILURE_CATEGORY_RETRY_EXHAUSTED = "retry_exhausted"
+
+# 临时错误：网络/服务抖动等，允许重试
+TEMPORARY_FAILURE_REASONS = {
+    FAIL_OE_DATA_MISSING,
+    FAIL_PRICE_CHECK_FAILED,
+}
+
+# 最大重试次数
+MAX_RETRY_COUNT = 3
+
 
 # 通用工具函数
 def _iter_enquiry_items(order_data):
@@ -176,6 +190,19 @@ def _extract_category_id(item, default="/5/"):
     return default
 
 
+def _get_expected_factory_brand(car_type5):
+    """根据车型名称确定允许的原厂品牌"""
+    if not car_type5:
+        return None
+    if car_type5.startswith('MINI'):
+        return 'MINI'
+    if car_type5.startswith('宝马'):
+        return '宝马'
+    if car_type5.startswith('奔驰'):
+        return '奔驰'
+    return None
+
+
 def _format_price_check_error(product, error):
     """格式化 priceCheck 失败信息"""
     brand = product.get('brandName', '未知品牌')
@@ -183,26 +210,47 @@ def _format_price_check_error(product, error):
     return f"{brand} {oe}: {error}"
 
 
+def _classify_failure_reason(reason):
+    """
+    根据失败原因字符串判断分类。
+
+    临时错误（temporary）：可能是网络/服务抖动导致，允许重试。
+    业务错误（business）：数据本身问题，重试无意义。
+    """
+    if not reason:
+        return FAILURE_CATEGORY_BUSINESS
+    for temp_reason in TEMPORARY_FAILURE_REASONS:
+        if reason.startswith(temp_reason):
+            return FAILURE_CATEGORY_TEMPORARY
+    return FAILURE_CATEGORY_BUSINESS
+
+
 def _filter_processed_orders(order_nos, company, begin_date, end_date):
     """
-    查询数据库，过滤掉已处理过的订单
+    查询数据库，返回已处理完成的 item 集合，以及每个 item 的重试信息。
+
+    处理完成判定：
+        - 成功提交（failure_category 为 NULL）
+        - 业务错误（business）
+        - 临时错误但重试次数已达上限（retry_exhausted）
 
     Returns:
-        set: 已存在的订单号集合
+        tuple: (processed_items, item_retry_info)
+            - processed_items: set((supplier_enquiry_no, enquiry_item_id))
+            - item_retry_info: dict{(supplier_enquiry_no, enquiry_item_id): {'retry_count': int, 'failure_category': str}}
     """
     if not order_nos:
-        return set()
+        return set(), {}
 
     from app.utils.database_connection import get_db_connection
 
     conn = None
     try:
         conn = get_db_connection()
-        # 显式指定 DictCursor，按列名取值（不要依赖默认游标类型）
         with conn.cursor(DictCursor) as cursor:
             placeholders = ','.join(['%s'] * len(order_nos))
             sql = f"""
-                SELECT DISTINCT supplier_enquiry_no
+                SELECT supplier_enquiry_no, enquiry_item_id, retry_count, failure_category
                 FROM qpl_quote_record
                 WHERE company = %s
                   AND supplier_enquiry_no IN ({placeholders})
@@ -212,10 +260,25 @@ def _filter_processed_orders(order_nos, company, begin_date, end_date):
             params = [company] + list(order_nos) + [f"{begin_date} 00:00:00", f"{end_date} 23:59:59"]
             cursor.execute(sql, params)
             rows = cursor.fetchall()
-            return set(row['supplier_enquiry_no'] for row in rows)
+
+            processed_items = set()
+            item_retry_info = {}
+            for row in rows:
+                item_key = (row['supplier_enquiry_no'], row['enquiry_item_id'])
+                retry_count = row.get('retry_count', 0) or 0
+                category = row.get('failure_category')
+                item_retry_info[item_key] = {
+                    'retry_count': retry_count,
+                    'failure_category': category,
+                }
+                # 成功的记录 category 为 NULL；临时错误未达上限才不算处理完成
+                if category == FAILURE_CATEGORY_TEMPORARY and retry_count < MAX_RETRY_COUNT:
+                    continue
+                processed_items.add(item_key)
+            return processed_items, item_retry_info
     except Exception as e:
         qpl_log(f"[{company}] 查询已处理订单失败: {e}")
-        return set()
+        return set(), {}
     finally:
         if conn:
             try:
@@ -269,9 +332,12 @@ def select_bmw_warehouse_and_days(stock_info):
     return available_warehouses[0], 7
 
 
-def _validate_adapt_list(enquiry_item_id, enquiry_no, company):
+def _validate_adapt_list(enquiry_item_id, enquiry_no, company, expected_factory_brand=None):
     """
     步骤1-2：适配列表校验
+
+    Args:
+        expected_factory_brand: 根据车型限制允许的原厂品牌名，None 表示不限制
 
     Returns:
         tuple: (data, error)
@@ -285,7 +351,15 @@ def _validate_adapt_list(enquiry_item_id, enquiry_no, company):
     if not brand_list:
         return None, FAIL_ADAPT_LIST_EMPTY
 
-    factory_brand = next((b for b in brand_list if b.get('brandTypeDesc') == '原厂'), None)
+    factory_brands = [b for b in brand_list if b.get('brandTypeDesc') == '原厂']
+    if not factory_brands:
+        return None, FAIL_NO_ORIGINAL_PRODUCT
+
+    if expected_factory_brand:
+        factory_brand = next((b for b in factory_brands if b.get('brandName') == expected_factory_brand), None)
+    else:
+        factory_brand = factory_brands[0]
+
     if not factory_brand:
         return None, FAIL_NO_ORIGINAL_PRODUCT
 
@@ -441,7 +515,7 @@ def _get_crm_spider(company='fsbbr'):
     return CrmGzbbrSpider(cookies_key=cookies_key)
 
 
-def process_crm_spot_quote(detail_data, company='fsbbr'):
+def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None):
     """
     CRM 现货优先报价流程
 
@@ -455,6 +529,7 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
     Args:
         detail_data: 询价单详情数据
         company: 组织代码
+        processed_item_ids: 已处理 item 集合，set((enquiry_no, enquiry_item_id))
 
     Returns:
         tuple: (crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices)
@@ -467,6 +542,8 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
     if not CRM_SPIDER_AVAILABLE:
         return {}, set(), {}, {}, {}
 
+    processed_item_ids = processed_item_ids or set()
+
     crm_quote_items = {}
     original_quoted_ids = set()
     crm_failed_items = {}
@@ -476,6 +553,7 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
     car_brand = detail_data.get('carBrand', '')
+    expected_factory_brand = _get_expected_factory_brand(detail_data.get('carType5', ''))
 
     # 收集询价详情中已有的 pid
     existing_pids = set()
@@ -488,9 +566,16 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
 
     spider = _get_crm_spider(company)
 
+    enquiry_no = detail_data.get('supplierEnquiryNo', '')
     for demand in detail_data.get('supplierEnquiryDemandList', []):
         for item in demand.get('supplierEnquiryItemList', []):
             enquiry_item_id = item.get('enquiryItemId')
+            item_key = (enquiry_no, enquiry_item_id)
+
+            # 已处理 item 跳过
+            if item_key in processed_item_ids:
+                continue
+
             item_oe = item.get('itemOe')
             quote_status = item.get('quoteStatus')
             quote_status_str = str(quote_status).strip()
@@ -509,10 +594,14 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
                     continue
 
                 # 构建候选产品：遍历适配列表所有品牌
+                # 原厂品牌必须与车型匹配（宝马车型只报宝马原厂，MINI 车型只报 MINI 原厂）
                 candidates = []
                 for brand in brand_list:
                     brand_name = brand.get('brandName', '')
                     brand_type_desc = brand.get('brandTypeDesc', '')
+                    is_original = brand_type_desc == '原厂'
+                    if is_original and expected_factory_brand and brand_name != expected_factory_brand:
+                        continue
                     for product in brand.get('productList', []):
                         pid = product.get('pid')
                         if not pid or pid in existing_pids:
@@ -688,7 +777,7 @@ def process_crm_spot_quote(detail_data, company='fsbbr'):
     return crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices
 
 
-def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
+def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, processed_item_ids=None):
     """
     处理奔驰车订单（管道式重构）
 
@@ -696,6 +785,7 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
         detail_data: 询价单详情数据
         company: 组织代码
         skip_item_ids: 需要跳过的 enquiry_item_id 集合（CRM 已报原厂品牌）
+        processed_item_ids: 已处理 item 集合，set((enquiry_no, enquiry_item_id))
 
     Returns:
         tuple: (mercedes_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices)
@@ -704,6 +794,7 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
         return {}, [], {}, {}, {}
 
     skip_item_ids = skip_item_ids or set()
+    processed_item_ids = processed_item_ids or set()
     mercedes_quote_items = {}
     summary_list = []
     failed_items = {}
@@ -712,21 +803,30 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
     car_brand = detail_data.get('carBrand', '')
+    expected_factory_brand = _get_expected_factory_brand(detail_data.get('carType5', ''))
 
     for demand in detail_data.get('supplierEnquiryDemandList', []):
         for item in demand.get('supplierEnquiryItemList', []):
             enquiry_item_id = item.get('enquiryItemId')
+            item_key = (enquiry_no, enquiry_item_id)
+
+            # 已处理 或 CRM 已报原厂的 item 跳过
+            if enquiry_item_id in skip_item_ids or item_key in processed_item_ids:
+                continue
+
             item_oe = item.get('itemOe')
             item_name = item.get('itemName')
             quote_status = item.get('quoteStatus')
 
-            if str(quote_status).strip() != 'WAITING_QUOTE' or enquiry_item_id in skip_item_ids:
+            if str(quote_status).strip() != 'WAITING_QUOTE':
                 continue
 
             category_id = _extract_category_id(item)
 
             # 适配列表校验
-            adapt_data, error = _validate_adapt_list(enquiry_item_id, enquiry_no, company)
+            adapt_data, error = _validate_adapt_list(
+                enquiry_item_id, enquiry_no, company, expected_factory_brand
+            )
             if error:
                 if error == FAIL_ADAPT_LIST_EMPTY:
                     failed_items[enquiry_item_id] = error
@@ -830,7 +930,7 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None):
     return mercedes_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices
 
 
-def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
+def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processed_item_ids=None):
     """
     处理宝马车订单（管道式重构）
 
@@ -838,6 +938,7 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
         detail_data: 询价单详情数据
         company: 组织代码
         skip_item_ids: 需要跳过的 enquiry_item_id 集合（CRM 已报原厂品牌）
+        processed_item_ids: 已处理 item 集合，set((enquiry_no, enquiry_item_id))
 
     Returns:
         tuple: (bmw_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices)
@@ -846,6 +947,7 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
         return {}, [], {}, {}, {}
 
     skip_item_ids = skip_item_ids or set()
+    processed_item_ids = processed_item_ids or set()
     bmw_quote_items = {}
     summary_list = []
     failed_items = {}
@@ -854,21 +956,30 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
     car_brand = detail_data.get('carBrand', '')
+    expected_factory_brand = _get_expected_factory_brand(detail_data.get('carType5', ''))
 
     for demand in detail_data.get('supplierEnquiryDemandList', []):
         for item in demand.get('supplierEnquiryItemList', []):
             enquiry_item_id = item.get('enquiryItemId')
+            item_key = (enquiry_no, enquiry_item_id)
+
+            # 已处理 或 CRM 已报原厂的 item 跳过
+            if enquiry_item_id in skip_item_ids or item_key in processed_item_ids:
+                continue
+
             item_oe = item.get('itemOe')
             item_name = item.get('itemName')
             quote_status = item.get('quoteStatus')
 
-            if str(quote_status).strip() != 'WAITING_QUOTE' or enquiry_item_id in skip_item_ids:
+            if str(quote_status).strip() != 'WAITING_QUOTE':
                 continue
 
             category_id = _extract_category_id(item)
 
             # 适配列表校验
-            adapt_data, error = _validate_adapt_list(enquiry_item_id, enquiry_no, company)
+            adapt_data, error = _validate_adapt_list(
+                enquiry_item_id, enquiry_no, company, expected_factory_brand
+            )
             if error:
                 if error == FAIL_ADAPT_LIST_EMPTY:
                     failed_items[enquiry_item_id] = error
@@ -972,20 +1083,34 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None):
     return bmw_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices
 
 
-def classify_order(order_data):
+def classify_order(order_data, processed_item_ids=None):
     """
     对订单进行分类，返回类别标识
+
+    已处理过的 item 不再参与类别判断。
 
     Returns:
         str: 'A' = 全PART_QUOTE, 'B' = 奔驰+未报价, 'C' = 宝马+未报价, 'SKIP' = 普通车+未报价
     """
-    car_type5 = order_data.get('carType5', '')
+    processed_item_ids = processed_item_ids or set()
+    enquiry_no = order_data.get('supplierEnquiryNo', '')
     items = list(_iter_enquiry_items(order_data))
 
-    has_waiting = any(str(item.get('quoteStatus', '')).strip() == 'WAITING_QUOTE' for item in items)
+    # 过滤已处理 item
+    unprocessed_items = [
+        item for item in items
+        if (enquiry_no, item.get('enquiryItemId')) not in processed_item_ids
+    ]
+
+    # 没有未处理 item 时按 SKIP 处理
+    if not unprocessed_items:
+        return 'SKIP'
+
+    has_waiting = any(str(item.get('quoteStatus', '')).strip() == 'WAITING_QUOTE' for item in unprocessed_items)
     if not has_waiting:
         return 'A'
 
+    car_type5 = order_data.get('carType5', '')
     is_mercedes = car_type5.startswith('奔驰') if car_type5 else False
     if is_mercedes:
         return 'B'
@@ -1030,7 +1155,7 @@ def _merge_failed_items(crm_failed_items, bc_quote_items, bc_failed_items):
     return failed_items
 
 
-def _handle_bc_category(detail_data, company, bc_process_func, category):
+def _handle_bc_category(detail_data, company, bc_process_func, category, processed_item_ids=None):
     """
     处理 B/C 类订单的通用逻辑（奔驰/宝马）
 
@@ -1039,13 +1164,17 @@ def _handle_bc_category(detail_data, company, bc_process_func, category):
         company: 组织代码
         bc_process_func: process_mercedes_order 或 process_bmw_order
         category: 'B' 或 'C'
+        processed_item_ids: 已处理 item 集合，set((enquiry_no, enquiry_item_id))
 
     Returns:
         dict: handler 结果
     """
-    crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices = process_crm_spot_quote(detail_data, company)
+    processed_item_ids = processed_item_ids or set()
+    crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices = process_crm_spot_quote(
+        detail_data, company, processed_item_ids=processed_item_ids
+    )
     bc_quote_items, summary_list, bc_failed_items, bc_failed_brand_names, bc_failed_item_prices = bc_process_func(
-        detail_data, company, skip_item_ids=original_quoted_ids
+        detail_data, company, skip_item_ids=original_quoted_ids, processed_item_ids=processed_item_ids
     )
 
     failed_items = _merge_failed_items(crm_failed_items, bc_quote_items, bc_failed_items)
@@ -1080,9 +1209,12 @@ def _handle_bc_category(detail_data, company, bc_process_func, category):
 
 
 @register_handler('A')
-def handle_category_a(detail_data, company):
+def handle_category_a(detail_data, company, processed_item_ids=None):
     """处理 A 类订单：全 PART_QUOTE，先走 CRM 现货流程"""
-    crm_quote_items, _, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices = process_crm_spot_quote(detail_data, company)
+    processed_item_ids = processed_item_ids or set()
+    crm_quote_items, _, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices = process_crm_spot_quote(
+        detail_data, company, processed_item_ids=processed_item_ids
+    )
     return {
         'extra_quote_items': crm_quote_items,
         'summary_list': [],
@@ -1099,15 +1231,15 @@ def handle_category_a(detail_data, company):
 
 
 @register_handler('B')
-def handle_category_b(detail_data, company):
+def handle_category_b(detail_data, company, processed_item_ids=None):
     """处理 B 类订单：奔驰车 + 有 WAITING_QUOTE，CRM 现货优先"""
-    return _handle_bc_category(detail_data, company, process_mercedes_order, 'B')
+    return _handle_bc_category(detail_data, company, process_mercedes_order, 'B', processed_item_ids=processed_item_ids)
 
 
 @register_handler('C')
-def handle_category_c(detail_data, company):
+def handle_category_c(detail_data, company, processed_item_ids=None):
     """处理 C 类订单：宝马车 + 有 WAITING_QUOTE，CRM 现货优先"""
-    return _handle_bc_category(detail_data, company, process_bmw_order, 'C')
+    return _handle_bc_category(detail_data, company, process_bmw_order, 'C', processed_item_ids=processed_item_ids)
 
 
 def _get_process_meta(process_result):
@@ -1124,13 +1256,41 @@ def _get_process_meta(process_result):
         'bc_quote_item_ids': process_result.get('bc_quote_item_ids', set()),
         'bc_failed_items': process_result.get('bc_failed_items', {}),
         'failed_brand_names': process_result.get('failed_brand_names', {}),
-        'failed_item_prices': process_result.get('failed_item_prices', {})
+        'failed_item_prices': process_result.get('failed_item_prices', {}),
+        'failure_categories': process_result.get('failure_categories', {}),
+        'retry_counts': process_result.get('retry_counts', {})
     }
 
 
-def process_order_by_category(detail_data, company):
+def _build_failure_metadata(failed_items, enquiry_no, item_retry_info):
+    """
+    为失败 item 构造失败分类和重试次数。
+
+    Returns:
+        tuple: (failure_categories, retry_counts)
+    """
+    failure_categories = {}
+    retry_counts = {}
+    for item_id, reason in failed_items.items():
+        category = _classify_failure_reason(reason)
+        item_key = (enquiry_no, item_id)
+        if category == FAILURE_CATEGORY_TEMPORARY:
+            current_retry = item_retry_info.get(item_key, {}).get('retry_count', 0) or 0
+            new_retry = current_retry + 1
+            retry_counts[item_id] = new_retry
+            if new_retry >= MAX_RETRY_COUNT:
+                category = FAILURE_CATEGORY_RETRY_EXHAUSTED
+        else:
+            retry_counts[item_id] = 0
+        failure_categories[item_id] = category
+    return failure_categories, retry_counts
+
+
+def process_order_by_category(detail_data, company, processed_item_ids=None, item_retry_info=None):
     """根据订单类别分发处理"""
-    category = classify_order(detail_data)
+    processed_item_ids = processed_item_ids or set()
+    item_retry_info = item_retry_info or {}
+    category = classify_order(detail_data, processed_item_ids=processed_item_ids)
     if category == 'SKIP':
         return {
             'extra_quote_items': {},
@@ -1142,10 +1302,21 @@ def process_order_by_category(detail_data, company):
             'crm_failed_items': {},
             'original_quoted_ids': set(),
             'bc_quote_item_ids': set(),
-            'bc_failed_items': {}
+            'bc_failed_items': {},
+            'failure_categories': {},
+            'retry_counts': {}
         }
     handler = ORDER_HANDLERS[category]
-    return handler(detail_data, company)
+    process_result = handler(detail_data, company, processed_item_ids=processed_item_ids)
+
+    # 为失败项补充分类和重试次数
+    enquiry_no = detail_data.get('supplierEnquiryNo', '')
+    failure_categories, retry_counts = _build_failure_metadata(
+        process_result.get('failed_items', {}), enquiry_no, item_retry_info
+    )
+    process_result['failure_categories'] = failure_categories
+    process_result['retry_counts'] = retry_counts
+    return process_result
 
 
 def _has_any_quote(detail_data, extra_quote_items):
@@ -1159,17 +1330,23 @@ def _has_any_quote(detail_data, extra_quote_items):
     return False
 
 
-def _collect_bmw_original_oes(orders, company):
+def _collect_bmw_original_oes(orders, company, processed_item_ids=None):
     """
     收集 C 类（宝马）订单中适配列表含原厂品牌的 item 对应的原厂 OE。
     兼容列表接口（顶层 supplierEnquiryItemList）和详情接口（supplierEnquiryDemandList 下）两种结构。
 
+    Args:
+        orders: 订单列表
+        company: 组织代码
+        processed_item_ids: 已处理 item 集合，set((enquiry_no, enquiry_item_id))
+
     Returns:
         set: 去重后的 OE 集合
     """
+    processed_item_ids = processed_item_ids or set()
     oe_set = set()
     for order in orders:
-        if classify_order(order) != 'C':
+        if classify_order(order, processed_item_ids=processed_item_ids) != 'C':
             continue
         enquiry_no = order.get('supplierEnquiryNo')
         if not enquiry_no:
@@ -1177,17 +1354,21 @@ def _collect_bmw_original_oes(orders, company):
             continue
         qpl_log(f"[{company}] 开始收集 C 类订单 OE: {enquiry_no}")
 
+        expected_factory_brand = _get_expected_factory_brand(order.get('carType5', ''))
         items = list(_iter_enquiry_items(order))
 
         qpl_log(f"[{company}] [OE收集] 订单 {enquiry_no} 共 {len(items)} 个 item")
         for item in items:
             item_status = str(item.get('quoteStatus', '')).strip()
             enquiry_item_id = item.get('enquiryItemId')
+            item_key = (enquiry_no, enquiry_item_id)
             item_oe = item.get('itemOe', '未知')
             qpl_log(
                 f"[{company}] [OE收集] item_id={enquiry_item_id} oe={item_oe} status={item_status}",
                 order_no=enquiry_no
             )
+            if item_key in processed_item_ids:
+                continue
             if item_status != 'WAITING_QUOTE':
                 continue
             try:
@@ -1197,10 +1378,14 @@ def _collect_bmw_original_oes(orders, company):
                     f"[{company}] [OE收集] item_id={enquiry_item_id} 适配品牌数={len(brand_list)}",
                     order_no=enquiry_no
                 )
-                factory_brand = next((b for b in brand_list if b.get('brandTypeDesc') == '原厂'), None)
+                factory_brands = [b for b in brand_list if b.get('brandTypeDesc') == '原厂']
+                if expected_factory_brand:
+                    factory_brand = next((b for b in factory_brands if b.get('brandName') == expected_factory_brand), None)
+                else:
+                    factory_brand = factory_brands[0] if factory_brands else None
                 if not factory_brand:
                     qpl_log(
-                        f"[{company}] [OE收集] item_id={enquiry_item_id} 无原厂品牌",
+                        f"[{company}] [OE收集] item_id={enquiry_item_id} 无匹配原厂品牌",
                         order_no=enquiry_no
                     )
                     continue
@@ -1277,10 +1462,13 @@ def _ensure_bmw_oes_in_local_db(missing_oes, company, max_per_round=20):
     return {'total': len(to_process), 'success': success_count, 'failed': failed_count}
 
 
-def _process_single_order(enquiry_no, category, company, idx, total, results):
+def _process_single_order(enquiry_no, category, company, idx, total, results, processed_item_ids=None, item_retry_info=None):
     """
     处理单个订单并追加结果。
     """
+    processed_item_ids = processed_item_ids or set()
+    item_retry_info = item_retry_info or {}
+
     detail = get_enquiry_detail(enquiry_no, company=company)
     detail_data = detail.get('data', {})
 
@@ -1292,7 +1480,14 @@ def _process_single_order(enquiry_no, category, company, idx, total, results):
         detail_data.update(pickup_info)
 
     handler = ORDER_HANDLERS[category]
-    process_result = handler(detail_data, company)
+    process_result = handler(detail_data, company, processed_item_ids=processed_item_ids)
+
+    # 为失败项补充分类和重试次数
+    failure_categories, retry_counts = _build_failure_metadata(
+        process_result.get('failed_items', {}), enquiry_no, item_retry_info
+    )
+    process_result['failure_categories'] = failure_categories
+    process_result['retry_counts'] = retry_counts
 
     extra_quote_items = process_result['extra_quote_items']
     summary_list = process_result['summary_list']
@@ -1319,7 +1514,7 @@ def _process_single_order(enquiry_no, category, company, idx, total, results):
         qpl_log(f"{order_prefix}: 未报价 {failed_desc}", order_no=enquiry_no)
 
         if not has_any_quote and all(
-            reason == '适配列表为空，无原厂产品' for reason in failed_items.values()
+            reason == FAIL_ADAPT_LIST_EMPTY for reason in failed_items.values()
         ):
             try:
                 cannot_quote_resp = cannot_quote(
@@ -1463,17 +1658,16 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
         unique_orders = {order.get('supplierEnquiryNo'): order for order in orders if order.get('supplierEnquiryNo')}
         total_orders = len(unique_orders)
 
-        # 过滤已处理订单
-        processed_nos = _filter_processed_orders(list(unique_orders.keys()), company, begin_date, end_date)
-        if processed_nos:
-            for order_no in processed_nos:
-                unique_orders.pop(order_no, None)
+        # 查询已处理 item 及重试信息
+        processed_items, item_retry_info = _filter_processed_orders(
+            list(unique_orders.keys()), company, begin_date, end_date
+        )
 
-        # 分类并统计
+        # 分类并统计（按 item 级过滤）
         category_counts = {'A': 0, 'B': 0, 'C': 0, 'SKIP': 0}
         categorized = []
         for enquiry_no, order in unique_orders.items():
-            category = classify_order(order)
+            category = classify_order(order, processed_item_ids=processed_items)
             category_counts[category] += 1
             if category == 'SKIP':
                 continue
@@ -1484,8 +1678,9 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
         categorized.sort(key=lambda x: category_order.get(x[0], 2))
 
         qpl_log(
-            f"[{company}] 任务开始 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
-            f"跳过{category_counts['SKIP']}个 待处理{len(categorized)}个 "
+            f"[{company}] 任务开始 | 找到{total_orders}个订单 "
+            f"已处理{len(processed_items)}个item 跳过{category_counts['SKIP']}个 "
+            f"待处理{len(categorized)}个订单 "
             f"类别=A:{category_counts['A']} B:{category_counts['B']} C:{category_counts['C']}"
         )
 
@@ -1494,14 +1689,17 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
         # 先处理 A/B 类订单
         ab_orders = [(c, no) for c, no in categorized if c in ('A', 'B')]
         for idx, (category, enquiry_no) in enumerate(ab_orders, start=1):
-            _process_single_order(enquiry_no, category, company, idx, len(ab_orders), results)
+            _process_single_order(
+                enquiry_no, category, company, idx, len(ab_orders), results,
+                processed_item_ids=processed_items, item_retry_info=item_retry_info
+            )
 
-        # 收集 C 类订单原厂 OE 并补齐本地库
+        # 收集 C 类订单原厂 OE 并补齐本地库（只收集未处理 item）
         c_order_nos = {no for c, no in categorized if c == 'C'}
         qpl_log(f"[{company}] C 类订单白名单: {c_order_nos}")
         if c_order_nos:
             c_orders = [unique_orders[no] for no in c_order_nos]
-            bmw_oe_set = _collect_bmw_original_oes(c_orders, company)
+            bmw_oe_set = _collect_bmw_original_oes(c_orders, company, processed_item_ids=processed_items)
             qpl_log(f"[{company}] 收集到 BMW 原厂 OE: {bmw_oe_set}")
             if bmw_oe_set:
                 from app.utils.qpl_auto_bill.bmw_quote_local_db import check_bmw_oes_in_local_db
@@ -1525,15 +1723,18 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
                 if enquiry_no not in fresh_unique_orders:
                     continue
                 c_count += 1
-                _process_single_order(enquiry_no, 'C', company, c_count, len(c_order_nos), results)
+                _process_single_order(
+                    enquiry_no, 'C', company, c_count, len(c_order_nos), results,
+                    processed_item_ids=processed_items, item_retry_info=item_retry_info
+                )
 
         # 任务完成统计
         processed_category_counts = {'A': 0, 'B': 0, 'C': 0}
         for result in results:
             processed_category_counts[result['order_category']] += 1
         qpl_log(
-            f"[{company}] 任务完成 | 找到{total_orders}个订单 已处理{len(processed_nos)}个 "
-            f"跳过{category_counts['SKIP']}个 待处理{len(results)}个 "
+            f"[{company}] 任务完成 | 找到{total_orders}个订单 已处理{len(processed_items)}个item "
+            f"跳过{category_counts['SKIP']}个 待处理{len(results)}个订单 "
             f"类别=A:{processed_category_counts['A']} B:{processed_category_counts['B']} C:{processed_category_counts['C']}"
         )
 

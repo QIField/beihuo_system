@@ -37,13 +37,15 @@ def init_qpl_quote_record_table():
                 vin_code VARCHAR(100) COMMENT 'VIN码',
                 car_type TEXT COMMENT '车型信息',
                 order_status VARCHAR(50) COMMENT '汽配龙产品报价状态（quoteStatusStr），如：已下单、已报价',
+                retry_count INT DEFAULT 0 COMMENT '失败重试次数',
+                failure_category VARCHAR(50) COMMENT '失败分类：business/temporary/retry_exhausted',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 INDEX idx_supplier_enquiry_no (supplier_enquiry_no),
                 INDEX idx_item_oe (item_oe),
                 INDEX idx_brand_name (brand_name),
                 INDEX idx_submit_time (submit_time),
                 INDEX idx_company (company),
-                INDEX idx_supplier_enquiry_item (supplier_enquiry_no, enquiry_item_id)
+                UNIQUE INDEX uk_company_order_item (company, supplier_enquiry_no, enquiry_item_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='汽配龙报价记录表';
             """
             cursor.execute(create_table_sql)
@@ -56,7 +58,9 @@ def init_qpl_quote_record_table():
                 {'name': 'vin_code', 'definition': "VARCHAR(100) COMMENT 'VIN码'"},
                 {'name': 'car_type', 'definition': "TEXT COMMENT '车型信息'"},
                 {'name': 'result_source', 'definition': "VARCHAR(50) COMMENT '报价来源/结果分类'"},
-                {'name': 'order_status', 'definition': "VARCHAR(50) COMMENT '汽配龙产品报价状态（quoteStatusStr），如：已下单、已报价'"}
+                {'name': 'order_status', 'definition': "VARCHAR(50) COMMENT '汽配龙产品报价状态（quoteStatusStr），如：已下单、已报价'"},
+                {'name': 'retry_count', 'definition': "INT DEFAULT 0 COMMENT '失败重试次数'"},
+                {'name': 'failure_category', 'definition': "VARCHAR(50) COMMENT '失败分类：business/temporary/retry_exhausted'"}
             ]
             check_and_add_fields('qpl_quote_record', qpl_fields)
 

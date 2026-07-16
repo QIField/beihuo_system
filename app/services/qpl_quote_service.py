@@ -68,7 +68,8 @@ def _extract_with_quotes(details, supplier_demand_id, enquiry_item_id, item_oe,
 @_register_extract_handler(False)
 def _extract_without_quotes(details, supplier_demand_id, enquiry_item_id, item_oe,
                             item_name, item_description, quote_status, failed_items,
-                            failed_brand_names=None, failed_item_prices=None, enquiry_no=None, **_):
+                            failed_brand_names=None, failed_item_prices=None, enquiry_no=None,
+                            failure_categories=None, retry_counts=None, **_):
     """无报价的项目：记录失败原因
 
     brand_name 展示规则：
@@ -80,6 +81,8 @@ def _extract_without_quotes(details, supplier_demand_id, enquiry_item_id, item_o
     reason = failed_items.get(enquiry_item_id, '未处理')
     failed_brand_names = failed_brand_names or {}
     failed_item_prices = failed_item_prices or {}
+    failure_categories = failure_categories or {}
+    retry_counts = retry_counts or {}
     brand_name = failed_brand_names.get(enquiry_item_id) or '无报价'
     # 价格检测失败时记录尝试价格
     item_sell_price = failed_item_prices.get(enquiry_item_id) if reason == FAIL_PRICE_CHECK_FAILED else None
@@ -97,7 +100,9 @@ def _extract_without_quotes(details, supplier_demand_id, enquiry_item_id, item_o
         'parts_no': None,
         'quote_status': quote_status,
         '_has_quote': False,
-        '_failure_reason': reason
+        '_failure_reason': reason,
+        '_failure_category': failure_categories.get(enquiry_item_id),
+        '_retry_count': retry_counts.get(enquiry_item_id, 0),
     })
 
 
@@ -137,6 +142,7 @@ def _parse_created_time(created_time_str):
 def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None,
                           item_submit_results=None, order_success=True,
                           failed_brand_names=None, failed_item_prices=None,
+                          failure_categories=None, retry_counts=None,
                           company=None):
     """
     从详情数据中提取报价明细（包括无报价的失败项目）
@@ -149,6 +155,8 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
         order_success: 订单整体是否成功
         failed_brand_names: 失败项实际尝试过的品牌名 {enquiry_item_id: brand_name}
         failed_item_prices: 价格检测失败时的尝试价格 {enquiry_item_id: sell_price}
+        failure_categories: 失败分类字典 {enquiry_item_id: category}
+        retry_counts: 重试次数字典 {enquiry_item_id: count}
         company: 组织代码，用于日志标识
 
     Returns:
@@ -159,6 +167,8 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
     item_submit_results = item_submit_results or {}
     failed_brand_names = failed_brand_names or {}
     failed_item_prices = failed_item_prices or {}
+    failure_categories = failure_categories or {}
+    retry_counts = retry_counts or {}
     details = []
 
     demand_list = detail_data.get('supplierEnquiryDemandList', [])
@@ -224,7 +234,9 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
                     failed_items=failed_items,
                     failed_brand_names=failed_brand_names,
                     failed_item_prices=failed_item_prices,
-                    enquiry_no=enquiry_no
+                    enquiry_no=enquiry_no,
+                    failure_categories=failure_categories,
+                    retry_counts=retry_counts
                 )
             elif str(quote_status).strip() == 'WAITING_QUOTE':
                 # CRM 未匹配 / 无原厂 等明确不记录场景：跳过
@@ -295,7 +307,10 @@ def _build_failure_result(detail, submit_result):
 
 def save_quote_records(enquiry_no, details, submit_result, submit_time, company='fsbbr'):
     """
-    保存报价记录到数据库（含失败项目）
+    保存报价记录到数据库（含失败项目），幂等写入。
+
+    同一个 (company, supplier_enquiry_no, enquiry_item_id) 已存在时更新，
+    不存在时插入。
 
     Args:
         enquiry_no: 询价单号
@@ -313,8 +328,28 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
             item_oe, item_name, item_description, brand_id, brand_name,
             item_sell_price, delivery_aging, item_quality, parts_no,
             quote_status, submit_result, result_source, submit_time, company,
-            created_time, vin_code, car_type
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            created_time, vin_code, car_type, retry_count, failure_category
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            supplier_demand_id = VALUES(supplier_demand_id),
+            item_oe = VALUES(item_oe),
+            item_name = VALUES(item_name),
+            item_description = VALUES(item_description),
+            brand_id = VALUES(brand_id),
+            brand_name = VALUES(brand_name),
+            item_sell_price = VALUES(item_sell_price),
+            delivery_aging = VALUES(delivery_aging),
+            item_quality = VALUES(item_quality),
+            parts_no = VALUES(parts_no),
+            quote_status = VALUES(quote_status),
+            submit_result = VALUES(submit_result),
+            result_source = VALUES(result_source),
+            submit_time = VALUES(submit_time),
+            created_time = VALUES(created_time),
+            vin_code = VALUES(vin_code),
+            car_type = VALUES(car_type),
+            retry_count = VALUES(retry_count),
+            failure_category = VALUES(failure_category)
         """
 
         for detail in details:
@@ -342,7 +377,9 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
                 company,
                 detail.get('created_time'),
                 detail.get('vin_code'),
-                detail.get('car_type')
+                detail.get('car_type'),
+                detail.get('_retry_count', 0),
+                detail.get('_failure_category')
             ))
 
         conn.commit()
@@ -500,11 +537,15 @@ def process_and_save_quotes_for_company(company, begin_date=None, end_date=None)
         extra_quote_items = result.get('extra_quote_items', {})
         failed_brand_names = result.get('failed_brand_names', {})
         failed_item_prices = result.get('failed_item_prices', {})
+        failure_categories = result.get('failure_categories', {})
+        retry_counts = result.get('retry_counts', {})
         details = extract_quote_details(
             result['detail_data'], failed_items, extra_quote_items,
             item_submit_results, result.get('success', False),
             failed_brand_names=failed_brand_names,
             failed_item_prices=failed_item_prices,
+            failure_categories=failure_categories,
+            retry_counts=retry_counts,
             company=company
         )
 
