@@ -848,7 +848,7 @@
                     <li class="layui-nav-item layui-nav-itemed">
                         <a href="javascript:;">CRM</a>
                         <dl class="layui-nav-child">
-                            <dd><a href="javascript:void(0);" onclick="openDiffReplaceNumberInNewTab()">替换号比对更新</a></dd>
+                            <dd><a href="javascript:void(0);" onclick="openReplaceNumberEditInNewTab()">替换号编辑</a></dd>
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed">
@@ -1584,9 +1584,9 @@ function openQplQuoteRecordInNewTab() {
     window.open('/web/qpl_quote_records', '_blank');
 }
 
-// 添加打开替换号比对更新新标签页的函数
-function openDiffReplaceNumberInNewTab() {
-    window.open('/diff_replace_number', '_blank');
+// 添加打开替换号编辑新标签页的函数
+function openReplaceNumberEditInNewTab() {
+    window.open('/replace_number_edit', '_blank');
 }
 
 // 添加打开仓库看板新标签页的函数
@@ -3750,6 +3750,7 @@ function bindEventHandlers(myTable, form, table) {
                                 <div class="ep-tab" data-tab="order" id="tabOrder">单据</div>
                                 <div class="ep-tab" data-tab="crm">新建产品</div>
                                 <div class="ep-tab" data-tab="update_crm" id="tabUpdateCrm">更新产品</div>
+                                <div class="ep-tab" data-tab="replace_number">更新替换号</div>
                             </div>
                             <div class="ep-body">
                                 <!-- 对账 -->
@@ -3820,6 +3821,31 @@ function bindEventHandlers(myTable, form, table) {
                                         <a href="javascript:;" id="updateCrmTemplateLink" style="font-size: 12px; color: #1890ff;">下载更新模板</a>
                                     </div>
                                 </div>
+
+                                <!-- 更新替换号 -->
+                                <div class="ep-panel" data-panel="replace_number">
+                                    <div class="ep-desc">上传包含 OE、品牌的 Excel，选择处理方式更新产品替换号。直接添加需填写“替换号”列，对比添加只需 OE 和品牌。</div>
+                                    <div class="ep-option">
+                                        <label>处理方式</label>
+                                        <select id="replaceNumberModeSelect">
+                                            <option value="" selected>请选择处理方式</option>
+                                            <option value="direct">直接添加替换号</option>
+                                            <option value="compare">对比添加替换号</option>
+                                        </select>
+                                        <a href="javascript:;" id="replaceNumberTemplateLink" style="font-size: 12px; color: #1890ff; margin-left: 8px;">下载模板</a>
+                                    </div>
+                                    <div class="ep-upload-zone">
+                                        <input type="file" id="replaceNumberFileSelect" accept=".xlsx,.xls,.csv">
+                                        <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
+                                        <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，仅单个文件</div>
+                                    </div>
+                                    <div class="ep-result" id="replaceNumberResultArea" style="display:none;">
+                                        <div class="ep-result-msg" id="replaceNumberResultMsg"></div>
+                                        <div class="ep-result-actions">
+                                            <button type="button" class="layui-btn layui-btn-normal" id="replaceNumberDownloadBtn">下载结果文件</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="ep-footer">
                                 <div class="ep-footer-left" id="selectedFilesList">暂无选择文件</div>
@@ -3836,7 +3862,8 @@ function bindEventHandlers(myTable, form, table) {
                             bill: [],
                             order: [],
                             crm: [],
-                            update_crm: []
+                            update_crm: [],
+                            replace_number: []
                         };
                         var currentTaskId = null;
                         var currentTaskData = null;
@@ -3877,6 +3904,7 @@ function bindEventHandlers(myTable, form, table) {
                             if (tab === 'order') return 'orderFileSelect';
                             if (tab === 'crm') return 'crmFileSelect';
                             if (tab === 'update_crm') return 'updateCrmFileSelect';
+                            if (tab === 'replace_number') return 'replaceNumberFileSelect';
                             return 'billFileSelect';
                         }
 
@@ -3895,7 +3923,7 @@ function bindEventHandlers(myTable, form, table) {
                         }
 
                         // 文件选择事件
-                        ['bill', 'order', 'crm', 'update_crm'].forEach(function(tab) {
+                        ['bill', 'order', 'crm', 'update_crm', 'replace_number'].forEach(function(tab) {
                             var inputId = getFileInputId(tab);
                             var input = document.getElementById(inputId);
                             if (!input) return;
@@ -3937,6 +3965,11 @@ function bindEventHandlers(myTable, form, table) {
                         // 新建产品模板下载
                         document.getElementById('crmTemplateLink').addEventListener('click', function() {
                             window.location.href = '/static/excel/productadd.xlsx';
+                        });
+
+                        // 更新替换号模板下载
+                        document.getElementById('replaceNumberTemplateLink').addEventListener('click', function() {
+                            window.location.href = '/static/excel/numberlist.xlsx';
                         });
 
                         // 确定处理
@@ -3989,6 +4022,23 @@ function bindEventHandlers(myTable, form, table) {
                                     return;
                                 }
                                 formData.append('file', files[0]);
+                            } else if (currentTab === 'replace_number') {
+                                var rnMode = document.getElementById('replaceNumberModeSelect').value;
+                                if (!rnMode) {
+                                    layer.msg('请选择处理方式', {icon: 2});
+                                    return;
+                                }
+                                if (files.length > 1) {
+                                    layer.msg('更新替换号仅支持单个文件', {icon: 2});
+                                    return;
+                                }
+                                var fileName = files[0].name.toLowerCase();
+                                if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
+                                    layer.msg('更新替换号仅支持Excel或CSV文件', {icon: 2});
+                                    return;
+                                }
+                                formData.append('file', files[0]);
+                                formData.append('mode', rnMode);
                             } else {
                                 // bill
                                 for (var i = 0; i < files.length; i++) {
@@ -4003,6 +4053,7 @@ function bindEventHandlers(myTable, form, table) {
 
                             // 隐藏上次 CRM 结果
                             document.getElementById('crmResultArea').style.display = 'none';
+                            document.getElementById('replaceNumberResultArea').style.display = 'none';
                             currentTaskId = null;
                             currentTaskData = null;
 
@@ -4020,6 +4071,9 @@ function bindEventHandlers(myTable, form, table) {
                                 });
                             } else if (currentTab === 'update_crm') {
                                 handleCrmAsyncProcess(formData, processLoading, '/api/excel/async/update_crm_product');
+                            } else if (currentTab === 'replace_number') {
+                                var rnMode = document.getElementById('replaceNumberModeSelect').value;
+                                handleReplaceNumberProcess(formData, processLoading, rnMode);
                             } else {
                                 handleSyncProcess(formData, processLoading, processType, files);
                             }
@@ -4032,35 +4086,16 @@ function bindEventHandlers(myTable, form, table) {
                             }
                         });
 
-                        // 查看替换号差异
-                        document.getElementById('crmDiffBtn').addEventListener('click', function() {
-                            var oeList = currentTaskData && currentTaskData.oe_list ? currentTaskData.oe_list : [];
-                            if (!oeList || oeList.length === 0) {
-                                layer.msg('没有可对比的 OE 数据', {icon: 2});
-                                return;
+                        // 更新替换号结果下载
+                        document.getElementById('replaceNumberDownloadBtn').addEventListener('click', function() {
+                            if (currentTaskId) {
+                                window.location.href = '/api/excel/async/download/' + currentTaskId;
                             }
+                        });
 
-                            var syncLoading = layer.load(1, { shade: [0.1, '#fff'] });
-                            fetch('/new/api/compare/sync-oe-list', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ oe_list: oeList })
-                            })
-                            .then(function(r) { return r.json(); })
-                            .then(function(res) {
-                                layer.close(syncLoading);
-                                if (res.code === 0) {
-                                    layer.msg('同步完成：保存 ' + (res.data.saved || 0) + ' 条', {icon: 1});
-                                    sessionStorage.setItem('diff_replace_number_oe_list', JSON.stringify(oeList));
-                                    window.open('/diff_replace_number', '_blank');
-                                } else {
-                                    layer.msg('同步失败：' + res.message, {icon: 2});
-                                }
-                            })
-                            .catch(function(err) {
-                                layer.close(syncLoading);
-                                layer.msg('同步请求失败：' + err.message, {icon: 2});
-                            });
+                        // 查看替换号差异（旧功能入口，保留跳转）
+                        document.getElementById('crmDiffBtn').addEventListener('click', function() {
+                            window.open('/replace_number_edit', '_blank');
                         });
                     }
                 });
@@ -4242,6 +4277,104 @@ function bindEventHandlers(myTable, form, table) {
                     layer.msg('查询状态失败: ' + error.message, {icon: 2});
                 });
             }, 2000); // 每2秒查询一次
+        })
+        .catch(error => {
+            layer.close(loadingIndex);
+            layer.msg('提交失败: ' + error.message, {icon: 2});
+        });
+    }
+
+    // 更新替换号处理函数
+    function handleReplaceNumberProcess(formData, loadingIndex, mode) {
+        fetch('/api/excel/async/replace_number', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.code !== 0) {
+                layer.close(loadingIndex);
+                layer.msg('提交失败: ' + result.msg, {icon: 2});
+                return;
+            }
+
+            if (mode === 'compare') {
+                layer.close(loadingIndex);
+                if (result.data && result.data.oe_brand_list) {
+                    sessionStorage.setItem('replace_number_oe_brand_list', JSON.stringify(result.data.oe_brand_list));
+                }
+                layer.msg('已跳转到替换号编辑页面', {icon: 1});
+                window.open('/replace_number_edit', '_blank');
+                return;
+            }
+
+            // direct 模式：轮询下载
+            var taskId = result.data.task_id;
+            currentTaskId = taskId;
+            layer.msg('任务已提交，处理中...', {icon: 1});
+
+            var progressLayerIndex = layer.open({
+                type: 1,
+                title: false,
+                closeBtn: 0,
+                shade: 0.3,
+                area: ['280px', '100px'],
+                content: '<div id="rnProgressContent" style="padding: 28px 0; text-align: center; font-size: 14px;"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> <span id="rnProgressText">初始化中...</span></div>'
+            });
+
+            var pollCount = 0;
+            var maxPollCount = 900;
+            var checkInterval = setInterval(function() {
+                pollCount++;
+                if (pollCount > maxPollCount) {
+                    clearInterval(checkInterval);
+                    layer.close(progressLayerIndex);
+                    document.title = '巴博瑞科技';
+                    layer.msg('处理超时，请稍后重试', {icon: 2});
+                    return;
+                }
+
+                fetch('/api/excel/async/status/' + taskId)
+                .then(response => response.json())
+                .then(statusResult => {
+                    if (statusResult.code !== 0) {
+                        clearInterval(checkInterval);
+                        layer.close(progressLayerIndex);
+                        layer.msg('查询状态失败: ' + statusResult.msg, {icon: 2});
+                        return;
+                    }
+
+                    var status = statusResult.data;
+                    if (status.status === 'running') {
+                        var progress = status.progress || 0;
+                        var total = status.total || 0;
+                        var message = status.message || '处理中...';
+                        var displayMsg = (progress === 0 && total === 0) ? '初始化中...' : '处理中: ' + progress + '/' + total + ' - ' + message;
+                        var progressText = document.getElementById('rnProgressText');
+                        if (progressText) {
+                            progressText.textContent = displayMsg;
+                        }
+                    } else if (status.status === 'completed') {
+                        clearInterval(checkInterval);
+                        layer.close(progressLayerIndex);
+                        document.title = '巴博瑞科技';
+                        document.getElementById('replaceNumberResultMsg').textContent = '处理完成，请下载结果文件';
+                        document.getElementById('replaceNumberResultArea').style.display = 'block';
+                        layer.msg('处理完成', {icon: 1});
+                    } else if (status.status === 'failed') {
+                        clearInterval(checkInterval);
+                        layer.close(progressLayerIndex);
+                        document.title = '巴博瑞科技';
+                        layer.msg('处理失败: ' + (status.error || '未知错误'), {icon: 2});
+                    }
+                })
+                .catch(error => {
+                    clearInterval(checkInterval);
+                    layer.close(progressLayerIndex);
+                    document.title = '巴博瑞科技';
+                    layer.msg('查询状态失败: ' + error.message, {icon: 2});
+                });
+            }, 2000);
         })
         .catch(error => {
             layer.close(loadingIndex);

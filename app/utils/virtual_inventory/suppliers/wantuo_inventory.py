@@ -32,6 +32,7 @@ def clean_oecode(pjcode):
     1. 去掉所有空格
     2. 去掉 '-' 及后面的所有内容
     3. 去掉所有中文字符
+    4. 去掉末尾连续的英文字母后缀（如 33526867865ZC 中的 ZC）
 
     :param pjcode: 原始零件编码
     :return: 清洗后的OE码
@@ -46,6 +47,8 @@ def clean_oecode(pjcode):
     code = code.split('-')[0]
     # 3. 去掉所有中文字符
     code = re.sub(r'[\u4e00-\u9fa5]+', '', code)
+    # 4. 去掉末尾连续的英文字母后缀
+    code = re.sub(r'[A-Za-z]+$', '', code)
 
     return code
 

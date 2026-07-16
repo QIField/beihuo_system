@@ -19,6 +19,10 @@ from .models import ProcessResult, ProcessStatus
 
 
 CRM_BRAND_INDEX_URL = 'https://crm.gzbbr.com/api/Product.Brand/index'
+CRM_PRODUCT_LIST_URL = 'https://crm.gzbbr.com/api/Product.Product/list'
+
+# 需要 OE + 品牌同时精确匹配的品牌
+ORIGINAL_BRANDS = {'原厂', '原厂国内4s件'}
 
 
 def _retry_request(func: Callable, name: str, max_retries: int = 1):
@@ -110,6 +114,60 @@ def _get_brand_id(session, brand: str) -> Optional[str]:
     return None
 
 
+def _query_product_list(session, oe_number: str) -> Optional[list]:
+    """
+    根据 OE 查询 CRM Product.Product/list，返回所有 (number, brand_name) 组合
+    """
+    from config import get_auth_headers
+
+    headers = get_auth_headers(session)
+    response = session.get(
+        CRM_PRODUCT_LIST_URL,
+        params={'number': oe_number},
+        headers=headers,
+        timeout=30
+    )
+    if response.status_code != 200:
+        return None
+
+    response_data = response.json()
+    if response_data.get('status') not in (200, 0) and response_data.get('msg') != '操作成功':
+        return None
+
+    data = response_data.get('data', {})
+    data_list = data.get('data', []) if isinstance(data, dict) else data
+    if not isinstance(data_list, list):
+        return None
+
+    items = []
+    for item in data_list:
+        if not isinstance(item, dict) or 'child' not in item:
+            continue
+        for child_item in item['child']:
+            if isinstance(child_item, dict):
+                items.append((child_item.get('number', ''), child_item.get('brand_name', '')))
+    return items
+
+
+def _is_product_existed_in_crm(oe_number: str, brand: str, product_items: list) -> bool:
+    """
+    判断 OE+品牌是否已存在于 CRM 中。
+
+    原厂 / 原厂国内4s件：必须 OE 和品牌同时精确匹配。
+    其他品牌：只要品牌名在结果中出现过即视为已存在。
+    """
+    if not product_items:
+        return False
+
+    if brand in ORIGINAL_BRANDS:
+        return any(
+            item_number == oe_number and item_brand == brand
+            for item_number, item_brand in product_items
+        )
+
+    return any(item_brand == brand for _, item_brand in product_items)
+
+
 def _get_oe_info(session, oe_number: str) -> Optional[dict]:
     """
     获取 OE 信息
@@ -169,6 +227,13 @@ def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session
     brand_id = _get_brand_id(session, brand)
     if not brand_id:
         result = ProcessResult(oe_number, ProcessStatus.FAILED, message=f"没有匹配到品牌ID: {brand}")
+        _save_result(db_manager, oe_number, brand, result)
+        return result
+
+    # 步骤 1.5: 前置存在性校验
+    product_items = _query_product_list(session, oe_number)
+    if product_items is not None and _is_product_existed_in_crm(oe_number, brand, product_items):
+        result = ProcessResult(oe_number, ProcessStatus.EXISTED, message='OE和品牌已存在于CRM中')
         _save_result(db_manager, oe_number, brand, result)
         return result
 
