@@ -297,7 +297,8 @@ def run_virtual_inventory_task():
             print(f"[{datetime.now()}] 虚拟库存数据同步任务执行完成！")
             
             # 在虚拟库存任务完成后，立即执行CRM新建产品任务
-            run_crm_create_products_task()
+            # 已注释：不再由定时任务自动新建产品
+            # run_crm_create_products_task()
             
             # 标记今日已执行组合任务
             daily_execution_status['combined_task_executed_today'] = True

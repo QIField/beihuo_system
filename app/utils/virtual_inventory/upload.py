@@ -282,10 +282,11 @@ def _batch_save(records, original_rows, brand_mapping_info, reverse_brand_mappin
     return result
 
 
-def start_b2b_upload_with_brand_mapping(today_only=False):
+def start_b2b_upload_with_brand_mapping(today_only=False, companies=None):
     """
     上传数据到B2B系统，包含品牌映射和价格处理逻辑（优化版）
     today_only: 是否只上传今天的数据
+    companies: 要推送的公司列表，默认全部
     """
     start_time = time.time()
     result = None  # 兼容函数末尾 return result：即使所有公司都跳过也不会抛 NameError
@@ -296,8 +297,9 @@ def start_b2b_upload_with_brand_mapping(today_only=False):
     # 创建反向映射：从真实品牌名到别名
     reverse_brand_mapping = {v: k for k, v in brand_mapping.items()}
 
-    # 定义要推送的所有公司
-    companies = list(COMPANY_TABLE_MAP.keys())
+    # 定义要推送的公司
+    if companies is None:
+        companies = list(COMPANY_TABLE_MAP.keys())
 
     # 一次性获取所有公司的 token
     logger.info("\n" + "="*60)

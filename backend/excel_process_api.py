@@ -246,6 +246,79 @@ def register_excel_process_routes(app):
             download_name=os.path.basename(result_file)
         )
 
+    @app.route('/api/excel/async/replace_number', methods=['POST'])
+    def async_replace_number():
+        """
+        更新替换号-异步提交接口
+        支持直接添加/对比添加两种模式
+        """
+        if 'file' not in request.files:
+            return jsonify({'code': 1, 'msg': '没有上传文件'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'code': 1, 'msg': '文件名为空'}), 400
+
+        allowed_extensions = {'.xlsx', '.xls', '.csv'}
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        if file_ext not in allowed_extensions:
+            return jsonify({
+                'code': 1,
+                'msg': f'不支持的文件格式，仅支持: {", ".join(allowed_extensions)}'
+            }), 400
+
+        mode = request.form.get('mode')
+        if mode not in ['direct', 'compare']:
+            return jsonify({
+                'code': 1,
+                'msg': '无效的处理模式，支持: direct, compare'
+            }), 400
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        temp_filename = f"replace_number_{timestamp}_{file.filename}"
+        temp_file_path = os.path.join(tempfile.gettempdir(), temp_filename)
+        file.save(temp_file_path)
+
+        from app.core.async_task_store import submit_excel_task
+        from app.services.replace_number_service.direct_processor import (
+            process_direct_replace_number,
+        )
+        from app.utils.replace_number.excel_utils import read_replace_number_excel
+
+        user_store = session.get('store', 'fsbbr')
+        current_org = session.get('current_org', user_store)
+        if not current_org or current_org in ('all', 'none', 'undefined', ''):
+            company = user_store
+        else:
+            company = current_org
+
+        if mode == 'direct':
+            task_id = submit_excel_task(
+                process_direct_replace_number,
+                temp_file_path,
+                company,
+            )
+            return jsonify({
+                'code': 0,
+                'msg': '任务已提交',
+                'data': {'task_id': task_id, 'mode': mode}
+            })
+        else:
+            df, rows = read_replace_number_excel(temp_file_path)
+            oe_brand_list = [
+                {'oe': r['oe'], 'brand': r['brand']}
+                for r in rows
+            ]
+            return jsonify({
+                'code': 0,
+                'msg': '已读取Excel数据',
+                'data': {
+                    'mode': mode,
+                    'redirect_url': '/replace_number_edit',
+                    'oe_brand_list': oe_brand_list
+                }
+            })
+
 
 def process_excel_concurrent(file_path, process_type, mode='two_column'):
     """

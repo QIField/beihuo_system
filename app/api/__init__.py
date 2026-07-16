@@ -15,8 +15,7 @@ api_bp = Blueprint('api', __name__, url_prefix='/new/api')
 # 导入 user 接口（必须放在下面！）
 from . import api_test
 from . import dashboard_crm_wms
-from . import compare_api
-from .compare_api import bp as compare_bp
+from .replace_number_api import replace_number_bp
 from .system_setting_api import system_setting_bp
 from .customer_quota_manager_api import customer_quota_manager_bp
 from .data_board_info_api import report_wx_quote_data_bp
@@ -29,8 +28,8 @@ from .user_preference_api import column_preference_bp
 
 
 
-# 注册比价数据对比蓝图（设置正确的 url_prefix）
-api_bp.register_blueprint(compare_bp, url_prefix='/compare')
+# 注册替换号蓝图
+api_bp.register_blueprint(replace_number_bp, url_prefix='/replace-number')
 api_bp.register_blueprint(qpl_quote_bp)
 api_bp.register_blueprint(ks_inquiry_records_bp)
 api_bp.register_blueprint(column_preference_bp)

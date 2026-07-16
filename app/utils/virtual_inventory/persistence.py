@@ -72,7 +72,7 @@ TABLE_MAP = {
 }
 
 
-def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changsheng_special_fn=None):
+def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changsheng_special_fn=None, companies=None):
     """
     保存数据到各公司虚拟库存表，按各公司价格规则处理
     非佛山表的供应商名称会映射为佛山X格式
@@ -82,9 +82,13 @@ def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changshe
     :param is_wantuo: 是否为万拓数据
     :param is_changsheng: 是否为昌盛数据
     :param is_changsheng_special_fn: 判断是否为昌盛特殊产品的函数
+    :param companies: 要保存的公司列表，默认全部
     """
     if df is None or df.empty:
         return
+
+    if companies is None:
+        companies = COMPANIES
 
     fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db_manager = get_db_connection()
@@ -96,7 +100,7 @@ def save_to_company_tables(df, is_wantuo=False, is_changsheng=False, is_changshe
             df[col] = df[col].astype(str).str.strip()
 
     try:
-        for company in COMPANIES:
+        for company in companies:
             table_name = TABLE_MAP[company]
             processed_data = []
 

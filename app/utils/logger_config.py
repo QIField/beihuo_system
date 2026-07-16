@@ -78,6 +78,9 @@ TASK_LOGGERS = [
     'wms_order_push',               # WMS 订单推送
     'wms_return_items_detail',      # WMS 采购入库单明细同步（按指定字段）
     'wms_gzbbr',                    # WMS 爬虫公共模块日志
+    'crm_price_sync',               # CRM 产品价格同步
+    'replace_number',               # 更新替换号
+    'quote_replace_number',         # 报价 OE 替换号自动同步
 ]
 
 
