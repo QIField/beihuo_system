@@ -6,7 +6,9 @@
 # @Software: PyCharm
 from app.exceptions.base import BusinessError
 from app.scripts.spiders.spider_entities.cassmall import CassmallSpider
-from app.services.wms_upload_site_service.cassmall_product_list import cassmall_product_list_search,cassmall_update_inventory_batch, cassmall_get_inventorys, on_shelf
+from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
+from app.services.wms_upload_site_service.cassmall_product_list import cassmall_product_list_search,cassmall_update_inventory_batch, cassmall_get_inventorys, on_shelf, cassmall_add_or_update_price
+from app.services.wms_upload_site_service.crm_oe_price_crawler import crm_get_oe_price_data
 
 from app.services.wms_upload_site_service.wms_get_status_orders_type import wms_get_return_items_service
 from app.utils.orm.session import orm_session
@@ -18,10 +20,19 @@ def wms_get_return_items_data():
     """
     WMS 状态订单爬虫服务 - 重新爬取数据
     """
-    return_items = wms_get_return_items_service(type_param=5, status_param=0, page_num=None)
-    return_items = wms_get_return_items_service(type_param=5, status_param=1, page_num=None)
+    # 创建数据库会话，将所有操作放在同一个事务中
+    with orm_session() as session:
+        # 第一步：将 wms_return_items 表中所有记录的 status 设为 3（历史数据标记）
+        WmsReturnItems.update_all_status(session, 3)
+        # 第二步：爬取 status=0（未开始）的订单，并更新到数据库
+        wms_get_return_items_service(type_param=5, status_param=0, page_num=None, session=session)
+        # 第三步：爬取 status=1（正在拣货）的订单，并更新到数据库
+        wms_get_return_items_service(type_param=5, status_param=1, page_num=None, session=session)
+        # 提交事务，所有修改一次性生效
+        session.commit()
 
-    return return_items
+    # 返回 None
+    return None
 
 
 def wms_get_return_items_from_db(page=1, limit=20, has_pushed_ks='', fullname=''):
@@ -68,33 +79,51 @@ def wms_get_return_items_from_db(page=1, limit=20, has_pushed_ks='', fullname=''
 
 
 
-def get_cassmall_product_list_search(internal_name):
+def get_cassmall_product_list_search(internal_name, number=None, brandname=None):
     spider = CassmallSpider()
-    ks_json_data=cassmall_product_list_search(internal_name,spider=spider)
-    if ks_json_data.get('data'):
-        # 获取数据列表
-        data_list = ks_json_data.get('data', [])
-        # 进行绝对匹配筛选
-        matched_list = []
-        for item in data_list:
-            if item.get('internalName') == internal_name:
-                matched_list.append(item)
-        # 更新数据
-        ks_json_data['data'] = matched_list
-        print(f"原始数据 {len(data_list)} 条，匹配后 {len(matched_list)} 条")
-        if len(matched_list) > 0:
-            ks_json_data['message'] = f"搜索成功，匹配到 {len(matched_list)} 条数据"
+    crm_spider = None
+    try:
+        ks_json_data=cassmall_product_list_search(internal_name,spider=spider)
+        if ks_json_data.get('data'):
+            # 获取数据列表
+            data_list = ks_json_data.get('data', [])
+            # 进行绝对匹配筛选
+            matched_list = []
+            for item in data_list:
+                if item.get('internalName') == internal_name:
+                    matched_list.append(item)
+            # 更新数据
+            ks_json_data['data'] = matched_list
+            print(f"原始数据 {len(data_list)} 条，匹配后 {len(matched_list)} 条")
+            if len(matched_list) > 0:
+                ks_json_data['message'] = f"搜索成功，匹配到 {len(matched_list)} 条数据"
+            else:
+                ks_json_data['message'] = f"{internal_name}没有搜索到对应的商家编码，请创建商家编码"
+
+            # 获取 CRM 价格并添加到每条数据中
+            if number and len(matched_list) > 0:
+                try:
+                    crm_spider = CrmGzbbrSpider()
+                    crm_price = crm_get_oe_price_data(crm_spider, number, brandname or '')
+                    print(f"商品 {number} 的 CRM 价格: {crm_price}")
+                    for item in matched_list:
+                        item['crm_price'] = crm_price
+                except Exception as e:
+                    print(f"获取CRM价格失败: {e}")
+                    for item in matched_list:
+                        item['crm_price'] = None
+
+            return ks_json_data
         else:
-            ks_json_data['message'] = f"{internal_name}没有搜索到对应的商家编码，请创建商家编码"
+            print(ks_json_data)
+            return ks_json_data
+    finally:
         spider.close()
-        return ks_json_data
-    else:
-        print(ks_json_data)
-        spider.close()
-        return ks_json_data
+        if crm_spider:
+            crm_spider.close()
 
 
-def inventory_sync(product_id, availableToPromiseTotal, record_id=None,spider=None,flag=True):
+def inventory_sync(product_id, availableToPromiseTotal, record_id=None, spider=None, flag=True, price=None):
     # 查询库存
     print("=== 查询库存...")
     if spider is None:
@@ -140,6 +169,15 @@ def inventory_sync(product_id, availableToPromiseTotal, record_id=None,spider=No
         if not is_on_shelf:
             raise BusinessError("产品不在货架上")
 
+    # 如果有价格参数，同时更新价格
+    if price is not None and '更新库存成功' in message:
+        print("\n=== 更新价格...")
+        price_result = cassmall_add_or_update_price(product_id, price, spider)
+        price_message = price_result.get('message', '')
+        print(f"价格更新结果: {price_message}")
+        if '更新价格成功' not in price_message:
+            print(f"警告: 库存更新成功，但价格更新失败: {price_message}")
+
     # 如果推送成功，更新数据库中的 has_pushed_ks 字段
     if '更新库存成功' in message and record_id:
         try:
@@ -165,7 +203,7 @@ def inventory_sync_batch(items):
     """
     批量同步库存到开思
     
-    :param items: 列表，每个元素包含 {'product_id': xxx, 'availableToPromiseTotal': xxx, 'record_id': xxx}
+    :param items: 列表，每个元素包含 {'product_id': xxx, 'availableToPromiseTotal': xxx, 'record_id': xxx, 'price': xxx}
     :return: 批量处理结果
     """
     if not items:
@@ -182,13 +220,14 @@ def inventory_sync_batch(items):
         product_id = item['product_id']
         availableToPromiseTotal = item['availableToPromiseTotal']
         record_id = item.get('record_id')
+        price = item.get('price')
         
         print(f"\n=== 处理第 {idx}/{len(items)} 条数据 ===")
         print(f"product_id: {product_id}, availableToPromiseTotal: {availableToPromiseTotal}")
         
         try:
             # 调用单个更新函数
-            result = inventory_sync(product_id, availableToPromiseTotal, record_id,spider,flag=False)
+            result = inventory_sync(product_id, availableToPromiseTotal, record_id, spider, flag=False, price=price)
             results.append({
                 'product_id': product_id,
                 'result': result
@@ -209,6 +248,8 @@ def inventory_sync_batch(items):
                 'error': error_msg
             })
             print(f"[失败] 第 {idx} 条数据处理异常: {error_msg}")
+    
+    spider.close()
     
     print(f"\n=== 批量同步完成 ===")
     print(f"成功: {success_count}, 失败: {failed_count}")

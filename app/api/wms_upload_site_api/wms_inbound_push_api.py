@@ -8,9 +8,10 @@ from flask import jsonify, request
 
 from . import wms_upload_site_bp
 from ...services.wms_upload_site_service.wms_inbound_push import wms_get_return_items_data, wms_get_return_items_from_db, get_cassmall_product_list_search, inventory_sync, inventory_sync_batch, set_cookie
-
+from app.core.permission.decorators import require_authentication
 
 @wms_upload_site_bp.route('/get_return_items_api', methods=['GET'])
+@require_authentication()
 def get_return_items_api():
     """
     获取采购入库单数据 API - 重新爬取数据并更新数据库，不返回数据
@@ -36,6 +37,7 @@ def get_return_items_api():
 
 
 @wms_upload_site_bp.route('/get_return_items_from_db_api', methods=['GET'])
+@require_authentication()
 def get_return_items_from_db_api():
     """
     获取采购入库单数据 API - 从数据库获取（分页，只返回status=0的数据）
@@ -68,14 +70,19 @@ def get_return_items_from_db_api():
 
 
 @wms_upload_site_bp.route('/cassmall_product_list_search_api', methods=['GET'])
+@require_authentication()
 def cassmall_product_list_search_api():
     """
-    调用 cassmall 商品搜索 API
+    调用 cassmall（开思） 商品搜索 API
     :return: JSON 响应
     """
     try:
         # 获取 frey_no 参数
         frey_no = request.args.get('frey_no', type=str, default='')
+        # 获取 number 参数（OE号）
+        number = request.args.get('number', type=str, default='')
+        # 获取 brandname 参数（品牌名称）
+        brandname = request.args.get('brandname', type=str, default='')
         
         if not frey_no:
             return jsonify({
@@ -85,7 +92,7 @@ def cassmall_product_list_search_api():
             })
         
         # 调用 service 层
-        result = get_cassmall_product_list_search(frey_no)
+        result = get_cassmall_product_list_search(frey_no, number=number, brandname=brandname)
         
         if result:
             return jsonify({
@@ -108,6 +115,7 @@ def cassmall_product_list_search_api():
 
 
 @wms_upload_site_bp.route('/inventory_sync_api', methods=['GET'])
+@require_authentication()
 def inventory_sync_api():
     """
     同步开思mall库存 API
@@ -118,6 +126,7 @@ def inventory_sync_api():
         product_id = request.args.get('product_id')
         availableToPromiseTotal = request.args.get('availableToPromiseTotal')
         record_id = request.args.get('record_id')
+        price = request.args.get('price')
         
         if not product_id:
             return jsonify({
@@ -145,8 +154,20 @@ def inventory_sync_api():
                 'data': None
             })
         
+        # 转换价格为浮点数
+        price_value = None
+        if price is not None and price != '':
+            try:
+                price_value = float(price)
+            except (ValueError, TypeError):
+                return jsonify({
+                    'code': 400,
+                    'msg': '价格参数格式错误',
+                    'data': None
+                })
+        
         # 调用 service 层
-        result = inventory_sync(product_id, availableToPromiseTotal, record_id)
+        result = inventory_sync(product_id, availableToPromiseTotal, record_id, price=price_value)
         
         # 根据 service 层的返回结果处理响应
         message = result.get('message', '')
@@ -173,9 +194,10 @@ def inventory_sync_api():
 
 
 @wms_upload_site_bp.route('/inventory_sync_batch_api', methods=['POST'])
+@require_authentication()
 def inventory_sync_batch_api():
     """
-    批量同步卡思mall库存 API
+    批量同步开思mall库存 API
     :return: JSON 响应
     """
     try:
@@ -223,6 +245,16 @@ def inventory_sync_batch_api():
                     'msg': f'第 {idx + 1} 条数据的参数必须是整数',
                     'data': None
                 })
+            # 转换价格为浮点数（可选参数）
+            if item.get('price') is not None and item.get('price') != '':
+                try:
+                    item['price'] = float(item['price'])
+                except (ValueError, TypeError):
+                    return jsonify({
+                        'code': 400,
+                        'msg': f'第 {idx + 1} 条数据的价格参数格式错误',
+                        'data': None
+                    })
         
         # 调用 service 层
         result = inventory_sync_batch(items)
@@ -252,6 +284,7 @@ def inventory_sync_batch_api():
 
 
 @wms_upload_site_bp.route('/set_cookie_api', methods=['POST'])
+@require_authentication()
 def set_cookie_api():
     """
     设置 Cookie 配置 API
