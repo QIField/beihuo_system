@@ -65,7 +65,7 @@ def get_crm_customer(crm_customer_name):
             PartnerList.fullname.like(f"%{crm_customer_name}%")
         ).order_by(
             PartnerList.fullname
-        ).limit(20).all()
+        ).limit(10).all()
         
         result = []
         for row in query:
@@ -108,8 +108,8 @@ def backfill_deal_info( start_date=None, end_date=None,weixin_decoding_result_id
                 oe_code,
                 record.create_date
             )
-            print(record.inquiry_customer, record.oe_code, record.create_date, sales_info)
-            print(sales_info)
+            # print(record.inquiry_customer, record.oe_code, record.create_date, sales_info)
+            # print(sales_info)
             if sales_info:
                 inquiry_customer = record.inquiry_customer.strip()
                 sales_info_map[(inquiry_customer, oe_code.strip(), record.create_date)] = sales_info
@@ -122,12 +122,13 @@ def backfill_deal_info( start_date=None, end_date=None,weixin_decoding_result_id
 
 
 
-def generate_draft_link(weixin_decoding_result_id, items):
+def generate_draft_link(weixin_decoding_result_id, items, extra_items=None):
     """
     生成草稿链接
     
     :param weixin_decoding_result_id: 微信解码结果ID
     :param items: 选中的配件列表，每项包含 oe_code, brand, price, quantity, original_quote
+    :param extra_items: 额外添加的配件列表，每项包含 product_id, quantity, price, oe_code
     :return: 生成的草稿链接字符串
     """
     from app.models.orm_models.wechat_daily_quote_detail import WechatDailyQuoteDetail
@@ -136,7 +137,7 @@ def generate_draft_link(weixin_decoding_result_id, items):
     if not weixin_decoding_result_id:
         raise ValueError('weixin_decoding_result_id不能为空')
     
-    if not items or not isinstance(items, list):
+    if (not items or not isinstance(items, list)) and (not extra_items or not isinstance(extra_items, list)):
         raise ValueError('请选择至少一个配件')
 
     
@@ -154,7 +155,7 @@ def generate_draft_link(weixin_decoding_result_id, items):
         inquiry_customer_id = records[0].inquiry_customer_id
 
         
-        link_code = generate_link(inquiry_customer_id,items)
+        link_code = generate_link(inquiry_customer_id, items, extra_items)
         
         # 临时占位：返回一个示例链接
         draft_link = f'https://crm.gzbbr.com/#/bills/generateOrderDetail?orders_id={link_code}'

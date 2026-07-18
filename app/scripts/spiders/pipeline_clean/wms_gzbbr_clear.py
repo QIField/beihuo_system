@@ -9,6 +9,8 @@
 
 import pandas as pd
 
+from app.exceptions.data_exceptions import DataNotFoundError
+
 
 def get_status_orders_clean(data_list, store='fsbbr', extra_fields=None):
     """
@@ -111,6 +113,81 @@ def product_list_clean(data,oe_code):
     df['product_id'] = pd.to_numeric(df['product_id'], errors='coerce')
     df['search_no'] = oe_code
     
+    clean_data_list = df.to_dict('records')  # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
+    
+    return clean_data_list
+
+
+def crawl_products_by_oe_brand_clean(oe_code, product_list):
+    """
+    根据 OE 号精确匹配清洗产品数据
+    
+    由于 API 返回的是模糊匹配结果，会包含多个不同 OE 号的产品，
+    此函数只保留 OE 号与输入完全匹配的产品记录。
+    
+    :param oe_code: 输入的 OE 号，用于精确匹配
+    :param product_list: 接口返回的原始 JSON 数据（已解析为字典）
+    :return: 清洗后的产品列表，每个元素包含 name、stock、number、price、product_id、brand_name、contrast_price_flag、search_no
+    """
+    # 参数校验：检查输入数据是否有效
+    if not product_list or not isinstance(product_list, dict):
+        return []
+    
+    # 提取 data.data 层级数据
+    data_obj = product_list.get('data', {})
+    if not data_obj or not isinstance(data_obj, dict):
+        return []
+    
+    data_list = data_obj.get('data', [])
+    if not data_list or not isinstance(data_list, list):
+        return []
+    
+   
+
+    # 定义需要保留的字段列表
+    model_fields = ['name', 'stock', 'number', 'price', 'product_id', 'brand_name']
+    
+    # 使用列表推导式展平所有 child 列表，提取所有产品数据
+    child_lists = [item.get('child', []) for item in data_list if isinstance(item.get('child'), list)]
+    all_products = [product for child_list in child_lists for product in child_list]
+    
+    # 检查是否为"找不到产品"的情况
+    for product in all_products:
+        if product.get('name') == '找不到产品':
+            raise DataNotFoundError('找不到产品')
+
+    # 转换为 DataFrame 进行向量化清洗
+    df = pd.DataFrame(all_products)
+    
+    # 空数据检查
+    if df.empty:
+        return []
+    
+    # 精确匹配 OE 号：将 number 字段转为字符串并去除空格后与输入 OE 号严格比较
+    df['number'] = df['number'].astype(str).str.strip()
+    # df = df[df['number'] == oe_code.strip()].copy()
+    
+    # 匹配后为空检查
+    if df.empty:
+        return []
+    
+    # 只保留模型定义的字段
+    available_fields = [field for field in model_fields if field in df.columns]
+    df = df[available_fields].copy()
+    
+ 
+    
+    # 匹配后为空检查
+    if df.empty:  # pyright: ignore[reportAttributeAccessIssue]
+        return []
+    
+   
+    df['product_id'] = pd.to_numeric(df['product_id'], errors='coerce')
+    
+    df['price'] = pd.to_numeric(df['price'].replace('', 0), errors='coerce').fillna(0).round(2).astype(float)  # pyright: ignore[reportAttributeAccessIssue]
+
+
+    # 转换为字典列表返回
     clean_data_list = df.to_dict('records')  # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
     
     return clean_data_list

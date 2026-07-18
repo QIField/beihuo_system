@@ -5,7 +5,7 @@ from pandas.core.frame import to_arrays  # 导入 defaultdict，用于按 oe_cod
 
 from app.exceptions.crawler_exceptions import CrawlerError
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider  # 导入 CRM 爬虫类
-from app.scripts.spiders.pipeline_clean.wms_gzbbr_clear import product_list_clean
+from app.scripts.spiders.pipeline_clean.wms_gzbbr_clear import crawl_products_by_oe_brand_clean, product_list_clean
 
 
 ##通过oe号搜索产品并清理数据
@@ -18,6 +18,60 @@ def crawl_related_products(oe_code):
     clean_data = product_list_clean(product_list,oe_code)
     # 返回清洗后的产品列表
     return clean_data
+
+def generate_tree(data_list):
+    root = []
+    for row in data_list:
+        oe = row['number']
+        brand = row['brand_name']
+        product_title = f"{row['name']} - {row['price']}元"
+        product_id = f"{row['product_id']}"
+        
+        oe_node = None
+        for node in root:
+            if node['id'] == oe:
+                oe_node = node
+                break
+        if not oe_node:
+            oe_node = {'id': oe, 'title': oe, 'child': []}
+            root.append(oe_node)
+        
+        brand_node = None
+        for node in oe_node['child']:
+            if node['id'] == brand:
+                brand_node = node
+                break
+        if not brand_node:
+            brand_node = {'id': brand, 'title': brand, 'type': 'group', 'child': []}
+            oe_node['child'].append(brand_node)
+        
+        brand_node['child'].append({
+            'id': product_id,
+            'title': product_title,
+            'productData': row
+        })
+    
+    return root
+
+
+def crawl_products_by_oe_brand(oe_code):
+    spider = CrmGzbbrSpider()
+    # 调用产品列表接口，根据 OE 号查询相关产品，获取响应并解析为 JSON
+    product_list = spider.get_product_product_list(numberlist=oe_code).json()  # pyright: ignore[reportOptionalMemberAccess]
+    # 对返回的原始数据进行清洗，只保留需要的字段且过滤掉无库存产品
+    clean_data = crawl_products_by_oe_brand_clean(oe_code,product_list)
+    
+    tree = generate_tree(clean_data)
+    
+    return tree
+
+
+if __name__ == '__main__':
+    data=crawl_products_by_oe_brand('0259971845')
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+   
+
+##生成tree结构
 
 
 
@@ -80,130 +134,35 @@ def add_cart_to_orders(inquiry_customer_id,list_data):
 
 
 
+
+
+
 ##生成草稿链接
-def generate_link(inquiry_customer_id,items):
-    # 先按 oe_code 对 items 分组，同一个 oe_code 只爬一次接口
-    oe_groups = merge_items_by_oe_code(items)
+def generate_link(inquiry_customer_id, items, extra_items):
     list_data = []
-    # print(oe_groups,"oe_groups items")
-    for oe,items in oe_groups.items():
-        product_list = crawl_related_products(oe)
-        
-        data = list_matching(items,product_list)
-        list_data.extend(data)
-   
-   
-    link_code = add_cart_to_orders(inquiry_customer_id,list_data)
+
+    if items:
+        oe_groups = merge_items_by_oe_code(items)
+        for oe, group_items in oe_groups.items():
+            product_list = crawl_related_products(oe)
+            data = list_matching(group_items, product_list)
+            list_data.extend(data)
+
+    if extra_items:
+        for item in extra_items:
+            extra_item = {
+                'product_id': item.get('product_id'),
+                'search_no': item.get('oe_code'),
+                'quote_quantity': item.get('quantity'),
+                'price': item.get('price'),
+            }
+            list_data.append(extra_item)
+
+  
+
+    link_code = add_cart_to_orders(inquiry_customer_id, list_data)
     return link_code
     
 
-
-# if __name__ == '__main__':
-#     items= [
-#         # {
-#         #     "oe_code": "22116860488",
-#         #     "brand": "菲尔",
-#         #     "price": "170",
-#         #     "quantity": 1
-#         # },
-#         # {
-#         #     "oe_code": "22116860488",
-#         #     "brand": "猫头鹰",
-#         #     "price": "196",
-#         #     "quantity": 1
-#         # },
-#         # {
-#         #     "oe_code": "22116860487",
-#         #     "brand": "菲尔",
-#         #     "price": "170",
-#         #     "quantity": 1
-#         # },
-#         # {
-#         #     "oe_code": "22116860487",
-#         #     "brand": "采埃孚",
-#         #     "price": "450",
-#         #     "quantity": 2
-#         # },
-#         # {
-#         #     "oe_code": "22326862577",
-#         #     "brand": "原厂国内4s件(波箱机脚胶)",
-#         #     "price": "480",
-#         #     "quantity": 1
-#         # },
-#         # {
-#         #     "oe_code": "22326862577",
-#         #     "brand": "原厂国内4s件(波箱后机脚胶)",
-#         #     "price": "490",
-#         #     "quantity": 2
-#         # },
-#         # {
-#         #     "oe_code": "11288580360",
-#         #     "brand": "慕贝尔",
-#         #     "price": "230",
-#         #     "quantity": 1
-#         # },
-#         # {
-#         #     "oe_code": "11288580360",
-#         #     "brand": "依纳",
-#         #     "price": "259",
-#         #     "quantity": 2
-#         # },
-#         # {
-#         #     "oe_code": "11288580360",
-#         #     "brand": "盖茨",
-#         #     "price": "350",
-#         #     "quantity": 1
-#         # },
-#         # {
-#         #     "oe_code": "34216870552",
-#         #     "brand": "泰明顿",
-#         #     "price": "250",
-#         #     "quantity": 2
-#         # },
-#         # {
-#         #     "oe_code": "34216870552",
-#         #     "brand": "原厂国内4s件(后刹车片)",
-#         #     "price": "530",
-#         #     "quantity": 2
-#         # },
-#         # {
-#         #     "oe_code": "31106861151",
-#         #     "brand": "猫头鹰(前下弯臂胶套到包装！！)",
-#         #     "price": "167",
-#         #     "quantity": 1
-#         # },
-#         # {
-#         #     "oe_code": "31106861151",
-#         #     "brand": "菲尔(左前下弯臂)",
-#         #     "price": "260",
-#         #     "quantity": 1
-#         # },
-#         # {
-#         #     "oe_code": "31106861151",
-#         #     "brand": "FAG",
-#         #     "price": "340",
-#         #     "quantity": 2
-#         # },
-#         # {
-#         #     "oe_code": "31106861151",
-#         #     "brand": "科帝克",
-#         #     "price": "400",
-#         #     "quantity": 2
-#         # },
-#         # {
-#         #     "oe_code": "31106861152",
-#         #     "brand": "科帝克",
-#         #     "price": "400",
-#         #     "quantity": 2
-#         # },
-#         {
-#             "oe_code": "31106861152",
-#             "brand": "猫头鹰(右前下弯臂双标！！)",
-#             "price": "550",
-#             "quantity": 2
-#         }
-#     ]
-#     data=generate_link(items)
-#     print(data)
 
 

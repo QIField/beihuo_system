@@ -13,6 +13,8 @@ from . import report_wx_quote_data_bp
 from app.services.report_wx_quote_data_services import wechat_daily_quote_detail_service
 from app.services.report_wx_quote_data_services import quote_summary_service
 from app.services.report_wx_quote_data_services import wechat_daily_quote_detail_subsidiary
+from app.services.report_wx_quote_data_services.create_link import crawl_products_by_oe_brand
+from app.exceptions.data_exceptions import DataNotFoundError
 
 
 @report_wx_quote_data_bp.route('/weixin_decoding_result_list_api', methods=['GET'])
@@ -326,6 +328,7 @@ def generate_draft_link_api():
         from flask import request
         weixin_decoding_result_id = request.json.get('weixin_decoding_result_id')  # pyright: ignore[reportOptionalMemberAccess]
         items = request.json.get('items')  # pyright: ignore[reportOptionalMemberAccess]
+        extra_items = request.json.get('extra_items')  # pyright: ignore[reportOptionalMemberAccess]
         
         if not weixin_decoding_result_id:
             return jsonify({
@@ -334,7 +337,7 @@ def generate_draft_link_api():
                 'data': None
             })
         
-        if not items or not isinstance(items, list):
+        if (not items or not isinstance(items, list)) and (not extra_items or not isinstance(extra_items, list)):
             return jsonify({
                 'code': 400,
                 'msg': '请选择至少一个配件',
@@ -343,7 +346,8 @@ def generate_draft_link_api():
         
         result = wechat_daily_quote_detail_subsidiary.generate_draft_link(
             weixin_decoding_result_id=weixin_decoding_result_id,
-            items=items
+            items=items,
+            extra_items=extra_items
         )
         
         return jsonify({
@@ -356,6 +360,52 @@ def generate_draft_link_api():
         return jsonify({
             'code': 500,
             'msg': f'生成草稿链接失败: {str(e)}',
+            'data': None
+        })
+
+
+@report_wx_quote_data_bp.route('/search_oe_product_api', methods=['GET'])
+@require_authentication()
+def search_oe_product_api():
+    """
+    搜索OE产品 API
+    根据OE号查询相关产品列表，用于添加额外品牌时选择产品
+    """
+    try:
+        oe_code = request.args.get('oe_code', '')
+        
+        if not oe_code:
+            return jsonify({
+                'code': 400,
+                'msg': 'OE码不能为空',
+                'data': None
+            })
+        
+        result = crawl_products_by_oe_brand(oe_code)
+        
+        if not result:
+            return jsonify({
+                'code': 404,
+                'msg': '未找到匹配的产品',
+                'data': []
+            })
+        
+        return jsonify({
+            'code': 200,
+            'msg': '搜索成功',
+            'data': result
+        })
+        
+    except DataNotFoundError as e:
+        return jsonify({
+            'code': 404,
+            'msg': str(e),
+            'data': []
+        })
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'搜索OE产品失败: {str(e)}',
             'data': None
         })
 

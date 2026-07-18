@@ -59,18 +59,17 @@
       <div class="layui-form-item">
         <label class="layui-form-label">询价客户</label>
         <div class="layui-input-block" style="margin-left: 110px;">
-          <div style="display: flex; align-items: center;">
-            <input type="text" name="inquiry_customer" value="" placeholder="请输入客户名称" autocomplete="off" class="layui-input" id="inquiryCustomerInput" style="flex: 1;">
-            <button type="button" class="layui-btn" id="searchCustomerBtn" style="margin-left: 10px;">搜索</button>
+          <div id="customerSearchContainer" style="position: relative;">
+            <input type="text" name="inquiry_customer" value="" placeholder="请输入客户名称搜索" autocomplete="off" class="layui-input" id="inquiryCustomerInput">
+            <div id="customerSuggestionDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid #d2d2d2; border-top: none; border-radius: 0 0 4px 4px; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            </div>
           </div>
-        </div>
-      </div>
-      <div class="layui-form-item">
-        <label class="layui-form-label">搜索结果</label>
-        <div class="layui-input-block">
-          <select name="customer_select" id="customerSelect" lay-search>
-            <option value="">请选择客户</option>
-          </select>
+          <div id="selectedCustomerTag" style="display: none; margin-top: 10px;">
+            <span style="display: inline-block; padding: 4px 12px; background: #16baaa; color: #fff; border-radius: 4px; font-size: 13px;">
+              <span id="selectedCustomerName"></span>
+              <a href="javascript:;" id="clearSelectedCustomer" style="margin-left: 8px; color: #fff; opacity: 0.8; text-decoration: none;">×</a>
+            </span>
+          </div>
         </div>
       </div>
       <div class="layui-form-item">
@@ -80,6 +79,61 @@
         </div>
       </div>
     </form>
+  </div>
+</script>
+
+<script type="text/html" id="addExtraBrandTemplate">
+  <div style="padding: 20px;">
+    <form class="layui-form" lay-filter="addExtraBrandForm">
+      <div class="layui-form-item">
+        <label class="layui-form-label">OE码</label>
+        <div class="layui-input-block" style="margin-left: 110px;">
+          <div style="display: flex; align-items: center;">
+            <input type="text" name="oe_code" value="" placeholder="请输入OE码" autocomplete="off" class="layui-input" id="extraOeCodeInput" style="flex: 1;">
+            <button type="button" class="layui-btn" id="searchOeBtn" style="margin-left: 10px;">搜索</button>
+          </div>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">选择产品</label>
+        <div class="layui-input-block">
+          <button type="button" class="layui-btn layui-btn-primary" id="productSelectBtn" style="width: 100%; text-align: left; justify-content: space-between;">
+            <span>请先搜索OE码</span>
+            <i class="layui-icon layui-icon-down layui-font-12"></i>
+          </button>
+          <div id="selectedProductInfo" style="margin-top: 10px; padding: 10px; background: #f8f8f8; border-radius: 4px; display: none;"></div>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">数量</label>
+        <div class="layui-input-block">
+          <input type="number" name="quantity" value="1" min="1" placeholder="请输入数量" autocomplete="off" class="layui-input" id="extraQuantityInput">
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <div class="layui-input-block">
+          <button type="button" class="layui-btn" lay-submit lay-filter="saveExtraBrand">添加</button>
+          <button type="button" class="layui-btn layui-btn-primary" lay-submit lay-filter="cancelExtraBrand">取消</button>
+        </div>
+      </div>
+    </form>
+    <div class="layui-form-item" style="margin-top:20px;">
+      <label class="layui-form-label">已添加产品</label>
+      <div class="layui-input-block">
+        <table id="extraBrandList" class="layui-table" lay-skin="line" style="margin-bottom:0;">
+          <thead>
+            <tr>
+              <th>OE码</th>
+              <th>品牌</th>
+              <th>数量</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="extraBrandListBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </script>
 
@@ -328,6 +382,9 @@
                             html += '<span class="draft-link-text" data-link="' + d.draft_link + '" title="点击复制，双击打开">' + d.draft_link + '</span>';
                         }
                         html += '<button class="layui-btn layui-btn-xs layui-btn-normal" lay-event="generateDraftLink" style="margin-left:5px;">生成链接</button>';
+                        var hasExtraItems = d.extra_items && d.extra_items.length > 0;
+                        var btnClass = hasExtraItems ? 'layui-btn-danger' : 'layui-btn-warm';
+                        html += '<button class="layui-btn layui-btn-xs ' + btnClass + '" lay-event="addExtraBrand" style="margin-left:5px;">添加额外品牌</button>';
                         return html;
                     }
                 },
@@ -539,23 +596,78 @@
                     type: 1,
                     area: ['500px', '350px'],
                     content: $('#editCustomerTemplate').html(),
+                    end: function () {
+                        $(document).off('mousedown.customerSearch');
+                    },
                     success: function (layero, index) {
-                        layero.find('input[name="inquiry_customer"]').val(data.inquiry_customer || '');
-
                         form.render();
 
                         const inquiryCustomerInput = layero.find('#inquiryCustomerInput');
-                        const searchCustomerBtn = layero.find('#searchCustomerBtn');
-                        const customerSelect = layero.find('#customerSelect');
-                        let selectedCustomerId = null;
+                        const suggestionDropdown = layero.find('#customerSuggestionDropdown');
+                        const selectedCustomerTag = layero.find('#selectedCustomerTag');
+                        const selectedCustomerNameSpan = layero.find('#selectedCustomerName');
+                        const clearSelectedBtn = layero.find('#clearSelectedCustomer');
+                        let selectedCustomerData = null;
+                        let searchTimer = null;
 
-                        searchCustomerBtn.on('click', function () {
-                            const keyword = inquiryCustomerInput.val().trim();
-                            if (!keyword) {
-                                layer.msg('请输入客户名称');
-                                return;
+                        function showSelectedTag(customerName) {
+                            selectedCustomerNameSpan.text(customerName);
+                            selectedCustomerTag.show();
+                            inquiryCustomerInput.val('');
+                            suggestionDropdown.hide();
+                        }
+
+                        function hideSelectedTag() {
+                            selectedCustomerData = null;
+                            selectedCustomerTag.hide();
+                            inquiryCustomerInput.focus();
+                        }
+
+                        function renderSuggestions(items) {
+                            suggestionDropdown.empty();
+                            if (!items || items.length === 0) {
+                                const emptyItem = $('<div></div>').css({
+                                    padding: '10px 12px',
+                                    color: '#999',
+                                    fontSize: '13px',
+                                    textAlign: 'center'
+                                }).text('未找到匹配客户');
+                                suggestionDropdown.append(emptyItem);
+                            } else {
+                                items.forEach(function (item) {
+                                    let displayText = item.fullname;
+                                    if (item.short_name) {
+                                        displayText += ' (' + item.short_name + ')';
+                                    }
+                                    if (item.contacts_phone) {
+                                        displayText += ' - ' + item.contacts_phone;
+                                    }
+                                    const suggestionItem = $('<div></div>').css({
+                                        padding: '8px 12px',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        borderBottom: '1px solid #f0f0f0',
+                                        transition: 'background-color 0.2s'
+                                    }).hover(
+                                        function () { $(this).css('background-color', '#f5f7fa'); },
+                                        function () { $(this).css('background-color', ''); }
+                                    ).text(displayText);
+
+                                    suggestionItem.on('click', function () {
+                                        selectedCustomerData = {
+                                            partner_id: item.partner_id,
+                                            fullname: item.fullname
+                                        };
+                                        showSelectedTag(item.fullname);
+                                    });
+
+                                    suggestionDropdown.append(suggestionItem);
+                                });
                             }
+                            suggestionDropdown.show();
+                        }
 
+                        function searchCustomers(keyword) {
                             $.ajax({
                                 url: '/new/api/report_wx_quote_data/search_crm_customer_api',
                                 type: 'GET',
@@ -563,39 +675,60 @@
                                     keyword: keyword
                                 },
                                 success: function (res) {
-                                    customerSelect.empty();
-                                    customerSelect.append('<option value="">请选择客户</option>');
-
-                                    if (res.code === 200 && res.data && res.data.length > 0) {
-                                        res.data.forEach(function (item) {
-                                            let displayText = item.fullname;
-                                            if (item.short_name) {
-                                                displayText += ' (' + item.short_name + ')';
-                                            }
-                                            if (item.contacts_phone) {
-                                                displayText += ' - ' + item.contacts_phone;
-                                            }
-                                            const optionValue = JSON.stringify({
-                                                partner_id: item.partner_id,
-                                                fullname: item.fullname
-                                            }).replace(/"/g, '&quot;');
-                                            customerSelect.append('<option value="' + optionValue + '">' + displayText + '</option>');
-                                        });
+                                    if (res.code === 200 && res.data) {
+                                        renderSuggestions(res.data);
                                     } else {
-                                        customerSelect.append('<option value="">未找到匹配客户</option>');
-                                    }
-                                    form.render('select');
-                                    if (res.code === 200 && res.data && res.data.length > 0) {
-                                        customerSelect.next('.layui-form-select').find('.layui-select-title').click();
+                                        renderSuggestions([]);
                                     }
                                 },
                                 error: function () {
-                                    layer.msg('搜索失败');
+                                    renderSuggestions([]);
                                 }
                             });
+                        }
+
+                        inquiryCustomerInput.on('input', function () {
+                            const keyword = $(this).val().trim();
+                            if (selectedCustomerData) {
+                                hideSelectedTag();
+                            }
+                            if (searchTimer) {
+                                clearTimeout(searchTimer);
+                            }
+                            if (!keyword) {
+                                suggestionDropdown.hide();
+                                return;
+                            }
+                            searchTimer = setTimeout(function () {
+                                searchCustomers(keyword);
+                            }, 300);
                         });
 
+                        inquiryCustomerInput.on('focus', function () {
+                            const keyword = $(this).val().trim();
+                            if (keyword && !selectedCustomerData) {
+                                searchCustomers(keyword);
+                            }
+                        });
 
+                        clearSelectedBtn.on('click', function () {
+                            hideSelectedTag();
+                        });
+
+                        $(document).on('mousedown.customerSearch', function (e) {
+                            if (!layero.find('#customerSearchContainer').is(e.target) &&
+                                layero.find('#customerSearchContainer').has(e.target).length === 0) {
+                                suggestionDropdown.hide();
+                            }
+                        });
+
+                        if (data.inquiry_customer && data.inquiry_customer_id) {
+                            selectedCustomerData = {
+                                partner_id: data.inquiry_customer_id,
+                                fullname: data.inquiry_customer
+                            };
+                            showSelectedTag(data.inquiry_customer);
+                        }
 
                         form.on('submit(saveCustomerEdit)', function () {
                             if (data.weixin_decoding_result_id === null) {
@@ -603,21 +736,13 @@
                                 return false;
                             }
 
-                            const customerSelectValue = customerSelect.val();
-                            if (!customerSelectValue) {
+                            if (!selectedCustomerData) {
                                 layer.msg('请先搜索并选择客户');
                                 return false;
                             }
 
-                            let submitCustomerId = null;
-                            let submitCustomerName = '';
-                            try {
-                                const customerData = JSON.parse(customerSelectValue);
-                                submitCustomerId = customerData.partner_id;
-                                submitCustomerName = customerData.fullname;
-                            } catch (e) {
-                                submitCustomerName = customerSelectValue;
-                            }
+                            const submitCustomerId = selectedCustomerData.partner_id;
+                            const submitCustomerName = selectedCustomerData.fullname;
 
                             $.ajax({
                                 url: '/new/api/report_wx_quote_data/update_inquiry_customer_api',
@@ -630,9 +755,19 @@
                                 }),
                                 success: function (res) {
                                     if (res.code === 200) {
+                                        var cache = layui.table.cache['weixinDecodingResultTable'];
+                                        for (var i = 0; i < cache.length; i++) {
+                                            if (cache[i].weixin_decoding_result_id === data.weixin_decoding_result_id) {
+                                                cache[i].inquiry_customer_id = submitCustomerId;
+                                                cache[i].inquiry_customer = submitCustomerName;
+                                            }
+                                        }
+                                        obj.update({
+                                            inquiry_customer_id: submitCustomerId,
+                                            inquiry_customer: submitCustomerName
+                                        });
                                         layer.msg('保存成功');
                                         layer.close(index);
-                                        reloadCurrentPage();
                                     } else {
                                         layer.msg(res.msg || '保存失败');
                                     }
@@ -652,6 +787,8 @@
                 });
             } else if (obj.event === 'generateDraftLink') {
                 handleGenerateDraftLink(obj);
+            } else if (obj.event === 'addExtraBrand') {
+                handleAddExtraBrand(obj);
             }
         });
 
@@ -676,8 +813,18 @@
                 }
             }
 
-            if (selectedItems.length === 0) {
-                layer.msg('请先选择至少一个配件的数量', { icon: 2 });
+            var extraItems = [];
+            for (var i = 0; i < cache.length; i++) {
+                var row = cache[i];
+                if (row.weixin_decoding_result_id === weixinDecodingResultId &&
+                    row.extra_items && row.extra_items.length > 0) {
+                    extraItems = extraItems.concat(row.extra_items);
+                    break;
+                }
+            }
+
+            if (selectedItems.length === 0 && extraItems.length === 0) {
+                layer.msg('请先选择至少一个配件的数量或添加额外品牌', { icon: 2 });
                 return;
             }
 
@@ -713,7 +860,8 @@
                 contentType: 'application/json',
                 data: JSON.stringify({
                     weixin_decoding_result_id: weixinDecodingResultId,
-                    items: selectedItems
+                    items: selectedItems,
+                    extra_items: extraItems
                 }),
                 success: function (res) {
                     btn.prop('disabled', false).text(originalText).removeClass('layui-btn-disabled');
@@ -724,8 +872,10 @@
                                 cache[i].draft_link = draftLink;
                             }
                         }
+                        obj.update({
+                            draft_link: draftLink
+                        });
                         layer.msg('生成成功', { icon: 1 });
-                        reloadCurrentPage();
                     } else {
                         layer.msg(res.msg || '生成失败', { icon: 2 });
                     }
@@ -733,6 +883,217 @@
                 error: function (xhr, status, error) {
                     layer.msg('生成失败: ' + error, { icon: 2 });
                     btn.prop('disabled', false).text(originalText).removeClass('layui-btn-disabled');
+                }
+            });
+        }
+
+        function updateAddExtraBrandBtnColor(weixinDecodingResultId, extraItemsCount) {
+            var tableElem = $('#weixinDecodingResultTable').next('.layui-table-view');
+            var trs = tableElem.find('tbody tr');
+            trs.each(function () {
+                var tr = $(this);
+                var rowIndex = tr.data('index');
+                var cache = layui.table.cache['weixinDecodingResultTable'];
+                if (cache[rowIndex] && cache[rowIndex].weixin_decoding_result_id === weixinDecodingResultId) {
+                    var btn = tr.find('[lay-event="addExtraBrand"]');
+                    if (btn.length > 0) {
+                        btn.removeClass('layui-btn-warm layui-btn-danger');
+                        if (extraItemsCount > 0) {
+                            btn.addClass('layui-btn-danger');
+                        } else {
+                            btn.addClass('layui-btn-warm');
+                        }
+                    }
+                    return false;
+                }
+            });
+        }
+
+        function handleAddExtraBrand(obj) {
+            var data = obj.data;
+            var weixinDecodingResultId = data.weixin_decoding_result_id;
+
+            layer.open({
+                title: '添加额外品牌',
+                type: 1,
+                area: ['600px', '550px'],
+                content: $('#addExtraBrandTemplate').html(),
+                success: function (layero, index) {
+                    form.render();
+
+                    var oeCodeInput = layero.find('#extraOeCodeInput');
+                    var searchOeBtn = layero.find('#searchOeBtn');
+                    var productSelectBtn = layero.find('#productSelectBtn');
+                    var selectedProductInfo = layero.find('#selectedProductInfo');
+                    var quantityInput = layero.find('#extraQuantityInput');
+                    var listBody = layero.find('#extraBrandListBody');
+                    var selectedProductData = null;
+                    var dropdownInstance = null;
+
+                    function getExtraItems() {
+                        var cache = layui.table.cache['weixinDecodingResultTable'];
+                        for (var i = 0; i < cache.length; i++) {
+                            if (cache[i].weixin_decoding_result_id === weixinDecodingResultId) {
+                                return cache[i].extra_items || [];
+                            }
+                        }
+                        return [];
+                    }
+
+                    function renderExtraBrandList() {
+                        var items = getExtraItems();
+                        listBody.empty();
+                        if (items.length === 0) {
+                            listBody.html('<tr><td colspan="4" style="text-align:center;color:#999;">暂无已添加的额外产品</td></tr>');
+                            return;
+                        }
+                        items.forEach(function (item, idx) {
+                            var tr = $('<tr>');
+                            tr.append('<td>' + item.oe_code + '</td>');
+                            tr.append('<td>' + item.brand + '</td>');
+                            tr.append('<td>' + item.quantity + '</td>');
+                            tr.append('<td><button class="layui-btn layui-btn-xs layui-btn-danger" data-idx="' + idx + '">删除</button></td>');
+                            listBody.append(tr);
+                        });
+
+                        listBody.find('button[data-idx]').off('click').on('click', function () {
+                            var idx = parseInt($(this).attr('data-idx'));
+                            var cache = layui.table.cache['weixinDecodingResultTable'];
+                            for (var i = 0; i < cache.length; i++) {
+                                if (cache[i].weixin_decoding_result_id === weixinDecodingResultId) {
+                                    if (cache[i].extra_items && cache[i].extra_items.length > idx) {
+                                        cache[i].extra_items.splice(idx, 1);
+                                        renderExtraBrandList();
+                                        updateAddExtraBrandBtnColor(weixinDecodingResultId, cache[i].extra_items.length);
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    renderExtraBrandList();
+
+                    searchOeBtn.on('click', function () {
+                        var oeCode = oeCodeInput.val().trim();
+                        if (!oeCode) {
+                            layer.msg('请输入OE码');
+                            return;
+                        }
+
+                        $.ajax({
+                            url: '/new/api/report_wx_quote_data/search_oe_product_api',
+                            type: 'GET',
+                            data: {
+                                oe_code: oeCode
+                            },
+                            success: function (res) {
+                                selectedProductData = null;
+                                selectedProductInfo.hide();
+                                productSelectBtn.find('span').text('请选择产品');
+
+                                if (res.code === 200 && res.data && res.data.length > 0) {
+                                    dropdownInstance = dropdown.render({
+                                        elem: productSelectBtn[0],
+                                        data: res.data,
+                                        click: function (item) {
+                                            if (item.productData) {
+                                                selectedProductData = item.productData;
+                                                productSelectBtn.find('span').text(
+                                                    selectedProductData.number + ' / ' +
+                                                    selectedProductData.brand_name + ' / ' +
+                                                    selectedProductData.name
+                                                );
+                                                selectedProductInfo.html(
+                                                    '<strong>已选择：</strong>' +
+                                                    'OE码: ' + selectedProductData.number + ' | ' +
+                                                    '品牌: ' + selectedProductData.brand_name + ' | ' +
+                                                    '名称: ' + selectedProductData.name + ' | ' +
+                                                    '价格: ' + selectedProductData.price + '元'
+                                                ).show();
+                                            }
+                                        }
+                                    });
+                                    productSelectBtn.click();
+                                } else if (res.code === 404) {
+                                    layer.msg(res.msg || '未找到匹配的产品', { icon: 2 });
+                                    productSelectBtn.find('span').text('未找到匹配产品');
+                                } else if (res.code === 400) {
+                                    layer.msg(res.msg || '参数错误', { icon: 2 });
+                                } else {
+                                    layer.msg(res.msg || '搜索失败', { icon: 2 });
+                                    productSelectBtn.find('span').text('搜索失败');
+                                }
+                            },
+                            error: function () {
+                                layer.msg('搜索失败', { icon: 2 });
+                            }
+                        });
+                    });
+
+                    oeCodeInput.on('keydown', function (e) {
+                        if (e.keyCode === 13) {
+                            searchOeBtn.click();
+                        }
+                    });
+
+                    form.on('submit(saveExtraBrand)', function () {
+                        var quantity = parseInt(quantityInput.val().trim()) || 1;
+
+                        if (!selectedProductData) {
+                            layer.msg('请先搜索并选择产品');
+                            return false;
+                        }
+
+                        if (quantity < 1) {
+                            layer.msg('数量必须大于0');
+                            return false;
+                        }
+
+                        var cache = layui.table.cache['weixinDecodingResultTable'];
+                        var isUpdated = false;
+                        for (var i = 0; i < cache.length; i++) {
+                            if (cache[i].weixin_decoding_result_id === weixinDecodingResultId) {
+                                if (!cache[i].extra_items) {
+                                    cache[i].extra_items = [];
+                                }
+                                var existingItem = cache[i].extra_items.find(function (item) {
+                                    return item.oe_code === selectedProductData.number && item.brand === selectedProductData.brand_name;
+                                });
+                                if (existingItem) {
+                                    existingItem.quantity = quantity;
+                                    isUpdated = true;
+                                } else {
+                                    cache[i].extra_items.push({
+                                        oe_code: selectedProductData.number,
+                                        brand: selectedProductData.brand_name,
+                                        quantity: quantity,
+                                        name: selectedProductData.name,
+                                        price: selectedProductData.price,
+                                        product_id: selectedProductData.product_id,
+                                        stock: selectedProductData.stock
+                                    });
+                                }
+                                break;
+                            }
+                        }
+
+                        oeCodeInput.val('');
+                        productSelectBtn.find('span').text('请先搜索OE码');
+                        selectedProductData = null;
+                        selectedProductInfo.hide();
+                        quantityInput.val('1');
+                        renderExtraBrandList();
+                        var currentExtraItems = getExtraItems();
+                        updateAddExtraBrandBtnColor(weixinDecodingResultId, currentExtraItems.length);
+                        layer.msg(isUpdated ? '更新成功' : '添加成功');
+
+                        return false;
+                    });
+
+                    form.on('submit(cancelExtraBrand)', function () {
+                        layer.close(index);
+                    });
                 }
             });
         }
