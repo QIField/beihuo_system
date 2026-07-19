@@ -230,6 +230,35 @@ class CassmallSpider:
             headers=self._get_auth_header()
         )
 
+    def add_or_update_price(self, product_id, price_value, price_type="DEFAULT_PRICE"):
+        """
+        新增或更新产品价格
+        :param product_id: 产品ID，如 "21210714347466096890"
+        :param price_value: 价格值，如 619.99
+        :param price_type: 价格类型，默认 "DEFAULT_PRICE"
+        :return: 响应对象
+        """
+        url = f"{self.BASE_URL}/sellerMgr/productPrice/addOrUpdate"
+
+        payload = {
+            "productId": product_id,
+            "priceType": price_type,
+            "priceValue": price_value
+        }
+
+        # ========== 打印请求信息 ==========
+        print("【请求API地址】", url)
+        print("【请求方法】", "POST")
+        print("【请求负载】", payload)
+        # ==================================
+
+        return self.spider_tool.fetch(
+            url=url,
+            method="POST",
+            json=payload,
+            headers=self._get_auth_header()
+        )
+
     def close(self):
         """关闭会话连接"""
         self.spider_tool.close()

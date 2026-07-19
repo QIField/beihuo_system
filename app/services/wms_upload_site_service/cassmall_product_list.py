@@ -201,6 +201,43 @@ def on_shelf(product_ids,spider):
     return True
 
 
+def cassmall_add_or_update_price(product_id, price_value, spider, price_type="DEFAULT_PRICE"):
+    """
+    新增或更新开思mall产品价格
+    :param product_id: 产品ID
+    :param price_value: 价格值
+    :param spider: 爬虫实例
+    :param price_type: 价格类型，默认 DEFAULT_PRICE
+    :return: 更新结果
+    """
+    response = spider.add_or_update_price(product_id, price_value, price_type)
+
+    if not response:
+        print("价格更新请求失败")
+        return {
+            'message': '价格更新请求失败',
+            'data': None
+        }
+
+    if response.status_code != 200:
+        print(f"更新价格失败: HTTP状态码 {response.status_code}")
+        return {
+            'message': f'更新价格失败: HTTP状态码 {response.status_code}',
+            'data': None
+        }
+
+    try:
+        json_data = response.json()
+        result_data = json_data.get('data')
+    except:
+        result_data = response.text
+
+    return {
+        'message': '更新价格成功',
+        'data': result_data
+    }
+
+
 # if __name__ == "__main__":
 #     data=on_shelf(["21600375463843921950","21600375463843921940"])
 #     print(data)

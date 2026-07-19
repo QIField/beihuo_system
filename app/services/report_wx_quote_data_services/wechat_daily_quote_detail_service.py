@@ -84,77 +84,24 @@ def fetch_data_paged(start_date=None, end_date=None, groupname=None, nickname=No
 def fetch_groupname_list():
     """
     获取所有群名称列表（去重）
-    
+
     Returns:
         群名称列表
     """
     try:
         with orm_session() as session:
-            # 构建查询条件
-            query = session.query(
-                CrmappSalesHistoryDetail.fullname,
-                CrmappSalesHistoryDetail.total_price,
-                CrmappSalesHistoryDetail.brand_name
+            results = session.query(
+                WechatDailyQuoteDetail.group_name
             ).filter(
-                CrmappSalesHistoryDetail.fullname.isnot(None),
-                CrmappSalesHistoryDetail.fullname != ''
-            )
-            
-            # 添加 OE 码条件
-            
-            # 去掉OE码前面的字母，只保留数字部分
-            # 例如: "A12345" → "12345"
-                
-            oe_code_clean = re.sub(r'^[a-zA-Z]+', '', oe_code)  # pyright: ignore[reportArgumentType, reportCallIssue]
-            if oe_code_clean:
-                query = query.filter(
-                    CrmappSalesHistoryDetail.number == oe_code_clean
-                )
-            
-            # 添加日期条件
-            try:
-                # 提取日期部分（只取 yyyy-mm-dd）
-                # 支持格式：2026-04-09 18:19:08 或 2026-04-09
-                date_part = None
-                if ' ' in create_date:  # pyright: ignore[reportOperatorIssue]
-                    date_part = create_date.split(' ')[0]  # pyright: ignore[reportOptionalMemberAccess]
-                elif 'T' in create_date:  # pyright: ignore[reportOperatorIssue]
-                    date_part = create_date.split('T')[0]  # pyright: ignore[reportOptionalMemberAccess]
-                else:
-                    date_part = create_date
-                
-                # 确保日期格式正确（只保留前10个字符）
-                if date_part and len(date_part) >= 10:
-                    date_part = date_part[:10]
-                
-                if date_part:
-                    # 例如 date_part='2026-01-05' → 匹配 >= '2026-01-05 00:00:00' and <= '2026-01-05 23:59:59'
-                    query = query.filter(
-                        CrmappSalesHistoryDetail.create_date >= f'{date_part} 00:00:00',
-                        CrmappSalesHistoryDetail.create_date <= f'{date_part} 23:59:59'
-                    )
-            except Exception as e:
-                print(f"处理日期条件时出错: {str(e)}")
-                pass
-            
-            # 执行查询
-            results = query.all()
-            
-            # 转换为需要的格式
-            customer_list = []
-            for i, row in enumerate(results, 1):
-                if row[0]:
-                    customer_list.append({
-                        'id': i,
-                        'fullname': row[0],
-                        'total_price': float(row[1]) if row[1] is not None else None,
-                        'brand_name': row[2]
-                    })
-            
-            return customer_list
-            
+                WechatDailyQuoteDetail.group_name.isnot(None),
+                WechatDailyQuoteDetail.group_name != ''
+            ).distinct().all()
+
+            groupname_list = [row[0] for row in results if row[0]]
+            return groupname_list
+
     except Exception as e:
-        print(f"获取客户列表失败: {str(e)}")
+        print(f"获取群名称列表失败: {str(e)}")
         traceback.print_exc()
         return []
 
