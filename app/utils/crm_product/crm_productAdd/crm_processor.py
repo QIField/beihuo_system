@@ -319,6 +319,7 @@ def process_items(items: List[dict], product_df, alias_df, session, progress_cal
 
     for item in items:
         oe_number = item['oe_number']
+        brand = item['brand']
 
         try:
             result = process_single_oe(item, product_df, alias_df, session=session)
