@@ -306,7 +306,7 @@ def register_excel_process_routes(app):
         else:
             df, rows = read_replace_number_excel(temp_file_path)
             oe_brand_list = [
-                {'oe': r['oe'], 'brand': r['brand']}
+                {'oe': r['oe'], 'brand': r['brand'], 'brand_number': r.get('brand_number', '')}
                 for r in rows
             ]
             return jsonify({

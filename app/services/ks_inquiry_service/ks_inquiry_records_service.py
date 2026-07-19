@@ -23,6 +23,7 @@ class KsInquiryRecordsService:
         'customerName': 'garage_company_name',
         'partsNum': 'partsNum',
         'resolve_parts_name': 'resolve_parts_name',
+        'partsName': 'partsName',
         'carBrandName': 'car_brand_name',
         'brandName': 'brandName',
         'brandNormalized': 'brandNormalized',
@@ -146,6 +147,7 @@ class KsInquiryRecordsService:
             'inquiryId': 'inquiryId',
             'partsNum': 'partsNum',
             'resolve_parts_name': 'resolve_parts_name',
+            'partsName': 'partsName',
             'brandName': 'brandName',
             'brandNormalized': 'brandNormalized',
             'brandId': 'brandId',
@@ -175,6 +177,7 @@ class KsInquiryRecordsService:
                 partsNum,
                 resolve_parts_num,
                 resolve_parts_name,
+                partsName,
                 brandName,
                 brandNormalized,
                 brandId,
@@ -217,7 +220,7 @@ class KsInquiryRecordsService:
 
             # 硬编码列名（确保与 SQL 一致）- 已删除：quote_date, partType, partsBrandQuality, company, created_at, updated_at
             columns = [
-                'inquiryId', 'customerName', 'partsNum', 'resolve_parts_num', 'resolve_parts_name', 'brandName', 'brandNormalized',
+                'inquiryId', 'customerName', 'partsNum', 'resolve_parts_num', 'resolve_parts_name', 'partsName', 'brandName', 'brandNormalized',
                 'brandId', 'sellerBtPrice', 'sellerPrice', 'displaySellerStatus', 'remark',
                 'vin', 'engine', 'productionDate', 'chassis', 'carBrandName',
                 'locationName', 'arrivalTime', 'content_item_index'
@@ -384,6 +387,48 @@ class KsInquiryRecordsService:
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
         db_col = config['columns'][column]
+
+        # 发动机统计：下拉值使用映射后的展示名称（奔驰取前6位后再映射）
+        if grid_type == 'garage_engine' and column == 'engine':
+            engine_display_expr = """
+                COALESCE(
+                    m.display_engine,
+                    CASE
+                        WHEN d.car_brand_name = '奔驰' AND LENGTH(d.engine) > 6 THEN LEFT(d.engine, 6)
+                        ELSE d.engine
+                    END
+                )
+            """.strip()
+            sql = f"""
+                SELECT engine AS value, COUNT(*) AS count
+                FROM (
+                    SELECT {engine_display_expr} AS engine,
+                           COUNT(DISTINCT d.inquiryId) AS cnt
+                    FROM crmapp_ks_inquiry_detail d
+                    LEFT JOIN ks_engine_mapping m ON m.company = %s AND m.original_engine = d.engine
+                    WHERE {where_clause}
+                    GROUP BY {engine_display_expr}
+                ) t
+                WHERE engine IS NOT NULL AND TRIM(engine) != ''
+                GROUP BY engine ORDER BY engine LIMIT 1000
+            """
+            params.insert(0, company)
+
+            with db_cursor() as cursor:
+                cursor.execute(sql, tuple(params))
+                rows = cursor.fetchall()
+                values = []
+                for r in rows:
+                    if isinstance(r, dict):
+                        values.append({'value': str(r.get('value', '')), 'count': int(r.get('count', 0))})
+                    else:
+                        values.append({'value': str(r[0]), 'count': int(r[1])})
+
+                end_time = time.time()
+                elapsed_time = (end_time - start_time) * 1000
+                print(f"[KsInquiryRecordsService] 列 {grid_type}.{column} 全量不重复值查询完成: "
+                      f"耗时 {elapsed_time:.2f} ms, 返回 {len(values)} 条")
+                return values
 
         if grid_type == 'master':
             # 主表按 inquiryId 去重，下拉计数应为“订单数”

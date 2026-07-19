@@ -19,8 +19,10 @@ class ReplaceNumberRow:
     row_index: int
     oe: str
     brand: str
+    brand_number: str = ""
     new_numbers: List[str] = field(default_factory=list)
     matched_products: List[MatchedProduct] = field(default_factory=list)
     updated_numbers: List[str] = field(default_factory=list)
     status: str = ""
     brand_codes: List[str] = field(default_factory=list)
+    product_desc: List[str] = field(default_factory=list)

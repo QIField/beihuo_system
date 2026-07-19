@@ -2,9 +2,58 @@
 替换号搜索匹配逻辑
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from .models import MatchedProduct
 from app.utils.replace_number.constants import ORIGINAL_BRANDS
+from app.utils.replace_number.crm_api_client import search_products_by_numberlist
+
+
+def extract_all_products(api_data: Dict) -> List[MatchedProduct]:
+    """
+    从 CRM 返回数据中提取所有 child 产品，不做 OE/品牌过滤
+
+    Args:
+        api_data: CRM 接口返回的 data 部分
+
+    Returns:
+        所有产品列表
+    """
+    results = []
+    brand_codes = extract_brand_codes(api_data)
+
+    for group in api_data.get("data", []):
+        for child in group.get("child", []):
+            child_number = str(child.get("number", "")).strip()
+            child_brand = str(child.get("brand_name", "")).strip()
+
+            display_numbers = extract_display_numbers(child.get("display_number"))
+            if brand_codes:
+                display_numbers = [n for n in display_numbers if n not in brand_codes]
+
+            results.append(MatchedProduct(
+                product_id=str(child.get("product_id", "")),
+                number=child_number,
+                brand_name=child_brand,
+                display_numbers=display_numbers
+            ))
+
+    return results
+
+
+def search_by_brand_number(company: str, brand_number: str) -> Tuple[Optional[MatchedProduct], List[str], str]:
+    """使用品牌号搜索产品；仅唯一结果时直接采用"""
+    api_data = search_products_by_numberlist(company, brand_number)
+    if not api_data:
+        return None, [], "品牌号搜索为0"
+
+    all_products = extract_all_products(api_data)
+    brand_codes = extract_brand_codes(api_data)
+    if len(all_products) == 0:
+        return None, brand_codes, "品牌号搜索为0"
+    elif len(all_products) > 1:
+        return None, brand_codes, "品牌号搜索出多条结果"
+    else:
+        return all_products[0], brand_codes, ""
 
 
 def extract_display_numbers(display_number) -> List[str]:

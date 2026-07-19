@@ -272,7 +272,7 @@ var CartPanel = (function() {
                 fixedColumnsRight: 1,
                 rowHeaders: true,
                 height: '100%',
-                stretchH: 'all',
+                stretchH: 'none',
                 rowHeight: 48,
                 headerHeight: 36,
                 afterChange: function(changes, source) {

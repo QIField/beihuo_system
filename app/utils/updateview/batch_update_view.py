@@ -29,6 +29,7 @@ os.environ['DB_NAME'] = 'bbr_test'
 
 from app.utils.database_connection import get_db_connection
 from config.cookie_config import create_crm_session
+from app.utils.crm_updateview_logger import execute_update_view_with_log
 
 
 def get_oe_by_brand_code(brand_code, cursor):
@@ -143,7 +144,6 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
     调用API: POST /api/Product.Product/updateView
     更新产品视图信息
     """
-    url = "https://crm.gzbbr.com/api/Product.Product/updateView"
     headers = {
         'accept': 'application/json, text/plain, */*',
         'content-type': 'application/json;charset=UTF-8',
@@ -165,17 +165,14 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
         "qpl_price": float(qpl_price) if qpl_price and str(qpl_price).strip() else None
     }
     
-    try:
-        response = session.post(url, json=payload, headers=headers, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-        
-        if data.get('status') == 200:
-            return True, data.get('msg', '更新成功')
-        else:
-            return False, data.get('msg', '更新失败')
-    except Exception as e:
-        return False, f"API调用失败: {e}"
+    return execute_update_view_with_log(
+        session=session,
+        payload=payload,
+        source="batch_update_view",
+        store_code="fsbbr",
+        headers=headers,
+        timeout=30,
+    )
 
 
 def process_excel(excel_path):
@@ -185,11 +182,13 @@ def process_excel(excel_path):
     print(f"正在读取Excel文件: {excel_path}")
     
     # 根据文件扩展名选择读取方式
+    # 配件编码、品牌号可能包含前导零，强制按字符串读取
     file_ext = Path(excel_path).suffix.lower()
+    read_dtype = {'配件编码': str, '品牌号': str}
     if file_ext == '.xls':
-        df = pd.read_excel(excel_path, engine='xlrd')
+        df = pd.read_excel(excel_path, engine='xlrd', dtype=read_dtype)
     else:
-        df = pd.read_excel(excel_path, engine='openpyxl')
+        df = pd.read_excel(excel_path, engine='openpyxl', dtype=read_dtype)
     
     print(f"读取完成，共 {len(df)} 行数据")
     

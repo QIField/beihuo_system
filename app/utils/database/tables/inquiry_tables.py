@@ -216,3 +216,42 @@ def init_price_inquiry_direct_table():
         print(f"  [失败] 询价直接入库数据表: {e}")
     finally:
         conn.close()
+
+
+def init_ks_engine_mapping_table():
+    """
+    初始化发动机展示名称映射表
+    用于存储原始发动机代码到展示名称的映射配置
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS ks_engine_mapping (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
+                company VARCHAR(50) NOT NULL COMMENT '门店/组织',
+                original_engine VARCHAR(100) NOT NULL COMMENT '原始发动机代码',
+                display_engine VARCHAR(100) NOT NULL COMMENT '展示名称',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                UNIQUE KEY uk_company_mapping (company, original_engine, display_engine)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='发动机展示名称映射配置表';
+            """
+            cursor.execute(create_table_sql)
+
+            # 检查并添加索引（兼容旧表）
+            try:
+                cursor.execute("""
+                    ALTER TABLE ks_engine_mapping
+                    ADD UNIQUE INDEX uk_company_mapping (company, original_engine, display_engine)
+                """)
+                print("  [成功] 已添加唯一索引 uk_company_mapping")
+            except Exception as e:
+                if "Duplicate key name" not in str(e):
+                    print(f"  ! 添加唯一索引时出错: {str(e)}")
+
+            print("  [成功] 发动机展示名称映射表")
+    except Exception as e:
+        print(f"  [失败] 发动机展示名称映射表: {e}")
+    finally:
+        conn.close()

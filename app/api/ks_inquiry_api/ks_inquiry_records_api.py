@@ -881,3 +881,106 @@ def get_brand_options():
             'message': f'查询失败: {str(e)}',
             'data': []
         }), 500
+
+
+@bp.route('/engine_mapping', methods=['GET'])
+def get_engine_mapping():
+    """
+    获取当前门店的发动机展示名称映射配置
+
+    Query Parameters:
+        company: 用户门店/组织
+
+    Returns:
+        JSON: {code: 0, data: {原始发动机代码: 展示名称}, message}
+    """
+    try:
+        company = request.args.get('company', '').strip()
+        if not company:
+            return jsonify({
+                'code': 400,
+                'message': '缺少 company 参数',
+                'data': {}
+            }), 400
+
+        result = KsInquiryStatsService.get_engine_mapping(company=company)
+        return jsonify({
+            'code': 0,
+            'message': 'success',
+            'data': result
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"[KsInquiryRecordsAPI] 获取发动机映射错误: {str(e)}")
+        print(f"[KsInquiryRecordsAPI] 堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'code': 500,
+            'message': f'查询失败: {str(e)}',
+            'data': {}
+        }), 500
+
+
+@bp.route('/engine_mapping', methods=['POST'])
+def save_engine_mapping():
+    """
+    保存当前门店的发动机展示名称映射配置
+
+    Request Body:
+        {
+            "company": "fsbbr",
+            "mappings": {
+                "A14NET": "N14",
+                "B16A": "A16"
+            }
+        }
+
+    Returns:
+        JSON: {code: 0, message: '保存成功'}
+    """
+    try:
+        data = request.get_json() or {}
+        company = data.get('company', '').strip()
+        mappings = data.get('mappings')
+
+        if not company:
+            return jsonify({
+                'code': 400,
+                'message': '缺少 company 参数',
+                'data': False
+            }), 400
+
+        if not isinstance(mappings, dict):
+            return jsonify({
+                'code': 400,
+                'message': 'mappings 必须是对象',
+                'data': False
+            }), 400
+
+        success = KsInquiryStatsService.save_engine_mapping(
+            company=company,
+            mappings=mappings
+        )
+
+        if success:
+            return jsonify({
+                'code': 0,
+                'message': '保存成功',
+                'data': True
+            })
+
+        return jsonify({
+            'code': 500,
+            'message': '保存失败',
+            'data': False
+        }), 500
+
+    except Exception as e:
+        import traceback
+        print(f"[KsInquiryRecordsAPI] 保存发动机映射错误: {str(e)}")
+        print(f"[KsInquiryRecordsAPI] 堆栈: {traceback.format_exc()}")
+        return jsonify({
+            'code': 500,
+            'message': f'保存失败: {str(e)}',
+            'data': False
+        }), 500

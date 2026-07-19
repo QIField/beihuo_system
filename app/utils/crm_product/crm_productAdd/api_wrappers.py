@@ -32,9 +32,10 @@ def _process_excel_file(file_path: str, mode: str, company: str = 'fsbbr', progr
         progress_callback: 进度回调函数
 
     Returns:
-        (result_path, all_results)
+        (result_path, all_results, all_items)
         result_path: 结果文件路径
-        all_results: {sheet_name: {'df': DataFrame, 'results': dict, 'oe_col': str}}
+        all_results: {sheet_name: {'df': DataFrame, 'results': {(oe, brand): ProcessResult}, 'oe_col': str, 'brand_col': str}}
+        all_items: 所有 sheet 的 item 列表合并
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"文件不存在: {file_path}")
@@ -52,6 +53,7 @@ def _process_excel_file(file_path: str, mode: str, company: str = 'fsbbr', progr
         total_items = sum(len(sheet['df']) for sheet in valid_sheets.values())
         processed = 0
         all_results = {}
+        all_items = []
 
         for sheet_name, sheet_info in valid_sheets.items():
             df = sheet_info['df']
@@ -66,11 +68,17 @@ def _process_excel_file(file_path: str, mode: str, company: str = 'fsbbr', progr
                 total_items=total_items
             )
 
-            all_results[sheet_name] = {'df': df, 'results': results, 'oe_col': oe_col}
+            all_results[sheet_name] = {
+                'df': df,
+                'results': results,
+                'oe_col': oe_col,
+                'brand_col': columns[1]
+            }
+            all_items.extend(items)
             processed += len(items)
 
         result_path = save_multi_sheet_results(all_results, file_path)
-        return result_path, all_results
+        return result_path, all_results, all_items
 
     finally:
         session.close()
@@ -92,28 +100,47 @@ def process_excel_async_wrapper(file_path: str, mode: str, company: str = 'fsbbr
             'result_file': 结果文件路径,
             'result_data': {
                 'oe_list': [...],
+                'oe_brand_list': [{'oe': ..., 'brand': ...}, ...],
                 'total': int,
                 'success_count': int,
                 'fail_count': int
             }
         }
     """
-    result_path, all_results = _process_excel_file(file_path, mode, company, progress_callback)
+    result_path, all_results, all_items = _process_excel_file(file_path, mode, company, progress_callback)
 
     processed_oe_set = set()
     success_count = 0
     fail_count = 0
 
     for sheet_data in all_results.values():
-        for oe, result in sheet_data['results'].items():
+        for (oe, brand), result in sheet_data['results'].items():
             processed_oe_set.add(oe)
             if result.is_success():
                 success_count += 1
             else:
                 fail_count += 1
 
+    oe_brand_list = []
+    seen = set()
+    for item in all_items:
+        oe = item.get('oe_number', '')
+        brand = item.get('brand', '')
+        if not oe or not brand:
+            continue
+        key = (oe, brand)
+        result = None
+        for sheet_data in all_results.values():
+            if key in sheet_data['results']:
+                result = sheet_data['results'][key]
+                break
+        if result and result.is_success() and key not in seen:
+            oe_brand_list.append({'oe': oe, 'brand': brand})
+            seen.add(key)
+
     result_data = {
         'oe_list': sorted(processed_oe_set),
+        'oe_brand_list': oe_brand_list,
         'total': len(processed_oe_set),
         'success_count': success_count,
         'fail_count': fail_count

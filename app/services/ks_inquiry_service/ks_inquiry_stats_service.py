@@ -179,6 +179,84 @@ class KsInquiryStatsService:
             }
 
     @staticmethod
+    def get_engine_mapping(company: str = '') -> Dict[str, str]:
+        """
+        获取指定门店的发动机展示名称映射配置
+
+        Args:
+            company: 门店/组织代码
+
+        Returns:
+            Dict: {原始发动机代码: 展示名称}
+        """
+        if not company:
+            return {}
+
+        sql = """
+            SELECT original_engine, display_engine
+            FROM ks_engine_mapping
+            WHERE company = %s
+        """
+        with db_cursor() as cursor:
+            cursor.execute(sql, (company,))
+            rows = cursor.fetchall()
+
+        result = {}
+        for row in rows:
+            original = _get_row_value(row, 0, 'original_engine')
+            display = _get_row_value(row, 1, 'display_engine')
+            if original:
+                result[original] = display
+        return result
+
+    @staticmethod
+    def save_engine_mapping(company: str = '', mappings: Optional[Dict[str, str]] = None) -> bool:
+        """
+        保存发动机展示名称映射配置
+        同一门店下，同一个原始发动机代码仅保留一条映射（取最新传入的展示名称）
+
+        Args:
+            company: 门店/组织代码
+            mappings: {原始发动机代码: 展示名称}
+
+        Returns:
+            bool: 是否保存成功
+        """
+        if not company or not mappings:
+            return False
+
+        valid_mappings = {
+            str(k).strip(): str(v).strip()
+            for k, v in mappings.items()
+            if str(k).strip() and str(v).strip()
+        }
+        if not valid_mappings:
+            return False
+
+        try:
+            with db_cursor() as cursor:
+                # 先删除该门店下这些原始代码的旧映射，保证一对一
+                originals = list(valid_mappings.keys())
+                placeholders = ', '.join(['%s'] * len(originals))
+                cursor.execute(
+                    f"DELETE FROM ks_engine_mapping WHERE company = %s AND original_engine IN ({placeholders})",
+                    (company,) + tuple(originals)
+                )
+
+                # 批量插入新映射
+                insert_sql = """
+                    INSERT INTO ks_engine_mapping (company, original_engine, display_engine)
+                    VALUES (%s, %s, %s)
+                """
+                for original, display in valid_mappings.items():
+                    cursor.execute(insert_sql, (company, original, display))
+
+            return True
+        except Exception as e:
+            print(f"[KsInquiryStatsService] 保存发动机映射失败: {e}")
+            return False
+
+    @staticmethod
     def get_customer_stats_by_oe(
         resolve_parts_num: str = '',
         inquiry_id: str = '',
@@ -670,59 +748,76 @@ class KsInquiryStatsService:
         """
         start_time = time.time()
 
-        conditions = ["COALESCE(TRIM(garage_company_name), '') != ''"]
+        conditions = ["COALESCE(TRIM(d.garage_company_name), '') != ''"]
         params = []
 
         if garage_name:
-            conditions.append("garage_company_name LIKE %s")
+            conditions.append("d.garage_company_name LIKE %s")
             params.append(f"%{garage_name}%")
 
         if company:
-            conditions.append("company = %s")
+            conditions.append("d.company = %s")
             params.append(company)
 
-        if begin_date:  conditions.append("quote_date >= %s");            params.append(begin_date)
-        if end_date:    conditions.append("quote_date <= %s");            params.append(end_date)
-        conditions.append("COALESCE(TRIM(engine), '') != ''")
+        if begin_date:  conditions.append("d.quote_date >= %s");            params.append(begin_date)
+        if end_date:    conditions.append("d.quote_date <= %s");            params.append(end_date)
+        conditions.append("COALESCE(TRIM(d.engine), '') != ''")
 
         # 列头下拉全量筛选
         having_conditions = []
         if column_filters:
             for col_id, values in column_filters.items():
                 placeholders = ', '.join(['%s'] * len(values))
-                if col_id in ('carBrandName', 'engine'):
-                    db_col = 'car_brand_name' if col_id == 'carBrandName' else col_id
-                    conditions.append(f"{db_col} IN ({placeholders})")
+                if col_id == 'carBrandName':
+                    conditions.append(f"d.car_brand_name IN ({placeholders})")
+                    params.extend(values)
+                elif col_id == 'engine':
+                    conditions.append(f"{engine_display_expr} IN ({placeholders})")
                     params.extend(values)
                 elif col_id == 'count':
-                    having_conditions.append(f"COUNT(DISTINCT inquiryId) IN ({placeholders})")
+                    having_conditions.append(f"COUNT(DISTINCT d.inquiryId) IN ({placeholders})")
                     params.extend(values)
 
         where_clause = " AND ".join(conditions)
         having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
 
+        # 发动机展示逻辑：先判断奔驰取前6位，再应用映射配置
+        engine_display_expr = """
+            COALESCE(
+                m.display_engine,
+                CASE
+                    WHEN d.car_brand_name = '奔驰' AND LENGTH(d.engine) > 6 THEN LEFT(d.engine, 6)
+                    ELSE d.engine
+                END
+            )
+        """.strip()
+
         engine_column_map = {
-            'carBrandName': 'car_brand_name',
-            'engine': 'engine',
-            'count': 'COUNT(DISTINCT inquiryId)'
+            'carBrandName': 'd.car_brand_name',
+            'engine': engine_display_expr,
+            'count': 'COUNT(DISTINCT d.inquiryId)'
         }
         order_by = build_order_by(
             sort_column, sort_dir, engine_column_map,
             numeric_columns={'count'},
-            default='COUNT(DISTINCT inquiryId) DESC, car_brand_name, engine'
+            default=f'COUNT(DISTINCT d.inquiryId) DESC, d.car_brand_name, {engine_display_expr}'
         )
 
         sql = f"""
             SELECT
-                car_brand_name AS carBrandName,
-                engine,
-                COUNT(DISTINCT inquiryId) AS count
-            FROM crmapp_ks_inquiry_detail
+                d.car_brand_name AS carBrandName,
+                {engine_display_expr} AS engine,
+                COUNT(DISTINCT d.inquiryId) AS count
+            FROM crmapp_ks_inquiry_detail d
+            LEFT JOIN ks_engine_mapping m ON m.company = %s AND m.original_engine = d.engine
             WHERE {where_clause}
-            GROUP BY car_brand_name, engine
+            GROUP BY d.car_brand_name, {engine_display_expr}
             {having_clause}
             ORDER BY {order_by}
         """
+
+        # JOIN 条件中的 company 放在参数最前面
+        params.insert(0, company)
 
         with db_cursor() as cursor:
             cursor.execute(sql, tuple(params))

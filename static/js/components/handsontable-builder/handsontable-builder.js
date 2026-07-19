@@ -18,7 +18,8 @@
  *       components: {
  *           pagination: { pageSizeOptions: [50, 100], defaultPageSize: 100 },
  *           columnMenu: { persist: true, pageKey: 'page1', gridKey: 'grid1' },
- *           doubleClickCopy: true
+ *           doubleClickCopy: true,
+ *           copyToast: true
  *       }
  *   });
  *
@@ -92,6 +93,64 @@ var HandsontableBuilder = (function() {
     }
 
     /**
+     * 显示复制成功提示
+     */
+    function showCopySuccessToast() {
+        if (typeof layui !== 'undefined' && layui.layer) {
+            layui.layer.msg('已复制到剪贴板', { icon: 1, time: 1000 });
+        }
+    }
+
+    /**
+     * 绑定原生复制事件（双击复制 + 快捷键复制提示）
+     * 比 Handsontable 的 afterOnCellDblClick 更稳定，兼容合并单元格。
+     */
+    function bindNativeCopyEvents(builder) {
+        var config = builder.config;
+        var components = config.components || {};
+        var enableDoubleClickCopy = isEnabled(components, 'doubleClickCopy');
+        var enableCopyToast = isEnabled(components, 'copyToast');
+
+        if (!enableDoubleClickCopy && !enableCopyToast) return;
+        if (builder.copyEventsBound) return;
+        builder.copyEventsBound = true;
+
+        var container = builder.container;
+
+        if (enableDoubleClickCopy) {
+            container.addEventListener('dblclick', function(e) {
+                var hot = builder.hot;
+                if (!hot) return;
+
+                var td = e.target.closest ? e.target.closest('td') : null;
+                if (!td) return;
+
+                var coords = hot.getCoords(td);
+                if (!coords || coords.row < 0 || coords.col < 0) return;
+
+                var value = hot.getDataAtCell(coords.row, coords.col);
+                if (value === undefined || value === null || value === '') return;
+
+                copyToClipboard(String(value), showCopySuccessToast, function() {
+                    if (typeof layui !== 'undefined' && layui.layer) {
+                        layui.layer.msg('复制失败', { icon: 2 });
+                    }
+                });
+            });
+        }
+
+        if (enableCopyToast) {
+            container.addEventListener('copy', function(e) {
+                var hot = builder.hot;
+                var selected = hot && typeof hot.getSelected === 'function' && hot.getSelected();
+                if (selected && selected.length > 0) {
+                    showCopySuccessToast();
+                }
+            }, true);
+        }
+    }
+
+    /**
      * 创建 Handsontable 并自动接线组件
      * @param {string} selector - 网格容器 CSS 选择器
      * @param {Object} config - 构建配置
@@ -127,6 +186,7 @@ var HandsontableBuilder = (function() {
 
         initPagination(builder, pgConfig);
         loadColumnPreferenceAndInit(builder);
+        bindNativeCopyEvents(builder);
 
         return builder;
     }
@@ -255,10 +315,13 @@ var HandsontableBuilder = (function() {
         var config = builder.config;
         var url = config.dataUrl + '?' + queryString;
 
+        console.log('[HandsontableBuilder] refresh: url=' + url);
+
         fetch(url, { method: 'GET', credentials: 'same-origin' })
             .then(function(response) { return response.json(); })
             .then(function(result) {
                 if (builder.destroyed) return;
+                console.log('[HandsontableBuilder] refresh: response code=' + result.code + ', msg=' + (result.msg || ''));
                 if (result.code !== 0) {
                     builder.container.innerHTML = '<div class="loading-overlay">加载失败: ' + (result.msg || '') + '</div>';
                     if (typeof config.onError === 'function') {
@@ -280,8 +343,11 @@ var HandsontableBuilder = (function() {
                     total = result.count || list.length;
                 }
 
+                console.log('[HandsontableBuilder] refresh: list.length=' + list.length + ', total=' + total);
+
                 if (typeof config.dataTransform === 'function') {
                     list = config.dataTransform(list) || list;
+                    console.log('[HandsontableBuilder] refresh: after transform list.length=' + list.length);
                 }
 
                 if (builder.pagination) {
@@ -322,7 +388,6 @@ var HandsontableBuilder = (function() {
         }
 
         var components = config.components || {};
-        var enableDoubleClickCopy = isEnabled(components, 'doubleClickCopy');
         var enableContextMenu = isEnabled(components, 'contextMenu');
         var enableShortcuts = isEnabled(components, 'shortcuts');
         var enableVirtualScroll = isEnabled(components, 'virtualScroll');
@@ -332,6 +397,8 @@ var HandsontableBuilder = (function() {
             userAfterGetColHeader = config.handsontableOptions.afterGetColHeader;
         }
 
+        var stretchH = (config.handsontableOptions && config.handsontableOptions.stretchH) || 'none';
+
         var options = assign({}, config.handsontableOptions || {}, {
             data: data,
             columns: builder.visibleColumns,
@@ -340,7 +407,7 @@ var HandsontableBuilder = (function() {
             colHeaders: true,
             height: '100%',
             width: '100%',
-            stretchH: 'all',
+            stretchH: stretchH,
             licenseKey: 'non-commercial-and-evaluation',
             rowHeights: rowHeights,
             autoRowSize: false,
@@ -369,24 +436,6 @@ var HandsontableBuilder = (function() {
                 }
             }
         });
-
-        if (enableDoubleClickCopy) {
-            options.afterOnCellDblClick = function(event, coords, TD) {
-                if (!coords || coords.row < 0 || coords.col < 0) return;
-                var value = this.getDataAtCell(coords.row, coords.col);
-                if (value !== undefined && value !== null && value !== '') {
-                    copyToClipboard(String(value), function() {
-                        if (typeof layui !== 'undefined' && layui.layer) {
-                            layui.layer.msg('已复制到剪贴板', { icon: 1, time: 1000 });
-                        }
-                    }, function() {
-                        if (typeof layui !== 'undefined' && layui.layer) {
-                            layui.layer.msg('复制失败', { icon: 2 });
-                        }
-                    });
-                }
-            };
-        }
 
         builder.hot = new Handsontable(builder.container, options);
 

@@ -19,3 +19,4 @@ SEARCH_LIMIT = 200
 OE_COLUMN_CANDIDATES = ["oe", "OE", "物料条码", "barcode"]
 BRAND_COLUMN_CANDIDATES = ["brand", "品牌", "品牌名称"]
 REPLACE_NUMBER_COLUMN_CANDIDATES = ["替换号", "replace_number"]
+BRAND_NUMBER_COLUMN_CANDIDATES = ["品牌号", "brand_number", "brand code", "品牌号单独查询（不需要oe和品牌）"]

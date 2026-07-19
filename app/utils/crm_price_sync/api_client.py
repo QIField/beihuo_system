@@ -10,12 +10,12 @@ import time
 import requests
 
 from config.cookie_config import create_crm_session
+from app.utils.crm_updateview_logger import execute_update_view_with_log
 
 
 CRM_BASE_URL = "https://crm.gzbbr.com"
 LIST_URL = f"{CRM_BASE_URL}/api/Product.Product/list"
 VIEW_URL = f"{CRM_BASE_URL}/api/Product.Product/view"
-UPDATE_VIEW_URL = f"{CRM_BASE_URL}/api/Product.Product/updateView"
 
 DEFAULT_PAGE_SIZE = 200
 REQUEST_DELAY = 0.3
@@ -93,10 +93,10 @@ class CrmPriceSyncApiClient:
         :param payload: dict 更新字段
         :return: (success: bool, msg: str)
         """
-        response = self.session.post(UPDATE_VIEW_URL, json=payload, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("status") == 200:
-            return True, data.get("msg", "更新成功")
-        return False, data.get("msg", "更新失败")
+        return execute_update_view_with_log(
+            session=self.session,
+            payload=payload,
+            source="crm_price_sync",
+            store_code=self.store_code,
+            timeout=30,
+        )

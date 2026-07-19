@@ -31,21 +31,25 @@ def _format_result(result) -> str:
     return str(result)
 
 
-def _add_result_column(df: pd.DataFrame, results: Dict[str, object], oe_col: str) -> pd.DataFrame:
+def _add_result_column(df: pd.DataFrame, results: Dict, oe_col: str, brand_col: str = None) -> pd.DataFrame:
     """
     在 DataFrame 中添加/填充“新建结果”列
+
+    results 的 key 为 (oe, brand) 元组
     """
     df['新建结果'] = ''
 
     for idx, row in df.iterrows():
         oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
-        if oe in results:
-            df.at[idx, '新建结果'] = _format_result(results[oe])
+        brand = str(row[brand_col]).strip() if brand_col and pd.notna(row[brand_col]) else ''
+        key = (oe, brand)
+        if key in results:
+            df.at[idx, '新建结果'] = _format_result(results[key])
 
     return df
 
 
-def save_single_sheet_results(df: pd.DataFrame, results: Dict[str, object], oe_col: str, original_file_path: str) -> str:
+def save_single_sheet_results(df: pd.DataFrame, results: Dict, oe_col: str, original_file_path: str) -> str:
     """
     保存单工作表结果
     """
@@ -68,8 +72,9 @@ def save_multi_sheet_results(all_results: Dict[str, dict], original_file_path: s
         all_results: {
             sheet_name: {
                 'df': DataFrame,
-                'results': {oe: ProcessResult},
-                'oe_col': str
+                'results': {(oe, brand): ProcessResult},
+                'oe_col': str,
+                'brand_col': str
             }
         }
         original_file_path: 原始文件路径
@@ -86,8 +91,9 @@ def save_multi_sheet_results(all_results: Dict[str, dict], original_file_path: s
             df = sheet_data['df'].copy()
             results = sheet_data['results']
             oe_col = sheet_data['oe_col']
+            brand_col = sheet_data.get('brand_col')
 
-            df = _add_result_column(df, results, oe_col)
+            df = _add_result_column(df, results, oe_col, brand_col)
 
             safe_sheet_name = sheet_name[:31]
             df.to_excel(writer, sheet_name=safe_sheet_name, index=False)

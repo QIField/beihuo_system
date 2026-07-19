@@ -135,13 +135,14 @@
             color: #999;
         }
         .col-seq { width: 5%; }
-        .col-oe { width: 13%; }
-        .col-brand { width: 10%; }
-        .col-original { width: 22%; }
-        .col-other { width: 22%; }
+        .col-oe { width: 12%; }
+        .col-brand { width: 8%; }
+        .col-brand-number { width: 10%; }
+        .col-original { width: 20%; }
+        .col-other { width: 20%; }
         .col-upload { width: 8%; }
         .col-products { width: 14%; }
-        .col-status { width: 6%; }
+        .col-status { width: 8%; }
         .status-success { color: #52c41a; font-weight: 500; }
         .status-fail { color: #ff4d4f; font-weight: 500; }
         .status-wait { color: #1890ff; }
@@ -208,6 +209,7 @@
                             <th class="col-seq">序号</th>
                             <th class="col-oe">OE</th>
                             <th class="col-brand">品牌</th>
+                            <th class="col-brand-number">品牌号</th>
                             <th class="col-original">原厂/4S 替换号</th>
                             <th class="col-other">其他品牌替换号</th>
                             <th class="col-upload">是否上传</th>
@@ -359,6 +361,7 @@
                         '<td class="col-seq">' + globalIndex + '</td>' +
                         '<td class="col-oe">' + (item.oe || '-') + '</td>' +
                         '<td class="col-brand">' + (item.brand || '-') + '</td>' +
+                        '<td class="col-brand-number">' + (item.brand_number || '') + '</td>' +
                         '<td class="col-original"><textarea class="original-input" data-field="original_numbers" ' + readOnly + '>' + (item.original_numbers || '') + '</textarea></td>' +
                         '<td class="col-other"><textarea class="other-input" data-field="other_numbers" ' + readOnly + '>' + (item.other_numbers || '') + '</textarea></td>' +
                         '<td class="col-upload">' +

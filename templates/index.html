@@ -3865,8 +3865,8 @@ function bindEventHandlers(myTable, form, table) {
                             update_crm: [],
                             replace_number: []
                         };
-                        var currentTaskId = null;
-                        var currentTaskData = null;
+                        currentTaskId = null;
+                        currentTaskData = null;
 
                         // 根据用户权限控制 Tab 显示，无权限直接隐藏
                         var canProcessOrders = window.currentUserPermissions && window.currentUserPermissions.can_process_orders;
@@ -4093,9 +4093,15 @@ function bindEventHandlers(myTable, form, table) {
                             }
                         });
 
-                        // 查看替换号差异（旧功能入口，保留跳转）
+                        // 查看替换号差异：将新建成功或已存在的 OE+品牌 传入替换号编辑页面
                         document.getElementById('crmDiffBtn').addEventListener('click', function() {
-                            window.open('/replace_number_edit', '_blank');
+                            var oeBrandList = currentTaskData && currentTaskData.oe_brand_list;
+                            if (oeBrandList && oeBrandList.length > 0) {
+                                sessionStorage.setItem('replace_number_oe_brand_list', JSON.stringify(oeBrandList));
+                                window.open('/replace_number_edit', '_blank');
+                            } else {
+                                layer.msg('没有可查看替换号的成功/已存在数据', {icon: 2});
+                            }
                         });
                     }
                 });
@@ -4141,6 +4147,10 @@ function bindEventHandlers(myTable, form, table) {
             console.error('加载数据错误:', error);
         });
     };
+
+    // Excel 处理弹窗共享的任务数据（供弹窗内部函数和下载按钮使用）
+    var currentTaskId = null;
+    var currentTaskData = null;
 
     // 页面加载完成后获取最新的更新时间
     window.addEventListener('load', function() {
@@ -4357,6 +4367,7 @@ function bindEventHandlers(myTable, form, table) {
                     } else if (status.status === 'completed') {
                         clearInterval(checkInterval);
                         layer.close(progressLayerIndex);
+                        layer.close(loadingIndex);
                         document.title = '巴博瑞科技';
                         document.getElementById('replaceNumberResultMsg').textContent = '处理完成，请下载结果文件';
                         document.getElementById('replaceNumberResultArea').style.display = 'block';
@@ -4364,6 +4375,7 @@ function bindEventHandlers(myTable, form, table) {
                     } else if (status.status === 'failed') {
                         clearInterval(checkInterval);
                         layer.close(progressLayerIndex);
+                        layer.close(loadingIndex);
                         document.title = '巴博瑞科技';
                         layer.msg('处理失败: ' + (status.error || '未知错误'), {icon: 2});
                     }
@@ -4371,6 +4383,7 @@ function bindEventHandlers(myTable, form, table) {
                 .catch(error => {
                     clearInterval(checkInterval);
                     layer.close(progressLayerIndex);
+                    layer.close(loadingIndex);
                     document.title = '巴博瑞科技';
                     layer.msg('查询状态失败: ' + error.message, {icon: 2});
                 });
