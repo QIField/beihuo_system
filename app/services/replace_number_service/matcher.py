@@ -111,7 +111,8 @@ def match_products(api_data: Dict, oe: str, brand: str) -> List[MatchedProduct]:
     根据 OE 和品牌匹配产品
 
     匹配规则：
-    - 原厂/原厂国内4S件：child.number 必须等于 oe，且 child.brand_name 必须等于 brand
+    - 原厂：child.number 必须等于 oe，且 child.brand_name 必须等于 "原厂"
+    - 原厂国内4S件：child.number 必须等于 oe，且 child.brand_name 必须等于 "原厂国内4S件"
     - 其他品牌：child.brand_name 等于 brand 即可
 
     匹配后会从 display_number 中过滤掉与 brand_code 相同的值
@@ -125,7 +126,6 @@ def match_products(api_data: Dict, oe: str, brand: str) -> List[MatchedProduct]:
         匹配到的产品列表
     """
     results = []
-    is_original = brand in ORIGINAL_BRANDS
     brand_codes = extract_brand_codes(api_data)
 
     for group in api_data.get("data", []):
@@ -133,8 +133,11 @@ def match_products(api_data: Dict, oe: str, brand: str) -> List[MatchedProduct]:
             child_number = str(child.get("number", "")).strip()
             child_brand = str(child.get("brand_name", "")).strip()
 
-            if is_original:
-                if child_number != oe or child_brand != brand:
+            if brand == "原厂":
+                if child_brand != "原厂" or child_number != oe:
+                    continue
+            elif brand == "原厂国内4S件":
+                if child_brand != "原厂国内4S件" or child_number != oe:
                     continue
             else:
                 if child_brand != brand:

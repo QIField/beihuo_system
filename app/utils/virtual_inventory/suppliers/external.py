@@ -19,6 +19,24 @@ from app.utils.logger_config import get_task_logger
 logger = get_task_logger('virtual_inventory')
 
 
+def _save_jiapei_raw_data(records):
+    """将原始 JSON 记录保存到 jiapei_data 表"""
+    db_manager = get_db_connection()
+    try:
+        sql = """
+            INSERT INTO jiapei_data (
+                supplier_name, oe_code, brand, price, expiry_date,
+                warehouse, stock, remark, source_filename, fetch_time
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        db_manager.execute_many(sql, records)
+        logger.info(f"已保存 {len(records)} 条原始记录到 jiapei_data")
+    except Exception:
+        logger.exception("保存 jiapei_data 原始数据失败")
+    finally:
+        db_manager.close()
+
+
 def ggg2():
     url = "http://113.45.176.129:8001/get_xlsx_files"
     payload = {}
@@ -46,19 +64,41 @@ def ggg2():
 
     files = response_data['files']
     xs_df_list = []
+    raw_records = []  # 用于保存原始 JSON 数据到 jiapei_data
+    fetch_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
     for file in files:
         url = "http://113.45.176.129:8001/download/" + file['filename']
         response = requests.request("GET", url, headers=headers)
         try:
             file_data = json.loads(response.text)['data']
             cdf = pd.DataFrame(file_data)
+            cdf['__source_filename__'] = file['filename']
             xs_df_list.append(cdf)
+
+            # 保存原始记录到 jiapei_data
+            for record in file_data:
+                raw_records.append((
+                    record.get('供应商名称', ''),
+                    record.get('原厂oe码', ''),
+                    record.get('品牌', ''),
+                    record.get('价格', None),
+                    record.get('失效时间', None),
+                    record.get('仓库名称', ''),
+                    record.get('库存', None),
+                    record.get('备注', ''),
+                    file['filename'],
+                    fetch_time,
+                ))
         except json.JSONDecodeError:
             logger.info(f"下载文件响应不是有效的JSON格式: {response.text}")
             continue
         except KeyError:
             logger.info(f"下载文件响应中没有'data'键: {response.text}")
             continue
+
+    if raw_records:
+        _save_jiapei_raw_data(raw_records)
 
     if not xs_df_list:  # 如果没有有效数据
         return pd.DataFrame()

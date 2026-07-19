@@ -9,37 +9,40 @@ from app.utils.replace_number.crm_api_client import search_products_by_numberlis
 from app.utils.replace_number.constants import ORIGINAL_BRANDS
 from app.utils.replace_number.excel_utils import dedup_numbers
 from app.utils.logger_config import get_task_logger
-from .matcher import extract_all_products, search_by_brand_number
+from .matcher import extract_all_products, match_products, search_by_brand_number
 
 
 logger = get_task_logger('replace_number')
 
 
-def _search_oe_batch(company: str, oe_list: List[str]) -> Dict[str, list]:
-    """批量搜索 OE，返回每个 OE 对应的所有产品"""
+def _search_oe_batch(company: str, oe_list: List[str]) -> Dict[str, dict]:
+    """批量搜索 OE，返回每个 OE 对应的所有产品及原始 API 数据"""
     result = {}
     for oe in oe_list:
         if not oe:
-            result[oe] = []
+            result[oe] = {'all': [], 'api_data': None}
             continue
         api_data = search_products_by_numberlist(company, oe)
         if api_data:
-            result[oe] = extract_all_products(api_data)
+            result[oe] = {
+                'all': extract_all_products(api_data),
+                'api_data': api_data
+            }
         else:
-            result[oe] = []
+            result[oe] = {'all': [], 'api_data': None}
     return result
 
 
-def search_all_products_by_oe(company: str, oe_list: List[str]) -> Dict[str, list]:
+def search_all_products_by_oe(company: str, oe_list: List[str]) -> Dict[str, dict]:
     """
-    对每个 OE 调用 CRM 列表接口，返回所有产品（不过滤品牌）
+    对每个 OE 调用 CRM 列表接口，返回所有产品及原始 API 数据
 
     Args:
         company: 公司代码
         oe_list: OE 列表
 
     Returns:
-        {oe: [MatchedProduct, ...]}
+        {oe: {'all': [MatchedProduct, ...], 'api_data': {...}}}
     """
     unique_oe_list = list(set(oe_list))
     mid = len(unique_oe_list) // 2
@@ -54,22 +57,13 @@ def search_all_products_by_oe(company: str, oe_list: List[str]) -> Dict[str, lis
     return final_result
 
 
-def _build_edit_row(oe: str, brand: str, brand_number: str, products: list):
+def _build_edit_row(oe: str, brand: str, brand_number: str, all_products: list, matched_products: list):
     """根据搜索到的所有产品构建编辑页一行数据"""
     original_numbers = []
     other_numbers = []
-    will_update_products = []
-    product_details = []
     original_brands = set()
 
-    for p in products:
-        will_update_products.append(f"{p.number} {p.brand_name}")
-        product_details.append({
-            'product_id': p.product_id,
-            'number': p.number,
-            'brand_name': p.brand_name,
-            'display_numbers': p.display_numbers
-        })
+    for p in all_products:
         if p.brand_name in ORIGINAL_BRANDS:
             original_numbers.extend(p.display_numbers)
             original_brands.add(p.brand_name)
@@ -78,6 +72,14 @@ def _build_edit_row(oe: str, brand: str, brand_number: str, products: list):
 
     original_numbers = dedup_numbers(original_numbers)
     other_numbers = dedup_numbers([n for n in other_numbers if n not in original_numbers])
+
+    will_update_products = [f"{p.number} {p.brand_name}" for p in matched_products]
+    product_details = [{
+        'product_id': p.product_id,
+        'number': p.number,
+        'brand_name': p.brand_name,
+        'display_numbers': p.display_numbers
+    } for p in matched_products]
 
     return {
         'oe': oe,
@@ -135,9 +137,13 @@ def build_replace_number_edit_list(company: str, oe_brand_list: List[dict], page
     matched_map = search_all_products_by_oe(company, [oe for oe, _, _ in valid_pairs])
 
     for oe, brand, brand_number in valid_pairs:
-        products = matched_map.get(oe, [])
-        if products:
-            data_list.append(_build_edit_row(oe, brand, brand_number, products))
+        oe_result = matched_map.get(oe, {'all': [], 'api_data': None})
+        all_products = oe_result.get('all', [])
+        api_data = oe_result.get('api_data')
+        matched_products = match_products(api_data, oe, brand) if api_data else []
+
+        if all_products:
+            data_list.append(_build_edit_row(oe, brand, brand_number, all_products, matched_products))
         else:
             data_list.append({
                 'oe': oe,
@@ -166,7 +172,7 @@ def build_replace_number_edit_list(company: str, oe_brand_list: List[dict], page
         else:
             display_oe = oe or product.number
             display_brand = brand or product.brand_name
-            data_list.append(_build_edit_row(display_oe, display_brand, brand_number, [product]))
+            data_list.append(_build_edit_row(display_oe, display_brand, brand_number, [product], [product]))
 
     total = len(data_list)
     start = (page - 1) * limit

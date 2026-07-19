@@ -209,7 +209,8 @@ def clear_all_tables():
             'aichebeimu_dongguan_data',
             'aichebeimu_zhongshan_data',
             'robot_data',
-            'external_data'
+            'external_data',
+            'jiapei_data'
             # 注意：这里不包括 'virtual_inventory' 表
         ]
 

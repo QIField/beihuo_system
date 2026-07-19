@@ -238,6 +238,36 @@ def init_external_data_table():
         conn.close()
 
 
+def init_jiapei_data_table():
+    """
+    初始化佳配原始数据表
+    用于存储从 113.45.176.129:8001 接口拉取的原始 Excel JSON 数据
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS jiapei_data (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
+                supplier_name VARCHAR(100) COMMENT '供应商名称',
+                oe_code VARCHAR(100) COMMENT 'OE码',
+                brand VARCHAR(100) COMMENT '品牌',
+                price DECIMAL(10,2) COMMENT '价格',
+                expiry_date DATETIME COMMENT '过期时间',
+                warehouse VARCHAR(100) COMMENT '仓库',
+                stock INT COMMENT '库存',
+                remark TEXT COMMENT '备注',
+                source_filename VARCHAR(255) COMMENT '来源文件名',
+                fetch_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '获取时间'
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='佳配原始数据表';
+            """
+            cursor.execute(create_table_sql)
+    except Exception as e:
+        print(f"  [失败] 佳配数据表: {e}")
+    finally:
+        conn.close()
+
+
 def init_all_virtual_inventory_tables():
     """初始化所有虚拟库存相关表"""
     init_virtual_inventory_table()
@@ -246,3 +276,4 @@ def init_all_virtual_inventory_tables():
     init_aichebeimu_data_tables()
     init_robot_data_table()
     init_external_data_table()
+    init_jiapei_data_table()

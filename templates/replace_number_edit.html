@@ -189,6 +189,8 @@
             <input type="text" id="searchOe" placeholder="支持空格分隔多值">
             <label>品牌：</label>
             <input type="text" id="searchBrand" placeholder="输入一个品牌">
+            <label>品牌号：</label>
+            <input type="text" id="searchBrandNumber" placeholder="输入一个品牌号">
             <button class="btn btn-primary" onclick="searchByInput()">查询</button>
             <button class="btn btn-default" onclick="resetForm()">重置</button>
         </div>
@@ -261,10 +263,16 @@
             function searchByInput() {
                 var oeInput = document.getElementById('searchOe').value.trim();
                 var brandInput = document.getElementById('searchBrand').value.trim();
+                var brandNumberInput = document.getElementById('searchBrandNumber').value.trim();
                 var oeList = parseOes(oeInput);
 
+                if (brandNumberInput) {
+                    searchFromList([{oe: '', brand: '', brand_number: brandNumberInput}]);
+                    return;
+                }
+
                 if (oeList.length === 0 || !brandInput) {
-                    layer.msg('请输入 OE 号和品牌', {icon: 2});
+                    layer.msg('请输入 OE 号和品牌，或输入品牌号', {icon: 2});
                     return;
                 }
 
@@ -397,6 +405,7 @@
             function resetForm() {
                 document.getElementById('searchOe').value = '';
                 document.getElementById('searchBrand').value = '';
+                document.getElementById('searchBrandNumber').value = '';
                 document.getElementById('dataArea').style.display = 'none';
                 document.getElementById('emptyState').style.display = 'block';
                 document.getElementById('emptyState').textContent = '请输入 OE 和品牌后点击查询';
