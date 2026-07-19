@@ -304,7 +304,7 @@ def process_single_sheet_batch(session, sheet_info, mode, process_func):
     for index, row in df.iterrows():
         oe_number = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
         brand = str(row[brand_col]).strip() if pd.notna(row[brand_col]) else ''
-        brand_code = str(row[brand_code_col]).strip() if pd.notna(row.get('brand_code_col', '')) else '' if mode == 'three_column' else ''
+        brand_code = str(row[brand_code_col]).strip() if pd.notna(row.get(brand_code_col, '')) else '' if mode == 'three_column' else ''
         
         if oe_number and brand:
             item = {
