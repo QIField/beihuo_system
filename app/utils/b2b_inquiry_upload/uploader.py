@@ -95,7 +95,7 @@ def load_crm_aliases_mapping():
             print(f"警告: 未找到 {excel_path}")
             return {}
         
-        df = pd.read_excel(excel_path)
+        df = pd.read_excel(excel_path, dtype=str)
         brand_mapping = {}
         
         for _, row in df.iterrows():

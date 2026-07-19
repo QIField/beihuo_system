@@ -157,7 +157,7 @@ def load_crm_aliases_mapping():
             logger.warning(f"警告: 未找到 {excel_path} 文件，将不进行品牌名称映射")
             return {}
 
-        df = pd.read_excel(excel_path)
+        df = pd.read_excel(excel_path, dtype=str)
         brand_mapping = {}
 
         # 遍历每一行，解析pp_names字段
