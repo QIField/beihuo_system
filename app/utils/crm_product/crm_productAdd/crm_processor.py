@@ -226,47 +226,47 @@ def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session
     # 步骤 1: 获取品牌 ID
     brand_id = _get_brand_id(session, brand)
     if not brand_id:
-        result = ProcessResult(oe_number, ProcessStatus.FAILED, message=f"没有匹配到品牌ID: {brand}")
+        result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message=f"没有匹配到品牌ID: {brand}")
         _save_result(db_manager, oe_number, brand, result)
         return result
 
     # 步骤 1.5: 前置存在性校验
     product_items = _query_product_list(session, oe_number)
     if product_items is not None and _is_product_existed_in_crm(oe_number, brand, product_items):
-        result = ProcessResult(oe_number, ProcessStatus.EXISTED, message='OE和品牌已存在于CRM中')
+        result = ProcessResult(oe_number, ProcessStatus.EXISTED, brand=brand, message='OE和品牌已存在于CRM中')
         _save_result(db_manager, oe_number, brand, result)
         return result
 
     # 步骤 2: 获取 OE 信息
     oe_info = _get_oe_info(session, oe_number)
     if not oe_info:
-        result = ProcessResult(oe_number, ProcessStatus.FAILED, message='获取 OE 信息失败')
+        result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message='获取 OE 信息失败')
         _save_result(db_manager, oe_number, brand, result)
         return result
 
     # 步骤 3: 校验 OE 信息字段（产品名称 > 车型 > 原厂品牌）
     product_name = oe_info.get('product_name', '')
     if not product_name:
-        result = ProcessResult(oe_number, ProcessStatus.FAILED, message='未返回产品名称')
+        result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message='未返回产品名称')
         _save_result(db_manager, oe_number, brand, result)
         return result
 
     vehicle_name = oe_info.get('vehicle_name', '')
     if not vehicle_name:
-        result = ProcessResult(oe_number, ProcessStatus.FAILED, message='未返回车型')
+        result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message='未返回车型')
         _save_result(db_manager, oe_number, brand, result)
         return result
 
     brand_name = oe_info.get('brand_name', '')
     if not brand_name:
-        result = ProcessResult(oe_number, ProcessStatus.FAILED, message='未返回原厂品牌')
+        result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message='未返回原厂品牌')
         _save_result(db_manager, oe_number, brand, result)
         return result
 
     # 步骤 4: 添加产品
     add_response = _add_product(session, oe_number, brand_id, product_name, oe_info)
     if not add_response:
-        result = ProcessResult(oe_number, ProcessStatus.FAILED, message='添加产品请求失败')
+        result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message='添加产品请求失败')
         _save_result(db_manager, oe_number, brand, result)
         return result
 
@@ -276,14 +276,14 @@ def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session
 
     # 步骤 5: 处理响应结果
     if status == 200:
-        result = ProcessResult(oe_number, ProcessStatus.SUCCESS, product_id=str(product_id), message=msg)
+        result = ProcessResult(oe_number, ProcessStatus.SUCCESS, brand=brand, product_id=str(product_id), message=msg)
     elif status == 201:
         if '该物料已关联当前组织' in msg:
-            result = ProcessResult(oe_number, ProcessStatus.EXISTED, product_id=str(product_id) if product_id else None, message=msg)
+            result = ProcessResult(oe_number, ProcessStatus.EXISTED, brand=brand, product_id=str(product_id) if product_id else None, message=msg)
         else:
-            result = ProcessResult(oe_number, ProcessStatus.SUCCESS, product_id=str(product_id) if product_id else None, message=msg)
+            result = ProcessResult(oe_number, ProcessStatus.SUCCESS, brand=brand, product_id=str(product_id) if product_id else None, message=msg)
     else:
-        result = ProcessResult(oe_number, ProcessStatus.FAILED, message=msg)
+        result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message=msg)
         _save_result(db_manager, oe_number, brand, result)
         return result
 
@@ -310,7 +310,7 @@ def process_items(items: List[dict], product_df, alias_df, session, progress_cal
         total_items: 总项目数
 
     Returns:
-        {oe_number: ProcessResult}
+        {(oe_number, brand): ProcessResult}
     """
     results = {}
     completed = 0
@@ -322,11 +322,11 @@ def process_items(items: List[dict], product_df, alias_df, session, progress_cal
 
         try:
             result = process_single_oe(item, product_df, alias_df, session=session)
-            results[oe_number] = result
+            results[(oe_number, brand)] = result
         except Exception as e:
-            result = ProcessResult(oe_number, ProcessStatus.FAILED, message=f"处理异常: {e}")
-            results[oe_number] = result
-            print(f"[失败] {oe_number}: {result.message}")
+            result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message=f"处理异常: {e}")
+            results[(oe_number, brand)] = result
+            print(f"[失败] {oe_number} {brand}: {result.message}")
 
         completed += 1
         if completed % 10 == 0 or completed == total:

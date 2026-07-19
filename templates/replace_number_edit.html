@@ -135,13 +135,14 @@
             color: #999;
         }
         .col-seq { width: 5%; }
-        .col-oe { width: 13%; }
-        .col-brand { width: 10%; }
-        .col-original { width: 22%; }
-        .col-other { width: 22%; }
+        .col-oe { width: 12%; }
+        .col-brand { width: 8%; }
+        .col-brand-number { width: 10%; }
+        .col-original { width: 20%; }
+        .col-other { width: 20%; }
         .col-upload { width: 8%; }
         .col-products { width: 14%; }
-        .col-status { width: 6%; }
+        .col-status { width: 8%; }
         .status-success { color: #52c41a; font-weight: 500; }
         .status-fail { color: #ff4d4f; font-weight: 500; }
         .status-wait { color: #1890ff; }
@@ -188,6 +189,8 @@
             <input type="text" id="searchOe" placeholder="支持空格分隔多值">
             <label>品牌：</label>
             <input type="text" id="searchBrand" placeholder="输入一个品牌">
+            <label>品牌号：</label>
+            <input type="text" id="searchBrandNumber" placeholder="输入一个品牌号">
             <button class="btn btn-primary" onclick="searchByInput()">查询</button>
             <button class="btn btn-default" onclick="resetForm()">重置</button>
         </div>
@@ -208,6 +211,7 @@
                             <th class="col-seq">序号</th>
                             <th class="col-oe">OE</th>
                             <th class="col-brand">品牌</th>
+                            <th class="col-brand-number">品牌号</th>
                             <th class="col-original">原厂/4S 替换号</th>
                             <th class="col-other">其他品牌替换号</th>
                             <th class="col-upload">是否上传</th>
@@ -259,10 +263,16 @@
             function searchByInput() {
                 var oeInput = document.getElementById('searchOe').value.trim();
                 var brandInput = document.getElementById('searchBrand').value.trim();
+                var brandNumberInput = document.getElementById('searchBrandNumber').value.trim();
                 var oeList = parseOes(oeInput);
 
+                if (brandNumberInput) {
+                    searchFromList([{oe: '', brand: '', brand_number: brandNumberInput}]);
+                    return;
+                }
+
                 if (oeList.length === 0 || !brandInput) {
-                    layer.msg('请输入 OE 号和品牌', {icon: 2});
+                    layer.msg('请输入 OE 号和品牌，或输入品牌号', {icon: 2});
                     return;
                 }
 
@@ -359,6 +369,7 @@
                         '<td class="col-seq">' + globalIndex + '</td>' +
                         '<td class="col-oe">' + (item.oe || '-') + '</td>' +
                         '<td class="col-brand">' + (item.brand || '-') + '</td>' +
+                        '<td class="col-brand-number">' + (item.brand_number || '') + '</td>' +
                         '<td class="col-original"><textarea class="original-input" data-field="original_numbers" ' + readOnly + '>' + (item.original_numbers || '') + '</textarea></td>' +
                         '<td class="col-other"><textarea class="other-input" data-field="other_numbers" ' + readOnly + '>' + (item.other_numbers || '') + '</textarea></td>' +
                         '<td class="col-upload">' +
@@ -394,6 +405,7 @@
             function resetForm() {
                 document.getElementById('searchOe').value = '';
                 document.getElementById('searchBrand').value = '';
+                document.getElementById('searchBrandNumber').value = '';
                 document.getElementById('dataArea').style.display = 'none';
                 document.getElementById('emptyState').style.display = 'block';
                 document.getElementById('emptyState').textContent = '请输入 OE 和品牌后点击查询';

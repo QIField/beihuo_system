@@ -2690,9 +2690,9 @@ def import_cart():
             temp_file_path = tmp_file.name
 
         try:
-            # 读取Excel文件
+            # 读取Excel文件，统一按字符串读取避免物料条码/品牌号前导零丢失
             import pandas as pd
-            df = pd.read_excel(temp_file_path) if file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(temp_file_path)
+            df = pd.read_excel(temp_file_path, dtype=str) if file.filename.endswith(('.xlsx', '.xls')) else pd.read_csv(temp_file_path, dtype=str)
 
             # 限制导入数据量，最多1000条
             if len(df) > 10000:

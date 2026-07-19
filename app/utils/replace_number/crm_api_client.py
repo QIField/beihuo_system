@@ -19,6 +19,7 @@ def search_products_by_numberlist(company: str, numberlist: str):
         response.data 部分
     """
     session = create_crm_session(company)
+    session.verify = False
     payload = {
         "numberlist": numberlist,
         "page": 1,
@@ -54,6 +55,7 @@ def update_product_numbers(company: str, product_id: str, numbers: list):
         CRM 接口原始响应字典
     """
     session = create_crm_session(company)
+    session.verify = False
     payload = {
         "product_id": str(product_id),
         "numbers": numbers

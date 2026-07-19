@@ -35,6 +35,16 @@
     <!-- AG Grid Loader 组件 -->
     <script src="/static/js/components/ag-grid-loader/ag-grid-loader.js"></script>
 
+    <!-- Handsontable -->
+    <link rel="stylesheet" href="/static/js/handsontable/handsontable.full.min.css">
+    <script src="/static/js/handsontable/handsontable.full.min.js"></script>
+
+    <!-- Handsontable Builder（配置化 Handsontable 构建器）-->
+    <script src="/static/js/components/handsontable-builder/handsontable-builder.js"></script>
+
+    <!-- ks_inquiry_records 统一表格配置 -->
+    <script src="/static/js/page-configs/ks_inquiry_grid_config.js"></script>
+
     <!-- Grid Detail Panel 组件（主表-副表联动） -->
     <link rel="stylesheet" href="/static/js/components/grid-detail-panel/grid-detail-panel.css">
     <script src="/static/js/components/grid-detail-panel/grid-detail-panel.js"></script>
@@ -131,7 +141,7 @@
             overflow: hidden;
         }
 
-        #ksInquiryGrid, #oeStatsGrid, #engineChassisGrid {
+        #oeStatsGrid, #engineChassisGrid {
             height: calc(100vh - 200px);
             min-height: 500px;
             width: 100%;
@@ -220,6 +230,20 @@
             color: #1890ff;
         }
 
+        /* 标签导航右侧操作区 */
+        .tab-nav-actions {
+            margin-left: auto;
+        }
+
+        .engine-config-btn {
+            background: #1890ff;
+            color: #fff;
+        }
+
+        .engine-config-btn:hover {
+            background: #40a9ff;
+        }
+
         /* AG Grid 自定义样式 - 紧凑版 */
         .ag-theme-alpine {
             --ag-font-size: 12px;
@@ -245,13 +269,6 @@
 
     <!-- 全局变量声明（需在子模板脚本之前） -->
     <script>
-        let gridApi = null;
-        let gridColumnApi = null;
-        let currentData = [];
-        let currentPage = 1;
-        let currentPageSize = 200;
-        let totalRecords = 0;
-        let customPagination = null;
         let currentTab = 'detail';
         const userCompany = '{{ session.get("store", "") }}';
 
@@ -333,6 +350,9 @@
             <button class="tab-btn" data-tab="oe">OE军备统计</button>
             <button class="tab-btn" data-tab="engine">动力底盘研判</button>
             <button class="tab-btn" data-tab="customer">合作单位分析</button>
+            <div class="tab-nav-actions">
+                <button class="tab-btn engine-config-btn" onclick="openEngineConfigModal()">发动机配置</button>
+            </div>
         </div>
 
         <!-- 搜索筛选区域 - 保持原样 -->
@@ -387,6 +407,17 @@
         </div>
     </div>
 
+    <!-- 发动机配置弹窗 -->
+    <div id="engineConfigModal" style="display: none; padding: 20px;">
+        <div style="margin-bottom: 12px; color: #666; font-size: 13px;">
+            每行一条映射规则，格式：原始发动机代码=展示名称<br>
+            例如：A14NET=N14
+        </div>
+        <textarea id="engineConfigTextarea"
+            style="width: 100%; height: 280px; padding: 10px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; resize: none; box-sizing: border-box;"
+            placeholder="A14NET=N14&#10;B16A=A16"></textarea>
+    </div>
+
     <!-- AG Grid JS - 使用本地文件 -->
     <script src="/static/ag-grid/ag-grid-community.min.js"></script>
 
@@ -425,6 +456,108 @@
             });
         }
 
+        // 当前门店发动机映射配置（全局共享给 engine_stats_tab 使用）
+        window.engineMapping = {};
+
+        // 加载发动机映射配置
+        function loadEngineMapping() {
+            fetch('/new/api/ks_inquiry/engine_mapping?company=' + encodeURIComponent(userCompany), {
+                credentials: 'same-origin'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.code === 0) {
+                    window.engineMapping = result.data || {};
+                }
+            })
+            .catch(function(e) {
+                console.error('[Engine Config] 加载映射失败:', e);
+            });
+        }
+
+        // 打开发动机配置弹窗
+        function openEngineConfigModal() {
+            layui.layer.open({
+                type: 1,
+                title: '发动机配置',
+                area: ['520px', '440px'],
+                content: layui.$('#engineConfigModal').html(),
+                btn: ['保存', '取消'],
+                yes: function(index) {
+                    saveEngineConfig(index);
+                },
+                success: function(layero) {
+                    renderEngineConfigTextarea(layero);
+                }
+            });
+        }
+
+        // 将当前映射渲染到弹窗文本框
+        function renderEngineConfigTextarea(layero) {
+            var textarea = layero.find('textarea')[0];
+            if (!textarea) return;
+            var lines = [];
+            for (var original in window.engineMapping) {
+                if (window.engineMapping.hasOwnProperty(original)) {
+                    lines.push(original + '=' + window.engineMapping[original]);
+                }
+            }
+            textarea.value = lines.join('\n');
+        }
+
+        // 保存发动机配置
+        function saveEngineConfig(layerIndex) {
+            var layero = layui.$('#layui-layer' + layerIndex);
+            var textarea = layero.find('textarea')[0];
+            if (!textarea) {
+                layui.layer.msg('未找到配置输入框', {icon: 2});
+                return;
+            }
+            var lines = (textarea.value || '').split('\n');
+            var mappings = {};
+            var hasError = false;
+
+            lines.forEach(function(line) {
+                line = line.trim();
+                if (!line) return;
+                var parts = line.split('=');
+                if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
+                    hasError = true;
+                    return;
+                }
+                mappings[parts[0].trim()] = parts[1].trim();
+            });
+
+            if (hasError) {
+                layui.layer.msg('格式错误，每行必须是：原始代码=展示名称', {icon: 2});
+                return;
+            }
+
+            fetch('/new/api/ks_inquiry/engine_mapping', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ company: userCompany, mappings: mappings })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.code === 0) {
+                    window.engineMapping = mappings;
+                    layui.layer.msg('保存成功', {icon: 1});
+                    layui.layer.close(layerIndex);
+                    if (currentTab === 'engine' && typeof refreshEngineChassis === 'function') {
+                        refreshEngineChassis();
+                    }
+                } else {
+                    layui.layer.msg(result.message || '保存失败', {icon: 2});
+                }
+            })
+            .catch(function(e) {
+                console.error('[Engine Config] 保存映射失败:', e);
+                layui.layer.msg('保存失败', {icon: 2});
+            });
+        }
+
         // 重置所有筛选条件
         function resetAll() {
             // 重置日期范围为近三天
@@ -452,7 +585,14 @@
             }
 
             if (currentTab === 'detail') {
-                refreshGrid();
+                if (typeof window.resetKsInquiryDetailFilters === 'function') {
+                    window.resetKsInquiryDetailFilters();
+                }
+                if (window.ksInquiryDetailBuilder) {
+                    window.ksInquiryDetailBuilder.reset();
+                } else {
+                    refreshGrid();
+                }
             } else if (currentTab === 'oe') {
                 refreshOeStats();
             } else if (currentTab === 'engine') {
@@ -575,9 +715,9 @@
                 contentSelector: '.tab-content',
                 onSwitch: function(tabId) {
                     updateSearchPanelForTab(tabId);
-                    if (tabId === 'detail' && gridApi) {
+                    if (tabId === 'detail' && window.ksInquiryDetailBuilder && window.ksInquiryDetailBuilder.hot) {
                         setTimeout(function() {
-                            gridApi.sizeColumnsToFit();
+                            window.ksInquiryDetailBuilder.hot.render();
                         }, 0);
                     } else if (tabId === 'oe' && typeof initOeStatsGrid === 'function') {
                         initOeStatsGrid();
@@ -638,11 +778,9 @@
                 });
             }
 
-            // 初始化明细列表 AG Grid
-            const gridDiv = document.querySelector('#ksInquiryGrid');
-            if (gridDiv && typeof gridOptions !== 'undefined') {
-                new agGrid.Grid(gridDiv, gridOptions);
-            }
+            // 初始化时加载发动机映射配置
+            loadEngineMapping();
+
         });
 
     </script>

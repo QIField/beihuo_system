@@ -15,7 +15,7 @@ from app.utils.replace_number.excel_utils import (
     save_direct_result,
 )
 from app.utils.logger_config import get_task_logger
-from .matcher import match_products, extract_brand_codes
+from .matcher import match_products, extract_brand_codes, search_by_brand_number
 from .models import ReplaceNumberRow
 
 
@@ -29,17 +29,32 @@ def _to_row_objects(raw_rows: List[dict]) -> List[ReplaceNumberRow]:
             row_index=r["row_index"],
             oe=r["oe"],
             brand=r["brand"],
+            brand_number=r.get("brand_number", ""),
             new_numbers=r["new_numbers"],
         )
         for r in raw_rows
     ]
 
 
+def _search_by_brand_number(company: str, row: ReplaceNumberRow):
+    """使用品牌号搜索产品；仅唯一结果时直接采用"""
+    product, brand_codes, status = search_by_brand_number(company, row.brand_number)
+    if status:
+        row.status = status
+        return
+
+    row.matched_products = [product]
+    row.brand_codes = brand_codes
+
+
 def _search_batch(company: str, rows: List[ReplaceNumberRow]):
     """批量搜索，线程内串行"""
     for row in rows:
         if not row.oe or not row.brand:
-            row.status = "缺少字段"
+            if row.brand_number:
+                _search_by_brand_number(company, row)
+            else:
+                row.status = "缺少字段"
             continue
 
         api_data = search_products_by_numberlist(company, row.oe)
@@ -75,10 +90,12 @@ def _update_batch(company: str, rows: List[ReplaceNumberRow]):
                 all_ok = False
                 continue
 
+            logger.info(f"发送更新参数: product_id={product.product_id}, numbers={merged}")
             response = update_product_numbers(company, product.product_id, merged)
 
             if response.get("status") == 200 or response.get("msg") == "操作成功":
                 updated = merged
+                row.product_desc.append(f"{product.number} {product.brand_name}")
             else:
                 all_ok = False
                 row.status = f"更新失败: {response.get('msg', '未知错误')}"
@@ -104,6 +121,7 @@ def process_direct_replace_number(file_path: str, company: str, progress_callbac
 
     df, raw_rows = read_replace_number_excel(file_path)
     rows = _to_row_objects(raw_rows)
+    logger.info(f"读取Excel内容: {raw_rows}")
 
     mid = len(rows) // 2
     batches = [rows[:mid], rows[mid:]]
@@ -122,6 +140,7 @@ def process_direct_replace_number(file_path: str, company: str, progress_callbac
         raw["matched_products"] = r.matched_products
         raw["updated_numbers"] = r.updated_numbers
         raw["status"] = r.status
+        raw["product_desc"] = r.product_desc
 
     result_path = save_direct_result(file_path, df, raw_rows)
     logger.info(f"直接添加替换号完成: result={result_path}")

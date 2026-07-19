@@ -26,6 +26,7 @@ os.environ['DB_NAME'] = 'bbr_test'
 
 from app.utils.database_connection import get_db_connection
 from config.cookie_config import create_crm_session
+from app.utils.crm_updateview_logger import execute_update_view_with_log
 
 SPECIAL_BRAND_GROUPS = [
     ['FAG', '舍弗勒FAG'],
@@ -138,7 +139,6 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
     更新产品视图信息
     只包含有值的字段，空字段不作为参数传递
     """
-    url = "https://crm.gzbbr.com/api/Product.Product/updateView"
     headers = {
         'accept': 'application/json, text/plain, */*',
         'content-type': 'application/json;charset=UTF-8',
@@ -201,20 +201,14 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
     # 打印调试信息
     print(f"    [DEBUG] 发送的payload: {payload}")
     
-    try:
-        import requests
-        response = session.post(url, json=payload, headers=headers, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-        
-        if data.get('status') == 200:
-            return True, data.get('msg', '更新成功')
-        else:
-            return False, data.get('msg', '更新失败')
-    except Exception as e:
-        print(f"    [DEBUG] API调用异常: {e}")
-        print(f"    [DEBUG] payload内容: {payload}")
-        return False, f"API调用失败: {e}"
+    return execute_update_view_with_log(
+        session=session,
+        payload=payload,
+        source="updateview_service",
+        store_code="fsbbr",
+        headers=headers,
+        timeout=30,
+    )
 
 
 def process_update_crm_product_async(file_path, progress_callback=None, **kwargs):
@@ -233,10 +227,12 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
     
     # 读取Excel文件
     file_ext = Path(file_path).suffix.lower()
+    # 配件编码、品牌号可能包含前导零，强制按字符串读取
+    read_dtype = {'配件编码': str, '品牌号': str}
     if file_ext == '.xls':
-        df = pd.read_excel(file_path, engine='xlrd')
+        df = pd.read_excel(file_path, engine='xlrd', dtype=read_dtype)
     else:
-        df = pd.read_excel(file_path, engine='openpyxl')
+        df = pd.read_excel(file_path, engine='openpyxl', dtype=read_dtype)
     
     total_rows = len(df)
     print(f"[UpdateView Service] 读取完成，共 {total_rows} 行数据")

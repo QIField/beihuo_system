@@ -16,10 +16,11 @@ class ProcessStatus:
 @dataclass
 class ProcessResult:
     """
-    单个 OE 的处理结果
+    单个 OE+品牌的处理结果
 
     Attributes:
         oe_number: OE 号
+        brand: 品牌名称
         status: 处理状态 (success / existed / failed)
         product_id: CRM 产品 ID，成功或已存在时可能返回
         message: 结果描述
@@ -27,6 +28,7 @@ class ProcessResult:
     """
     oe_number: str
     status: str
+    brand: Optional[str] = None
     product_id: Optional[str] = None
     message: str = ''
     brand_code_updated: bool = False

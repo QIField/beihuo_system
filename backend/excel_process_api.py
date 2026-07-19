@@ -38,8 +38,8 @@ def register_excel_process_routes(app):
             file.save(temp_file_path)
             
             try:
-                # 读取Excel文件检查列名
-                df = pd.read_excel(temp_file_path) if temp_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(temp_file_path)
+                # 读取Excel文件检查列名，统一按字符串读取避免前导零丢失
+                df = pd.read_excel(temp_file_path, dtype=str) if temp_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(temp_file_path, dtype=str)
                 
                 # 检查支持的列组合
                 from app.utils.crm_product.crm_productAdd.excel_reader import identify_columns, identify_columns_extended
@@ -306,7 +306,7 @@ def register_excel_process_routes(app):
         else:
             df, rows = read_replace_number_excel(temp_file_path)
             oe_brand_list = [
-                {'oe': r['oe'], 'brand': r['brand']}
+                {'oe': r['oe'], 'brand': r['brand'], 'brand_number': r.get('brand_number', '')}
                 for r in rows
             ]
             return jsonify({
@@ -325,8 +325,8 @@ def process_excel_concurrent(file_path, process_type, mode='two_column'):
     并发处理Excel文件的主要函数
     """
     try:
-        # 读取Excel文件
-        df = pd.read_excel(file_path, sheet_name=None)
+        # 读取Excel文件，统一按字符串读取避免前导零丢失
+        df = pd.read_excel(file_path, sheet_name=None, dtype=str)
         all_results = {}
         
         for sheet_name, sheet_df in df.items():

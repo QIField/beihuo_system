@@ -561,7 +561,8 @@ var GridColumnMenu = (function() {
         var info = menuConfig.grids[gridSelector];
         if (!info) return;
         info.columnDefs.forEach(function(col) {
-            var field = col.field || col.colId;
+            var field = col.field || col.colId || col.data;
+            if (!field) return;
             if (visible) info.hiddenColumns.delete(field);
             else info.hiddenColumns.add(field);
         });
@@ -895,7 +896,8 @@ var GridColumnMenu = (function() {
                         if (targetApi) {
                             var states = [];
                             info.columnDefs.forEach(function(col) {
-                                var f = col.field || col.colId;
+                                var f = col.field || col.colId || col.data;
+                                if (!f) return;
                                 states.push({ colId: f, hide: info.hiddenColumns.has(f) });
                             });
                             targetApi.applyColumnState({ state: states, applyOrder: false });
@@ -905,7 +907,8 @@ var GridColumnMenu = (function() {
                                 : ((typeof info.api.setColumnVisible === 'function') ? info.api : null);
                             if (visApi) {
                                 info.columnDefs.forEach(function(col) {
-                                    var f = col.field || col.colId;
+                                    var f = col.field || col.colId || col.data;
+                                    if (!f) return;
                                     visApi.setColumnVisible(f, !info.hiddenColumns.has(f));
                                 });
                             }

@@ -27,11 +27,11 @@ def load_account_receivable_excel(file_path):
         if ext not in ['.xlsx', '.xls']:
             raise ValueError(f"文件格式不支持: {ext}，请使用 .xlsx 或 .xls 格式的Excel文件")
         
-        # 读取Excel文件，指定engine以避免格式检测问题
+        # 读取Excel文件，指定engine以避免格式检测问题；dtype=str 保留前导零
         if ext == '.xlsx':
-            df = pd.read_excel(file_path, engine='openpyxl')
+            df = pd.read_excel(file_path, engine='openpyxl', dtype=str)
         else:
-            df = pd.read_excel(file_path, engine='xlrd')
+            df = pd.read_excel(file_path, engine='xlrd', dtype=str)
         
         return df
     except Exception as e:
@@ -53,11 +53,11 @@ def load_account_receivable_excel_from_file(file_obj, filename):
         if ext not in ['.xlsx', '.xls']:
             raise ValueError(f"文件格式不支持: {ext}，请使用 .xlsx 或 .xls 格式的Excel文件")
         
-        # 读取Excel文件，指定engine以避免格式检测问题
+        # 读取Excel文件，指定engine以避免格式检测问题；dtype=str 保留前导零
         if ext == '.xlsx':
-            df = pd.read_excel(file_obj, engine='openpyxl')
+            df = pd.read_excel(file_obj, engine='openpyxl', dtype=str)
         else:
-            df = pd.read_excel(file_obj, engine='xlrd')
+            df = pd.read_excel(file_obj, engine='xlrd', dtype=str)
         
         return df
     except Exception as e:

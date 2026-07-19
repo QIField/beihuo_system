@@ -292,7 +292,10 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         session = create_crm_session()
         try:
             raw_results = process_items(need_create_items, product_df, alias_df, session)
-            create_results = {oe: _format_result_message(result) for oe, result in raw_results.items()}
+            create_results = {
+                (oe, brand): _format_result_message(result)
+                for (oe, brand), result in raw_results.items()
+            }
         finally:
             session.close()
 
@@ -303,7 +306,8 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     second_upload_items = []
     for item in valid_items:
         oe = item['oe']
-        create_result = create_results.get(oe, '')
+        brand = item.get('mapped_brand', item.get('brand', ''))
+        create_result = create_results.get((oe, brand), '')
         if create_result and ('已存在' in create_result or ('成功' in create_result and '失败' not in create_result)):
             second_upload_items.append(item)
     
@@ -325,8 +329,9 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     
     for item in valid_items:
         oe = item['oe']
+        brand = item.get('mapped_brand', item.get('brand', ''))
         update_msg = item.get('update_msg', '')
-        create_result = create_results.get(oe, '')
+        create_result = create_results.get((oe, brand), '')
         
         category = _classify_nine_category(update_msg, create_result)
         item['处理结果'] = category
