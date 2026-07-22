@@ -56,7 +56,7 @@ def init_ks_inquiry_detail_table():
                 partsBrandQuality VARCHAR(50) DEFAULT NULL COMMENT '配件品质',
                 remark TEXT DEFAULT NULL COMMENT '备注',
                 order_status VARCHAR(20) DEFAULT '未下单' COMMENT 'content级别下单状态（已下单/未下单）',
-                display_seller_status VARCHAR(20) DEFAULT '未下单' COMMENT '前端显示卖家状态（未下单/本店下单/非本店下单）',
+                display_seller_status VARCHAR(20) DEFAULT '未下单' COMMENT '前端显示卖家状态（未下单/同报本店未采/本店下单/非本店下单）',
                 vin VARCHAR(50) DEFAULT NULL COMMENT '车架号',
                 engine VARCHAR(100) DEFAULT NULL COMMENT '发动机',
                 production_date VARCHAR(50) DEFAULT NULL COMMENT '车辆生产日期',
@@ -218,40 +218,59 @@ def init_price_inquiry_direct_table():
         conn.close()
 
 
-def init_ks_engine_mapping_table():
+def init_ks_part_mapping_table():
     """
-    初始化发动机展示名称映射表
-    用于存储原始发动机代码到展示名称的映射配置
+    初始化车辆零部件展示名称映射表
+    用于存储发动机、底盘等零部件的原始代码到展示名称的映射配置
     """
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             create_table_sql = """
-            CREATE TABLE IF NOT EXISTS ks_engine_mapping (
+            CREATE TABLE IF NOT EXISTS ks_part_mapping (
                 id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
                 company VARCHAR(50) NOT NULL COMMENT '门店/组织',
-                original_engine VARCHAR(100) NOT NULL COMMENT '原始发动机代码',
-                display_engine VARCHAR(100) NOT NULL COMMENT '展示名称',
+                mapping_type VARCHAR(20) NOT NULL DEFAULT 'engine' COMMENT '映射类型：engine/chassis',
+                car_brand_name VARCHAR(100) NOT NULL DEFAULT '' COMMENT '车辆品牌',
+                original_code VARCHAR(100) NOT NULL COMMENT '原始代码',
+                display_code VARCHAR(100) NOT NULL COMMENT '展示名称',
+                remark VARCHAR(255) DEFAULT '' COMMENT '备注',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-                UNIQUE KEY uk_company_mapping (company, original_engine, display_engine)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='发动机展示名称映射配置表';
+                UNIQUE KEY uk_company_mapping (company, mapping_type, car_brand_name, original_code)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='车辆零部件展示名称映射配置表';
             """
             cursor.execute(create_table_sql)
+
+            # 检查并添加新列（兼容旧表）
+            for col_name, col_def in [
+                ('mapping_type', "VARCHAR(20) NOT NULL DEFAULT 'engine' COMMENT '映射类型：engine/chassis'"),
+                ('car_brand_name', "VARCHAR(100) NOT NULL DEFAULT '' COMMENT '车辆品牌'"),
+                ('remark', "VARCHAR(255) DEFAULT '' COMMENT '备注'")
+            ]:
+                try:
+                    cursor.execute(f"""
+                        ALTER TABLE ks_part_mapping
+                        ADD COLUMN {col_name} {col_def}
+                    """)
+                    print(f"  [成功] 已添加列 {col_name}")
+                except Exception as e:
+                    if "Duplicate column name" not in str(e):
+                        print(f"  ! 添加列 {col_name} 时出错: {str(e)}")
 
             # 检查并添加索引（兼容旧表）
             try:
                 cursor.execute("""
-                    ALTER TABLE ks_engine_mapping
-                    ADD UNIQUE INDEX uk_company_mapping (company, original_engine, display_engine)
+                    ALTER TABLE ks_part_mapping
+                    ADD UNIQUE INDEX uk_company_mapping (company, mapping_type, car_brand_name, original_code)
                 """)
                 print("  [成功] 已添加唯一索引 uk_company_mapping")
             except Exception as e:
                 if "Duplicate key name" not in str(e):
                     print(f"  ! 添加唯一索引时出错: {str(e)}")
 
-            print("  [成功] 发动机展示名称映射表")
+            print("  [成功] 车辆零部件展示名称映射表")
     except Exception as e:
-        print(f"  [失败] 发动机展示名称映射表: {e}")
+        print(f"  [失败] 车辆零部件展示名称映射表: {e}")
     finally:
         conn.close()

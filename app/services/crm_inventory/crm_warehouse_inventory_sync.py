@@ -724,7 +724,7 @@ def _send_notification(company, sku_total):
             f"今日无库存数据"
         )
         try:
-            message_push("crm", message)
+            message_push("仓位", message)
             logger.info(f"[通知] {company} 今日无库存数据，跳过Excel导出")
         except Exception as e:
             logger.error(f"[通知] 发送失败: {e}")
@@ -744,6 +744,9 @@ def _send_notification(company, sku_total):
             rows = kw_no_rows[kw_no]
             sheet_name = kw_no[:31]  # Excel sheet 名最长 31 字符
             pd.DataFrame(rows).to_excel(writer, sheet_name=sheet_name, index=False)
+
+        for sheet in writer.sheets.values():
+            sheet.freeze_panes = 'A2'
 
     # 构建通知消息
     total_change = sum(row['增减'] for row in summary_rows)
@@ -766,7 +769,7 @@ def _send_notification(company, sku_total):
     )
 
     try:
-        message_push("crm", message)
+        message_push("仓位", message)
         logger.info(f"[通知] 已发送 {company} 的业务汇报，仓位数 {len(summary_rows)}，总SKU {sku_total}")
     except Exception as e:
         logger.error(f"[通知] 发送失败: {e}")

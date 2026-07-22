@@ -184,6 +184,9 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
     # 默认 submit_result：未走 CRM/B/C 流程的已有报价项
     order_part = '操作成功' if order_success else '操作失败'
     default_submit_result = f"[{order_part}][][]"
+    default_order_submit_status = 'success' if order_success else 'failure'
+    default_crm_flow_status = 'none'
+    default_bc_flow_status = 'none'
 
     for demand in demand_list:
         supplier_demand_id = demand.get('supplerDemandId')
@@ -258,21 +261,30 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
                     f"quote_status={quote_status}，无报价记录"
                 )
 
-    # 给每个明细追加订单级别字段、submit_result 和 result_source
+    # 给每个明细追加订单级别字段、submit_result、result_source 及各流程状态
     for detail in details:
         detail.update(order_meta)
         item_id = detail.get('enquiry_item_id')
         item_result = item_submit_results.get(item_id)
         if isinstance(item_result, dict):
             detail['_submit_result'] = item_result.get('submit_result', default_submit_result)
+            detail['_order_submit_status'] = item_result.get('order_submit_status', default_order_submit_status)
+            detail['_crm_flow_status'] = item_result.get('crm_flow_status', default_crm_flow_status)
+            detail['_bc_flow_status'] = item_result.get('bc_flow_status', default_bc_flow_status)
             detail['_result_source'] = item_result.get('result_source', 'unknown')
         elif item_result:
             # 兼容旧格式字符串
             detail['_submit_result'] = item_result
+            detail['_order_submit_status'] = default_order_submit_status
+            detail['_crm_flow_status'] = default_crm_flow_status
+            detail['_bc_flow_status'] = default_bc_flow_status
             detail['_result_source'] = 'unknown'
         else:
             # 未走 CRM/B/C 流程的已有报价项
             detail['_submit_result'] = default_submit_result
+            detail['_order_submit_status'] = default_order_submit_status
+            detail['_crm_flow_status'] = default_crm_flow_status
+            detail['_bc_flow_status'] = default_bc_flow_status
             detail['_result_source'] = 'existing_quote'
 
     return details
@@ -327,9 +339,10 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
             supplier_enquiry_no, supplier_demand_id, enquiry_item_id,
             item_oe, item_name, item_description, brand_id, brand_name,
             item_sell_price, delivery_aging, item_quality, parts_no,
-            quote_status, submit_result, result_source, submit_time, company,
+            quote_status, submit_result, order_submit_status, crm_flow_status, bc_flow_status,
+            result_source, submit_time, company,
             created_time, vin_code, car_type, retry_count, failure_category
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             supplier_demand_id = VALUES(supplier_demand_id),
             item_oe = VALUES(item_oe),
@@ -343,6 +356,9 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
             parts_no = VALUES(parts_no),
             quote_status = VALUES(quote_status),
             submit_result = VALUES(submit_result),
+            order_submit_status = VALUES(order_submit_status),
+            crm_flow_status = VALUES(crm_flow_status),
+            bc_flow_status = VALUES(bc_flow_status),
             result_source = VALUES(result_source),
             submit_time = VALUES(submit_time),
             created_time = VALUES(created_time),
@@ -356,6 +372,9 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
             # 用布尔值作为字典键分发，消除 if/else
             record_result = _RESULT_BUILDERS[detail['_has_quote']](detail, submit_result)
             result_source = detail.get('_result_source', 'unknown')
+            order_submit_status = detail.get('_order_submit_status')
+            crm_flow_status = detail.get('_crm_flow_status')
+            bc_flow_status = detail.get('_bc_flow_status')
 
             cursor.execute(sql, (
                 enquiry_no,
@@ -372,6 +391,9 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
                 detail.get('parts_no'),
                 detail.get('quote_status'),
                 record_result,
+                order_submit_status,
+                crm_flow_status,
+                bc_flow_status,
                 result_source,
                 submit_time,
                 company,
@@ -425,14 +447,53 @@ def _map_bc_fail_reason(reason, category):
     return _BC_SOURCE_MAP.get(category, 'bc') + '_failed'
 
 
+def _map_crm_flow_status(item_id, crm_quote_item_ids, crm_failed_items):
+    """按项目判定 CRM 流程状态"""
+    if item_id in crm_quote_item_ids:
+        return 'quoted'
+    if item_id in crm_failed_items:
+        reason = crm_failed_items[item_id][0]
+        if reason == FAIL_PART_NO_MISMATCH:
+            return 'part_no_mismatch'
+        if reason == FAIL_NO_EFFECTIVE_PRICE:
+            return 'no_effective_price'
+        if reason == FAIL_PRICE_CHECK_FAILED:
+            return 'crm_price_check_failed'
+        return 'crm_failed'
+    return 'none'
+
+
+def _map_bc_flow_status(item_id, bc_quote_item_ids, bc_failed_items, category):
+    """按项目判定 B/C 接口流程状态"""
+    if item_id in bc_quote_item_ids:
+        return 'quoted'
+    if item_id in bc_failed_items:
+        reason = bc_failed_items[item_id]
+        if reason == FAIL_ADAPT_LIST_EMPTY:
+            return 'adapt_list_empty'
+        if reason == FAIL_ORIGINAL_PRODUCT_NO_OE:
+            return 'original_product_no_oe'
+        if reason == FAIL_OE_DATA_MISSING:
+            return 'oe_data_missing'
+        if reason == FAIL_NO_STOCK:
+            return 'no_stock'
+        if reason == FAIL_INVALID_PRICE:
+            return 'invalid_price'
+        if reason == FAIL_PRICE_CHECK_FAILED:
+            return 'bc_price_check_failed'
+        return _BC_SOURCE_MAP.get(category, 'bc') + '_failed'
+    return 'none'
+
+
 def _build_item_submit_results(order_success, crm_quote_item_ids, crm_failed_items,
                                original_quoted_ids, bc_quote_item_ids, bc_failed_items,
                                category):
     """
-    按项目构造 submit_result 字符串和 result_source
+    按项目构造 submit_result 字符串、result_source 及各流程状态
 
     submit_result 格式：[操作成功/失败][crm流程][奔驰宝马接口]
     result_source 格式：前端展示/筛选用的结构化标签
+    order_submit_status / crm_flow_status / bc_flow_status 用于结构化筛选
     """
     item_results = {}
     all_item_ids = (
@@ -475,6 +536,9 @@ def _build_item_submit_results(order_success, crm_quote_item_ids, crm_failed_ite
 
         item_results[item_id] = {
             'submit_result': submit_result,
+            'order_submit_status': 'success' if order_success else 'failure',
+            'crm_flow_status': _map_crm_flow_status(item_id, crm_quote_item_ids, crm_failed_items),
+            'bc_flow_status': _map_bc_flow_status(item_id, bc_quote_item_ids, bc_failed_items, category),
             'result_source': _resolve_result_source(
                 item_id, category, crm_quote_item_ids, bc_quote_item_ids,
                 crm_failed_items, bc_failed_items

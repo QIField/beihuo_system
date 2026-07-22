@@ -120,11 +120,8 @@ class KsInquiryRecordsService:
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
         if seller_status:
-            if seller_status == '本店下单':
-                conditions.append("display_seller_status IN ('本店下单', '本店下单！')")
-            else:
-                conditions.append("display_seller_status = %s")
-                params.append(seller_status)
+            conditions.append("display_seller_status = %s")
+            params.append(seller_status)
         if car_brand_name: conditions.append("car_brand_name = %s");        params.append(car_brand_name)
         if garage_name:   conditions.append("garage_company_name LIKE %s");  params.append(f"%{garage_name}%")
         if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
@@ -272,11 +269,8 @@ class KsInquiryRecordsService:
 
         # 按订单状态过滤：只保留包含该状态的订单
         if seller_status:
-            if seller_status == '本店下单':
-                status_condition = "display_seller_status IN ('本店下单', '本店下单！')"
-            else:
-                status_condition = "display_seller_status = %s"
-                params.append(seller_status)
+            status_condition = "display_seller_status = %s"
+            params.append(seller_status)
             conditions.append(f"inquiryId IN (SELECT DISTINCT inquiryId FROM crmapp_ks_inquiry_detail WHERE {status_condition})")
 
         KsInquiryRecordsService._apply_filters(column_filters, KsInquiryRecordsService._MASTER_FILTER_MAP, conditions, params)
@@ -344,11 +338,8 @@ class KsInquiryRecordsService:
         if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
         if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
         if seller_status:
-            if seller_status == '本店下单':
-                conditions.append("display_seller_status IN ('本店下单', '本店下单！')")
-            else:
-                conditions.append("display_seller_status = %s")
-                params.append(seller_status)
+            conditions.append("display_seller_status = %s")
+            params.append(seller_status)
         if car_brand_name: conditions.append("car_brand_name LIKE %s");     params.append(f"%{car_brand_name}%")
         if garage_name:   conditions.append("garage_company_name LIKE %s");  params.append(f"%{garage_name}%")
         if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
@@ -363,7 +354,16 @@ class KsInquiryRecordsService:
             'garage_chassis': {'columns': {'carBrandName': 'car_brand_name', 'chassis': 'chassis', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, chassis'},
             'garage_engine':  {'columns': {'carBrandName': 'car_brand_name', 'engine': 'engine', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, engine'},
             'garage_oenum':   {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'partsNum', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, partsNum'},
-            'customer_stats': {'columns': {'customerName': 'garage_company_name', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'garage_company_name'},
+            'customer_stats': {
+                'columns': {
+                    'customerName': 'garage_company_name',
+                    'count': 'count',
+                    'orderedCount': 'orderedCount',
+                    'unorderedCount': 'unorderedCount',
+                    'conversionRate': 'conversionRate'
+                },
+                'aggregated': {'count', 'orderedCount', 'unorderedCount', 'conversionRate'}
+            },
             'customer_stats_by_oe': {'columns': {'customerName': 'garage_company_name', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'garage_company_name'},
             'customer_oenum': {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'resolve_parts_num', 'partsName': 'resolve_parts_name', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, resolve_parts_num'}
         }
@@ -388,29 +388,43 @@ class KsInquiryRecordsService:
 
         db_col = config['columns'][column]
 
-        # 发动机统计：下拉值使用映射后的展示名称（奔驰取前6位后再映射）
+        # 发动机/底盘统计：下拉值使用映射后的展示名称
         if grid_type == 'garage_engine' and column == 'engine':
-            engine_display_expr = """
+            display_expr = """
                 COALESCE(
-                    m.display_engine,
+                    m.display_code,
                     CASE
                         WHEN d.car_brand_name = '奔驰' AND LENGTH(d.engine) > 6 THEN LEFT(d.engine, 6)
                         ELSE d.engine
                     END
                 )
             """.strip()
+            mapping_type = 'engine'
+            original_col = 'd.engine'
+        elif grid_type == 'garage_chassis' and column == 'chassis':
+            display_expr = "COALESCE(m.display_code, d.chassis)"
+            mapping_type = 'chassis'
+            original_col = 'd.chassis'
+        else:
+            display_expr = None
+
+        if display_expr:
             sql = f"""
-                SELECT engine AS value, COUNT(*) AS count
+                SELECT value, COUNT(*) AS count
                 FROM (
-                    SELECT {engine_display_expr} AS engine,
+                    SELECT {display_expr} AS value,
                            COUNT(DISTINCT d.inquiryId) AS cnt
                     FROM crmapp_ks_inquiry_detail d
-                    LEFT JOIN ks_engine_mapping m ON m.company = %s AND m.original_engine = d.engine
+                    LEFT JOIN ks_part_mapping m
+                        ON m.company = %s
+                        AND m.mapping_type = '{mapping_type}'
+                        AND m.car_brand_name = d.car_brand_name
+                        AND m.original_code = {original_col}
                     WHERE {where_clause}
-                    GROUP BY {engine_display_expr}
+                    GROUP BY {display_expr}
                 ) t
-                WHERE engine IS NOT NULL AND TRIM(engine) != ''
-                GROUP BY engine ORDER BY engine LIMIT 1000
+                WHERE value IS NOT NULL AND TRIM(value) != ''
+                GROUP BY value ORDER BY value LIMIT 1000
             """
             params.insert(0, company)
 
@@ -436,6 +450,38 @@ class KsInquiryRecordsService:
                 SELECT {db_col} AS value, COUNT(DISTINCT inquiryId) AS count
                 FROM crmapp_ks_inquiry_detail
                 WHERE {where_clause} AND {db_col} IS NOT NULL AND TRIM({db_col}) != ''
+                GROUP BY {db_col} ORDER BY {db_col} LIMIT 1000
+            """
+        elif grid_type == 'customer_stats' and column in config['aggregated']:
+            # 客户统计：按 客户+询价单号+resolve_parts_num 去重后计算聚合值
+            dedup_key = "CONCAT(COALESCE(garage_company_name, ''), '_', COALESCE(inquiryId, ''), '_', COALESCE(resolve_parts_num, ''))"
+            sql = f"""
+                SELECT {db_col} AS value, COUNT(*) AS count
+                FROM (
+                    SELECT
+                        garage_company_name,
+                        COUNT(DISTINCT {dedup_key}) AS count,
+                        COUNT(DISTINCT CASE WHEN has_ordered = 1 THEN {dedup_key} END) AS orderedCount,
+                        COUNT(DISTINCT CASE WHEN has_unordered = 1 AND has_ordered = 0 THEN {dedup_key} END) AS unorderedCount,
+                        ROUND(
+                            COUNT(DISTINCT CASE WHEN has_ordered = 1 THEN {dedup_key} END) * 100.0
+                            / NULLIF(COUNT(DISTINCT {dedup_key}), 0),
+                            2
+                        ) AS conversionRate
+                    FROM (
+                        SELECT
+                            garage_company_name,
+                            inquiryId,
+                            resolve_parts_num,
+                            MAX(CASE WHEN display_seller_status = '本店下单' THEN 1 ELSE 0 END) AS has_ordered,
+                            MAX(CASE WHEN display_seller_status IN ('未下单', '非本店下单') THEN 1 ELSE 0 END) AS has_unordered
+                        FROM crmapp_ks_inquiry_detail
+                        WHERE {where_clause}
+                        GROUP BY garage_company_name, inquiryId, resolve_parts_num
+                    ) t2
+                    GROUP BY garage_company_name
+                ) t
+                WHERE {db_col} IS NOT NULL
                 GROUP BY {db_col} ORDER BY {db_col} LIMIT 1000
             """
         elif column in config['aggregated']:

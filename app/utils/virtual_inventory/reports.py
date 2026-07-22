@@ -111,6 +111,9 @@ def generate_virtual_inventory_compare_excel(business_date):
         df_price.to_excel(writer, sheet_name='价格变化', index=False)
         df_stock.to_excel(writer, sheet_name='库存变化', index=False)
 
+        for sheet in writer.sheets.values():
+            sheet.freeze_panes = 'A2'
+
     # 清理7天前的旧文件
     for f in os.listdir(export_dir):
         fpath = os.path.join(export_dir, f)
