@@ -26,7 +26,7 @@ from .inquiry_tables import (
     init_weixin_inquiry_detail_table,
     init_ks_inquiry_monitor_table,
     init_price_inquiry_direct_table,
-    init_ks_engine_mapping_table,
+    init_ks_part_mapping_table,
 )
 
 from .virtual_inventory_stats_tables import (

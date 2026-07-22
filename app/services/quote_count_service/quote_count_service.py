@@ -533,7 +533,7 @@ class QuoteCountSyncService:
                 if content_order_status == '未下单':
                     content_display_status = '未下单'
                 elif has_ordered_in_content:
-                    content_display_status = '本店下单'
+                    content_display_status = '同报本店未采'
                 else:
                     content_display_status = '非本店下单'
                 # === 新增结束 ===
@@ -568,8 +568,8 @@ class QuoteCountSyncService:
                     # 只保存有完整数据的记录
                     if parts_num and brand_name and parts_name:
                         item_display_status = content_display_status
-                        if content_display_status == '本店下单' and (brand_name, parts_num) in ordered_item_keys:
-                            item_display_status = '本店下单！'
+                        if content_display_status == '同报本店未采' and (brand_name, parts_num) in ordered_item_keys:
+                            item_display_status = '本店下单'
 
                         items.append({
                             'inquiryId': inquiry_id,

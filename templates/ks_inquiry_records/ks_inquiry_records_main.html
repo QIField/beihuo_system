@@ -351,7 +351,20 @@
             <button class="tab-btn" data-tab="engine">动力底盘研判</button>
             <button class="tab-btn" data-tab="customer">合作单位分析</button>
             <div class="tab-nav-actions">
-                <button class="tab-btn engine-config-btn" onclick="openEngineConfigModal()">发动机配置</button>
+                <style>
+                    .engine-config-btn,
+                    .chassis-config-btn {
+                        background-color: #e6f7ff !important;
+                        border: 1px solid #91d5ff !important;
+                        color: #1890ff !important;
+                    }
+                    .engine-config-btn:hover,
+                    .chassis-config-btn:hover {
+                        background-color: #bae7ff !important;
+                    }
+                </style>
+                <button class="tab-btn engine-config-btn" onclick="openPartConfigModal('engine')">发动机配置</button>
+                <button class="tab-btn chassis-config-btn" onclick="openPartConfigModal('chassis')" style="margin-left: 8px;">底盘配置</button>
             </div>
         </div>
 
@@ -375,6 +388,7 @@
                     <option value="" selected>全部</option>
                     <option value="未下单">未下单</option>
                     <option value="非本店下单">非本店下单</option>
+                    <option value="同报本店未采">同报本店未采</option>
                     <option value="本店下单">本店下单</option>
                 </select>
             </span>
@@ -407,15 +421,31 @@
         </div>
     </div>
 
-    <!-- 发动机配置弹窗 -->
-    <div id="engineConfigModal" style="display: none; padding: 20px;">
-        <div style="margin-bottom: 12px; color: #666; font-size: 13px;">
-            每行一条映射规则，格式：原始发动机代码=展示名称<br>
-            例如：A14NET=N14
+    <!-- 零部件映射配置弹窗 -->
+    <div id="partConfigModal" style="display: none;">
+        <div class="part-config-body" style="padding: 20px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column;">
+            <div id="partConfigHint" style="margin-bottom: 12px; color: #666; font-size: 13px; flex-shrink: 0;">
+                格式：原始代码=展示名称，例如：26491510901982=264915
+            </div>
+            <div id="partConfigTableWrapper" style="flex: 1; min-height: 0; overflow-y: auto; border: 1px solid #d9d9d9; border-radius: 4px;">
+            <table id="partConfigTable" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead style="background: #f5f5f5; position: sticky; top: 0;">
+                    <tr>
+                        <th style="padding: 8px; border-bottom: 1px solid #d9d9d9; width: 50px; text-align: center;">序号</th>
+                        <th style="padding: 8px; border-bottom: 1px solid #d9d9d9; width: 120px;">车辆品牌</th>
+                        <th style="padding: 8px; border-bottom: 1px solid #d9d9d9; width: 200px;">代码（a=b）</th>
+                        <th style="padding: 8px; border-bottom: 1px solid #d9d9d9;">备注</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 动态生成 -->
+                </tbody>
+            </table>
         </div>
-        <textarea id="engineConfigTextarea"
-            style="width: 100%; height: 280px; padding: 10px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 13px; resize: none; box-sizing: border-box;"
-            placeholder="A14NET=N14&#10;B16A=A16"></textarea>
+            <div style="margin-top: 12px; flex-shrink: 0;">
+                <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" onclick="addPartConfigRow()">新增一行</button>
+            </div>
+        </div>
     </div>
 
     <!-- AG Grid JS - 使用本地文件 -->
@@ -456,93 +486,172 @@
             });
         }
 
-        // 当前门店发动机映射配置（全局共享给 engine_stats_tab 使用）
-        window.engineMapping = {};
+        // 当前门店零部件映射配置（engine / chassis）
+        window.partMappings = { engine: [], chassis: [] };
+        var currentPartConfigType = 'engine';
 
-        // 加载发动机映射配置
-        function loadEngineMapping() {
-            fetch('/new/api/ks_inquiry/engine_mapping?company=' + encodeURIComponent(userCompany), {
-                credentials: 'same-origin'
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
-                if (result.code === 0) {
-                    window.engineMapping = result.data || {};
-                }
-            })
-            .catch(function(e) {
-                console.error('[Engine Config] 加载映射失败:', e);
+        // 加载零部件映射配置
+        function loadPartMappings() {
+            ['engine', 'chassis'].forEach(function(type) {
+                fetch('/new/api/ks_inquiry/part_mapping?company=' + encodeURIComponent(userCompany) + '&mapping_type=' + type, {
+                    credentials: 'same-origin'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.code === 0) {
+                        window.partMappings[type] = Array.isArray(result.data) ? result.data : [];
+                    }
+                })
+                .catch(function(e) {
+                    console.error('[Part Config] 加载映射失败:', type, e);
+                });
             });
         }
 
-        // 打开发动机配置弹窗
-        function openEngineConfigModal() {
+        // 根据 DPI 缩放比例计算弹窗尺寸
+        function getLayerArea(baseWidth, baseHeight) {
+            var ratio = window.devicePixelRatio || 1;
+            if (ratio <= 1) return [baseWidth + 'px', baseHeight + 'px'];
+            return [Math.round(baseWidth * ratio) + 'px', Math.round(baseHeight * ratio) + 'px'];
+        }
+
+        // 打开零部件配置弹窗
+        function openPartConfigModal(type) {
+            currentPartConfigType = type === 'chassis' ? 'chassis' : 'engine';
+            var title = currentPartConfigType === 'chassis' ? '底盘配置' : '发动机配置';
+            var hint = currentPartConfigType === 'chassis'
+                ? '底盘列格式：原始底盘代码=展示名称'
+                : '发动机列格式：原始发动机代码=展示名称，例如：26491510901982=264915';
+
             layui.layer.open({
                 type: 1,
-                title: '发动机配置',
-                area: ['520px', '440px'],
-                content: layui.$('#engineConfigModal').html(),
+                title: title,
+                area: getLayerArea(1000, 800),
+                content: layui.$('#partConfigModal').html(),
                 btn: ['保存', '取消'],
                 yes: function(index) {
-                    saveEngineConfig(index);
+                    savePartConfig(index);
                 },
                 success: function(layero) {
-                    renderEngineConfigTextarea(layero);
+                    layero.find('#partConfigHint').text(hint);
+                    renderPartConfigTable(layero);
                 }
             });
         }
 
-        // 将当前映射渲染到弹窗文本框
-        function renderEngineConfigTextarea(layero) {
-            var textarea = layero.find('textarea')[0];
-            if (!textarea) return;
-            var lines = [];
-            for (var original in window.engineMapping) {
-                if (window.engineMapping.hasOwnProperty(original)) {
-                    lines.push(original + '=' + window.engineMapping[original]);
-                }
-            }
-            textarea.value = lines.join('\n');
-        }
+        // 渲染配置表格
+        function renderPartConfigTable(layero) {
+            var tbody = layero.find('#partConfigTable tbody')[0];
+            if (!tbody) return;
+            tbody.innerHTML = '';
 
-        // 保存发动机配置
-        function saveEngineConfig(layerIndex) {
-            var layero = layui.$('#layui-layer' + layerIndex);
-            var textarea = layero.find('textarea')[0];
-            if (!textarea) {
-                layui.layer.msg('未找到配置输入框', {icon: 2});
+            var data = window.partMappings[currentPartConfigType] || [];
+            if (data.length === 0) {
+                addPartConfigRowInternal(tbody, { carBrandName: '', code: '', displayCode: '', remark: '' }, 1);
                 return;
             }
-            var lines = (textarea.value || '').split('\n');
-            var mappings = {};
+            data.forEach(function(item, index) {
+                var codeText = '';
+                if (item.code) {
+                    codeText = item.code;
+                    if (item.displayCode && item.displayCode !== item.code) {
+                        codeText += '=' + item.displayCode;
+                    }
+                }
+                addPartConfigRowInternal(tbody, {
+                    carBrandName: item.carBrandName || '',
+                    code: codeText,
+                    remark: item.remark || ''
+                }, index + 1);
+            });
+        }
+
+        // 新增一行（供按钮调用，使用弹窗内的 tbody）
+        function addPartConfigRow() {
+            var layerContent = document.querySelector('.layui-layer-content');
+            if (!layerContent) return;
+            var tbody = layerContent.querySelector('#partConfigTable tbody');
+            if (!tbody) return;
+            var rowCount = tbody.querySelectorAll('tr').length;
+            addPartConfigRowInternal(tbody, { carBrandName: '', code: '', remark: '' }, rowCount + 1);
+        }
+
+        // 内部：向 tbody 添加一行
+        function addPartConfigRowInternal(tbody, data, seq) {
+            var tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #e8e8e8';
+            tr.innerHTML =
+                '<td style="padding: 6px; text-align: center;">' + seq + '</td>' +
+                '<td style="padding: 6px;"><input type="text" class="pc-car-brand" value="' + escapeHtml(data.carBrandName || '') + '" style="width: 100%; padding: 4px; border: 1px solid #d9d9d9; border-radius: 3px; box-sizing: border-box;" placeholder="如：奔驰"></td>' +
+                '<td style="padding: 6px;"><input type="text" class="pc-code" value="' + escapeHtml(data.code || '') + '" style="width: 100%; padding: 4px; border: 1px solid #d9d9d9; border-radius: 3px; box-sizing: border-box;" placeholder="原始=展示"></td>' +
+                '<td style="padding: 6px;"><input type="text" class="pc-remark" value="' + escapeHtml(data.remark || '') + '" style="width: 100%; padding: 4px; border: 1px solid #d9d9d9; border-radius: 3px; box-sizing: border-box;"></td>';
+            tbody.appendChild(tr);
+            reindexPartConfigRows(tbody);
+        }
+
+        // 重新计算序号
+        function reindexPartConfigRows(tbody) {
+            var rows = tbody.querySelectorAll('tr');
+            rows.forEach(function(row, index) {
+                var td = row.querySelector('td');
+                if (td) td.textContent = index + 1;
+            });
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+
+        // 保存零部件配置
+        function savePartConfig(layerIndex) {
+            var layero = layui.$('#layui-layer' + layerIndex);
+            var rows = layero.find('#partConfigTable tbody tr');
+            var mappings = [];
             var hasError = false;
 
-            lines.forEach(function(line) {
-                line = line.trim();
-                if (!line) return;
-                var parts = line.split('=');
-                if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
+            rows.each(function(index, tr) {
+                var carBrand = layui.$(tr).find('.pc-car-brand').val().trim();
+                var codeText = layui.$(tr).find('.pc-code').val().trim();
+                var remark = layui.$(tr).find('.pc-remark').val().trim();
+
+                if (!codeText) return;
+
+                var parts = codeText.split('=');
+                if (parts.length < 2 || !parts[0].trim() || !parts[1].trim()) {
                     hasError = true;
-                    return;
+                    return false;
                 }
-                mappings[parts[0].trim()] = parts[1].trim();
+
+                mappings.push({
+                    carBrandName: carBrand,
+                    code: parts[0].trim(),
+                    displayCode: parts[1].trim(),
+                    remark: remark
+                });
             });
 
             if (hasError) {
-                layui.layer.msg('格式错误，每行必须是：原始代码=展示名称', {icon: 2});
+                layui.layer.msg('代码列格式错误，必须是：原始代码=展示名称', {icon: 2});
                 return;
             }
 
-            fetch('/new/api/ks_inquiry/engine_mapping', {
+            fetch('/new/api/ks_inquiry/part_mapping', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ company: userCompany, mappings: mappings })
+                body: JSON.stringify({
+                    company: userCompany,
+                    mapping_type: currentPartConfigType,
+                    mappings: mappings
+                })
             })
             .then(function(r) { return r.json(); })
             .then(function(result) {
                 if (result.code === 0) {
-                    window.engineMapping = mappings;
+                    window.partMappings[currentPartConfigType] = mappings;
                     layui.layer.msg('保存成功', {icon: 1});
                     layui.layer.close(layerIndex);
                     if (currentTab === 'engine' && typeof refreshEngineChassis === 'function') {
@@ -553,7 +662,7 @@
                 }
             })
             .catch(function(e) {
-                console.error('[Engine Config] 保存映射失败:', e);
+                console.error('[Part Config] 保存映射失败:', e);
                 layui.layer.msg('保存失败', {icon: 2});
             });
         }
@@ -778,8 +887,8 @@
                 });
             }
 
-            // 初始化时加载发动机映射配置
-            loadEngineMapping();
+            // 初始化时加载零部件映射配置
+            loadPartMappings();
 
         });
 

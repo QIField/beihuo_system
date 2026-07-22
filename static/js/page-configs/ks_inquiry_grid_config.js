@@ -43,7 +43,10 @@ window.KsInquiryGridConfig = (function() {
             return [];
         }
 
+        // 主表字段：按 inquiryId 合并
         var mainFields = ['rowNumber', 'inquiryId', 'customerName', 'carBrandName', 'vin', 'engine', 'productionDate', 'chassis'];
+        // 半明细字段：按 inquiryId + resolve_parts_num 合并
+        var subGroupFields = ['resolve_parts_name'];
         var columns = hot.getSettings().columns || [];
         var mainCols = [];
         var visibleFieldMap = {};
@@ -63,6 +66,14 @@ window.KsInquiryGridConfig = (function() {
             }
         });
 
+        var subGroupCols = [];
+        subGroupFields.forEach(function(field) {
+            var col = visibleFieldMap[field];
+            if (typeof col === 'number' && col >= 0) {
+                subGroupCols.push(col);
+            }
+        });
+
         var merges = [];
         var i = 0;
         while (i < data.length) {
@@ -73,13 +84,31 @@ window.KsInquiryGridConfig = (function() {
             }
             var count = j - i;
             if (count > 1) {
+                // 合并主表字段（询价单维度）
                 mainCols.forEach(function(col) {
                     merges.push({ row: i, col: col, rowspan: count, colspan: 1 });
                 });
+
+                // 按 inquiryId + resolve_parts_num 合并配件名称
+                var k = i;
+                while (k < j) {
+                    var resolvePartsNum = data[k].resolve_parts_num || '';
+                    var m = k + 1;
+                    while (m < j && (data[m].resolve_parts_num || '') === resolvePartsNum) {
+                        m++;
+                    }
+                    var subCount = m - k;
+                    if (subCount > 1) {
+                        subGroupCols.forEach(function(col) {
+                            merges.push({ row: k, col: col, rowspan: subCount, colspan: 1 });
+                        });
+                    }
+                    k = m;
+                }
             }
             i = j;
         }
-        console.log('[KS Inquiry Config] recomputeMergeCellsByField: 主表列索引=' + JSON.stringify(mainCols) + ', 合并块数=' + (mainCols.length > 0 ? merges.length / mainCols.length : 0) + ', 总合并单元格=' + merges.length);
+        console.log('[KS Inquiry Config] recomputeMergeCellsByField: 主表列索引=' + JSON.stringify(mainCols) + ', 半明细列索引=' + JSON.stringify(subGroupCols) + ', 总合并单元格=' + merges.length);
         return merges;
     }
 
@@ -124,7 +153,7 @@ window.KsInquiryGridConfig = (function() {
                 { data: 'engine', title: '发动机', width: 120, readOnly: true },
                 { data: 'productionDate', title: '车辆生产日期', width: 140, readOnly: true },
                 { data: 'chassis', title: '底盘', width: 120, readOnly: true },
-                { data: 'partsName', title: '配件名称', width: 200, readOnly: true },
+                { data: 'resolve_parts_name', title: '配件名称', width: 200, readOnly: true },
                 { data: 'partsNum', title: 'OE号', width: 150, className: 'oe-cell', readOnly: true },
                 { data: 'brandName', title: '品牌', width: 120, className: 'brand-cell', readOnly: true },
                 { data: 'brandNormalized', title: '标准化品牌', width: 120, className: 'brand-cell', readOnly: true },

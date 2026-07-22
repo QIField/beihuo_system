@@ -45,6 +45,35 @@ var GridColumnMenu = (function() {
         return api && typeof api.updateSettings === 'function' && typeof api.getPlugin === 'function';
     }
 
+    // ==================== 视口边界适配 ====================
+
+    /**
+     * 检测元素是否超出视口右侧，若超出则向左翻转
+     * @param {HTMLElement} element - 已挂载到 DOM 的定位元素
+     * @param {DOMRect} anchorRect - 触发源（按钮/一级菜单）的边界矩形
+     * @param {string} direction - 当前展开方向：'right'（二级面板默认向右）|'bottom'（一级菜单默认向下）
+     */
+    function _fitToViewport(element, anchorRect, direction) {
+        if (!element || !anchorRect) return;
+        var rect = element.getBoundingClientRect();
+        // 未获得有效尺寸时不调整，避免元素尚未完成布局导致误判
+        if (!rect.width || !rect.height) return;
+
+        var viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+        if (rect.right <= viewportWidth) return;
+
+        var gap = 4;
+        var newLeft;
+        if (direction === 'right') {
+            // 二级面板：从右侧翻转到锚点左侧
+            newLeft = anchorRect.left - rect.width - gap;
+        } else {
+            // 一级菜单：右边缘与锚点右边缘对齐
+            newLeft = anchorRect.right - rect.width;
+        }
+        element.style.left = Math.max(gap, newLeft) + 'px';
+    }
+
     // ==================== 初始化 ====================
 
     function init(gridApi, gridSelector, columnDefs, options) {
@@ -157,6 +186,27 @@ var GridColumnMenu = (function() {
                         setTimeout(function() {
                             addMenuButtonsToHeaders(gridSelector);
                         }, 50);
+
+                        // 调用外部 onApplied 回调（如果提供）
+                        if (typeof options.onApplied === 'function') {
+                            try {
+                                options.onApplied(state);
+                            } catch (e) {
+                                console.warn('[GridColumnMenu] onApplied callback error:', e);
+                            }
+                        }
+
+                        // 外部回调可能修改了列状态，重新同步 hiddenColumns
+                        setTimeout(function() {
+                            var api = info.columnApi || info.api;
+                            if (!api || typeof api.getColumnState !== 'function') return;
+                            var currentState = api.getColumnState();
+                            info.hiddenColumns = new Set();
+                            currentState.forEach(function(s) {
+                                if (s.hide) info.hiddenColumns.add(s.colId);
+                            });
+                            addMenuButtonsToHeaders(gridSelector);
+                        }, 100);
                     }
                 });
             }
@@ -465,7 +515,8 @@ var GridColumnMenu = (function() {
             '</div>';
 
         var rect = anchor.getBoundingClientRect();
-        menu.style.left = (rect.left - 20) + 'px';
+        // 初始位置左对齐按钮并保留原有 20px 偏移，左侧不超出视口
+        menu.style.left = Math.max(4, rect.left - 20) + 'px';
         menu.style.top = (rect.bottom + 2) + 'px';
 
         document.body.appendChild(menu);
@@ -540,6 +591,7 @@ var GridColumnMenu = (function() {
         panel.style.top = anchorRect.top + 'px';
 
         document.body.appendChild(panel);
+        _fitToViewport(panel, anchorRect, 'right');
         menuConfig.activeLevel2Panel = panel;
         currentPanel = panel;
         currentMode = 'columnVisibility';
@@ -616,6 +668,7 @@ var GridColumnMenu = (function() {
         panel.style.top = anchorRect.top + 'px';
 
         document.body.appendChild(panel);
+        _fitToViewport(panel, anchorRect, 'right');
         currentPanel = panel;
         currentMode = 'columnFilter';
         currentField = colId;

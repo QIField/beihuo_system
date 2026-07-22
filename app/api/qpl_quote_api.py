@@ -136,7 +136,8 @@ def get_records():
         allowed_columns = {
             'supplier_enquiry_no', 'submit_time', 'item_oe', 'item_name',
             'brand_name', 'item_sell_price', 'delivery_aging', 'item_quality',
-            'parts_no', 'quote_status', 'result_source', 'submit_result'
+            'parts_no', 'quote_status', 'result_source', 'submit_result',
+            'order_submit_status', 'crm_flow_status', 'bc_flow_status'
         }
         
         # 获取用户当前门店
@@ -240,7 +241,8 @@ def get_filter_values():
         allowed_columns = {
             'supplier_enquiry_no', 'submit_time', 'item_oe', 'item_name',
             'brand_name', 'item_sell_price', 'delivery_aging', 'item_quality',
-            'parts_no', 'quote_status', 'result_source', 'submit_result'
+            'parts_no', 'quote_status', 'result_source', 'submit_result',
+            'order_submit_status', 'crm_flow_status', 'bc_flow_status'
         }
         if not column or column not in allowed_columns:
             return jsonify({'code': 1, 'msg': '无效的列名'})

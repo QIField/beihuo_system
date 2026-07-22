@@ -2,8 +2,8 @@
 <div id="tab-customer" class="tab-pane">
     <div class="customer-layout">
         <!-- 左侧主表：客户列表 -->
-        <div style="flex: 1; min-width: 0;">
-            <div id="customerStatsGrid" class="ag-theme-alpine" style="height: 100%; width: 100%;"></div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); overflow: hidden;">
+            <div id="customerStatsGrid" class="ag-theme-alpine" style="flex: 1; width: 100%; min-height: 0;"></div>
         </div>
 
         <!-- 右侧副表区域：发动机、底盘、OE -->
@@ -47,8 +47,11 @@
     // 主表列定义
     const customerStatsColumnDefs = [
         { headerName: '序号', valueGetter: params => params.node ? params.node.rowIndex + 1 : '', width: 70, sortable: false, filter: false, lockPosition: 'left' },
-        { field: 'customerName', headerName: '客户', width: 200, pinned: 'left', sortable: false, filter: true },
-        { field: 'count', headerName: '询价次数', width: 120, sortable: false, filter: true }
+        { field: 'customerName', headerName: '客户', width: 200, sortable: false, filter: true },
+        { field: 'count', headerName: '询价次数', width: 120, sortable: false, filter: true },
+        { field: 'orderedCount', headerName: '下单数量', width: 110, sortable: false, filter: true },
+        { field: 'unorderedCount', headerName: '未下单数量', width: 110, sortable: false, filter: true },
+        { field: 'conversionRate', headerName: '转换率', width: 100, sortable: false, filter: true, valueFormatter: params => params.value !== undefined && params.value !== null ? params.value + '%' : '' }
     ];
 
     // 副表列定义
@@ -114,6 +117,27 @@
                     },
                     getFilterValues: function(colId, callback) {
                         fetchCustomerStatsColumnValues(colId, callback);
+                    },
+                    onApplied: function(state) {
+                        // 修复历史持久化状态中的错误：取消所有列固定，并确保询价次数列显示
+                        var hasBadState = false;
+                        state.forEach(function(s) {
+                            if (s.pinned) hasBadState = true;
+                            if (s.colId === 'count' && s.hide) hasBadState = true;
+                        });
+                        if (!hasBadState) return;
+
+                        var corrected = state.map(function(s) {
+                            var clone = Object.assign({}, s);
+                            clone.pinned = null;
+                            if (clone.colId === 'count') clone.hide = false;
+                            return clone;
+                        });
+                        customerStatsGridColumnApi.applyColumnState({ state: corrected, applyOrder: true });
+
+                        if (typeof ColumnPreference !== 'undefined' && typeof ColumnPreference.flush === 'function') {
+                            ColumnPreference.flush('ks_inquiry_records', 'customer_grid');
+                        }
                     }
                 });
             }
@@ -131,7 +155,11 @@
 
     // 通用副表配置
     function createSubGridOptions(columnDefs, gridType) {
-        return {
+        var gridSelector = gridType === 'engine' ? '#customerEngineGrid' :
+                           gridType === 'chassis' ? '#customerChassisGrid' : '#customerOeGrid';
+        var gridKeyName = gridType === 'engine' ? 'customer_engine_grid' :
+                          gridType === 'chassis' ? 'customer_chassis_grid' : 'customer_oe_grid';
+        var gridOpts = {
             columnDefs: columnDefs,
             rowData: [],
             defaultColDef: {
@@ -152,8 +180,35 @@
 
                 params.api.sizeColumnsToFit();
                 setupSubGridDoubleClickCopy(params.api, gridType);
+
+                // 初始化列菜单功能（含持久化）
+                if (typeof GridColumnMenu !== 'undefined') {
+                    GridColumnMenu.init(params.api, gridSelector, columnDefs, {
+                        columnApi: params.columnApi,
+                        gridOptions: gridOpts,
+                        persist: true,
+                        pageKey: 'ks_inquiry_records',
+                        gridKey: gridKeyName,
+                        onSort: function(colId, direction) {
+                            const searchParams = getCustomerSubSearchParams();
+                            if (gridType === 'engine') loadCustomerEngineStats(searchParams);
+                            else if (gridType === 'chassis') loadCustomerChassisStats(searchParams);
+                            else if (gridType === 'oe') loadCustomerOeStats(searchParams);
+                        },
+                        onDataRefresh: function(filterState) {
+                            const searchParams = getCustomerSubSearchParams();
+                            if (gridType === 'engine') loadCustomerEngineStats(searchParams);
+                            else if (gridType === 'chassis') loadCustomerChassisStats(searchParams);
+                            else if (gridType === 'oe') loadCustomerOeStats(searchParams);
+                        },
+                        getFilterValues: function(colId, callback) {
+                            fetchCustomerSubColumnValues(gridType, colId, callback);
+                        }
+                    });
+                }
             }
         };
+        return gridOpts;
     }
 
     function initCustomerStatsGrid() {
@@ -360,11 +415,28 @@
         if (!customerEngineGridApi) return;
         customerEngineGridApi.showLoadingOverlay();
 
-        fetch('/new/api/ks_inquiry/records/garage_engine_stats?' + new URLSearchParams(params))
+        // 合并排序参数
+        const sortParams = getSortParams('#customerEngineGrid');
+        const finalParams = Object.assign({}, params, sortParams);
+
+        // 合并列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#customerEngineGrid');
+            if (filterState.active && filterState.filters) {
+                finalParams.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/garage_engine_stats?' + new URLSearchParams(finalParams))
             .then(response => response.json())
             .then(data => {
                 if (data.code === 0 || data.code === '0') {
-                    customerEngineGridApi.setRowData(data.data?.list || []);
+                    const list = data.data?.list || [];
+                    // 缓存原始数据到 GridColumnMenu，供列筛选下拉选项使用
+                    if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                        GridColumnMenu.setOriginalRows('#customerEngineGrid', list);
+                    }
+                    customerEngineGridApi.setRowData(list);
                 } else {
                     layui.layer.msg(data.message || '查询失败', {icon: 2});
                     customerEngineGridApi.setRowData([]);
@@ -380,11 +452,28 @@
         if (!customerChassisGridApi) return;
         customerChassisGridApi.showLoadingOverlay();
 
-        fetch('/new/api/ks_inquiry/records/garage_chassis_stats?' + new URLSearchParams(params))
+        // 合并排序参数
+        const sortParams = getSortParams('#customerChassisGrid');
+        const finalParams = Object.assign({}, params, sortParams);
+
+        // 合并列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#customerChassisGrid');
+            if (filterState.active && filterState.filters) {
+                finalParams.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/garage_chassis_stats?' + new URLSearchParams(finalParams))
             .then(response => response.json())
             .then(data => {
                 if (data.code === 0 || data.code === '0') {
-                    customerChassisGridApi.setRowData(data.data?.list || []);
+                    const list = data.data?.list || [];
+                    // 缓存原始数据到 GridColumnMenu，供列筛选下拉选项使用
+                    if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                        GridColumnMenu.setOriginalRows('#customerChassisGrid', list);
+                    }
+                    customerChassisGridApi.setRowData(list);
                 } else {
                     layui.layer.msg(data.message || '查询失败', {icon: 2});
                     customerChassisGridApi.setRowData([]);
@@ -400,11 +489,28 @@
         if (!customerOeGridApi) return;
         customerOeGridApi.showLoadingOverlay();
 
-        fetch('/new/api/ks_inquiry/records/customer_oenum_stats?' + new URLSearchParams(params))
+        // 合并排序参数
+        const sortParams = getSortParams('#customerOeGrid');
+        const finalParams = Object.assign({}, params, sortParams);
+
+        // 合并列头下拉筛选条件（后端全量数据筛选）
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState('#customerOeGrid');
+            if (filterState.active && filterState.filters) {
+                finalParams.column_filters = JSON.stringify(filterState.filters);
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/customer_oenum_stats?' + new URLSearchParams(finalParams))
             .then(response => response.json())
             .then(data => {
                 if (data.code === 0 || data.code === '0') {
-                    customerOeGridApi.setRowData(data.data?.list || []);
+                    const list = data.data?.list || [];
+                    // 缓存原始数据到 GridColumnMenu，供列筛选下拉选项使用
+                    if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.setOriginalRows) {
+                        GridColumnMenu.setOriginalRows('#customerOeGrid', list);
+                    }
+                    customerOeGridApi.setRowData(list);
                 } else {
                     layui.layer.msg(data.message || '查询失败', {icon: 2});
                     customerOeGridApi.setRowData([]);
@@ -414,6 +520,20 @@
                 console.error('客户OE统计查询失败:', error);
                 customerOeGridApi.setRowData([]);
             });
+    }
+
+    // 获取指定表格的排序参数
+    function getSortParams(gridSelector) {
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getSortState) {
+            const state = GridColumnMenu.getSortState(gridSelector);
+            if (state.sortColumn) {
+                return {
+                    sort_column: state.sortColumn,
+                    sort_dir: state.sortDir
+                };
+            }
+        }
+        return {};
     }
 
     // 从后端获取客户统计指定列的全量不重复值（用于列头下拉筛选）
@@ -449,6 +569,49 @@
             })
             .catch(function(error) {
                 console.error('[customer_stats_tab] 获取列值请求失败:', error);
+                callback([]);
+            });
+    }
+
+    // 从后端获取右侧副表指定列的全量不重复值（用于列头下拉筛选）
+    function fetchCustomerSubColumnValues(gridType, colId, callback) {
+        const params = getCustomerSubSearchParams();
+        params.column = colId;
+        params.grid_type = gridType === 'engine' ? 'garage_engine'
+                         : gridType === 'chassis' ? 'garage_chassis'
+                         : 'customer_oenum';
+
+        const gridSelector = gridType === 'engine' ? '#customerEngineGrid'
+                            : gridType === 'chassis' ? '#customerChassisGrid'
+                            : '#customerOeGrid';
+
+        if (typeof GridColumnMenu !== 'undefined' && GridColumnMenu.getFilterState) {
+            const filterState = GridColumnMenu.getFilterState(gridSelector);
+            if (filterState.active && filterState.filters) {
+                const otherFilters = {};
+                Object.keys(filterState.filters).forEach(function(key) {
+                    if (key !== colId) {
+                        otherFilters[key] = filterState.filters[key];
+                    }
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
+            }
+        }
+
+        fetch('/new/api/ks_inquiry/records/column_values?' + new URLSearchParams(params))
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    callback(result.data?.values || []);
+                } else {
+                    console.error('[customer_stats_tab] 获取副表列值失败:', result.message);
+                    callback([]);
+                }
+            })
+            .catch(function(error) {
+                console.error('[customer_stats_tab] 获取副表列值请求失败:', error);
                 callback([]);
             });
     }

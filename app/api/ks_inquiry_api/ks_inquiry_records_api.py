@@ -392,7 +392,8 @@ def get_customer_stats_by_oe():
 @bp.route('/records/customer_stats', methods=['GET'])
 def get_customer_stats():
     """
-    获取客户维度列表（按garage_company_name分组聚合，询价次数按inquiryId去重）
+    获取客户维度列表（按garage_company_name分组聚合，
+    统计指标按 客户+询价单号+resolve_parts_num 去重）
 
     Query Parameters:
         garage_name: 客户名称（可选，模糊筛选）
@@ -403,7 +404,7 @@ def get_customer_stats():
         page_size: 每页条数（默认200）
 
     Returns:
-        JSON: {code: 0, data: {list: [{customerName, count}], total, page, page_size}, message}
+        JSON: {code: 0, data: {list: [{customerName, count, orderedCount, unorderedCount, conversionRate}], total, page, page_size}, message}
     """
     try:
         garage_name = request.args.get('garage_name', '').strip()
@@ -883,27 +884,32 @@ def get_brand_options():
         }), 500
 
 
-@bp.route('/engine_mapping', methods=['GET'])
-def get_engine_mapping():
+@bp.route('/part_mapping', methods=['GET'])
+def get_part_mapping():
     """
-    获取当前门店的发动机展示名称映射配置
+    获取当前门店的零部件展示名称映射配置
 
     Query Parameters:
         company: 用户门店/组织
+        mapping_type: 映射类型，engine 或 chassis
 
     Returns:
-        JSON: {code: 0, data: {原始发动机代码: 展示名称}, message}
+        JSON: {code: 0, data: [{carBrandName, code, displayCode, remark}], message}
     """
     try:
         company = request.args.get('company', '').strip()
+        mapping_type = request.args.get('mapping_type', 'engine').strip()
         if not company:
             return jsonify({
                 'code': 400,
                 'message': '缺少 company 参数',
-                'data': {}
+                'data': []
             }), 400
 
-        result = KsInquiryStatsService.get_engine_mapping(company=company)
+        result = KsInquiryStatsService.get_part_mapping(
+            company=company,
+            mapping_type=mapping_type
+        )
         return jsonify({
             'code': 0,
             'message': 'success',
@@ -912,27 +918,27 @@ def get_engine_mapping():
 
     except Exception as e:
         import traceback
-        print(f"[KsInquiryRecordsAPI] 获取发动机映射错误: {str(e)}")
+        print(f"[KsInquiryRecordsAPI] 获取零部件映射错误: {str(e)}")
         print(f"[KsInquiryRecordsAPI] 堆栈: {traceback.format_exc()}")
         return jsonify({
             'code': 500,
             'message': f'查询失败: {str(e)}',
-            'data': {}
+            'data': []
         }), 500
 
 
-@bp.route('/engine_mapping', methods=['POST'])
-def save_engine_mapping():
+@bp.route('/part_mapping', methods=['POST'])
+def save_part_mapping():
     """
-    保存当前门店的发动机展示名称映射配置
+    保存当前门店的零部件展示名称映射配置
 
     Request Body:
         {
             "company": "fsbbr",
-            "mappings": {
-                "A14NET": "N14",
-                "B16A": "A16"
-            }
+            "mapping_type": "engine",
+            "mappings": [
+                {"carBrandName": "奔驰", "code": "26491510901982", "displayCode": "264915", "remark": ""}
+            ]
         }
 
     Returns:
@@ -941,6 +947,7 @@ def save_engine_mapping():
     try:
         data = request.get_json() or {}
         company = data.get('company', '').strip()
+        mapping_type = data.get('mapping_type', 'engine').strip()
         mappings = data.get('mappings')
 
         if not company:
@@ -950,15 +957,23 @@ def save_engine_mapping():
                 'data': False
             }), 400
 
-        if not isinstance(mappings, dict):
+        if mapping_type not in ('engine', 'chassis'):
             return jsonify({
                 'code': 400,
-                'message': 'mappings 必须是对象',
+                'message': 'mapping_type 必须是 engine 或 chassis',
                 'data': False
             }), 400
 
-        success = KsInquiryStatsService.save_engine_mapping(
+        if not isinstance(mappings, list):
+            return jsonify({
+                'code': 400,
+                'message': 'mappings 必须是数组',
+                'data': False
+            }), 400
+
+        success = KsInquiryStatsService.save_part_mapping(
             company=company,
+            mapping_type=mapping_type,
             mappings=mappings
         )
 
@@ -977,7 +992,7 @@ def save_engine_mapping():
 
     except Exception as e:
         import traceback
-        print(f"[KsInquiryRecordsAPI] 保存发动机映射错误: {str(e)}")
+        print(f"[KsInquiryRecordsAPI] 保存零部件映射错误: {str(e)}")
         print(f"[KsInquiryRecordsAPI] 堆栈: {traceback.format_exc()}")
         return jsonify({
             'code': 500,

@@ -118,6 +118,9 @@ window.QplQuoteGridConfig = (function() {
                 { data: 'parts_no', title: '零件号', width: 130, readOnly: true },
                 { data: 'quote_status', title: '报价状态', width: 100, readOnly: true },
                 { data: 'result_source', title: '报价来源', width: 120, readOnly: true },
+                { data: 'order_submit_status', title: '订单提交状态', width: 120, readOnly: true },
+                { data: 'crm_flow_status', title: 'CRM流程状态', width: 120, readOnly: true },
+                { data: 'bc_flow_status', title: 'BC接口状态', width: 120, readOnly: true },
                 { data: 'submit_result', title: '提交结果(日志)', width: 150, readOnly: true }
             ],
             paramsBuilder: buildDetailParams,
