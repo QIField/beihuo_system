@@ -29,6 +29,8 @@
 from functools import wraps
 from typing import Callable, List
 
+from flask import render_template
+
 from app.core.permission.permission_checker import PermissionCheckerRegistry
 from app.core.permission.error_handlers import default_error_response
 
@@ -61,6 +63,79 @@ def require_authentication(
             user_id = PermissionCheckerRegistry.get_user_id()
             if user_id is None:
                 return error_response("未登录，请先登录", 401)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def require_page_login(
+    login_template: str = 'login.html',
+):
+    """
+    页面登录验证装饰器（页面版）
+
+    检查用户是否已登录，未登录则渲染登录页面而不是返回 JSON 错误。
+    适用于页面路由，与 require_authentication（API 版）对应。
+
+    Args:
+        login_template: 登录页面模板路径
+
+    使用示例:
+        @bp.route('/dashboard')
+        @require_page_login()
+        def dashboard():
+            return render_template('dashboard.html')
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            user_id = PermissionCheckerRegistry.get_user_id()
+            if user_id is None:
+                return render_template(login_template)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def require_page_permission(
+    permission_code: str,
+    login_template: str = 'login.html',
+    forbidden_template: str = 'forbidden.html',
+):
+    """
+    页面单权限检查装饰器（页面版）
+
+    检查用户是否已登录并拥有指定权限。
+    未登录则渲染登录页面，权限不足则渲染权限不足页面。
+    适用于页面路由，与 require_permission（API 版）对应。
+
+    Args:
+        permission_code: 权限编码，如 'cart:delete'
+        login_template: 登录页面模板路径
+        forbidden_template: 权限不足页面模板路径
+
+    使用示例:
+        @bp.route('/admin/settings')
+        @require_page_permission('admin:settings')
+        def admin_settings():
+            return render_template('admin/settings.html')
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            user_id = PermissionCheckerRegistry.get_user_id()
+            if user_id is None:
+                return render_template(login_template)
+
+            if not PermissionCheckerRegistry.check_permission(user_id, permission_code):
+                return render_template(forbidden_template, required_permission=permission_code)
+
             return func(*args, **kwargs)
 
         return wrapper
@@ -394,6 +469,8 @@ def require_any_admin(
 
 __all__ = [
     'require_authentication',
+    'require_page_login',
+    'require_page_permission',
     'require_permission',
     'require_any_permission',
     'require_all_permissions',

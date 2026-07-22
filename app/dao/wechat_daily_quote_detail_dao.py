@@ -48,7 +48,10 @@ class WechatDailyQuoteDetailDao:
         if end_date:
             id_query = id_query.filter(WechatDailyQuoteDetail.create_date <= f'{end_date} 23:59:59')
         if groupname:
-            id_query = id_query.filter(WechatDailyQuoteDetail.group_name == groupname)
+            if isinstance(groupname, list):
+                id_query = id_query.filter(WechatDailyQuoteDetail.group_name.in_(groupname))
+            else:
+                id_query = id_query.filter(WechatDailyQuoteDetail.group_name == groupname)
         if nickname:
             id_query = id_query.filter(WechatDailyQuoteDetail.user_name.like(f'%{nickname}%'))
         if deal_status is not None:

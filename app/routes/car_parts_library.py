@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template
+from app.core.permission.decorators import require_page_login
 
 car_parts_library_bp = Blueprint(
     "car_parts_library",  # 蓝图唯一标识
@@ -10,6 +11,7 @@ car_parts_library_bp = Blueprint(
 
 
 @car_parts_library_bp.route("/cart")
+@require_page_login()
 def cart_html():
     """购物车页片段（沿用 combined 页面风格）"""
     return render_template("car_parts_library/car_parts_library_combined.html")
@@ -18,6 +20,7 @@ def cart_html():
 # ==================== 华晨宝马（BMW Brilliance）配件库页面路由 ====================
 
 @car_parts_library_bp.route("/bmw")
+@require_page_login()
 def bmw_main_page():
     """
     宝马配件库主页面（单页 Tab 结构：
@@ -30,6 +33,7 @@ def bmw_main_page():
 
 
 @car_parts_library_bp.route("/bmw_detail")
+@require_page_login()
 def bmw_detail_page():
     """
     宝马配件库详情页面（单页 Tab 结构：
@@ -41,6 +45,7 @@ def bmw_detail_page():
     return render_template("car_parts_library/bmw_parts_detail.html")
 
 @car_parts_library_bp.route("/benz_detail")
+@require_page_login()
 def benz_detail_page():
     """
     宝马配件库收藏页面（单页 Tab 结构：

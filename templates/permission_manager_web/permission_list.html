@@ -27,11 +27,18 @@
                 <input type="text" id="keyword" placeholder="请输入权限名称或编码" autocomplete="off" class="layui-input" style="width: 240px;">
             </div>
             <div class="layui-inline">
-                <select id="permType" lay-filter="permTypeFilter">
-                    <option value="">全部类型</option>
-                    <option value="1">模块权限</option>
-                    <option value="2">操作权限</option>
-                </select>
+                <button type="button" class="layui-btn layui-btn-primary" id="permTypeBtn" style="width: 140px; text-align: left; justify-content: space-between;">
+                    <span>全部类型</span>
+                    <i class="layui-icon layui-icon-down layui-font-12"></i>
+                </button>
+                <input type="hidden" id="permType" value="">
+            </div>
+            <div class="layui-inline">
+                <button type="button" class="layui-btn layui-btn-primary" id="parentFilterBtn" style="width: 200px; text-align: left; justify-content: space-between;">
+                    <span>全部权限</span>
+                    <i class="layui-icon layui-icon-down layui-font-12"></i>
+                </button>
+                <input type="hidden" id="parentFilterId" value="">
             </div>
             <div class="layui-inline">
                 <button class="layui-btn layui-btn-normal" id="btnSearch">
@@ -77,9 +84,11 @@
             <div class="layui-form-item">
                 <label class="layui-form-label">父权限</label>
                 <div class="layui-input-block">
-                    <select name="parent_permission_id" id="formParent">
-                        <option value="">无</option>
-                    </select>
+                    <button type="button" class="layui-btn layui-btn-primary" id="parentPermBtn" style="width: 100%; text-align: left; justify-content: space-between;">
+                        <span>无</span>
+                        <i class="layui-icon layui-icon-down layui-font-12"></i>
+                    </button>
+                    <input type="hidden" name="parent_permission_id" id="parentPermId" value="">
                 </div>
             </div>
             <div class="layui-form-item layui-form-text">
@@ -110,14 +119,24 @@
 
     <script src="/static/layui/layui.js"></script>
     <script>
-        layui.use(['table', 'layer', 'form', 'jquery'], function(){
+        layui.use(['table', 'layer', 'form', 'jquery', 'dropdown'], function(){
             var table = layui.table;
             var layer = layui.layer;
             var form = layui.form;
             var $ = layui.jquery;
+            var dropdown = layui.dropdown;
             var modalIndex;       // 弹窗索引
             var isEdit = false;   // 是否编辑模式
             var editId = null;    // 正在编辑的权限ID
+            var permissionTree = [];  // 权限树数据
+            var parentDropdownInstance = null;  // 弹窗内父权限下拉实例
+            var filterDropdownInstance = null;  // 搜索栏父模块筛选下拉实例
+
+            // ============== 0. 页面初始化 ==============
+            initPermTypeDropdown();
+            loadPermissionTree(function(){
+                initFilterDropdown();
+            });
 
             // ============== 1. 渲染数据表格 ==============
             table.render({
@@ -163,8 +182,9 @@
             $('#btnSearch').on('click', function(){
                 var keyword = $('#keyword').val().trim();
                 var permType = $('#permType').val();
+                var parentId = $('#parentFilterId').val();
                 table.reload('permissionTable', {
-                    where: { keyword: keyword, type: permType },
+                    where: { keyword: keyword, type: permType, parent_permission_id: parentId },
                     page: { curr: 1 }
                 });
             });
@@ -172,7 +192,9 @@
             $('#btnReset').on('click', function(){
                 $('#keyword').val('');
                 $('#permType').val('');
-                form.render('select');
+                $('#permTypeBtn span').text('全部类型');
+                $('#parentFilterId').val('');
+                $('#parentFilterBtn span').text('全部权限');
                 table.reload('permissionTable', { where: {}, page: { curr: 1 } });
             });
 
@@ -216,9 +238,11 @@
                         layero.find('button[lay-submit]').trigger('click');
                     },
                     success: function(layero, index){
-                        // 加载父权限下拉（仅模块权限可选）
-                        loadParentOptions();
-                        form.render();
+                        loadPermissionTree(function(){
+                            var btn = layero.find('#parentPermBtn');
+                            initParentDropdown(btn);
+                            form.render();
+                        });
                     }
                 });
             }
@@ -238,14 +262,25 @@
                         layero.find('button[lay-submit]').trigger('click');
                     },
                     success: function(layero, index){
-                        // 先加载父权限下拉
-                        loadParentOptions(function(){
-                            // 回填数据
+                        loadPermissionTree(function(){
+                            var btn = layero.find('#parentPermBtn');
+                            var hiddenInput = layero.find('input[name="parent_permission_id"]');
+                            initParentDropdown(btn);
+
                             layero.find('input[name="permission_name"]').val(data.permission_name);
                             layero.find('input[name="permission_code"]').val(data.permission_code);
                             layero.find('textarea[name="description"]').val(data.description || '');
                             layero.find('select[name="type"]').val(data.type);
-                            layero.find('select[name="parent_permission_id"]').val(data.parent_permission_id || '');
+
+                            var parentId = data.parent_permission_id || '';
+                            hiddenInput.val(parentId);
+                            if (parentId) {
+                                var name = getPermissionNameById(permissionTree, parentId);
+                                btn.find('span').text(name || '未知');
+                            } else {
+                                btn.find('span').text('无');
+                            }
+
                             if (data.status === 1) {
                                 layero.find('input[name="status"]').prop('checked', true);
                             }
@@ -255,30 +290,101 @@
                 });
             }
 
-            // ============== 8. 加载父权限下拉列表（只显示模块权限） ==============
-            function loadParentOptions(callback) {
+            // ============== 8. 加载模块权限树并初始化父权限级联选择器 ==============
+            function loadPermissionTree(callback) {
                 $.ajax({
                     url: '/new/api/system_management/permissions/modules',
                     type: 'GET',
                     dataType: 'json',
                     success: function(res){
-                        var html = '<option value="">无</option>';
-                        if (res.code === 200 && Array.isArray(res.data)) {
-                            // 后端已过滤 type=1，直接渲染所有条目
-                            res.data.forEach(function(item){
-                                html += '<option value="' + item.id + '">' + item.permission_name + '</option>';
-                            });
-                        }
-                        $('select[name="parent_permission_id"]').html(html);
-                        form.render('select');
+                        permissionTree = (res.code === 200 && Array.isArray(res.data))
+                            ? convertToDropdownData(res.data) : [];
                         if (callback) callback();
                     },
                     error: function(){
-                        $('select[name="parent_permission_id"]').html('<option value="">无</option>');
-                        form.render('select');
+                        permissionTree = [];
                         if (callback) callback();
                     }
                 });
+            }
+
+            function convertToDropdownData(nodes) {
+                var result = [];
+                if (!nodes || !nodes.length) return result;
+                for (var i = 0; i < nodes.length; i++) {
+                    var n = nodes[i];
+                    var item = { title: n.permission_name, id: n.id };
+                    if (n.children && n.children.length) {
+                        item.child = [{ title: '选择此项', id: n.id, _parent: true }]
+                            .concat(convertToDropdownData(n.children));
+                    }
+                    result.push(item);
+                }
+                return result;
+            }
+
+            function initParentDropdown(elem) {
+                var data = [{ title: '无', id: '' }].concat(permissionTree);
+                var hiddenInput = elem.siblings('input[name="parent_permission_id"]');
+                parentDropdownInstance = dropdown.render({
+                    elem: elem[0],
+                    data: data,
+                    click: function(obj){
+                        elem.find('span').text(findPermName(permissionTree, obj.id) || '无');
+                        hiddenInput.val(obj.id || '');
+                    }
+                });
+            }
+
+            function initPermTypeDropdown() {
+                dropdown.render({
+                    elem: '#permTypeBtn',
+                    data: [
+                        { title: '全部类型', id: '' },
+                        { title: '模块权限', id: '1' },
+                        { title: '操作权限', id: '2' }
+                    ],
+                    click: function(obj){
+                        $('#permTypeBtn span').text(obj.title);
+                        $('#permType').val(obj.id);
+                        var keyword = $('#keyword').val().trim();
+                        var parentId = $('#parentFilterId').val();
+                        table.reload('permissionTable', {
+                            where: { keyword: keyword, type: obj.id, parent_permission_id: parentId },
+                            page: { curr: 1 }
+                        });
+                    }
+                });
+            }
+
+            function initFilterDropdown() {
+                var data = [{ title: '全部权限', id: '' }].concat(permissionTree);
+                filterDropdownInstance = dropdown.render({
+                    elem: '#parentFilterBtn',
+                    data: data,
+                    click: function(obj){
+                        var name = obj.id ? (findPermName(permissionTree, obj.id) || '全部权限') : '全部权限';
+                        $('#parentFilterBtn span').text(name);
+                        $('#parentFilterId').val(obj.id || '');
+                        var keyword = $('#keyword').val().trim();
+                        var permType = $('#permType').val();
+                        table.reload('permissionTable', {
+                            where: { keyword: keyword, type: permType, parent_permission_id: obj.id || '' },
+                            page: { curr: 1 }
+                        });
+                    }
+                });
+            }
+
+            function findPermName(nodes, id) {
+                for (var i = 0; i < nodes.length; i++) {
+                    if (nodes[i].id == id && !nodes[i]._parent) return nodes[i].title;
+                    if (nodes[i].child) {
+                        var r = findPermName(nodes[i].child, id);
+                        if (r) return r;
+                    }
+                }
+                return null;
             }
 
             // ============== 9. 提交新增 ==============

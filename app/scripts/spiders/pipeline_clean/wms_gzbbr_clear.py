@@ -163,8 +163,13 @@ def crawl_products_by_oe_brand_clean(oe_code, product_list):
     if df.empty:
         return []
     
+    # 只保留 is_bold=1 的记录（兼容字符串和整数类型）
+    if 'is_bold' in df.columns:
+        df['is_bold'] = pd.to_numeric(df['is_bold'], errors='coerce').fillna(0)  # pyright: ignore[reportAttributeAccessIssue]
+        df = df[df['is_bold'] == 1].copy()
+    
     # 精确匹配 OE 号：将 number 字段转为字符串并去除空格后与输入 OE 号严格比较
-    df['number'] = df['number'].astype(str).str.strip()
+    df['number'] = df['number'].astype(str).str.strip()  # pyright: ignore[reportAttributeAccessIssue]
     # df = df[df['number'] == oe_code.strip()].copy()
     
     # 匹配后为空检查

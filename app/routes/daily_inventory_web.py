@@ -6,6 +6,7 @@
 # @Software: trae-cn
 
 from flask import Blueprint, render_template
+from app.core.permission.decorators import require_page_login
 
 daily_inventory_web_bp = Blueprint(
     "daily_inventory_web",  # 蓝图唯一标识
@@ -16,6 +17,7 @@ daily_inventory_web_bp = Blueprint(
 )
 
 @daily_inventory_web_bp.route("/daily_inventory")
+@require_page_login()
 def daily_inventory_web_list():
     """日库存主页面"""
     return render_template("daily_inventory.html")

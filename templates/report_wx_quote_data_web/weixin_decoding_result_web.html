@@ -97,11 +97,16 @@
       <div class="layui-form-item">
         <label class="layui-form-label">选择产品</label>
         <div class="layui-input-block">
-          <button type="button" class="layui-btn layui-btn-primary" id="productSelectBtn" style="width: 100%; text-align: left; justify-content: space-between;">
-            <span>请先搜索OE码</span>
-            <i class="layui-icon layui-icon-down layui-font-12"></i>
-          </button>
+          <select name="product" lay-filter="productSelect" id="productSelect" lay-search>
+            <option value="">请先搜索OE码</option>
+          </select>
           <div id="selectedProductInfo" style="margin-top: 10px; padding: 10px; background: #f8f8f8; border-radius: 4px; display: none;"></div>
+        </div>
+      </div>
+      <div class="layui-form-item">
+        <label class="layui-form-label">价格</label>
+        <div class="layui-input-block">
+          <input type="number" name="price" value="" min="0" step="0.01" placeholder="请输入价格" autocomplete="off" class="layui-input" id="extraPriceInput">
         </div>
       </div>
       <div class="layui-form-item">
@@ -125,6 +130,7 @@
             <tr>
               <th>OE码</th>
               <th>品牌</th>
+              <th>价格</th>
               <th>数量</th>
               <th>操作</th>
             </tr>
@@ -307,6 +313,15 @@
                 deal_status: currentDealStatus
             },
             parseData: function (res) {
+                if (res.code === 403) {
+                    layer.msg(res.msg || '权限不足', { icon: 2, time: 3000 });
+                    return {
+                        "code": 403,
+                        "msg": res.msg || '权限不足',
+                        "count": 0,
+                        "data": []
+                    };
+                }
                 const originalData = res.data.result || [];
                 const formattedData = originalData.map(function (record) {
                     record.rowId = record.rowId || (record.weixin_decoding_result_id ? String(record.weixin_decoding_result_id) : '');
@@ -425,11 +440,41 @@
                 tableMerge.render(this);
                 bindQuantityEvents();
                 bindDraftLinkEvents();
+            },
+            error: function (xhr, status, error) {
+                try {
+                    const res = JSON.parse(xhr.responseText);
+                    if (res.code === 403 || xhr.status === 403) {
+                        layer.msg(res.msg || '权限不足', { icon: 2, time: 3000 });
+                    } else if (res.code === 401 || xhr.status === 401) {
+                        layer.msg(res.msg || '未登录，请先登录', { icon: 2, time: 3000 });
+                    } else {
+                        layer.msg(res.msg || '请求失败: ' + error, { icon: 2 });
+                    }
+                } catch (e) {
+                    if (xhr.status === 403) {
+                        layer.msg('权限不足', { icon: 2, time: 3000 });
+                    } else if (xhr.status === 401) {
+                        layer.msg('未登录，请先登录', { icon: 2, time: 3000 });
+                    } else {
+                        layer.msg('请求失败: ' + error, { icon: 2 });
+                    }
+                }
             }
         });
 
         function bindQuantityEvents() {
             var tableElem = $('#weixinDecodingResultTable').next('.layui-table-view');
+
+            function canAddQuantity(row) {
+                if (!row.oe_code || row.oe_code === '' || row.oe_code === '0' || row.oe_code === 0) {
+                    return false;
+                }
+                if (!row.brand || row.brand === '' || row.brand === '0' || row.brand === 0) {
+                    return false;
+                }
+                return true;
+            }
 
             tableElem.off('click', '[data-action="plus"]').on('click', '[data-action="plus"]', function () {
                 var btn = $(this);
@@ -437,6 +482,10 @@
                 var index = tr.data('index');
                 var cache = layui.table.cache['weixinDecodingResultTable'];
                 if (cache[index]) {
+                    if (!canAddQuantity(cache[index])) {
+                        layer.msg('OE码或品牌无效，不能添加数量', { icon: 2 });
+                        return;
+                    }
                     cache[index].quantity = (cache[index].quantity || 0) + 1;
                     btn.siblings('[data-action="quantity"]').val(cache[index].quantity);
                 }
@@ -842,11 +891,17 @@
                 return;
             }
 
-            var hasOutOfStock = selectedItems.some(function(item) {
-                return item.is_out_of_stock == true;
-            });
-            if (hasOutOfStock) {
-                layer.msg('包含缺货的配件，不能生成草稿链接', { icon: 2 });
+            var hasInquiryCustomerId = false;
+            for (var i = 0; i < cache.length; i++) {
+                if (cache[i].weixin_decoding_result_id === weixinDecodingResultId) {
+                    if (cache[i].inquiry_customer_id) {
+                        hasInquiryCustomerId = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasInquiryCustomerId) {
+                layer.msg('请先设置询价客户', { icon: 2 });
                 return;
             }
 
@@ -870,11 +925,14 @@
                         for (var i = 0; i < cache.length; i++) {
                             if (cache[i].weixin_decoding_result_id === weixinDecodingResultId) {
                                 cache[i].draft_link = draftLink;
+                                cache[i].extra_items = [];
                             }
                         }
                         obj.update({
-                            draft_link: draftLink
+                            draft_link: draftLink,
+                            extra_items: []
                         });
+                        updateAddExtraBrandBtnColor(weixinDecodingResultId, 0);
                         layer.msg('生成成功', { icon: 1 });
                     } else {
                         layer.msg(res.msg || '生成失败', { icon: 2 });
@@ -923,12 +981,13 @@
 
                     var oeCodeInput = layero.find('#extraOeCodeInput');
                     var searchOeBtn = layero.find('#searchOeBtn');
-                    var productSelectBtn = layero.find('#productSelectBtn');
+                    var productSelect = layero.find('#productSelect');
                     var selectedProductInfo = layero.find('#selectedProductInfo');
                     var quantityInput = layero.find('#extraQuantityInput');
+                    var priceInput = layero.find('#extraPriceInput');
                     var listBody = layero.find('#extraBrandListBody');
                     var selectedProductData = null;
-                    var dropdownInstance = null;
+                    var productList = [];
 
                     function getExtraItems() {
                         var cache = layui.table.cache['weixinDecodingResultTable'];
@@ -944,13 +1003,14 @@
                         var items = getExtraItems();
                         listBody.empty();
                         if (items.length === 0) {
-                            listBody.html('<tr><td colspan="4" style="text-align:center;color:#999;">暂无已添加的额外产品</td></tr>');
+                            listBody.html('<tr><td colspan="5" style="text-align:center;color:#999;">暂无已添加的额外产品</td></tr>');
                             return;
                         }
                         items.forEach(function (item, idx) {
                             var tr = $('<tr>');
                             tr.append('<td>' + item.oe_code + '</td>');
                             tr.append('<td>' + item.brand + '</td>');
+                            tr.append('<td>' + item.price + '</td>');
                             tr.append('<td>' + item.quantity + '</td>');
                             tr.append('<td><button class="layui-btn layui-btn-xs layui-btn-danger" data-idx="' + idx + '">删除</button></td>');
                             listBody.append(tr);
@@ -974,8 +1034,18 @@
 
                     renderExtraBrandList();
 
-                    searchOeBtn.on('click', function () {
-                        var oeCode = oeCodeInput.val().trim();
+                    function canAddQuantity(row) {
+                        if (!row.oe_code || row.oe_code === '' || row.oe_code === '0' || row.oe_code === 0) {
+                            return false;
+                        }
+                        if (!row.brand || row.brand === '' || row.brand === '0' || row.brand === 0) {
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    function searchProduct(oeCode) {
+                        oeCode = oeCode.trim();
                         if (!oeCode) {
                             layer.msg('请输入OE码');
                             return;
@@ -990,45 +1060,55 @@
                             success: function (res) {
                                 selectedProductData = null;
                                 selectedProductInfo.hide();
-                                productSelectBtn.find('span').text('请选择产品');
+                                productList = [];
+                                productSelect.html('<option value="">请选择产品</option>');
 
                                 if (res.code === 200 && res.data && res.data.length > 0) {
-                                    dropdownInstance = dropdown.render({
-                                        elem: productSelectBtn[0],
-                                        data: res.data,
-                                        click: function (item) {
-                                            if (item.productData) {
-                                                selectedProductData = item.productData;
-                                                productSelectBtn.find('span').text(
-                                                    selectedProductData.number + ' / ' +
-                                                    selectedProductData.brand_name + ' / ' +
-                                                    selectedProductData.name
-                                                );
-                                                selectedProductInfo.html(
-                                                    '<strong>已选择：</strong>' +
-                                                    'OE码: ' + selectedProductData.number + ' | ' +
-                                                    '品牌: ' + selectedProductData.brand_name + ' | ' +
-                                                    '名称: ' + selectedProductData.name + ' | ' +
-                                                    '价格: ' + selectedProductData.price + '元'
-                                                ).show();
-                                            }
-                                        }
+                                    productList = res.data;
+                                    res.data.forEach(function (product, idx) {
+                                        var optionText = product.number + ' / ' + product.brand_name + ' / ' + product.name + ' - ' + product.price + '元';
+                                        productSelect.append('<option value="' + idx + '">' + optionText + '</option>');
                                     });
-                                    productSelectBtn.click();
+                                    form.render('select');
                                 } else if (res.code === 404) {
                                     layer.msg(res.msg || '未找到匹配的产品', { icon: 2 });
-                                    productSelectBtn.find('span').text('未找到匹配产品');
+                                    productSelect.html('<option value="">未找到匹配产品</option>');
+                                    form.render('select');
                                 } else if (res.code === 400) {
                                     layer.msg(res.msg || '参数错误', { icon: 2 });
                                 } else {
                                     layer.msg(res.msg || '搜索失败', { icon: 2 });
-                                    productSelectBtn.find('span').text('搜索失败');
+                                    productSelect.html('<option value="">搜索失败</option>');
+                                    form.render('select');
                                 }
                             },
                             error: function () {
                                 layer.msg('搜索失败', { icon: 2 });
                             }
                         });
+                    }
+
+                    searchOeBtn.on('click', function () {
+                        searchProduct(oeCodeInput.val());
+                    });
+
+                    form.on('select(productSelect)', function (data) {
+                        var idx = parseInt(data.value);
+                        if (!isNaN(idx) && productList[idx]) {
+                            selectedProductData = productList[idx];
+                            priceInput.val(selectedProductData.price || '');
+                            selectedProductInfo.html(
+                                '<strong>已选择：</strong>' +
+                                'OE码: ' + selectedProductData.number + ' | ' +
+                                '品牌: ' + selectedProductData.brand_name + ' | ' +
+                                '名称: ' + selectedProductData.name + ' | ' +
+                                '价格: ' + selectedProductData.price + '元'
+                            ).show();
+                        } else {
+                            selectedProductData = null;
+                            priceInput.val('');
+                            selectedProductInfo.hide();
+                        }
                     });
 
                     oeCodeInput.on('keydown', function (e) {
@@ -1037,11 +1117,33 @@
                         }
                     });
 
+                    var cache = layui.table.cache['weixinDecodingResultTable'];
+                    var firstValidOe = '';
+                    for (var i = 0; i < cache.length; i++) {
+                        if (cache[i].weixin_decoding_result_id === weixinDecodingResultId) {
+                            var oe = cache[i].oe_code;
+                            if (oe && oe !== '' && oe !== '0' && oe !== 0) {
+                                firstValidOe = oe;
+                                break;
+                            }
+                        }
+                    }
+                    if (firstValidOe) {
+                        oeCodeInput.val(firstValidOe);
+                        searchProduct(firstValidOe);
+                    }
+
                     form.on('submit(saveExtraBrand)', function () {
                         var quantity = parseInt(quantityInput.val().trim()) || 1;
+                        var price = parseFloat(priceInput.val().trim());
 
                         if (!selectedProductData) {
                             layer.msg('请先搜索并选择产品');
+                            return false;
+                        }
+
+                        if (isNaN(price) || price < 0) {
+                            layer.msg('请输入有效的价格');
                             return false;
                         }
 
@@ -1062,6 +1164,7 @@
                                 });
                                 if (existingItem) {
                                     existingItem.quantity = quantity;
+                                    existingItem.price = price;
                                     isUpdated = true;
                                 } else {
                                     cache[i].extra_items.push({
@@ -1069,7 +1172,7 @@
                                         brand: selectedProductData.brand_name,
                                         quantity: quantity,
                                         name: selectedProductData.name,
-                                        price: selectedProductData.price,
+                                        price: price,
                                         product_id: selectedProductData.product_id,
                                         stock: selectedProductData.stock
                                     });
@@ -1079,10 +1182,13 @@
                         }
 
                         oeCodeInput.val('');
-                        productSelectBtn.find('span').text('请先搜索OE码');
+                        productSelect.html('<option value="">请先搜索OE码</option>');
+                        form.render('select');
                         selectedProductData = null;
                         selectedProductInfo.hide();
                         quantityInput.val('1');
+                        priceInput.val('');
+                        productList = [];
                         renderExtraBrandList();
                         var currentExtraItems = getExtraItems();
                         updateAddExtraBrandBtnColor(weixinDecodingResultId, currentExtraItems.length);

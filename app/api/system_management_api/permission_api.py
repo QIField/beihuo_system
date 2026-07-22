@@ -38,6 +38,7 @@ def get_permissions():
         limit: 每页数量，默认 10（Layui 表格参数名）
         keyword: 搜索关键词（权限名称或权限编码）
         type: 权限类型筛选（1-模块权限，2-操作权限）
+        parent_permission_id: 父权限ID筛选
 
     Returns:
         {
@@ -56,12 +57,16 @@ def get_permissions():
         perm_type = request.args.get('type')
         if perm_type:
             perm_type = int(perm_type)
+        parent_perm_id = request.args.get('parent_permission_id')
+        if parent_perm_id:
+            parent_perm_id = int(parent_perm_id)
 
         permissions, total = PermissionManagementService.get_permission_list(
             page=page,
             page_size=page_size,
             keyword=keyword,  # pyright: ignore[reportArgumentType]
-            perm_type=perm_type  # pyright: ignore[reportArgumentType]
+            perm_type=perm_type,  # pyright: ignore[reportArgumentType]
+            parent_permission_id=parent_perm_id  # pyright: ignore[reportArgumentType]
         )
 
         return jsonify({
@@ -126,17 +131,26 @@ def get_all_permissions():
 @require_admin()
 def get_module_permissions():
     """
-    获取所有模块权限（type=1，扁平列表形式）。
+    获取所有模块权限（type=1，无限层级树形结构）。
 
     用于"父权限下拉框"等只需模块作为候选父节点的场景。
-    返回扁平列表，不包含 children。
+    只返回 type=1 的模块权限，支持任意层级的父子嵌套。
 
     Returns:
         {
             "code": 200,
             "msg": "success",
             "data": [
-                {"id": 1, "permission_name": "购物车模块", "permission_code": "module:cart", ...},
+                {
+                    "id": 1,
+                    "permission_name": "系统管理",
+                    "permission_code": "module:system",
+                    ...
+                    "children": [
+                        {"id": 2, "permission_name": "用户管理", "children": [...]},
+                        ...
+                    ]
+                },
                 ...
             ]
         }

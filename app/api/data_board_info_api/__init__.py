@@ -11,4 +11,6 @@ from flask import Blueprint
 report_wx_quote_data_bp = Blueprint('report_wx_quote_data', __name__, url_prefix='/report_wx_quote_data')
 
 # 导入并注册路由
-from . import report_wx_quote_data_api
+from . import common_api
+from . import weixin_decoding_result_api
+from . import summary_api

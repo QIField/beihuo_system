@@ -28,6 +28,7 @@
   <script>
   layui.use(['jquery', 'layer', 'table', 'form', 'dropdown'], function(){
     const $ = layui.jquery;
+    const layer = layui.layer;
 
     // 1. 路由表按需实际情况填写
     const routes = {
@@ -36,7 +37,20 @@
       '/monthly_summary': 'monthly_summary'
     };
 
-    // 2. 渲染视图函数
+    // 2. 检查用户群权限
+    function checkUserPermissions() {
+      $.ajax({
+        url: '/new/api/report_wx_quote_data/user_group_permissions_api',
+        type: 'GET',
+        success: function(res) {
+          if (res.code === 200 && res.data && res.data.length === 0) {
+            layer.msg('您没有任何群的查看权限，请联系管理员分配权限', { icon: 2, time: 3000 });
+          }
+        }
+      });
+    }
+
+    // 3. 渲染视图函数
     function renderView() {
       const hash = location.hash.replace('#', '') || '/weixin_decoding_result';
       const url = routes[hash];
@@ -52,8 +66,9 @@
       });
     }
 
-    // 3. 监听hash变化
+    // 4. 监听hash变化
     window.addEventListener('hashchange', renderView);
+    checkUserPermissions(); // 检查权限
     renderView(); // 首次加载
   });
   </script>
