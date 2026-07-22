@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy import and_
 
 from app.utils.orm.session import orm_session
+from app.services.permission_service.permission_service import PermissionService
 from app.models.orm_models.system_models import (
     CrmappUserRoles,
     CrmappUsers,
@@ -346,6 +347,7 @@ class UserRoleManagementService:
                     )
                     session.add(new_ur)
 
+            PermissionService.clear_cache(user_id)
             return True, "角色分配成功"
 
         except Exception as e:
@@ -417,6 +419,7 @@ class UserRoleManagementService:
                             )
                             session.add(new_ur)
 
+            PermissionService.clear_cache(user_id)
             return True, "角色分配成功"
 
         except Exception as e:
@@ -456,6 +459,7 @@ class UserRoleManagementService:
                 )
 
             if rows_affected > 0:
+                PermissionService.clear_cache(user_id)
                 return True, "角色取消成功"
             else:
                 return True, "用户没有该角色"
@@ -490,6 +494,7 @@ class UserRoleManagementService:
                     synchronize_session=False,
                 )
 
+            PermissionService.clear_cache(user_id)
             return True, "已取消所有角色"
 
         except Exception as e:

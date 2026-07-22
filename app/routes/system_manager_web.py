@@ -12,6 +12,8 @@
 """
 
 from flask import render_template, Blueprint
+from app.core.permission.decorators import require_page_login
+
 
 
 system_manager_web_bp = Blueprint(
@@ -24,6 +26,7 @@ system_manager_web_bp = Blueprint(
 
 
 @system_manager_web_bp.route("/task_scheduler_list")
+@require_page_login()
 def task_scheduler_list_page():
     """定时任务列表页面"""
     return render_template("system_manager/task_scheduler_list.html")

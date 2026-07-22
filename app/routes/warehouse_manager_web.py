@@ -14,7 +14,10 @@ warehouse_manager_web_bp = Blueprint(
 )
 
 
+from app.core.permission.decorators import require_page_login
+
 @warehouse_manager_web_bp.route("/wms_upload_site")
+@require_page_login()
 def wms_upload_site():
     """WMS采购入库单数据管理页面"""
     return render_template("wms_upload_site_web.html")

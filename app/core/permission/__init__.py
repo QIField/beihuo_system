@@ -32,6 +32,8 @@ from app.core.permission.error_handlers import (
 
 from app.core.permission.decorators import (
     require_authentication,
+    require_page_login,
+    require_page_permission,
     require_permission,
     require_any_permission,
     require_all_permissions,
@@ -50,6 +52,8 @@ __all__ = [
     'NotAuthenticatedError',
     # 装饰器
     'require_authentication',
+    'require_page_login',
+    'require_page_permission',
     'require_permission',
     'require_any_permission',
     'require_all_permissions',

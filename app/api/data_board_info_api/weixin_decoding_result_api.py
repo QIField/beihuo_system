@@ -2,23 +2,66 @@
 # @Time    : 2026/4/28 16:33
 # @Author  : xingkongtub
 # @Project : beihuo_system
-# @File    : report_wx_quote_data_api.py
+# @File    : weixin_decoding_result_api.py
 # @Software: PyCharm
 
-from flask import jsonify, request
+from flask import jsonify, request, session
 
 from app.core.permission.decorators import require_authentication
+from app.core.permission.decorators_plus import require_param_permission
 
 from . import report_wx_quote_data_bp
 from app.services.report_wx_quote_data_services import wechat_daily_quote_detail_service
-from app.services.report_wx_quote_data_services import quote_summary_service
 from app.services.report_wx_quote_data_services import wechat_daily_quote_detail_subsidiary
 from app.services.report_wx_quote_data_services.create_link import crawl_products_by_oe_brand
 from app.exceptions.data_exceptions import DataNotFoundError
 
 
 @report_wx_quote_data_bp.route('/weixin_decoding_result_list_api', methods=['GET'])
-@require_authentication()
+@require_param_permission(
+    param_name='groupname',
+    permission_value_map={
+        # ============================================================
+        # 权限编码与群名称的映射配置
+        # 格式: '权限编码': '群名称'
+        # 用户拥有对应权限，才能查询该群的数据
+        # 无权限时返回 403 错误: "权限不足，需要权限: xxx"
+        # ============================================================
+        # 示例配置（请根据实际需求修改或删除）：
+        # 'wx_group:view_all': None,           # 查看全部群数据（groupname=None 时）
+        # 'wx_group:view_group_a': 'A群',       # 查看"A群"的数据
+        # 'wx_group:view_group_b': 'B群',       # 查看"B群"的数据
+        # 'wx_group:view_group_c': 'C群',       # 查看"C群"的数据
+        # ============================================================
+        # TODO: 在此添加实际的权限-群名映射
+
+
+        'wx_group':'全部',
+        'wx_group:view_group_f3': 'F3查询群',
+       
+        'wx_group:view_group_fs_nb': '佛山巴博瑞内部查询群',
+        'wx_group:view_group_fs_crm':'佛山报价CRM中台数据',
+        'wx_group:view_group_fs_zt': '佛山报价中台数据',
+
+        'wx_group:view_group_fs_kc': '查佛山库存卖价',
+
+        'wx_group:view_group_hf_nb': '合峰内部查询群',
+        'wx_group:view_group_kd':'开单群',
+        'wx_group:view_group_hl':'湖南巴博瑞自动报价',
+       
+        
+        'wx_group:view_group_zh_nb': '珠海巴博瑞内部查询群',
+
+
+
+        'wx_group:view_group_gx_nb': '广西嘉昊内部查询群',
+        'wx_group:view_group_gx_proxy':'广西嘉昊-代理价',
+        'wx_group:view_group_gx_wholesale':'广西嘉昊-批发价',
+        'wx_group:view_group_gx_retail':'广西嘉昊-零售价',
+
+    },
+    bypass_permission='wx_group:view_group_all',
+)
 def weixin_decoding_result_list_api():
     """
     获取每日报价明细列表 API
@@ -32,33 +75,26 @@ def weixin_decoding_result_list_api():
         nickname = request.args.get('nickname')
         deal_status = request.args.get('deal_status')
         
-        # 处理空值，如果日期是空字符串，设置为None
         if start_date == '':
             start_date = None
         if end_date == '':
             end_date = None
-        if groupname == '':
-            groupname = None
-        # "全部"也当作None处理
-        if groupname == '全部':
-            groupname = None
-        if nickname == '':
-            nickname = None
-        if nickname == '全部':
-            nickname = None
-        # 处理deal_status，空字符串转为None
+        if groupname == '' or groupname == '全部':
+            groupname = None   
+        if nickname == '' or nickname == '全部':
+            nickname = None     
         if deal_status == '':
             deal_status = None
-        # deal_status需要转成整数
         if deal_status is not None:
             try:
                 deal_status = int(deal_status)
             except (ValueError, TypeError):
                 deal_status = None
             
-        # 如果只给了一个日期，默认查询当天
         if start_date and not end_date:
             end_date = start_date
+        
+        user_id = session.get('user_id')
         
         result = wechat_daily_quote_detail_service.fetch_data_paged(
             start_date=start_date,
@@ -67,7 +103,8 @@ def weixin_decoding_result_list_api():
             nickname=nickname,
             deal_status=deal_status,
             page=page,
-            limit=limit
+            limit=limit,
+            user_id=user_id
         )
         return jsonify({
             'code': 200,
@@ -82,118 +119,6 @@ def weixin_decoding_result_list_api():
         })
 
 
-@report_wx_quote_data_bp.route('/daily_summary_list_api', methods=['GET'])
-@require_authentication()
-def daily_summary_list_api():
-    """
-    获取每日汇总列表 API
-    """
-    try:
-        page = request.args.get('page', 1, type=int)
-        limit = request.args.get('limit', 20, type=int)
-        date = request.args.get('date')
-        groupname = request.args.get('groupname')
-        nickname = request.args.get('nickname')
-        
-        # 处理空值
-        if groupname == '' or groupname == '全部':
-            groupname = None
-        if nickname == '' or nickname == '全部':
-            nickname = None
-        
-        if not date:
-            return jsonify({
-                'code': 400,
-                'msg': '日期不能为空',
-                'data': None
-            })
-        
-        result = quote_summary_service.summarize_oe_codes_daily(
-            start_date=date,
-            end_date=date,
-            groupname=groupname,
-            nickname=nickname,
-            page=page,
-            limit=limit
-        )
-        return jsonify({
-            'code': 200,
-            'msg': '获取每日汇总成功',
-            'data': result
-        })
-    except Exception as e:
-        return jsonify({
-            'code': 500,
-            'msg': f'获取每日汇总失败: {str(e)}',
-            'data': None
-        })
-
-
-@report_wx_quote_data_bp.route('/monthly_summary_list_api', methods=['GET'])
-@require_authentication()
-def monthly_summary_list_api():
-    """
-    获取每月汇总列表 API
-    """
-    try:
-        page = request.args.get('page', 1, type=int)
-        limit = request.args.get('limit', 20, type=int)
-        month = request.args.get('month')
-        groupname = request.args.get('groupname')
-        
-        # 处理空值
-        if groupname == '' or groupname == '全部':
-            groupname = None
-        
-        if not month:
-            return jsonify({
-                'code': 400,
-                'msg': '月份不能为空',
-                'data': None
-            })
-        
-        result = quote_summary_service.summarize_oe_codes_monthly(
-            month_str=month,
-            groupname=groupname,
-            page=page,
-            limit=limit
-        )
-        return jsonify({
-            'code': 200,
-            'msg': '获取每月汇总成功',
-            'data': result
-        })
-    except Exception as e:
-        return jsonify({
-            'code': 500,
-            'msg': f'获取每月汇总失败: {str(e)}',
-            'data': None
-        })
-
-
-@report_wx_quote_data_bp.route('/groupname_list_api', methods=['GET'])
-@require_authentication()
-def groupname_list_api():
-    """
-    获取所有群名称列表 API
-    """
-    try:
-        result = wechat_daily_quote_detail_service.fetch_groupname_list()
-        return jsonify({
-            'code': 200,
-            'msg': '获取群名称列表成功',
-            'data': result
-        })
-    except Exception as e:
-        return jsonify({
-            'code': 500,
-            'msg': f'获取群名称列表失败: {str(e)}',
-            'data': None
-        })
-
-
-
-
 @report_wx_quote_data_bp.route('/search_crm_customer_api', methods=['GET'])
 @require_authentication()
 def search_crm_customer_api():
@@ -204,7 +129,6 @@ def search_crm_customer_api():
     try:
         keyword = request.args.get('keyword', '')
         
-        # 处理空值
         if keyword == '':
             return jsonify({
                 'code': 200,
@@ -271,48 +195,6 @@ def update_inquiry_customer_api():
         return jsonify({
             'code': 500,
             'msg': f'保存失败: {str(e)}',
-            'data': None
-        })
-
-
-
-
-
-@report_wx_quote_data_bp.route('/fetch_data_and_save_to_database_api', methods=['POST'])
-@require_authentication()
-def fetch_data_and_save_to_database_api():
-    """
-    获取并保存数据到数据库 API
-    按10天分批处理指定日期范围的数据
-    """
-    try:
-        from flask import request
-        start_date = request.json.get('start_date')  # pyright: ignore[reportOptionalMemberAccess]
-        end_date = request.json.get('end_date')  # pyright: ignore[reportOptionalMemberAccess]
-        
-        if not start_date or not end_date:
-            return jsonify({
-                'code': 400,
-                'msg': '开始日期和结束日期不能为空',
-                'data': None
-            })
-        
-        # 调用服务函数
-        wechat_daily_quote_detail_service.fetch_data_and_save_to_database(
-            start_date=start_date,
-            end_date=end_date
-        )
-        
-        return jsonify({
-            'code': 200,
-            'msg': '数据获取并保存成功',
-            'data': None
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'code': 500,
-            'msg': f'数据获取并保存失败: {str(e)}',
             'data': None
         })
 
@@ -408,6 +290,3 @@ def search_oe_product_api():
             'msg': f'搜索OE产品失败: {str(e)}',
             'data': None
         })
-
-
-

@@ -19,7 +19,6 @@ from flask import Blueprint, jsonify, request
 from app.core.permission.decorators import require_admin
 from app.services.permission_service import (
     UserRoleManagementService,
-    PermissionService
 )
 
 
@@ -155,8 +154,6 @@ def assign_roles_to_user(user_id):
             role_ids=role_ids
         )
         if success:
-            # 清除权限缓存，使角色分配立即生效
-            PermissionService.clear_cache(user_id)
             return jsonify({
                 'code': 200,
                 'msg': msg,
@@ -199,7 +196,6 @@ def remove_role_from_user(user_id, role_id):
             role_id=role_id
         )
         if success:
-            PermissionService.clear_cache(user_id)
             return jsonify({
                 'code': 200,
                 'msg': msg,

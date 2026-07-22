@@ -12,6 +12,7 @@ import calendar
 from app.utils.orm.session import orm_session
 from app.models.orm_models.wechat_daily_quote_detail import WechatDailyQuoteDetail
 from sqlalchemy import func, Integer
+from .get_permission import get_user_group_permissions
 
 
 
@@ -20,25 +21,33 @@ from sqlalchemy import func, Integer
 
 
 
-def summarize_oe_codes_daily(start_date=None, end_date=None, groupname=None, nickname=None, page=1, limit=20):
+def summarize_oe_codes_daily(start_date=None, end_date=None, groupname=None, page=1, limit=20, user_id=None):
     """
-    按 groupname、oe_code、create_time（日期）分组统计 oe 码的询价次数、缺货次数和成交次数（日统计）
-    直接用 SQL 从 wechat_daily_quote_detail 表进行 GROUP BY 查询
+    按 groupname、oe_code 分组统计 oe 码的询价次数、缺货次数和成交次数（日统计）
+    先按日期筛选明细，再分组统计，最后按群名称过滤分组结果
     
     Args:
         start_date: 开始日期字符串，如 "2026-02-21"
         end_date: 结束日期字符串，如 "2026-02-21"
-        groupname: 群名称，可选
-        nickname: 业务员，可选
+        groupname: 群名称，可选（分组后过滤）；为 None 表示全部，会根据用户权限过滤
         page: 页码
         limit: 每页条数
+        user_id: 用户ID，用于权限过滤，可选
         
     Returns:
         统计结果列表（带分页信息）
     """
+    filtered_groupname = groupname  # 初始化过滤用的群名，默认等于传入的 groupname
+    if groupname is None and user_id is not None:  # 选择了全部群且传入了用户ID时，按用户权限过滤
+        user_perms = get_user_group_permissions(user_id)  # 获取用户拥有的群权限列表
+        has_view_all = any(p['permission_code'] == 'wx_group:view_group_all' for p in user_perms)  # 检查是否有查看全部群的权限
+        if not has_view_all:  # 没有全部权限时，用用户有权限的群列表过滤
+            filtered_groupname = [p['group_name'] for p in user_perms if p['group_name']]  # 提取用户有权限的群名列表
+            if not filtered_groupname:  # 用户一个群权限都没有
+                return {'result': [], 'total': 0, 'page': page, 'limit': limit}  # 直接返回空结果
+
     with orm_session() as session:
-        # 一次查询搞定：统计数据 + 取第一条记录的详情
-        query = session.query(
+        subquery = session.query(
             WechatDailyQuoteDetail.group_name.label('groupname'),
             WechatDailyQuoteDetail.oe_code,
             func.cast(func.count(WechatDailyQuoteDetail.id), Integer).label('inquiry_count'),
@@ -56,36 +65,49 @@ def summarize_oe_codes_daily(start_date=None, end_date=None, groupname=None, nic
             WechatDailyQuoteDetail.oe_code != '0'
         )
         
-        # 添加筛选条件
         if start_date:
-            # 例如 start_date='2026-01-05' → 匹配 >= '2026-01-05 00:00:00'
-            query = query.filter(WechatDailyQuoteDetail.create_date >= f'{start_date} 00:00:00')
+            subquery = subquery.filter(WechatDailyQuoteDetail.create_date >= f'{start_date} 00:00:00')
         if end_date:
-            # 例如 end_date='2026-01-05' → 匹配 <= '2026-01-05 23:59:59'
-            query = query.filter(WechatDailyQuoteDetail.create_date <= f'{end_date} 23:59:59')
-        if groupname:
-            query = query.filter(WechatDailyQuoteDetail.group_name == groupname)
-        if nickname:
-            query = query.filter(WechatDailyQuoteDetail.user_name.like(f'%{nickname}%'))
+            subquery = subquery.filter(WechatDailyQuoteDetail.create_date <= f'{end_date} 23:59:59')
         
-        # 分组
-        query = query.group_by(
+        subquery = subquery.group_by(
             WechatDailyQuoteDetail.group_name,
             WechatDailyQuoteDetail.oe_code
-        ).order_by(
-            WechatDailyQuoteDetail.group_name,
-            WechatDailyQuoteDetail.oe_code
+        ).subquery()
+        
+        query = session.query(subquery)
+        
+        if filtered_groupname:
+            if isinstance(filtered_groupname, list):
+                query = query.filter(subquery.c.groupname.in_(filtered_groupname))
+            else:
+                query = query.filter(subquery.c.groupname == filtered_groupname)
+        
+        query = query.order_by(
+            subquery.c.groupname,
+            subquery.c.oe_code
         )
+        
+        total_query = session.query(func.count(subquery.c.oe_code))
+        if filtered_groupname:
+            if isinstance(filtered_groupname, list):
+                total_query = total_query.filter(subquery.c.groupname.in_(filtered_groupname))
+            else:
+                total_query = total_query.filter(subquery.c.groupname == filtered_groupname)
         
         # 打印 SQL
         print("\n" + "="*100)
-        # print("SQL 语句:")
-        # print("="*100)
-        # print(str(query.statement.compile(compile_kwargs={"literal_binds": True})))
+        print("查询 SQL:")
+        print("="*100)
+        print(str(query.statement.compile(compile_kwargs={"literal_binds": True})))
+        print("-"*100)
+        print("COUNT SQL:")
+        print("-"*100)
+        print(str(total_query.statement.compile(compile_kwargs={"literal_binds": True})))
         print("="*100 + "\n")
         
         # 获取总数
-        total = query.count()
+        total = total_query.scalar()
         
         if total == 0:
             return {
@@ -111,7 +133,7 @@ def summarize_oe_codes_daily(start_date=None, end_date=None, groupname=None, nic
             'total': total
         }
 
-def summarize_oe_codes_monthly(month_str, groupname=None, page=1, limit=20):
+def summarize_oe_codes_monthly(month_str, groupname=None, page=1, limit=20, user_id=None):
     """
     按 groupname、oe_code 分组统计 oe 码的询价次数、缺货次数和成交次数（月统计）
     将月份转换为该月的第一天和最后一天，调用日统计函数
@@ -121,6 +143,7 @@ def summarize_oe_codes_monthly(month_str, groupname=None, page=1, limit=20):
         groupname: 群名称，可选
         page: 页码
         limit: 每页条数
+        user_id: 用户ID，用于权限过滤，可选
         
     Returns:
         统计结果列表（带分页信息）
@@ -141,7 +164,8 @@ def summarize_oe_codes_monthly(month_str, groupname=None, page=1, limit=20):
         end_date=end_date,
         groupname=groupname,
         page=page,
-        limit=limit
+        limit=limit,
+        user_id=user_id
     )
 
 

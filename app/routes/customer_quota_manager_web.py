@@ -5,6 +5,7 @@
 # @File    : customer_quota_manager_web.py
 # @Software: PyCharm
 from flask import render_template, Blueprint
+from app.core.permission.decorators import require_page_login
 
 customer_quota_manager_web_bp = Blueprint(
     "customer_quota_manager",  # 蓝图唯一标识
@@ -22,39 +23,46 @@ customer_quota_manager_web_bp = Blueprint(
 
 
 @customer_quota_manager_web_bp.route("/customer_quota")
+@require_page_login()
 def customer_quota():
     """客户额度管理"""
     return render_template("customer_quota_manager_web/views/customer_quota.html")
 
 
 @customer_quota_manager_web_bp.route("/unpaid_customer")
+@require_page_login()
 def unpaid_customer():
     return render_template("customer_quota_manager_web/views/unpaid_customer.html")
 
 
 @customer_quota_manager_web_bp.route("/expected_unpaid_customers")
+@require_page_login()
 def expected_unpaid_customers():
     return render_template("customer_quota_manager_web/views/expected_unpaid_customers.html")
 
 
 @customer_quota_manager_web_bp.route("/transaction_sum")
+@require_page_login()
 def transaction_sum():
 
     return render_template("customer_quota_manager_web/views/transaction_sum.html")
 
 
 @customer_quota_manager_web_bp.route("/display_unpaid_customer_limit")
+@require_page_login()
 def display_unpaid_customer_limit():
     """未付款客户额度展示"""
     return render_template("customer_quota_manager_web/views/display_unpaid_customer_limit.html")
 
 @customer_quota_manager_web_bp.route("/customer_quota_manager_main_web")
+@require_page_login()
 def customer_quota_manager_main_web():
     """未付款客户额度展示"""
     return render_template("customer_quota_manager_web/customer_quota_manager_main_web.html")
 
 
 @customer_quota_manager_web_bp.route("/customer_quota_settings")
+@require_page_login()
 def customer_quota_settings():
     """应收单数据导入设置"""
     return render_template("customer_quota_manager_web/views/customer_quota_settings_web.html")

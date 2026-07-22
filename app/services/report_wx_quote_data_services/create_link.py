@@ -19,56 +19,17 @@ def crawl_related_products(oe_code):
     # 返回清洗后的产品列表
     return clean_data
 
-def generate_tree(data_list):
-    root = []
-    for row in data_list:
-        oe = row['number']
-        brand = row['brand_name']
-        product_title = f"{row['name']} - {row['price']}元"
-        product_id = f"{row['product_id']}"
-        
-        oe_node = None
-        for node in root:
-            if node['id'] == oe:
-                oe_node = node
-                break
-        if not oe_node:
-            oe_node = {'id': oe, 'title': oe, 'child': []}
-            root.append(oe_node)
-        
-        brand_node = None
-        for node in oe_node['child']:
-            if node['id'] == brand:
-                brand_node = node
-                break
-        if not brand_node:
-            brand_node = {'id': brand, 'title': brand, 'type': 'group', 'child': []}
-            oe_node['child'].append(brand_node)
-        
-        brand_node['child'].append({
-            'id': product_id,
-            'title': product_title,
-            'productData': row
-        })
-    
-    return root
-
-
 def crawl_products_by_oe_brand(oe_code):
     spider = CrmGzbbrSpider()
-    # 调用产品列表接口，根据 OE 号查询相关产品，获取响应并解析为 JSON
     product_list = spider.get_product_product_list(numberlist=oe_code).json()  # pyright: ignore[reportOptionalMemberAccess]
-    # 对返回的原始数据进行清洗，只保留需要的字段且过滤掉无库存产品
     clean_data = crawl_products_by_oe_brand_clean(oe_code,product_list)
     
-    tree = generate_tree(clean_data)
-    
-    return tree
+    return clean_data
 
 
-if __name__ == '__main__':
-    data=crawl_products_by_oe_brand('0259971845')
-    print(json.dumps(data, ensure_ascii=False, indent=2))
+# if __name__ == '__main__':
+#     data=crawl_products_by_oe_brand('A2820170200')
+#     print(json.dumps(data, ensure_ascii=False, indent=2))
    
 
 ##生成tree结构

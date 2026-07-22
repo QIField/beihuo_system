@@ -14,30 +14,41 @@ from app.utils.orm.session import orm_session
 from app.dao.wechat_daily_quote_detail_dao import WechatDailyQuoteDetailDao
 from app.models.orm_models.crmapp_sales_history_detail import CrmappSalesHistoryDetail
 from .weixin_decoding_result_clear import fetch_data_and_save_to_database
+from .get_permission import get_user_group_permissions
 
 
-def fetch_data_paged(start_date=None, end_date=None, groupname=None, nickname=None, deal_status=None, page=1, limit=20):
+def fetch_data_paged(start_date=None, end_date=None, groupname=None, nickname=None, deal_status=None, page=1, limit=20, user_id=None):
     """
     从数据库获取微信日报报价详情数据（使用原生SQL，带分页信息）
     
     Args:
         start_date: 开始日期 (YYYY-MM-DD)，可选
         end_date: 结束日期 (YYYY-MM-DD)，可选
-        groupname: 群名称，可选
+        groupname: 群名称，可选；为 None 表示全部，会根据用户权限过滤
         nickname: 业务员，可选
         deal_status: 成交状态，可选 (0-未知, 1-成交, 2-未成交)
         page: 页码，从1开始
         limit: 每页条数
+        user_id: 用户ID，用于权限过滤，可选
         
     Returns:
         包含分页信息的字典 {'result': [...], 'total': ..., 'page': ..., 'limit': ...}
     """
+    filtered_groupname = groupname
+    if groupname is None and user_id is not None:
+        user_perms = get_user_group_permissions(user_id)
+        has_view_all = any(p['permission_code'] == 'wx_group:view_group_all' for p in user_perms)
+        if not has_view_all:
+            filtered_groupname = [p['group_name'] for p in user_perms if p['group_name']]
+            if not filtered_groupname:
+                return {'result': [], 'total': 0, 'page': page or 1, 'limit': limit or 20}
+
     with orm_session() as session:
         result = WechatDailyQuoteDetailDao.fetch_data_paged(
             session=session,
             start_date=start_date,
             end_date=end_date,
-            groupname=groupname,
+            groupname=filtered_groupname,
             nickname=nickname,
             deal_status=deal_status,
             page=page,

@@ -16,6 +16,8 @@
 """
 
 from flask import render_template, Blueprint
+from app.core.permission.decorators import require_page_login
+
 
 
 permission_manager_web_bp = Blueprint(
@@ -28,24 +30,28 @@ permission_manager_web_bp = Blueprint(
 
 
 @permission_manager_web_bp.route("/permission_main")
+@require_page_login()
 def permission_manager_main():
     """权限管理主页面（左侧导航 + 右侧内容区）"""
     return render_template("permission_manager_web/permission_manager_main_web.html")
 
 
 @permission_manager_web_bp.route("/permission_list")
+@require_page_login()
 def permission_list_page():
     """权限列表页面"""
     return render_template("permission_manager_web/permission_list.html")
 
 
 @permission_manager_web_bp.route("/role_management")
+@require_page_login()
 def role_management_page():
     """角色管理页面"""
     return render_template("permission_manager_web/role_management.html")
 
 
 @permission_manager_web_bp.route("/user_role_assignment")
+@require_page_login()
 def user_role_assignment_page():
     """用户角色分配页面"""
     return render_template("permission_manager_web/user_role_assignment.html")

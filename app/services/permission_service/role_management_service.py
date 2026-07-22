@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy import and_, or_
 
 from app.utils.orm.session import orm_session
+from app.services.permission_service.permission_service import PermissionService
 from app.models.orm_models.system_models import (
     CrmappRoles,
     CrmappUserRoles,
@@ -249,6 +250,7 @@ class RoleManagementService:
                 session.flush()  # 拿到新生成的 id
                 role_id = new_role.id
 
+            PermissionService.clear_cache()
             return True, "创建成功", role_id
 
         except Exception as e:
@@ -317,6 +319,7 @@ class RoleManagementService:
 
                 role.updated_time = datetime.now()
 
+            PermissionService.clear_cache()
             return True, "更新成功"
 
         except Exception as e:
@@ -376,6 +379,7 @@ class RoleManagementService:
                     CrmappRoles.id == role_id
                 ).delete(synchronize_session=False)
 
+            PermissionService.clear_cache()
             return True, "删除成功"
 
         except Exception as e:
@@ -477,6 +481,7 @@ class RoleManagementService:
                         )
                         session.add(rp)
 
+            PermissionService.clear_cache()
             return True, "权限分配成功"
 
         except Exception as e:

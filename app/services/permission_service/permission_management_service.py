@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy import and_, or_
 
 from app.utils.orm.session import orm_session
+from app.services.permission_service.permission_service import PermissionService
 from app.models.orm_models.system_models import (
     CrmappPermissions,
     CrmappRolePermissions,
@@ -28,7 +29,7 @@ class PermissionManagementService:
 
     @staticmethod
     def get_permission_list(page: int = 1, page_size: int = 50, keyword: str = None,  # pyright: ignore[reportArgumentType]
-                            perm_type: int = None) -> Tuple[List[Dict], int]:  # pyright: ignore[reportArgumentType]
+                            perm_type: int = None, parent_permission_id: int = None) -> Tuple[List[Dict], int]:  # pyright: ignore[reportArgumentType]
         """
         获取权限列表（分页）
 
@@ -37,6 +38,7 @@ class PermissionManagementService:
             page_size: 每页数量
             keyword: 搜索关键词（权限名称或编码）
             perm_type: 权限类型筛选（1-模块权限，2-操作权限）
+            parent_permission_id: 父权限ID筛选
 
         Returns:
             (权限列表, 总数)
@@ -63,6 +65,8 @@ class PermissionManagementService:
                 if perm_type is not None and perm_type != '':
                    
                     conditions.append(CrmappPermissions.type == perm_type)
+                if parent_permission_id is not None and parent_permission_id != '':
+                    conditions.append(CrmappPermissions.parent_permission_id == parent_permission_id)
 
                 if conditions:
                     query = query.filter(and_(*conditions))
@@ -158,43 +162,47 @@ class PermissionManagementService:
     @staticmethod
     def get_all_permissions() -> List[Dict]:
         """
-        获取所有权限（扁平列表形式）。
+        获取所有模块权限（type=1）并构建无限层级树形结构。
 
-        用于遍历、批量检查、或其他需要完整权限条目（非树形）的业务场景。
-        每一项包含基础字段，不包含 children。
+        用于"父权限下拉框"等只需模块作为候选父节点的场景。
+        只返回 type=1 的模块权限，支持任意层级的父子嵌套。
 
         Returns:
             [
                 {
                     "id": 1,
-                    "permission_name": "...",
-                    "permission_code": "...",
-                    "description": "...",
-                    "parent_permission_id": null,
+                    "permission_name": "系统管理",
+                    "permission_code": "module:system",
                     "type": 1,
-                    "status": 1,
-                    "created_time": "....",
-                    "updated_time": "....",
+                    ...
+                    "children": [
+                        {
+                            "id": 2,
+                            "permission_name": "用户管理",
+                            "type": 1,
+                            ...
+                            "children": [...]
+                        },
+                        ...
+                    ]
                 },
                 ...
             ]
         """
         try:
-            permissions: List[Dict] = []
+            all_perms: List[Dict] = []
             with orm_session() as session:
                 rows = (
                     session.query(CrmappPermissions)
-                    .filter(CrmappPermissions.type == 1)  # 只查询模块权限
+                    .filter(CrmappPermissions.type == 1)
                     .order_by(
-                        CrmappPermissions.type.asc(),
                         CrmappPermissions.id.asc()
                     )
                     .all()
                 )
 
-                # 在 session 关闭前完成字段读取，避免 lazy-load 失败
                 for r in rows:
-                    permissions.append({
+                    all_perms.append({
                         'id': r.id,
                         'permission_name': r.permission_name,
                         'permission_code': r.permission_code,
@@ -202,6 +210,7 @@ class PermissionManagementService:
                         'parent_permission_id': r.parent_permission_id,
                         'type': r.type,
                         'status': r.status,
+                        'children': [],
                         'created_time': (
                             r.created_time.strftime('%Y-%m-%d %H:%M:%S')
                             if r.created_time else None  # pyright: ignore[reportGeneralTypeIssues]
@@ -212,10 +221,20 @@ class PermissionManagementService:
                         ),
                     })
 
-            return permissions
+            id_map: Dict[int, Dict] = {p['id']: p for p in all_perms}
+            roots: List[Dict] = []
+
+            for perm in all_perms:
+                parent_id = perm['parent_permission_id']
+                if parent_id is None or parent_id not in id_map:
+                    roots.append(perm)
+                else:
+                    id_map[parent_id]['children'].append(perm)
+
+            return roots
 
         except Exception as e:
-            print(f"[PermissionManagementService] 获取所有权限（扁平）失败: {str(e)}")
+            print(f"[PermissionManagementService] 获取模块权限树失败: {str(e)}")
             return []
 
     @staticmethod
@@ -369,6 +388,7 @@ class PermissionManagementService:
                 session.flush()  # 拿到新生成的 id
                 permission_id = new_perm.id
 
+            PermissionService.clear_cache()
             return True, "创建成功", permission_id  # pyright: ignore[reportReturnType]
 
         except Exception as e:
@@ -441,6 +461,7 @@ class PermissionManagementService:
 
                 perm.updated_time = datetime.now()  # pyright: ignore[reportAttributeAccessIssue]
 
+            PermissionService.clear_cache()
             return True, "更新成功"
 
         except Exception as e:
@@ -491,6 +512,7 @@ class PermissionManagementService:
                     CrmappPermissions.id == permission_id
                 ).delete(synchronize_session=False)
 
+            PermissionService.clear_cache()
             return True, "删除成功"
 
         except Exception as e:
