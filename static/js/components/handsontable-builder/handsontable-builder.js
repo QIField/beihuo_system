@@ -230,7 +230,11 @@ var HandsontableBuilder = (function() {
             builder.visibleColumns = columns.filter(function(col) {
                 return !col.hide;
             });
-            refresh(builder);
+            if (config.dataUrl === null || config.dataUrl === undefined) {
+                renderLocalData(builder);
+            } else {
+                refresh(builder);
+            }
             return;
         }
 
@@ -252,14 +256,30 @@ var HandsontableBuilder = (function() {
                 builder.visibleColumns = columns.filter(function(col) {
                     return !col.hide;
                 });
-                refresh(builder);
+                if (config.dataUrl === null || config.dataUrl === undefined) {
+                    renderLocalData(builder);
+                } else {
+                    refresh(builder);
+                }
             })
             .catch(function(e) {
                 console.error('[HandsontableBuilder] 加载列偏好失败:', e);
                 columns.forEach(function(col) { col.hide = false; });
                 builder.visibleColumns = columns.slice();
-                refresh(builder);
+                if (config.dataUrl === null || config.dataUrl === undefined) {
+                    renderLocalData(builder);
+                } else {
+                    refresh(builder);
+                }
             });
+    }
+
+    function renderLocalData(builder) {
+        var data = builder.config.localData || [];
+        if (builder.pagination) {
+            builder.pagination.update(data.length, builder.currentPage, builder.pageSize);
+        }
+        render(builder, data);
     }
 
     function buildParams(builder) {
@@ -554,7 +574,13 @@ var HandsontableBuilder = (function() {
         if (!builder) return null;
 
         builder.refresh = function(page, pageSize) {
-            refresh(builder, page, pageSize);
+            if (builder.config.dataUrl === null || builder.config.dataUrl === undefined) {
+                builder.currentPage = page !== undefined ? page : builder.currentPage;
+                builder.pageSize = pageSize !== undefined ? pageSize : builder.pageSize;
+                renderLocalData(builder);
+            } else {
+                refresh(builder, page, pageSize);
+            }
             return builder;
         };
 

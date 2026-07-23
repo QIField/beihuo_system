@@ -376,10 +376,11 @@ class QuoteCountSyncService:
         for item in data:
             name = item.get('name', '')
             value = item.get('value', '')
-            # 发动机：优先"发动机"，其次"发动机编码"
-            if name in ["发动机", "发动机编码"]:
+            # 发动机：优先"发动机"，其次"发动机编码"、"发动机编号"
+            if name in ["发动机", "发动机编码", "发动机编号"]:
                 config["engine"] = value
-            elif name == "车辆生产日期":
+            # 车辆生产日期：优先"车辆生产日期"，其次"交货日期"
+            elif name in ["车辆生产日期", "交货日期"]:
                 config["production_date"] = value
             # 底盘：优先"底盘"，其次"车型编码"
             elif name in ["底盘", "车型编码"]:

@@ -74,3 +74,10 @@ def display_unpaid_customer_limit():
 def ks_inquiry_records():
     """开思询价明细页面"""
     return render_template("ks_inquiry_records/ks_inquiry_records_main.html")
+
+
+@general_web_bp.route("/multi_channel_quote_adjust")
+@require_page_login()
+def multi_channel_quote_adjust():
+    """多渠道报价调价"""
+    return render_template("multi_channel_quote_adjust/multi_channel_quote_adjust.html")
