@@ -849,6 +849,7 @@
                         <a href="javascript:;">CRM</a>
                         <dl class="layui-nav-child">
                             <dd><a href="javascript:void(0);" onclick="openReplaceNumberEditInNewTab()">替换号编辑</a></dd>
+                            <dd id="multiChannelQuoteAdjustMenuItem" style="display: none;"><a href="/multi_channel_quote_adjust" target="_blank">多渠道报价调价</a></dd>
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed">
@@ -1123,6 +1124,12 @@ function addUser() {
                                 <input type="checkbox" name="can_update_crm" lay-skin="switch" lay-text="是|否">
                             </div>
                         </div>
+                        <div class="layui-form-item" id="multiChannelQuoteAdjustPermissionItemAdd" style="display: none;">
+                            <label class="layui-form-label">多渠道报价调价权限</label>
+                            <div class="layui-input-block">
+                                <input type="checkbox" name="can_multi_channel_quote_adjust" lay-skin="switch" lay-text="是|否">
+                            </div>
+                        </div>
                         <div class="layui-form-item">
                             <label class="layui-form-label">所属门店</label>
                             <div class="layui-input-block">
@@ -1197,6 +1204,7 @@ function addUser() {
                             can_inquiry_module: form_data.field.can_inquiry_module === 'on' ? 1 : 0, // 询价模块权限
                             can_compare_module: form_data.field.can_compare_module === 'on' ? 1 : 0, // 比价模块权限
                             can_update_crm: form_data.field.can_update_crm === 'on' ? 1 : 0, // 更新CRM权限
+                            can_multi_channel_quote_adjust: form_data.field.can_multi_channel_quote_adjust === 'on' ? 1 : 0, // 多渠道报价调价权限
                             store: form_data.field.store,
                             department: form_data.field.department,  // 板块
                             job_level: form_data.field.job_level     // 职级
@@ -1513,6 +1521,10 @@ fetch('/api/current_user')
             document.getElementById('compareFunctionMenuItem').style.display =
                 result.can_compare_module ? 'block' : 'none';
 
+            // 控制多渠道报价调价菜单项的显示
+            document.getElementById('multiChannelQuoteAdjustMenuItem').style.display =
+                result.can_multi_channel_quote_adjust ? 'block' : 'none';
+
             // 将用户权限存储到全局变量中
             window.currentUserPermissions = {
                 username: result.username,
@@ -1522,6 +1534,7 @@ fetch('/api/current_user')
                 can_inquiry_module: result.can_inquiry_module || false,  // 询价模块权限
                 can_compare_module: result.can_compare_module || false,  // 比价模块权限
                 can_update_crm: result.can_update_crm || false,  // 更新CRM权限
+                can_multi_channel_quote_adjust: result.can_multi_channel_quote_adjust || false,  // 多渠道报价调价权限
                 store: result.store,
                 current_org: result.current_org,
                 allowed_orgs: result.allowed_orgs || []  // 允许切换的组织列表
@@ -1726,13 +1739,16 @@ window.loadStoreInfo = function() {
                         {field: 'can_update_crm', title: '更新CRM', width: 80, align: 'center', templet: function(d){
                             return d.can_update_crm ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
                         }},
+                        {field: 'can_multi_channel_quote_adjust', title: '多渠道报价', width: 90, align: 'center', templet: function(d){
+                            return d.can_multi_channel_quote_adjust ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
                         {field: 'store_name', title: '门店', width: 80, align: 'center'},
                         {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
                         {title: '操作', width: 150, align: 'center', templet: function(d) {
                             // 只保留编辑和删除按钮，其他功能移到编辑弹窗内
                             if (currentUser.logged_in && currentUser.is_admin && d.username !== currentUser.username) {
                                 return '<div class="user-action-btns">' +
-                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ', \'' + (d.department || '') + '\', \'' + (d.job_level || '') + '\', ' + (d.allowed_orgs ? '\'' + btoa(JSON.stringify(d.allowed_orgs)) + '\'' : 'null') + ', ' + (d.can_inquiry_module || 0) + ', ' + (d.can_compare_module || 0) + ', ' + (d.can_update_crm || 0) + ')">编辑</button>' +
+                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ', \'' + (d.department || '') + '\', \'' + (d.job_level || '') + '\', ' + (d.allowed_orgs ? '\'' + btoa(JSON.stringify(d.allowed_orgs)) + '\'' : 'null') + ', ' + (d.can_inquiry_module || 0) + ', ' + (d.can_compare_module || 0) + ', ' + (d.can_update_crm || 0) + ', ' + (d.can_multi_channel_quote_adjust || 0) + ')">编辑</button>' +
                                        '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteUser(' + d.id + ', \'' + d.username + '\')">删除</button>' +
                                        '</div>';
                             }
@@ -1790,6 +1806,9 @@ window.loadStoreInfo = function() {
                         }},
                         {field: 'can_update_crm', title: '更新CRM', width: 80, align: 'center', templet: function(d){
                             return d.can_update_crm ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+                        }},
+                        {field: 'can_multi_channel_quote_adjust', title: '多渠道报价', width: 90, align: 'center', templet: function(d){
+                            return d.can_multi_channel_quote_adjust ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
                         }},
                         {field: 'store_name', title: '门店', width: 80, align: 'center'},
                         {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
@@ -2024,22 +2043,26 @@ function addUser() {
                     var permItem3 = layero.find('#inquiryModulePermissionItemAdd')[0];
                     var permItem4 = layero.find('#compareModulePermissionItemAdd')[0];
                     var permItem5 = layero.find('#updateCrmPermissionItemAdd')[0];
+                    var permItem6 = layero.find('#multiChannelQuoteAdjustPermissionItemAdd')[0];
                     if (permItem1) permItem1.style.display = 'block';
                     if (permItem2) permItem2.style.display = 'block';
                     if (permItem3) permItem3.style.display = 'block';
                     if (permItem4) permItem4.style.display = 'block';
                     if (permItem5) permItem5.style.display = 'block';
+                    if (permItem6) permItem6.style.display = 'block';
                 } else {
                     var permItem1 = layero.find('#processOrdersPermissionItemAdd')[0];
                     var permItem2 = layero.find('#processOrdersPermissionItemAdd2')[0];
                     var permItem3 = layero.find('#inquiryModulePermissionItemAdd')[0];
                     var permItem4 = layero.find('#compareModulePermissionItemAdd')[0];
                     var permItem5 = layero.find('#updateCrmPermissionItemAdd')[0];
+                    var permItem6 = layero.find('#multiChannelQuoteAdjustPermissionItemAdd')[0];
                     if (permItem1) permItem1.style.display = 'none';
                     if (permItem2) permItem2.style.display = 'none';
                     if (permItem3) permItem3.style.display = 'none';
                     if (permItem4) permItem4.style.display = 'none';
                     if (permItem5) permItem5.style.display = 'none';
+                    if (permItem6) permItem6.style.display = 'none';
                 }
 
                 form.render(); // 渲染表单元素
@@ -2256,7 +2279,7 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs, userStore) {
 }
 
 // 编辑用户功能
-function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders, admin_flag, department, job_level, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm) {
+function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders, admin_flag, department, job_level, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust) {
     layui.use(['layer', 'form'], function(){
         var layer = layui.layer;
         var form = layui.form;
@@ -2325,6 +2348,12 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                                 <input type="checkbox" name="can_update_crm" lay-skin="switch" lay-text="是|否">
                             </div>
                         </div>
+                        <div class="layui-form-item" id="multiChannelQuoteAdjustPermissionItem" style="display: none;">
+                            <label class="layui-form-label">多渠道报价调价权限</label>
+                            <div class="layui-input-block">
+                                <input type="checkbox" name="can_multi_channel_quote_adjust" lay-skin="switch" lay-text="是|否">
+                            </div>
+                        </div>
                         <div class="layui-form-item">
                             <label class="layui-form-label">所属门店</label>
                             <div class="layui-input-block">
@@ -2386,22 +2415,26 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                     var permItem3 = layero.find('#inquiryModulePermissionItem')[0];
                     var permItem4 = layero.find('#compareModulePermissionItem')[0];
                     var permItem5 = layero.find('#updateCrmPermissionItem')[0];
+                    var permItem6 = layero.find('#multiChannelQuoteAdjustPermissionItem')[0];
                     if (permItem1) permItem1.style.display = 'block';
                     if (permItem2) permItem2.style.display = 'block';
                     if (permItem3) permItem3.style.display = 'block';
                     if (permItem4) permItem4.style.display = 'block';
                     if (permItem5) permItem5.style.display = 'block';
+                    if (permItem6) permItem6.style.display = 'block';
                 } else {
                     var permItem1 = layero.find('#processOrdersPermissionItem')[0];
                     var permItem2 = layero.find('#processOrdersPermissionItemAdd')[0];
                     var permItem3 = layero.find('#inquiryModulePermissionItem')[0];
                     var permItem4 = layero.find('#compareModulePermissionItem')[0];
                     var permItem5 = layero.find('#updateCrmPermissionItem')[0];
+                    var permItem6 = layero.find('#multiChannelQuoteAdjustPermissionItem')[0];
                     if (permItem1) permItem1.style.display = 'none';
                     if (permItem2) permItem2.style.display = 'none';
                     if (permItem3) permItem3.style.display = 'none';
                     if (permItem4) permItem4.style.display = 'none';
                     if (permItem5) permItem5.style.display = 'none';
+                    if (permItem6) permItem6.style.display = 'none';
                 }
 
                 form.render(); // 渲染表单元素
@@ -2414,6 +2447,7 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                     'can_inquiry_module': can_inquiry_module ? 'on' : '', // 添加询价模块权限开关
                     'can_compare_module': can_compare_module ? 'on' : '', // 添加比价模块权限开关
                     'can_update_crm': can_update_crm ? 'on' : '', // 更新CRM权限开关
+                    'can_multi_channel_quote_adjust': can_multi_channel_quote_adjust ? 'on' : '', // 多渠道报价调价权限开关
                     'store': store
                 });
                 
@@ -2432,6 +2466,7 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                             can_inquiry_module: form_data.field.can_inquiry_module === 'on' ? 1 : 0, // 添加询价模块权限字段
                             can_compare_module: form_data.field.can_compare_module === 'on' ? 1 : 0, // 添加比价模块权限字段
                             can_update_crm: form_data.field.can_update_crm === 'on' ? 1 : 0, // 更新CRM权限字段
+                            can_multi_channel_quote_adjust: form_data.field.can_multi_channel_quote_adjust === 'on' ? 1 : 0, // 多渠道报价调价权限字段
                             store: form_data.field.store,
                             department: form_data.field.department || null,  // 板块
                             job_level: form_data.field.job_level || null     // 职级

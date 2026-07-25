@@ -39,6 +39,17 @@ def login_required(f):
     return decorated_function
 
 
+def multi_channel_quote_adjust_permission_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return jsonify({'code': 1, 'msg': '未登录，请先登录'}), 401
+        if not session.get('is_admin', False) and not session.get('can_multi_channel_quote_adjust', False):
+            return jsonify({'code': 1, 'msg': '无权限访问多渠道报价调价'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 def get_user_company():
     """获取当前用户公司代码"""
     user_store = session.get('store', 'fsbbr')
@@ -49,7 +60,7 @@ def get_user_company():
 
 
 @bp.route('/supplier-quote/import-excel', methods=['POST'])
-@login_required
+@multi_channel_quote_adjust_permission_required
 def import_excel():
     """
     导入 OE Excel
@@ -100,7 +111,7 @@ def import_excel():
 
 
 @bp.route('/supplier-quote/quote-list', methods=['GET'])
-@login_required
+@multi_channel_quote_adjust_permission_required
 def quote_list():
     """
     获取最近 36 小时内导入的 OE 报价列表（直接读库，不再实时调 CRM）
@@ -128,7 +139,7 @@ def quote_list():
 
 
 @bp.route('/supplier-quote/convert-qq-messages', methods=['POST'])
-@login_required
+@multi_channel_quote_adjust_permission_required
 def convert_qq_messages():
     """
     手动触发 QQ 聊天消息转换
@@ -148,7 +159,7 @@ def convert_qq_messages():
 
 
 @bp.route('/supplier-quote/template-url', methods=['GET'])
-@login_required
+@multi_channel_quote_adjust_permission_required
 def template_url():
     """获取模板下载地址"""
     return jsonify({
@@ -161,7 +172,7 @@ def template_url():
 
 
 @bp.route('/supplier-quote/update-price', methods=['POST'])
-@login_required
+@multi_channel_quote_adjust_permission_required
 def update_price():
     """
     更新产品卖价到公司价格系统
@@ -201,7 +212,7 @@ def update_price():
 
 
 @bp.route('/supplier-quote/batch-update-price', methods=['POST'])
-@login_required
+@multi_channel_quote_adjust_permission_required
 def batch_update_price():
     """
     批量更新当前页产品卖价

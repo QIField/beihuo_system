@@ -35,6 +35,7 @@ class CrmappUsers(BaseModels):
     can_inquiry_module = Column(SmallInteger, default=0, comment='是否有权限访问询价模块 0-否 1-是')
     can_compare_module = Column(SmallInteger, default=0, comment='是否有权限访问比价模块 0-否 1-是')
     can_update_crm = Column(SmallInteger, default=0, comment='是否有权限更新CRM产品信息 0-否 1-是')
+    can_multi_channel_quote_adjust = Column(SmallInteger, default=0, comment='是否有权限访问多渠道报价调价 0-否 1-是')
 
     # 组织与人员信息
     store = Column(String(50), default='fsbbr', comment='所属门店代码')
@@ -127,6 +128,7 @@ class CrmappUsers(BaseModels):
             'can_inquiry_module': self.can_inquiry_module,
             'can_compare_module': self.can_compare_module,
             'can_update_crm': self.can_update_crm,
+            'can_multi_channel_quote_adjust': self.can_multi_channel_quote_adjust,
             'ip_records': self.get_ip_records(),
             'allowed_orgs': self.get_allowed_orgs(),
             'created_time': self.created_time.strftime('%Y-%m-%d %H:%M:%S') if self.created_time else None,  # pyright: ignore[reportGeneralTypeIssues]
