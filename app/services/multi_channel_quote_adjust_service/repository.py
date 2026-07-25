@@ -325,7 +325,7 @@ def fetch_qq_chat_message_results_by_oes(oe_list: List[str], hours: int = 36) ->
         return []
 
     sql = """
-        SELECT `search_oe`, `供应商`, `brand`, `price`
+        SELECT `search_oe`, `result_oe`, `供应商`, `brand`, `price`
         FROM `qq_chat_message_result`
         WHERE `search_oe` IN (%s)
           AND `conversion_time` >= DATE_SUB(NOW(), INTERVAL %%s HOUR)

@@ -171,6 +171,7 @@
             { data: 'car_brand', title: '车辆品牌', width: 90, readOnly: true },
             { data: 'system_oe', title: '系统 OE', width: 130, readOnly: true },
             { data: 'supplier', title: '询价供应商', width: 120, readOnly: true },
+            { data: 'return_oe', title: '返回OE', width: 130, readOnly: true },
             { data: 'return_brand', title: '返回品牌', width: 100, readOnly: true },
             { data: 'return_price', title: '返回价格', width: 100, type: 'numeric', numericFormat: { pattern: '0.00' }, readOnly: true },
             { data: 'sell_price', title: '卖价', width: 80, type: 'numeric', numericFormat: { pattern: '0.00' }, readOnly: true },
@@ -188,7 +189,7 @@
         ];
 
         // 不参与 product_id 合并的列字段
-        var UNMERGED_COLUMNS = ['supplier', 'return_brand', 'return_price'];
+        var UNMERGED_COLUMNS = ['supplier', 'return_oe', 'return_brand', 'return_price'];
 
         function buildMergeCells(data) {
             var visibleCols = (window.builder && window.builder.visibleColumns) ? window.builder.visibleColumns : columns;

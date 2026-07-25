@@ -321,6 +321,7 @@ def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> 
         if not matched:
             new_row = dict(row)
             new_row["supplier"] = ""
+            new_row["return_oe"] = ""
             new_row["return_brand"] = ""
             new_row["return_price"] = ""
             expanded.append(new_row)
@@ -329,6 +330,7 @@ def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> 
         for r in matched:
             new_row = dict(row)
             new_row["supplier"] = r.get("供应商", "")
+            new_row["return_oe"] = r.get("result_oe", "")
             new_row["return_brand"] = r.get("brand", "")
             new_row["return_price"] = _to_str_price(r.get("price"))
             expanded.append(new_row)
