@@ -13,6 +13,10 @@ import pandas as pd
 
 from app.services.multi_channel_quote_adjust_service.repository import (
     fetch_suppliers_by_car_brand,
+    fetch_qq_chat_message_results_by_oes,
+    save_to_qq_msg,
+    save_import_records,
+    fetch_recent_imports,
 )
 from app.utils.crm_product.crm_product_matcher import (
     fetch_matched_products,
@@ -223,7 +227,9 @@ def build_quote_adjust_rows(company: str, rows: List[Dict[str, Any]]) -> List[Di
                 "profit_rate": "",
                 "profit_amount": "",
                 "supplier_selected": "",
-                "new_sell_price": "",
+                "cass_price": "",
+                "peer_price": "",
+                "qpl_price": "",
                 "new_profit_rate": "",
                 "new_profit_amount": "",
                 "product_id": "",
@@ -249,7 +255,9 @@ def build_quote_adjust_rows(company: str, rows: List[Dict[str, Any]]) -> List[Di
                 "profit_rate": _calc_profit_rate(sell_price, cost_price),
                 "profit_amount": _calc_profit_amount(sell_price, cost_price),
                 "supplier_selected": "",
-                "new_sell_price": "",
+                "cass_price": "",
+                "peer_price": "",
+                "qpl_price": "",
                 "new_profit_rate": "",
                 "new_profit_amount": "",
                 "product_id": fields.get("product_id", ""),
@@ -264,3 +272,92 @@ def build_quote_adjust_rows(company: str, rows: List[Dict[str, Any]]) -> List[Di
 def get_template_download_url() -> str:
     """获取模板下载 URL"""
     return "/static/excel/multi_price_edit.xlsx"
+
+
+def _to_str_price(value: Any) -> str:
+    """将价格转为字符串，保留两位小数"""
+    if value is None or value == "":
+        return ""
+    try:
+        return f"{float(value):.2f}"
+    except (ValueError, TypeError):
+        return str(value)
+
+
+def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> List[Dict[str, Any]]:
+    """
+    将导入行按 qq_chat_message_result 的匹配结果逐行展开
+
+    规则：
+    - 用导入行的 oe 匹配结果表的 search_oe
+    - 只取最近 N 小时内的结果
+    - 每个匹配结果生成一行；无结果时保留原行， supplier / return_brand / return_price 为空
+
+    Args:
+        rows: fetch_recent_imports 返回的行列表
+        hours: 结果时间窗口（小时）
+
+    Returns:
+        展开后的行列表
+    """
+    if not rows:
+        return []
+
+    oe_list = [row.get("oe", "") for row in rows if row.get("oe")]
+    results = fetch_qq_chat_message_results_by_oes(oe_list, hours)
+
+    results_by_oe: Dict[str, List[Dict[str, Any]]] = {}
+    for r in results:
+        oe = r.get("search_oe", "")
+        if oe not in results_by_oe:
+            results_by_oe[oe] = []
+        results_by_oe[oe].append(r)
+
+    expanded = []
+    for row in rows:
+        oe = row.get("oe", "")
+        matched = results_by_oe.get(oe, [])
+
+        if not matched:
+            new_row = dict(row)
+            new_row["supplier"] = ""
+            new_row["return_brand"] = ""
+            new_row["return_price"] = ""
+            expanded.append(new_row)
+            continue
+
+        for r in matched:
+            new_row = dict(row)
+            new_row["supplier"] = r.get("供应商", "")
+            new_row["return_brand"] = r.get("brand", "")
+            new_row["return_price"] = _to_str_price(r.get("price"))
+            expanded.append(new_row)
+
+    return expanded
+
+
+def save_import_pipeline(expanded_rows: List[Dict[str, Any]], full_rows: List[Dict[str, Any]], create_by: str) -> None:
+    """
+    导入 Excel 后的完整保存流程
+
+    Args:
+        expanded_rows: 展开供应商后的行
+        full_rows: 组装完成的前端表格行
+        create_by: 操作人
+    """
+    save_to_qq_msg(expanded_rows)
+    save_import_records(full_rows, create_by)
+
+
+def fetch_quote_list_data(hours: int = 36) -> List[Dict[str, Any]]:
+    """
+    获取报价列表数据（含 QQ 聊天消息结果展开）
+
+    Args:
+        hours: 查询最近 N 小时内的导入记录
+
+    Returns:
+        展开后的前端表格行列表
+    """
+    data_list = fetch_recent_imports(hours)
+    return expand_rows_with_qq_results(data_list, hours=hours)

@@ -158,6 +158,11 @@ var HandsontableBuilder = (function() {
      */
     function create(selector, config) {
         config = config || {};
+        config.components = config.components || {};
+        // 默认开启虚拟滚动，页面可显式设置为 false 关闭
+        if (config.components.virtualScroll === undefined) {
+            config.components.virtualScroll = true;
+        }
 
         var container = document.querySelector(selector);
         if (!container) {
@@ -207,7 +212,11 @@ var HandsontableBuilder = (function() {
             onPageChange: function(page, pageSize) {
                 builder.currentPage = page;
                 builder.pageSize = pageSize;
-                refresh(builder);
+                if (builder.config.dataUrl === null || builder.config.dataUrl === undefined) {
+                    renderLocalData(builder);
+                } else {
+                    refresh(builder);
+                }
             }
         });
     }
@@ -276,10 +285,52 @@ var HandsontableBuilder = (function() {
 
     function renderLocalData(builder) {
         var data = builder.config.localData || [];
-        if (builder.pagination) {
-            builder.pagination.update(data.length, builder.currentPage, builder.pageSize);
+
+        // 本地筛选
+        if (builder.filterColumn && builder.filterValues && builder.filterValues.length > 0) {
+            data = data.filter(function(row) {
+                var val = row[builder.filterColumn];
+                if (val === undefined || val === null) val = '';
+                return builder.filterValues.indexOf(String(val)) !== -1;
+            });
         }
-        render(builder, data);
+
+        var pageData = data;
+        if (builder.pagination) {
+            var page = builder.currentPage || 1;
+            var pageSize = builder.pageSize || data.length;
+            var start = (page - 1) * pageSize;
+            var end = start + pageSize;
+            pageData = data.slice(start, end);
+            builder.pagination.update(data.length, page, pageSize);
+        }
+        render(builder, pageData);
+    }
+
+    function sortLocalData(builder) {
+        var data = builder.config.localData || [];
+        var colId = builder.sortColumn;
+        var dir = builder.sortDir;
+        if (!colId || !dir || !data.length) return;
+
+        data.sort(function(a, b) {
+            var va = a[colId];
+            var vb = b[colId];
+            if (va === undefined || va === null) va = '';
+            if (vb === undefined || vb === null) vb = '';
+
+            var numA = parseFloat(va);
+            var numB = parseFloat(vb);
+            if (!isNaN(numA) && !isNaN(numB) && String(va).trim() !== '' && String(vb).trim() !== '') {
+                return dir === 'asc' ? numA - numB : numB - numA;
+            }
+
+            va = String(va);
+            vb = String(vb);
+            if (va < vb) return dir === 'asc' ? -1 : 1;
+            if (va > vb) return dir === 'asc' ? 1 : -1;
+            return 0;
+        });
     }
 
     function buildParams(builder) {
@@ -483,7 +534,8 @@ var HandsontableBuilder = (function() {
             persist: persist,
             pageKey: pageKey,
             gridKey: gridKey,
-            skipInitialLoad: true
+            skipInitialLoad: true,
+            _originalRows: (config.localData || []).slice()
         };
 
         menuOptions.onSort = function(colId, direction) {
@@ -493,7 +545,12 @@ var HandsontableBuilder = (function() {
             if (typeof config.onSort === 'function') {
                 config.onSort(colId, direction);
             }
-            refresh(builder);
+            if (builder.config.dataUrl === null || builder.config.dataUrl === undefined) {
+                sortLocalData(builder);
+                renderLocalData(builder);
+            } else {
+                refresh(builder);
+            }
         };
 
         menuOptions.onColumnVisibilityChange = function(visibleCols) {
@@ -501,6 +558,7 @@ var HandsontableBuilder = (function() {
             if (typeof config.onColumnVisibilityChange === 'function') {
                 config.onColumnVisibilityChange(visibleCols);
             }
+            renderLocalData(builder);
         };
 
         menuOptions.onDataRefresh = function(filterState) {
@@ -519,7 +577,11 @@ var HandsontableBuilder = (function() {
             } else if (typeof config.onFilter === 'function') {
                 config.onFilter(filterState);
             }
-            refresh(builder);
+            if (builder.config.dataUrl === null || builder.config.dataUrl === undefined) {
+                renderLocalData(builder);
+            } else {
+                refresh(builder);
+            }
         };
 
         if (typeof config.getFilterValues === 'function') {
