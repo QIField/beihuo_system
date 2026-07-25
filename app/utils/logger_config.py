@@ -81,6 +81,7 @@ TASK_LOGGERS = [
     'crm_price_sync',               # CRM 产品价格同步
     'replace_number',               # 更新替换号
     'quote_replace_number',         # 报价 OE 替换号自动同步
+    'multi_channel_quote_adjust',   # 多渠道报价调价
 ]
 
 

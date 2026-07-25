@@ -421,8 +421,6 @@ var GridColumnMenu = (function() {
         menuBtn.style.right = '0px';
         menuBtn.style.top = '50%';
         menuBtn.style.transform = 'translateY(-50%)';
-        menuBtn.style.padding = '0 6px';
-        menuBtn.style.fontSize = '14px';
         colHeader.appendChild(menuBtn);
         refreshMenuButtonStates(gridSelector);
     }
@@ -433,8 +431,8 @@ var GridColumnMenu = (function() {
         menuBtn.className = 'ag-col-menu-btn';
         menuBtn.setAttribute('data-col-id', colId);
         menuBtn.setAttribute('data-grid-selector', gridSelector);
-        menuBtn.innerHTML = '▾';
-        menuBtn.style.cssText = 'cursor: pointer; padding: 0 6px; margin-left: 2px; user-select: none;';
+        menuBtn.innerHTML = '';
+        menuBtn.style.cssText = 'cursor: pointer; user-select: none;';
 
         if (!options.noHover) {
             menuBtn.addEventListener('mouseenter', function() { this.style.opacity = '1'; });
@@ -696,6 +694,10 @@ var GridColumnMenu = (function() {
         var rowData = [];
         if (gridInfo._originalRows && gridInfo._originalRows.length > 0) {
             rowData = gridInfo._originalRows;
+        } else if (gridInfo.isHandsontable && api) {
+            try {
+                rowData = api.getSourceData() || [];
+            } catch (e) {}
         } else {
             try {
                 api.forEachNode(function(node) { if (node.data) rowData.push(node.data); });

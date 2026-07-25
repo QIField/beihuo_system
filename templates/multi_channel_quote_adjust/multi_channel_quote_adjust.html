@@ -20,6 +20,9 @@
     <link rel="stylesheet" href="/static/js/components/grid-column-menu/grid-column-menu.css">
     <script src="/static/js/components/grid-column-menu/grid-column-menu.js"></script>
 
+    <!-- Filter Panel (Grid Column Menu 下拉面板样式依赖) -->
+    <link rel="stylesheet" href="/static/js/components/filter_panel/filter-panel.css">
+
     <!-- Column Preference -->
     <script src="/static/js/components/column-preference/column-preference.js"></script>
 
@@ -107,6 +110,12 @@
             <button class="layui-btn layui-btn-normal" id="downloadTemplateBtn">
                 下载模板
             </button>
+            <button class="layui-btn layui-btn-normal" id="convertQqBtn">
+                转换 QQ 消息
+            </button>
+            <button class="layui-btn layui-btn-normal" id="batchUpdateBtn">
+                批量更新当前页数据
+            </button>
         </div>
 
         <div class="tab-content">
@@ -145,26 +154,84 @@
             return td;
         }
 
+        function indexRenderer(instance, td, row, col, prop, value, cellProperties) {
+            var page = window.builder ? window.builder.currentPage : 1;
+            var pageSize = window.builder ? window.builder.pageSize : 100;
+            td.innerText = (page - 1) * pageSize + row + 1;
+            td.style.textAlign = 'center';
+            return td;
+        }
+
         var gridData = [];
 
         var columns = [
+            { data: 'index', title: '序号', width: 60, readOnly: true, renderer: indexRenderer },
             { data: 'oe', title: 'OE 号', width: 140, readOnly: true },
             { data: 'brand', title: '品牌', width: 90, readOnly: true },
             { data: 'car_brand', title: '车辆品牌', width: 90, readOnly: true },
             { data: 'system_oe', title: '系统 OE', width: 130, readOnly: true },
-            { data: 'supplier', title: '询价供应商', width: 160, readOnly: true },
+            { data: 'supplier', title: '询价供应商', width: 120, readOnly: true },
+            { data: 'return_oe', title: '返回OE', width: 130, readOnly: true },
+            { data: 'return_brand', title: '返回品牌', width: 100, readOnly: true },
+            { data: 'return_price', title: '返回价格', width: 100, type: 'numeric', numericFormat: { pattern: '0.00' }, readOnly: true },
             { data: 'sell_price', title: '卖价', width: 80, type: 'numeric', numericFormat: { pattern: '0.00' }, readOnly: true },
             { data: 'cost_price', title: '成本', width: 80, type: 'numeric', numericFormat: { pattern: '0.00' }, readOnly: true },
             { data: 'profit_rate', title: '利润率', width: 80, readOnly: true },
             { data: 'profit_amount', title: '毛利额', width: 80, readOnly: true },
-            { data: 'supplier_selected', title: '供应商', width: 120, readOnly: true },
-            { data: 'new_sell_price', title: '修改后的卖价', width: 120, type: 'numeric', numericFormat: { pattern: '0.00' } },
+            { data: 'cass_price', title: '开思价', width: 100, type: 'numeric', numericFormat: { pattern: '0.00' }, readOnly: false },
+            { data: 'peer_price', title: '同行价', width: 100, type: 'numeric', numericFormat: { pattern: '0.00' }, readOnly: false },
+            { data: 'qpl_price', title: '汽配龙价', width: 100, type: 'numeric', numericFormat: { pattern: '0.00' }, readOnly: false },
             { data: 'new_profit_rate', title: '利润率', width: 80, readOnly: true },
             { data: 'new_profit_amount', title: '毛利额', width: 80, readOnly: true },
             { data: 'product_id', title: '产品 ID', width: 130, readOnly: true },
             { data: 'barcode', title: '条码', width: 120, readOnly: true },
             { data: 'modify', title: '修改', width: 80, type: 'text', renderer: yesNoRenderer, readOnly: false }
         ];
+
+        // 不参与 product_id 合并的列字段
+        var UNMERGED_COLUMNS = ['supplier', 'return_oe', 'return_brand', 'return_price'];
+
+        function buildMergeCells(data) {
+            var visibleCols = (window.builder && window.builder.visibleColumns) ? window.builder.visibleColumns : columns;
+            var mergeCells = [];
+            if (!data || data.length < 2) return mergeCells;
+
+            var startRow = 0;
+            for (var i = 1; i <= data.length; i++) {
+                var prevPid = data[i - 1] ? (data[i - 1].product_id || '') : '';
+                var currPid = data[i] ? (data[i].product_id || '') : '';
+                if (i === data.length || prevPid !== currPid || !prevPid) {
+                    var endRow = i - 1;
+                    var rowCount = endRow - startRow + 1;
+                    if (rowCount > 1 && prevPid) {
+                        for (var c = 0; c < visibleCols.length; c++) {
+                            var colDef = visibleCols[c];
+                            if (!colDef || !colDef.data) continue;
+                            if (UNMERGED_COLUMNS.indexOf(colDef.data) !== -1) continue;
+
+                            var firstValue = data[startRow][colDef.data];
+                            var allSame = true;
+                            for (var r = startRow + 1; r <= endRow; r++) {
+                                if (data[r][colDef.data] !== firstValue) {
+                                    allSame = false;
+                                    break;
+                                }
+                            }
+                            if (allSame) {
+                                mergeCells.push({
+                                    row: startRow,
+                                    col: c,
+                                    rowspan: rowCount,
+                                    colspan: 1
+                                });
+                            }
+                        }
+                    }
+                    startRow = i;
+                }
+            }
+            return mergeCells;
+        }
 
         function createGrid() {
             return HandsontableBuilder.create('#supplierQuoteGrid', {
@@ -174,6 +241,7 @@
                 columns: columns,
                 dataUrl: null,
                 localData: gridData,
+                mergeCellsBuilder: buildMergeCells,
                 paramsBuilder: function() {
                     return {};
                 },
@@ -192,30 +260,34 @@
                     contextMenu: false,
                     shortcuts: true
                 },
-                beforeChange: function(changes, source) {
-                    if (source === 'loadData' || !changes) return;
-                    for (var i = 0; i < changes.length; i++) {
-                        var prop = changes[i][1];
-                        var newValue = changes[i][3];
-                        if (prop === 'modify' && newValue !== '是' && newValue !== '否') {
-                            layui.layer.msg('请输入是/否', { icon: 2 });
-                            return false;
+                handsontableOptions: {
+                    beforeChange: function(changes, source) {
+                        if (source === 'loadData' || !changes) return;
+                        for (var i = 0; i < changes.length; i++) {
+                            var prop = changes[i][1];
+                            var newValue = changes[i][3];
+                            if (prop === 'modify' && newValue !== '是' && newValue !== '否') {
+                                layui.layer.msg('请输入是/否', { icon: 2 });
+                                return false;
+                            }
                         }
+                    },
+                    afterChange: function(changes, source) {
+                        if (source === 'loadData' || source === 'programmatic' || !changes) return;
+                        changes.forEach(function(change) {
+                            var row = change[0];
+                            var prop = change[1];
+                            if (prop === 'cass_price') {
+                                var item = window.builder.hot.getSourceDataAtRow(row);
+                                if (!item) return;
+                                var cost = parseFloat(item.cost_price) || 0;
+                                var newProfitRate = item.cass_price ? calcProfitRate(item.cass_price, cost) : '';
+                                var newProfitAmount = item.cass_price ? calcProfitAmount(item.cass_price, cost) : '';
+                                window.builder.hot.setDataAtRowProp(row, 'new_profit_rate', newProfitRate, 'programmatic');
+                                window.builder.hot.setDataAtRowProp(row, 'new_profit_amount', newProfitAmount, 'programmatic');
+                            }
+                        });
                     }
-                },
-                afterChange: function(changes, source) {
-                    if (source === 'loadData' || !changes) return;
-                    changes.forEach(function(change) {
-                        var row = change[0];
-                        var prop = change[1];
-                        if (prop === 'new_sell_price') {
-                            var item = gridData[row];
-                            var cost = parseFloat(item.cost_price) || 0;
-                            item.new_profit_rate = item.new_sell_price ? calcProfitRate(item.new_sell_price, cost) : '';
-                            item.new_profit_amount = item.new_sell_price ? calcProfitAmount(item.new_sell_price, cost) : '';
-                            window.builder.hot.render();
-                        }
-                    });
                 }
             });
         }
@@ -237,8 +309,7 @@
                 if (Array.isArray(result.data.list)) {
                     gridData.push.apply(gridData, result.data.list);
                 }
-                window.builder.hot.loadData(gridData);
-                window.builder.pagination.update(gridData.length, 1, window.builder.pageSize);
+                window.builder.refresh(1, window.builder.pageSize);
             })
             .catch(function(e) {
                 layui.layer.closeAll('loading');
@@ -264,6 +335,7 @@
             var importBtn = document.getElementById('importOeBtn');
             var importInput = document.getElementById('importFileInput');
             var downloadBtn = document.getElementById('downloadTemplateBtn');
+            var batchUpdateBtn = document.getElementById('batchUpdateBtn');
 
             importBtn.addEventListener('click', function() {
                 importInput.click();
@@ -304,6 +376,94 @@
 
             downloadBtn.addEventListener('click', function() {
                 window.open('/static/excel/multi_price_edit.xlsx', '_blank');
+            });
+
+            var convertQqBtn = document.getElementById('convertQqBtn');
+            convertQqBtn.addEventListener('click', function() {
+                layui.layer.load(2);
+                fetch('/new/api/multi_channel_quote_adjust/supplier-quote/convert-qq-messages', {
+                    method: 'POST',
+                    credentials: 'same-origin'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    layui.layer.closeAll('loading');
+                    layui.layer.msg(result.msg || '转换完成', { icon: result.code === 0 ? 1 : 2 });
+                    if (result.code === 0) {
+                        loadQuoteList();
+                    }
+                })
+                .catch(function(e) {
+                    layui.layer.closeAll('loading');
+                    console.error('[转换QQ消息] 失败:', e);
+                    layui.layer.msg('转换QQ消息失败', { icon: 2 });
+                });
+            });
+
+            batchUpdateBtn.addEventListener('click', function() {
+                var currentData = window.builder.hot.getSourceData();
+                var updates = [];
+                var seenProductIds = {};
+                var conflictProductIds = [];
+
+                for (var i = 0; i < currentData.length; i++) {
+                    var row = currentData[i];
+                    if (row.modify === '是' && row.product_id && row.cass_price && row.peer_price) {
+                        var pid = row.product_id;
+                        var priceKey = row.cass_price + '|' + row.peer_price;
+                        if (seenProductIds[pid]) {
+                            if (seenProductIds[pid] !== priceKey) {
+                                if (conflictProductIds.indexOf(pid) === -1) {
+                                    conflictProductIds.push(pid);
+                                }
+                            }
+                            continue;
+                        }
+                        seenProductIds[pid] = priceKey;
+                        updates.push({
+                            product_id: pid,
+                            cass_price: row.cass_price || '',
+                            peer_price: row.peer_price || '',
+                            oe: row.oe || ''
+                        });
+                    }
+                }
+
+                if (conflictProductIds.length > 0) {
+                    layui.layer.msg('以下产品ID存在多个不同价格，请检查后再更新：' + conflictProductIds.join(', '), { icon: 0 });
+                    return;
+                }
+
+                if (updates.length === 0) {
+                    layui.layer.msg('没有需要更新的数据（请确保“修改”为“是”且已填写“开思价”和“同行价”和产品ID）', { icon: 0 });
+                    return;
+                }
+
+                layui.layer.confirm('确认批量更新 ' + updates.length + ' 条数据？', {
+                    btn: ['确认', '取消']
+                }, function() {
+                    layui.layer.load(2);
+
+                    fetch('/new/api/multi_channel_quote_adjust/supplier-quote/batch-update-price', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ updates: updates }),
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(result) {
+                        layui.layer.closeAll('loading');
+                        layui.layer.msg(result.msg || '更新完成', { icon: result.code === 0 ? 1 : 2 });
+                        if (result.code === 0) {
+                            loadQuoteList();
+                        }
+                    })
+                    .catch(function(e) {
+                        layui.layer.closeAll('loading');
+                        console.error('[批量更新] 失败:', e);
+                        layui.layer.msg('批量更新失败', { icon: 2 });
+                    });
+                });
             });
         });
     </script>
