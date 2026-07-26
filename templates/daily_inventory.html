@@ -378,6 +378,21 @@
                     {field: 'detail_ks_price', title: '开思价', width: 110, templet: function(d) {
                         return d.detail_ks_price ? '¥' + d.detail_ks_price : '-';
                       }},
+                    {field: 'detail_gross_profit', title: '毛利额', width: 110, templet: function(d) {
+                        var ks = parseFloat(d.detail_ks_price);
+                        var purchase_price = parseFloat(d.detail_price);
+                        if (isNaN(ks) || ks <= 0 || isNaN(purchase_price) || purchase_price < 0) return '-';
+                        var gross_profit = ks - purchase_price;
+                        return '¥' + gross_profit.toFixed(2);
+                      }},
+                    {field: 'detail_gross_margin', title: '毛利率', width: 110, templet: function(d) {
+                        var ks = parseFloat(d.detail_ks_price);
+                        var purchase_price = parseFloat(d.detail_price);
+                        if (isNaN(ks) || ks <= 0 || isNaN(purchase_price) || purchase_price < 0) return '-';
+                        var gross_profit = ks - purchase_price;
+                        var gross_margin = (gross_profit / ks * 100);
+                        return gross_margin.toFixed(2) + '%';
+                      }},
                     {field: 'detail_operator', title: '操作人', width: 100},
                     { title: '操作', width: 120, fixed: 'right', align: 'center', templet: '#dailyInventoryToolBar' }
                      
