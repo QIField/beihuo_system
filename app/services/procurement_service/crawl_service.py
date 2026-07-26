@@ -419,6 +419,17 @@ class CRMDataCrawlService:
             print("="*80)
             self._sync_sales_from_beihuo()
 
+            # 重建 replace_number_index 预处理表
+            print("\n" + "="*80)
+            print("开始重建 replace_number_index 预处理表")
+            print("="*80)
+            try:
+                from app.services.multi_channel_quote_adjust_service.oe_inventory_matcher import rebuild_replace_number_index
+                rebuild_result = rebuild_replace_number_index()
+                print(f"[成功] replace_number_index 重建完成，源数据 {rebuild_result['processed']} 条，索引行 {rebuild_result['saved']} 条，耗时 {rebuild_result['elapsed']:.1f}s")
+            except Exception as e:
+                print(f"[警告] 重建 replace_number_index 失败: {e}")
+
             return result
 
         except Exception as e:

@@ -111,7 +111,10 @@
                 下载模板
             </button>
             <button class="layui-btn layui-btn-normal" id="convertQqBtn">
-                转换 QQ 消息
+                转换价格信息
+            </button>
+            <button class="layui-btn layui-btn-normal" id="matchOeInventoryBtn">
+                匹配接口价格
             </button>
             <button class="layui-btn layui-btn-normal" id="batchUpdateBtn">
                 批量更新当前页数据
@@ -380,23 +383,45 @@
 
             var convertQqBtn = document.getElementById('convertQqBtn');
             convertQqBtn.addEventListener('click', function() {
-                layui.layer.load(2);
+                var loadIndex = layui.layer.load(2, { shade: [0.3, '#000'] });
                 fetch('/new/api/multi_channel_quote_adjust/supplier-quote/convert-qq-messages', {
                     method: 'POST',
                     credentials: 'same-origin'
                 })
                 .then(function(r) { return r.json(); })
                 .then(function(result) {
-                    layui.layer.closeAll('loading');
+                    layui.layer.close(loadIndex);
                     layui.layer.msg(result.msg || '转换完成', { icon: result.code === 0 ? 1 : 2 });
                     if (result.code === 0) {
                         loadQuoteList();
                     }
                 })
                 .catch(function(e) {
-                    layui.layer.closeAll('loading');
-                    console.error('[转换QQ消息] 失败:', e);
-                    layui.layer.msg('转换QQ消息失败', { icon: 2 });
+                    layui.layer.close(loadIndex);
+                    console.error('[转换价格信息] 失败:', e);
+                    layui.layer.msg('转换价格信息失败', { icon: 2 });
+                });
+            });
+
+            var matchOeInventoryBtn = document.getElementById('matchOeInventoryBtn');
+            matchOeInventoryBtn.addEventListener('click', function() {
+                var loadIndex = layui.layer.load(2, { shade: [0.3, '#000'] });
+                fetch('/new/api/multi_channel_quote_adjust/supplier-quote/match-oe-inventory', {
+                    method: 'POST',
+                    credentials: 'same-origin'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    layui.layer.close(loadIndex);
+                    layui.layer.msg(result.msg || '匹配完成', { icon: result.code === 0 ? 1 : 2 });
+                    if (result.code === 0) {
+                        loadQuoteList();
+                    }
+                })
+                .catch(function(e) {
+                    layui.layer.close(loadIndex);
+                    console.error('[匹配接口价格] 失败:', e);
+                    layui.layer.msg('匹配接口价格失败', { icon: 2 });
                 });
             });
 

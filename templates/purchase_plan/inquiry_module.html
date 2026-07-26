@@ -526,6 +526,106 @@
             border: 1px solid #ffccc7;
         }
 
+        /* 预检面板样式 */
+        .precheck-panel {
+            flex: 1;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            min-width: 300px;
+        }
+
+        .precheck-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .precheck-header h3 {
+            margin: 0;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .precheck-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .precheck-status.success {
+            background-color: #f6ffed;
+            color: #52c41a;
+            border: 1px solid #b7eb8f;
+        }
+
+        .precheck-status.error {
+            background-color: #fff2f0;
+            color: #ff4d4f;
+            border: 1px solid #ffccc7;
+        }
+
+        .precheck-status.loading {
+            background-color: #e6f7ff;
+            color: #1890ff;
+            border: 1px solid #91d5ff;
+        }
+
+        .precheck-content {
+            flex: 1;
+            border: 1px solid #e8e8e8;
+            border-radius: 4px;
+            overflow-y: auto;
+            max-height: 200px;
+            background-color: #fafafa;
+            padding: 10px;
+        }
+
+        .precheck-empty {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .precheck-section {
+            margin-bottom: 12px;
+        }
+
+        .precheck-section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .precheck-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .precheck-list li {
+            padding: 4px 8px;
+            background-color: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #ff4d4f;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .precheck-success {
+            padding: 20px;
+            text-align: center;
+            color: #52c41a;
+            font-size: 13px;
+        }
+
     </style>
 </head>
 <body>
@@ -550,6 +650,17 @@
                 </div>
                 <input type="file" class="file-input" id="fileInput" accept=".csv,.xls,.xlsx">
                 <div id="uploadResult"></div>
+            </div>
+
+            <!-- 中间：预检结果 -->
+            <div class="precheck-panel" id="precheckPanel">
+                <div class="precheck-header">
+                    <h3>🔍 导入预检</h3>
+                    <span id="precheckStatus" class="precheck-status"></span>
+                </div>
+                <div class="precheck-content" id="precheckContent">
+                    <div class="precheck-empty">请选择 Excel/CSV 文件，系统将自动预检品牌和供应商是否可匹配</div>
+                </div>
             </div>
 
             <!-- 右侧：品牌搜索 -->
@@ -1382,7 +1493,7 @@
             // 当前选中的导入模式
             let currentImportMode = null;
 
-            // 文件选择后，先弹出导入设置弹窗
+            // 文件选择后，先进行预检
             function handleFileSelect(file) {
                 const validTypes = ['.csv', '.xls', '.xlsx'];
                 const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
@@ -1394,8 +1505,82 @@
                 // 保存文件引用
                 pendingFile = file;
                 
-                // 显示导入设置弹窗
-                showImportModal();
+                // 先执行预检
+                precheckFile(file);
+            }
+
+            // 预检文件品牌和供应商
+            async function precheckFile(file) {
+                const precheckContent = document.getElementById('precheckContent');
+                const precheckStatus = document.getElementById('precheckStatus');
+                
+                precheckStatus.className = 'precheck-status loading';
+                precheckStatus.textContent = '预检中...';
+                precheckContent.innerHTML = '<div class="precheck-empty">正在预检品牌和供应商，请稍候...</div>';
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const response = await fetch('/api/purchase_plan/inquiry/precheck', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    
+                    if (result.code !== 0) {
+                        precheckStatus.className = 'precheck-status error';
+                        precheckStatus.textContent = '预检失败';
+                        precheckContent.innerHTML = '<div class="precheck-empty" style="color: #ff4d4f;">' + (result.msg || '预检失败') + '</div>';
+                        return;
+                    }
+                    
+                    const data = result.data;
+                    const unmatchedBrands = data.unmatched_brands || [];
+                    const unmatchedSuppliers = data.unmatched_suppliers || [];
+                    
+                    if (unmatchedBrands.length === 0 && unmatchedSuppliers.length === 0) {
+                        // 全部匹配通过
+                        precheckStatus.className = 'precheck-status success';
+                        precheckStatus.textContent = '预检通过';
+                        precheckContent.innerHTML = '<div class="precheck-success">✅ 所有品牌和供应商均已匹配成功，即将进入导入设置...</div>';
+                        
+                        setTimeout(() => {
+                            showImportModal();
+                        }, 500);
+                    } else {
+                        // 存在未匹配项
+                        precheckStatus.className = 'precheck-status error';
+                        precheckStatus.textContent = '预检未通过';
+                        
+                        let html = '';
+                        if (unmatchedBrands.length > 0) {
+                            html += '<div class="precheck-section">';
+                            html += '<div class="precheck-section-title">未匹配到的品牌（' + unmatchedBrands.length + '个）</div>';
+                            html += '<ul class="precheck-list">';
+                            unmatchedBrands.forEach(brand => {
+                                html += '<li>' + brand + '</li>';
+                            });
+                            html += '</ul></div>';
+                        }
+                        if (unmatchedSuppliers.length > 0) {
+                            html += '<div class="precheck-section">';
+                            html += '<div class="precheck-section-title">未匹配到的供应商（' + unmatchedSuppliers.length + '个）</div>';
+                            html += '<ul class="precheck-list">';
+                            unmatchedSuppliers.forEach(supplier => {
+                                html += '<li>' + supplier + '</li>';
+                            });
+                            html += '</ul></div>';
+                        }
+                        html += '<div class="precheck-empty" style="color: #ff4d4f; padding-top: 10px;">请修改文件后重新上传</div>';
+                        precheckContent.innerHTML = html;
+                    }
+                } catch (error) {
+                    console.error('预检失败:', error);
+                    precheckStatus.className = 'precheck-status error';
+                    precheckStatus.textContent = '预检失败';
+                    precheckContent.innerHTML = '<div class="precheck-empty" style="color: #ff4d4f;">预检请求失败: ' + error.message + '</div>';
+                }
             }
 
             // 显示导入设置弹窗

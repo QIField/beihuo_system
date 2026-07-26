@@ -77,7 +77,7 @@ def get_tuple_cursor(connection):
     :param connection: 数据库连接对象
     :return: 元组格式游标
     """
-    return connection.cursor()
+    return connection.cursor(Cursor)
 
 
 def get_dict_cursor(connection):
@@ -179,7 +179,7 @@ class DBCursorContext:
         if self.dict_cursor:
             self.cursor = self.connection.cursor(DictCursor)
         else:
-            self.cursor = self.connection.cursor()
+            self.cursor = self.connection.cursor(Cursor)
         
         return self.cursor
     
