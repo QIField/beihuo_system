@@ -24,6 +24,10 @@ from app.services.multi_channel_quote_adjust_service.price_update_service import
 from app.services.multi_channel_quote_adjust_service.message_converter import (
     convert_qq_chat_messages,
 )
+from app.services.multi_channel_quote_adjust_service.oe_inventory_matcher import (
+    match_oe_inventory,
+    rebuild_replace_number_index,
+)
 
 
 bp = Blueprint('multi_channel_quote_adjust', __name__, url_prefix='/multi_channel_quote_adjust')
@@ -150,12 +154,74 @@ def convert_qq_messages():
         "msg": "转换完成，共处理 N 条"
     }
     """
+    qq_result = {"processed": 0, "saved": 0, "no_match": 0, "failed": 0}
+
     try:
-        convert_qq_chat_messages(limit=100)
+        qq_result = convert_qq_chat_messages(limit=100)
     except Exception as e:
+        logger.exception("QQ消息转换异常")
         return jsonify({'code': 1, 'msg': f'QQ 消息转换失败: {e}'}), 500
 
-    return jsonify({'code': 0, 'msg': 'QQ 消息转换完成'})
+    return jsonify({
+        'code': 0,
+        'msg': f"QQ消息处理 {qq_result['processed']} 条",
+        'data': qq_result
+    })
+
+
+@bp.route('/supplier-quote/match-oe-inventory', methods=['POST'])
+@multi_channel_quote_adjust_permission_required
+def match_oe_inventory_api():
+    """
+    手动触发 OE 库存匹配
+
+    响应:
+    {
+        "code": 0,
+        "msg": "库存匹配完成，匹配 N 条"
+    }
+    """
+    try:
+        company = get_user_company()
+        result = match_oe_inventory(company=company, hours=36)
+    except Exception as e:
+        logger.exception("OE库存匹配异常")
+        return jsonify({'code': 1, 'msg': f'库存匹配失败: {e}'}), 500
+
+    return jsonify({
+        'code': 0,
+        'msg': f"库存匹配完成，匹配 {result.get('saved', 0)} 条",
+        'data': result
+    })
+
+
+@bp.route('/supplier-quote/rebuild-replace-index', methods=['POST'])
+@multi_channel_quote_adjust_permission_required
+def rebuild_replace_index():
+    """
+    手动重建 replace_number_index 预处理表
+
+    响应:
+    {
+        "code": 0,
+        "msg": "索引重建完成，共处理 N 条，生成索引 M 条，耗时 Xs"
+    }
+    """
+    try:
+        result = rebuild_replace_number_index()
+    except Exception as e:
+        logger.exception("重建替换号索引异常")
+        return jsonify({'code': 1, 'msg': f'索引重建失败: {e}'}), 500
+
+    return jsonify({
+        'code': 0,
+        'msg': (
+            f"索引重建完成，源数据 {result.get('processed', 0)} 条，"
+            f"生成索引 {result.get('saved', 0)} 条，"
+            f"耗时 {result.get('elapsed', 0):.1f}s"
+        ),
+        'data': result
+    })
 
 
 @bp.route('/supplier-quote/template-url', methods=['GET'])

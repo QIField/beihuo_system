@@ -7,7 +7,7 @@
 - multi_channel_quote_import 表写入/查询
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 from app.utils.database_connection import db_cursor
 
@@ -219,7 +219,7 @@ def delete_import_record(company: str, oe: str, product_id: str) -> None:
 
 CREATE TABLE IF NOT EXISTS `qq_chat_message_result` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `chat_message_id` BIGINT NOT NULL COMMENT '关联 qq_chat_message.序号',
+    `chat_message_id` BIGINT NULL COMMENT '关联 qq_chat_message.序号，接口数据匹配时可为 NULL',
     `supplier` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '发送对象',
     `供应商` VARCHAR(100) NOT NULL DEFAULT '' COMMENT '供应商简称',
     `search_oe` VARCHAR(100) NOT NULL DEFAULT '' COMMENT '搜索OE',
@@ -278,6 +278,34 @@ def update_qq_chat_message_status(message_id: int, status: str) -> None:
         cursor.execute(sql, (status, message_id))
 
 
+def batch_update_qq_chat_message_status(updates: List[Dict[str, Any]]) -> None:
+    """
+    批量更新 qq_chat_message 转换状态
+
+    Args:
+        updates: 每个元素包含 message_id, status
+    """
+    if not updates:
+        return
+
+    status_groups: Dict[str, List[int]] = {}
+    for u in updates:
+        status = u["status"]
+        status_groups.setdefault(status, []).append(u["message_id"])
+
+    with db_cursor(dict_cursor=False) as cursor:
+        for status, ids in status_groups.items():
+            for i in range(0, len(ids), 500):
+                batch = ids[i:i + 500]
+                placeholders = ",".join(["%s"] * len(batch))
+                sql = f"""
+                    UPDATE `qq_chat_message`
+                    SET `转换状态` = %s
+                    WHERE `序号` IN ({placeholders})
+                """
+                cursor.execute(sql, (status, *batch))
+
+
 def save_qq_chat_message_results(rows: List[Dict[str, Any]]) -> None:
     """
     将转换结果批量写入 qq_chat_message_result 表
@@ -292,22 +320,26 @@ def save_qq_chat_message_results(rows: List[Dict[str, Any]]) -> None:
         INSERT INTO `qq_chat_message_result`
         (`chat_message_id`, `supplier`, `供应商`, `search_oe`, `result_oe`, `price`, `brand`, `conversion_time`)
         VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        ON DUPLICATE KEY UPDATE
+            `price` = VALUES(`price`),
+            `conversion_time` = NOW()
     """
 
+    params = [
+        (
+            row.get("chat_message_id") if row.get("chat_message_id") is not None else None,
+            row.get("supplier", ""),
+            row.get("supplier_name", ""),
+            row.get("search_oe", ""),
+            row.get("result_oe", ""),
+            row.get("price", 0),
+            row.get("brand", ""),
+        )
+        for row in rows
+    ]
+
     with db_cursor(dict_cursor=False) as cursor:
-        for row in rows:
-            cursor.execute(
-                insert_sql,
-                (
-                    row.get("chat_message_id", 0),
-                    row.get("supplier", ""),
-                    row.get("supplier_name", ""),
-                    row.get("search_oe", ""),
-                    row.get("result_oe", ""),
-                    row.get("price", 0),
-                    row.get("brand", ""),
-                ),
-            )
+        cursor.executemany(insert_sql, params)
 
 
 def fetch_qq_chat_message_results_by_oes(oe_list: List[str], hours: int = 36) -> List[Dict[str, Any]]:
@@ -335,3 +367,191 @@ def fetch_qq_chat_message_results_by_oes(oe_list: List[str], hours: int = 36) ->
     with db_cursor(dict_cursor=True) as cursor:
         cursor.execute(sql, tuple(oe_list) + (hours,))
         return cursor.fetchall()
+
+
+def fetch_recent_import_oes(hours: int = 36) -> List[str]:
+    """
+    查询最近 N 小时内 multi_channel_quote_import 表中的 distinct oe
+
+    Args:
+        hours: 时间窗口（小时）
+
+    Returns:
+        去重并去除首尾空格的 OE 列表
+    """
+    sql = """
+        SELECT DISTINCT `oe`
+        FROM `multi_channel_quote_import`
+        WHERE `create_time` >= DATE_SUB(NOW(), INTERVAL %s HOUR)
+          AND `oe` IS NOT NULL AND `oe` != ''
+        ORDER BY `oe`
+    """
+    with db_cursor(dict_cursor=False) as cursor:
+        cursor.execute(sql, (hours,))
+        return [row[0].strip() for row in cursor.fetchall()]
+
+
+def fetch_replace_numbers() -> List[Dict[str, Any]]:
+    """
+    查询 crmapp_compare_summary 表中所有非空替换号
+
+    Returns:
+        每条包含 oe, replace_number
+    """
+    sql = """
+        SELECT `oe`, `replace_number`, `company`
+        FROM `crmapp_compare_summary`
+        WHERE `replace_number` IS NOT NULL AND `replace_number` != ''
+    """
+    with db_cursor(dict_cursor=True) as cursor:
+        cursor.execute(sql)
+        return cursor.fetchall()
+
+
+def fetch_virtual_inventory_by_oes(oe_list: List[str]) -> List[Dict[str, Any]]:
+    """
+    根据 OE 列表精确查询虚拟库存
+
+    Args:
+        oe_list: OE 码列表
+
+    Returns:
+        每条包含 oe_code, supplier_name, brand, price
+    """
+    if not oe_list:
+        return []
+
+    sql = """
+        SELECT `oe_code`, `supplier_name`, `brand`, `price`
+        FROM `virtual_inventory`
+        WHERE `oe_code` IN (%s)
+          AND `fetch_time` >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+    """ % ",".join(["%s"] * len(oe_list))
+
+    with db_cursor(dict_cursor=True) as cursor:
+        cursor.execute(sql, tuple(oe_list))
+        return cursor.fetchall()
+
+
+def fetch_unmatched_import_oes(hours: int = 36) -> List[str]:
+    """
+    查询最近 N 小时内、且未做过库存匹配的 distinct oe
+
+    Args:
+        hours: 时间窗口（小时）
+
+    Returns:
+        去重并去除首尾空格的 OE 列表
+    """
+    sql = """
+        SELECT DISTINCT `oe`
+        FROM `multi_channel_quote_import`
+        WHERE `create_time` >= DATE_SUB(NOW(), INTERVAL %s HOUR)
+          AND `oe` IS NOT NULL AND `oe` != ''
+          AND `oe_inventory_matched_at` IS NULL
+        ORDER BY `oe`
+    """
+    with db_cursor(dict_cursor=False) as cursor:
+        cursor.execute(sql, (hours,))
+        return [row[0].strip() for row in cursor.fetchall()]
+
+
+def mark_import_oes_matched(oe_list: List[str]) -> None:
+    """
+    标记指定 OE 列表已完成库存匹配
+
+    Args:
+        oe_list: 已匹配的 OE 列表
+    """
+    if not oe_list:
+        return
+
+    placeholders = ",".join(["%s"] * len(oe_list))
+    sql = f"""
+        UPDATE `multi_channel_quote_import`
+        SET `oe_inventory_matched_at` = NOW()
+        WHERE `oe` IN ({placeholders})
+          AND `oe_inventory_matched_at` IS NULL
+    """
+    with db_cursor(dict_cursor=False) as cursor:
+        cursor.execute(sql, tuple(oe_list))
+
+
+def init_replace_number_index_table() -> None:
+    """
+    初始化 replace_number_index 预处理表
+    """
+    sql = """
+        CREATE TABLE IF NOT EXISTS `replace_number_index` (
+            `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+            `normalized_key` VARCHAR(255) NOT NULL COMMENT '归一化后的替换号',
+            `oe` VARCHAR(255) NOT NULL COMMENT '对应的OE号',
+            `company` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '门店/公司代码',
+            INDEX `idx_normalized_key_company` (`normalized_key`, `company`),
+            INDEX `idx_oe` (`oe`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='替换号反向索引表'
+    """
+    with db_cursor(dict_cursor=False) as cursor:
+        cursor.execute(sql)
+
+
+def clear_replace_number_index() -> None:
+    """清空 replace_number_index 表"""
+    with db_cursor(dict_cursor=False) as cursor:
+        cursor.execute("TRUNCATE TABLE `replace_number_index`")
+
+
+def batch_insert_replace_number_index(rows: List[tuple]) -> None:
+    """
+    批量插入 replace_number_index 数据
+
+    Args:
+        rows: [(normalized_key, oe, company), ...]
+    """
+    if not rows:
+        return
+    sql = """
+        INSERT INTO `replace_number_index` (`normalized_key`, `oe`, `company`)
+        VALUES (%s, %s, %s)
+    """
+    with db_cursor(dict_cursor=False) as cursor:
+        cursor.executemany(sql, rows)
+
+
+def fetch_replace_index_by_keys(keys: List[str], company: str = "") -> List[Dict[str, Any]]:
+    """
+    根据归一化 key 列表和门店查询 replace_number_index
+
+    Args:
+        keys: 归一化后的替换号列表
+        company: 门店/公司代码
+
+    Returns:
+        每条包含 normalized_key, oe
+    """
+    if not keys:
+        return []
+    placeholders = ",".join(["%s"] * len(keys))
+    sql = """
+        SELECT DISTINCT `normalized_key`, `oe`
+        FROM `replace_number_index`
+        WHERE `normalized_key` IN (%s)
+          AND `company` = %s
+    """ % (placeholders, "%s")
+    with db_cursor(dict_cursor=True) as cursor:
+        cursor.execute(sql, tuple(keys) + (company,))
+        return cursor.fetchall()
+
+
+def check_replace_number_index_empty() -> bool:
+    """
+    检查 replace_number_index 表是否为空
+
+    Returns:
+        True 为空，False 非空
+    """
+    sql = "SELECT COUNT(*) as cnt FROM `replace_number_index`"
+    with db_cursor(dict_cursor=True) as cursor:
+        cursor.execute(sql)
+        row = cursor.fetchone()
+        return row["cnt"] == 0 if row else True

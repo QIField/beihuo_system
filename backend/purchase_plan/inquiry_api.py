@@ -216,11 +216,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         df['original_price'] = df['price'].copy()
         df['price'] = (df['price'] * markup_rate).round(2)
     
-    # 加载品牌别名映射
-    from app.utils.b2b_inquiry_upload.uploader import load_crm_aliases_mapping
-    brand_aliases_mapping = load_crm_aliases_mapping()
-    
-    # 准备数据
+    # 准备数据（询价模块不使用品牌别名映射）
     from app.utils.b2b_inquiry_upload.uploader import prepare_data, batch_upload_with_callback
     valid_items, skipped_items = prepare_data(df)
 
@@ -242,7 +238,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     if skip_b2b:
         return _process_direct_import(
             valid_items, skipped_items, df, original_columns, column_mapping,
-            brand_aliases_mapping, file_path, creator, company, markup_rate, progress_callback
+            file_path, creator, company, markup_rate, progress_callback
         )
     
     # 步骤1：B2B上传（带进度回调）
@@ -252,30 +248,22 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         if progress_callback:
             progress_callback(processed, total, f"B2B上传: {result.get('oe', '')}")
     
-    b2b_results = batch_upload_with_callback(valid_items, callback=item_callback)
+    b2b_results = batch_upload_with_callback(valid_items, callback=item_callback, brand_mapping={})
     
-    # 合并结果到valid_items，并处理品牌别名映射
+    # 合并结果到valid_items（询价模块保持原始品牌）
     for item in valid_items:
         oe = item['oe']
         result = b2b_results.get(oe, {})
         item['update_msg'] = result.get('update_msg', '未知错误')
         item['b2b_status'] = result.get('status', 'error')
-        
-        # 品牌别名映射
-        original_brand = item.get('brand', '')
-        mapped_brand = brand_aliases_mapping.get(original_brand, original_brand)
-        item['mapped_brand'] = mapped_brand
-        b2b_mapped_brand = result.get('mapped_brand')
-        if b2b_mapped_brand:
-            item['mapped_brand'] = b2b_mapped_brand
     
-    # 步骤2：筛选需要CRM新建的项
+    # 步骤2：筛选需要CRM新建的项（询价模块保持原始品牌，不做别名映射）
     need_create_items = []
     for item in valid_items:
         if '产品数据不存在' in item.get('update_msg', ''):
             need_create_items.append({
                 'oe_number': item['oe'],
-                'brand': item.get('mapped_brand', item['brand']),
+                'brand': item['brand'],
                 'supplier_name': item.get('supplier', ''),
                 'mode': 'inquiry'
             })
@@ -291,7 +279,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         product_df = load_product_data()
         session = create_crm_session()
         try:
-            raw_results = process_items(need_create_items, product_df, alias_df, session)
+            raw_results = process_items(need_create_items, product_df, alias_df, session, use_brand_alias=False)
             create_results = {
                 (oe, brand): _format_result_message(result)
                 for (oe, brand), result in raw_results.items()
@@ -302,18 +290,18 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         if progress_callback:
             progress_callback(total, total, "CRM新建完成")
     
-    # 步骤4：二次上传（针对新建成功的产品）
+    # 步骤4：二次上传（针对新建成功的产品，询价模块保持原始品牌）
     second_upload_items = []
     for item in valid_items:
         oe = item['oe']
-        brand = item.get('mapped_brand', item.get('brand', ''))
+        brand = item['brand']
         create_result = create_results.get((oe, brand), '')
         if create_result and ('已存在' in create_result or ('成功' in create_result and '失败' not in create_result)):
             second_upload_items.append(item)
     
     second_upload_results = {}
     if second_upload_items:
-        second_b2b_results = batch_upload_with_callback(second_upload_items, callback=item_callback)
+        second_b2b_results = batch_upload_with_callback(second_upload_items, callback=item_callback, brand_mapping={})
         for item in second_upload_items:
             oe = item['oe']
             result = second_b2b_results.get(oe, {})
@@ -329,7 +317,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     
     for item in valid_items:
         oe = item['oe']
-        brand = item.get('mapped_brand', item.get('brand', ''))
+        brand = item['brand']
         update_msg = item.get('update_msg', '')
         create_result = create_results.get((oe, brand), '')
         
@@ -353,9 +341,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         row_data = {}
         for orig_col in original_columns:
             english_col = column_mapping.get(orig_col, orig_col)
-            if english_col == 'brand':
-                row_data[orig_col] = item.get('mapped_brand', item.get('brand', ''))
-            elif english_col in ['oe', 'supplier', 'price', 'warehouse', 'expire_time', 'stock_quantity', 'remark']:
+            if english_col in ['oe', 'brand', 'supplier', 'price', 'warehouse', 'expire_time', 'stock_quantity', 'remark']:
                 value = item.get(english_col, '')
                 if value is None or (isinstance(value, float) and math.isnan(value)) or str(value).lower() == 'nan':
                     value = ''
@@ -401,7 +387,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         insert_data = []
         for item in upload_success_items:
             oe = item['oe']
-            brand = item.get('mapped_brand') or item.get('brand') or None
+            brand = item.get('brand') or None
             supplier = item.get('supplier') or None
             price = item.get('price', 0)
             original_price = item.get('original_price', price)
@@ -510,7 +496,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
 
 
 def _process_direct_import(valid_items, skipped_items, df, original_columns, column_mapping, 
-                           brand_aliases_mapping, file_path, creator, company, markup_rate, progress_callback):
+                           file_path, creator, company, markup_rate, progress_callback):
     """
     处理直接入库流程（跳过B2B推送）
     """
@@ -519,12 +505,8 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
     
     total = len(valid_items)
     
-    # 处理品牌别名映射
+    # 直接入库，所有数据都标记为成功（询价模块保持原始品牌，不做别名映射）
     for item in valid_items:
-        original_brand = item.get('brand', '')
-        mapped_brand = brand_aliases_mapping.get(original_brand, original_brand)
-        item['mapped_brand'] = mapped_brand
-        # 直接入库，所有数据都标记为成功
         item['处理结果'] = '直接入库'
         item['详情'] = '跳过B2B推送，直接入库'
         item['二次上传'] = ''
@@ -545,9 +527,7 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
         row_data = {}
         for orig_col in original_columns:
             english_col = column_mapping.get(orig_col, orig_col)
-            if english_col == 'brand':
-                row_data[orig_col] = item.get('mapped_brand', item.get('brand', ''))
-            elif english_col in ['oe', 'supplier', 'price', 'warehouse', 'expire_time', 'stock_quantity', 'remark']:
+            if english_col in ['oe', 'brand', 'supplier', 'price', 'warehouse', 'expire_time', 'stock_quantity', 'remark']:
                 value = item.get(english_col, '')
                 if value is None or (isinstance(value, float) and math.isnan(value)) or str(value).lower() == 'nan':
                     value = ''
@@ -582,7 +562,7 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
     insert_data = []
     for item in valid_items:
         oe = item['oe']
-        brand = item.get('mapped_brand') or item.get('brand') or None
+        brand = item.get('brand') or None
         supplier = item.get('supplier') or None
         price = item.get('price', 0)
         original_price = item.get('original_price', price)
@@ -1067,6 +1047,168 @@ def get_crm_brands():
             
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'查询品牌失败: {str(e)}', 'data': []}), 500
+
+
+@inquiry_bp.route('/b2b_suppliers', methods=['GET'])
+@login_required
+def get_b2b_suppliers():
+    """
+    获取B2B供应商列表
+    返回所有供应商名称列表
+    """
+    try:
+        from app.utils.b2b_inquiry_upload.uploader import login, getAllSupplierChannel
+        
+        token = login('fsbbr')
+        supplier_df = getAllSupplierChannel(token)
+        
+        if supplier_df is None or supplier_df.empty:
+            return jsonify({
+                'code': 0,
+                'msg': '获取成功',
+                'data': [],
+                'total': 0
+            })
+        
+        supplier_names = supplier_df['name'].dropna().astype(str).tolist()
+        
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': supplier_names,
+            'total': len(supplier_names)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'code': 1, 'msg': f'获取供应商失败: {str(e)}', 'data': []}), 500
+
+
+def _parse_inquiry_file(file):
+    """
+    解析询价模块上传文件，返回DataFrame
+    """
+    # 保存临时文件
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    temp_path = os.path.join(tempfile.gettempdir(), f"precheck_{timestamp}_{file.filename}")
+    file.save(temp_path)
+    
+    try:
+        # 读取文件
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(temp_path, encoding='utf-8', dtype=str)
+        else:
+            df = pd.read_excel(temp_path, dtype=str)
+        
+        # 列名映射
+        column_mapping = {
+            'oe': 'oe', 'OE': 'oe', 'OE号': 'oe',
+            '品牌': 'brand', 'brand': 'brand',
+            '供应商': 'supplier', 'supplier': 'supplier',
+            '单价': 'price', 'price': 'price', '价格': 'price',
+            '仓库': 'warehouse', 'warehouse': 'warehouse',
+            '失效时间': 'expire_time', 'expire_time': 'expire_time',
+            '备注': 'remark', 'remark': 'remark',
+            '库存数量': 'stock_quantity', 'stock_quantity': 'stock_quantity',
+            '通用号': 'common_number', 'common_number': 'common_number'
+        }
+        
+        rename_dict = {old: new for old, new in column_mapping.items() 
+                       if old in df.columns and new not in df.columns}
+        if rename_dict:
+            df = df.rename(columns=rename_dict)
+        
+        return df, temp_path
+    except Exception:
+        os.remove(temp_path)
+        raise
+
+
+@inquiry_bp.route('/precheck', methods=['POST'])
+@login_required
+def precheck_inquiry_file():
+    """
+    询价模块上传文件预检
+    提取文件中的品牌和供应商，分别与CRM品牌、B2B供应商进行精准匹配
+    返回未匹配的品牌和供应商列表
+    
+    请求: multipart/form-data, file
+    返回:
+    {
+        "code": 0,
+        "data": {
+            "unmatched_brands": ["品牌1", ...],
+            "unmatched_suppliers": ["供应商1", ...],
+            "brand_count": 1,
+            "supplier_count": 1
+        }
+    }
+    """
+    if 'file' not in request.files:
+        return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
+
+    temp_path = None
+    try:
+        df, temp_path = _parse_inquiry_file(file)
+        df = df.where(pd.notnull(df), None)
+        
+        # 提取唯一的品牌和供应商
+        brands = set()
+        suppliers = set()
+        for _, row in df.iterrows():
+            brand = str(row.get('brand', '')).strip() if row.get('brand') else ''
+            supplier = str(row.get('supplier', '')).strip() if row.get('supplier') else ''
+            if brand:
+                brands.add(brand)
+            if supplier:
+                suppliers.add(supplier)
+        
+        # 获取CRM品牌列表（全量）
+        from app.utils.crm_product.crm_productAdd.crm_brand_id import get_brand_dict
+        from config import create_crm_session
+        session = create_crm_session()
+        try:
+            crm_brand_dict = get_brand_dict(session)
+            crm_brand_names = set(crm_brand_dict.values())
+        finally:
+            session.close()
+        
+        # 获取B2B供应商列表（全量）
+        from app.utils.b2b_inquiry_upload.uploader import login, getAllSupplierChannel
+        token = login('fsbbr')
+        supplier_df = getAllSupplierChannel(token)
+        if supplier_df is None or supplier_df.empty:
+            b2b_supplier_names = set()
+        else:
+            b2b_supplier_names = set(supplier_df['name'].dropna().astype(str).tolist())
+        
+        # 精确匹配
+        unmatched_brands = sorted([b for b in brands if b not in crm_brand_names])
+        unmatched_suppliers = sorted([s for s in suppliers if s not in b2b_supplier_names])
+        
+        return jsonify({
+            'code': 0,
+            'msg': '预检完成',
+            'data': {
+                'unmatched_brands': unmatched_brands,
+                'unmatched_suppliers': unmatched_suppliers,
+                'brand_count': len(brands),
+                'supplier_count': len(suppliers)
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'code': 1, 'msg': f'预检失败: {str(e)}'}), 500
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 @inquiry_bp.route('/parse_oe_list', methods=['POST'])

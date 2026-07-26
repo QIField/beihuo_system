@@ -93,7 +93,7 @@ def _search_brand_id_by_name(session, headers: dict, brand_name: str) -> Optiona
     return None
 
 
-def _get_brand_id(session, brand: str) -> Optional[str]:
+def _get_brand_id(session, brand: str, use_alias: bool = True) -> Optional[str]:
     """
     根据品牌名称获取品牌 ID，支持别名匹配
     """
@@ -107,9 +107,10 @@ def _get_brand_id(session, brand: str) -> Optional[str]:
         return brand_id
 
     # 别名匹配
-    corrected_brand = find_brand_by_alias(brand)
-    if corrected_brand and corrected_brand != brand:
-        return _search_brand_id_by_name(session, headers, corrected_brand)
+    if use_alias:
+        corrected_brand = find_brand_by_alias(brand)
+        if corrected_brand and corrected_brand != brand:
+            return _search_brand_id_by_name(session, headers, corrected_brand)
 
     return None
 
@@ -204,7 +205,7 @@ def _add_product(session, oe_number: str, brand_id: str, product_name: str, oe_i
     return _retry_request(lambda: add_product(product_data, session), 'crmProductAdd')
 
 
-def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session=None) -> ProcessResult:
+def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session=None, use_brand_alias: bool = True) -> ProcessResult:
     """
     处理单个 OE 号码（核心逻辑）
 
@@ -214,6 +215,7 @@ def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session
         alias_df: 别名数据 DataFrame（保留兼容，当前未使用）
         db_manager: 数据库管理器（数据库模式用）
         session: 已认证的 CRM session
+        use_brand_alias: 是否使用品牌别名映射
 
     Returns:
         ProcessResult
@@ -224,7 +226,7 @@ def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session
     is_three_column = item.get('mode') == 'three_column'
 
     # 步骤 1: 获取品牌 ID
-    brand_id = _get_brand_id(session, brand)
+    brand_id = _get_brand_id(session, brand, use_alias=use_brand_alias)
     if not brand_id:
         result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message=f"没有匹配到品牌ID: {brand}")
         _save_result(db_manager, oe_number, brand, result)
@@ -296,7 +298,7 @@ def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session
     return result
 
 
-def process_items(items: List[dict], product_df, alias_df, session, progress_callback=None, progress_offset: int = 0, total_items: int = None) -> Dict[str, ProcessResult]:
+def process_items(items: List[dict], product_df, alias_df, session, progress_callback=None, progress_offset: int = 0, total_items: int = None, use_brand_alias: bool = True) -> Dict[str, ProcessResult]:
     """
     统一批量处理 items
 
@@ -308,6 +310,7 @@ def process_items(items: List[dict], product_df, alias_df, session, progress_cal
         progress_callback: 进度回调函数(current, total, message)
         progress_offset: 进度偏移量（多工作表场景）
         total_items: 总项目数
+        use_brand_alias: 是否使用品牌别名映射
 
     Returns:
         {(oe_number, brand): ProcessResult}
@@ -322,7 +325,7 @@ def process_items(items: List[dict], product_df, alias_df, session, progress_cal
         brand = item['brand']
 
         try:
-            result = process_single_oe(item, product_df, alias_df, session=session)
+            result = process_single_oe(item, product_df, alias_df, session=session, use_brand_alias=use_brand_alias)
             results[(oe_number, brand)] = result
         except Exception as e:
             result = ProcessResult(oe_number, ProcessStatus.FAILED, brand=brand, message=f"处理异常: {e}")

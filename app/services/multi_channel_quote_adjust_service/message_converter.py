@@ -24,6 +24,7 @@ from app.services.multi_channel_quote_adjust_service.message_parser import (
 from app.services.multi_channel_quote_adjust_service.repository import (
     fetch_unconverted_qq_chat_messages,
     update_qq_chat_message_status,
+    batch_update_qq_chat_message_status,
     save_qq_chat_message_results,
 )
 
@@ -53,6 +54,7 @@ SUPPLIER_NAME_MAP: Dict[str, str] = {
 
 STATUS_CONVERTED = "已转换"
 STATUS_NO_MATCH = "转换对象不符合"
+STATUS_EXCEPTION = "转换异常"
 
 
 def _extract_search_numbers(content: str) -> List[str]:
@@ -106,28 +108,37 @@ def convert_qq_chat_messages(limit: int = 100) -> Dict[str, Any]:
     no_match = 0
     failed = 0
 
+    status_updates = []
+    all_result_rows = []
+
     for msg in messages:
         message_id = msg.get("序号")
         supplier = msg.get("发送对象", "")
         search_content = msg.get("发送内容", "")
         reply_content = msg.get("回复内容", "")
 
+        if not message_id:
+            failed += 1
+            processed += 1
+            continue
+
         parser = SUPPLIER_STRATEGY.get(supplier)
         if not parser:
-            update_qq_chat_message_status(message_id, STATUS_NO_MATCH)
+            status_updates.append({"message_id": message_id, "status": STATUS_NO_MATCH})
             no_match += 1
             processed += 1
             continue
 
         search_numbers = _extract_search_numbers(search_content)
         if not search_numbers:
-            update_qq_chat_message_status(message_id, STATUS_CONVERTED)
+            status_updates.append({"message_id": message_id, "status": STATUS_CONVERTED})
             processed += 1
             continue
 
         try:
             parsed_results = parser(search_numbers, reply_content or "")
         except Exception:
+            status_updates.append({"message_id": message_id, "status": STATUS_EXCEPTION})
             failed += 1
             processed += 1
             continue
@@ -149,11 +160,17 @@ def convert_qq_chat_messages(limit: int = 100) -> Dict[str, Any]:
             })
 
         if result_rows:
-            save_qq_chat_message_results(result_rows)
+            all_result_rows.extend(result_rows)
             saved += len(result_rows)
 
-        update_qq_chat_message_status(message_id, STATUS_CONVERTED)
+        status_updates.append({"message_id": message_id, "status": STATUS_CONVERTED})
         processed += 1
+
+    if all_result_rows:
+        save_qq_chat_message_results(all_result_rows)
+
+    if status_updates:
+        batch_update_qq_chat_message_status(status_updates)
 
     return {
         "processed": processed,

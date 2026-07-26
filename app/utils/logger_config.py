@@ -189,6 +189,7 @@ def get_task_logger(task_name):
             '%(asctime)s [%(levelname)s] %(message)s'
         ))
 
+        logger.setLevel(logging.INFO)
         logger.addHandler(handler)
         logger.addHandler(_create_error_handler())
 

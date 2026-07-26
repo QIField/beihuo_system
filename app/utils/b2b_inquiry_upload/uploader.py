@@ -155,11 +155,14 @@ def prepare_data(df):
     return valid_items, skipped_items
 
 
-def upload_single_item(item, token, warehouse_df, supplier_df, brand_mapping):
+def upload_single_item(item, token, warehouse_df, supplier_df, brand_mapping=None):
     """
     单条数据上传到B2B
     返回包含update_msg字段的结果
     """
+    if brand_mapping is None:
+        brand_mapping = load_crm_aliases_mapping()
+    
     oe = item['oe']
     brand = item['brand']
     
@@ -265,7 +268,7 @@ def upload_single_item(item, token, warehouse_df, supplier_df, brand_mapping):
         }
 
 
-def batch_upload(items):
+def batch_upload(items, brand_mapping=None):
     """
     批量上传（循环处理）
     """
@@ -278,7 +281,8 @@ def batch_upload(items):
     # 获取映射表
     warehouse_df = getAllCassWarehouse(token)
     supplier_df = getAllSupplierChannel(token)
-    brand_mapping = load_crm_aliases_mapping()
+    if brand_mapping is None:
+        brand_mapping = load_crm_aliases_mapping()
     
     results = {}
     
@@ -300,7 +304,7 @@ def batch_upload(items):
     return results
 
 
-def batch_upload_with_callback(items, callback=None):
+def batch_upload_with_callback(items, callback=None, brand_mapping=None):
     """
     批量上传并支持回调函数
     """
@@ -313,7 +317,8 @@ def batch_upload_with_callback(items, callback=None):
     # 获取映射表
     warehouse_df = getAllCassWarehouse(token)
     supplier_df = getAllSupplierChannel(token)
-    brand_mapping = load_crm_aliases_mapping()
+    if brand_mapping is None:
+        brand_mapping = load_crm_aliases_mapping()
     
     results = {}
     
@@ -377,7 +382,7 @@ def upload_inquiry_data(df, company='fsbbr'):
     }
 
 
-def validate_b2b_upload(items, company='fsbbr'):
+def validate_b2b_upload(items, company='fsbbr', brand_mapping=None):
     """
     验证B2B上传可行性（不实际上传，只验证仓库、供应商等映射是否存在）
     用于导入前的预验证，确保数据能成功上传
@@ -385,6 +390,7 @@ def validate_b2b_upload(items, company='fsbbr'):
     Args:
         items: 待验证的数据列表
         company: 公司代码
+        brand_mapping: 品牌映射字典，None 时使用默认别名表
         
     Returns:
         dict: {oe: {'status': 'success'/'error', 'msg': '...'}, ...}
@@ -399,7 +405,8 @@ def validate_b2b_upload(items, company='fsbbr'):
         token = login(company)
         warehouse_df = getAllCassWarehouse(token)
         supplier_df = getAllSupplierChannel(token)
-        brand_mapping = load_crm_aliases_mapping()
+        if brand_mapping is None:
+            brand_mapping = load_crm_aliases_mapping()
         
         results = {}
         
