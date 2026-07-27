@@ -246,7 +246,7 @@ def build_quote_adjust_rows(company: str, rows: List[Dict[str, Any]]) -> List[Di
 
             result.append({
                 "oe": oe,
-                "brand": brand,
+                "brand": fields.get("brand_name") or brand,
                 "car_brand": car_brand,
                 "system_oe": fields.get("number", ""),
                 "supplier": supplier_text,
@@ -262,6 +262,7 @@ def build_quote_adjust_rows(company: str, rows: List[Dict[str, Any]]) -> List[Di
                 "new_profit_amount": "",
                 "product_id": fields.get("product_id", ""),
                 "barcode": fields.get("frey_no", ""),
+                "stock": str(fields.get("stock", "")),
                 "modify": "是",
                 "qq": row["qq"],
             })
