@@ -232,7 +232,7 @@ def match_oe_inventory(company: str = "", hours: int = 36) -> Dict[str, Any]:
                 "supplier_name": inv.get("supplier_name", ""),
                 "search_oe": task["search_oe"],
                 "result_oe": inv.get("oe_code", match_key),
-                "price": inv.get("price", 0),
+                "price": inv.get("original_price", 0),
                 "brand": inv.get("brand", ""),
             })
     logger.info("[匹配接口价格] 步骤5-组装结果: 耗时 %.3fs, 结果条数 %d", time.time() - step_start, len(result_rows))

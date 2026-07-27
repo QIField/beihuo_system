@@ -220,7 +220,7 @@ def build_quote_adjust_rows(company: str, rows: List[Dict[str, Any]]) -> List[Di
                 "oe": oe,
                 "brand": brand,
                 "car_brand": car_brand,
-                "system_oe": "系统无搜索结果",
+                "system_oe": "系统无库存",
                 "supplier": supplier_text,
                 "sell_price": "",
                 "cost_price": "",
@@ -234,6 +234,7 @@ def build_quote_adjust_rows(company: str, rows: List[Dict[str, Any]]) -> List[Di
                 "new_profit_amount": "",
                 "product_id": "",
                 "barcode": "",
+                "stock": "",
                 "modify": "是",
                 "qq": row["qq"],
             })
@@ -262,6 +263,7 @@ def build_quote_adjust_rows(company: str, rows: List[Dict[str, Any]]) -> List[Di
                 "new_profit_amount": "",
                 "product_id": fields.get("product_id", ""),
                 "barcode": fields.get("frey_no", ""),
+                "stock": str(fields.get("stock", "")),
                 "modify": "是",
                 "qq": row["qq"],
             })
@@ -284,6 +286,60 @@ def _to_str_price(value: Any) -> str:
         return str(value)
 
 
+def aggregate_qq_results_by_supplier_brand(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    按供应商 + 品牌聚合 QQ 消息结果
+
+    规则：
+    - 分组键：（询价供应商, 返回品牌）
+    - 过滤 price 为 null 或无效值的记录
+    - 中间价 = (最大值 + 最小值) / 2，保留两位小数
+    - 返回 OE 用逗号连接分组内所有 result_oe
+    - 每组仅输出一条聚合记录
+    """
+    groups: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    for r in results:
+        supplier = r.get("供应商", "") or r.get("supplier", "")
+        brand = r.get("brand", "")
+        key = (supplier, brand)
+        groups.setdefault(key, []).append(r)
+
+    aggregated: List[Dict[str, Any]] = []
+    for (supplier, brand), group_records in groups.items():
+        valid_prices: List[float] = []
+        oes: List[str] = []
+        search_oe = ""
+
+        for r in group_records:
+            price = r.get("price")
+            if price is None or price == "":
+                continue
+            try:
+                valid_prices.append(float(price))
+                oes.append(str(r.get("result_oe", "") or "").strip())
+                if not search_oe:
+                    search_oe = r.get("search_oe", "")
+            except (ValueError, TypeError):
+                continue
+
+        if not valid_prices:
+            continue
+
+        max_price = max(valid_prices)
+        min_price = min(valid_prices)
+        mid_price = round((max_price + min_price) / 2, 2)
+
+        aggregated.append({
+            "search_oe": search_oe,
+            "result_oe": ",".join(oe for oe in oes if oe),
+            "供应商": supplier,
+            "brand": brand,
+            "price": mid_price,
+        })
+
+    return aggregated
+
+
 def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> List[Dict[str, Any]]:
     """
     将导入行按 qq_chat_message_result 的匹配结果逐行展开
@@ -291,7 +347,8 @@ def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> 
     规则：
     - 用导入行的 oe 匹配结果表的 search_oe
     - 只取最近 N 小时内的结果
-    - 每个匹配结果生成一行；无结果时保留原行， supplier / return_brand / return_price 为空
+    - 对结果按供应商 + 品牌聚合，每组输出一行
+    - 无结果时保留原行， supplier / return_brand / return_price 为空
 
     Args:
         rows: fetch_recent_imports 返回的行列表
@@ -305,6 +362,7 @@ def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> 
 
     oe_list = [row.get("oe", "") for row in rows if row.get("oe")]
     results = fetch_qq_chat_message_results_by_oes(oe_list, hours)
+    results = aggregate_qq_results_by_supplier_brand(results)
 
     results_by_oe: Dict[str, List[Dict[str, Any]]] = {}
     for r in results:

@@ -5,6 +5,10 @@
 - supplier_info 表查询
 - qq_msg 表写入
 - multi_channel_quote_import 表写入/查询
+
+表结构变更：
+ALTER TABLE `multi_channel_quote_import`
+ADD COLUMN `stock` INT NOT NULL DEFAULT 0 COMMENT '库存数量' AFTER `barcode`;
 """
 
 from typing import List, Dict, Any, Tuple
@@ -66,7 +70,7 @@ def save_import_records(rows: List[Dict[str, Any]], create_by: str = "") -> None
     Args:
         rows: 组装后的前端行，包含 oe, brand, car_brand, supplier, system_oe,
               sell_price, cost_price, profit_rate, profit_amount,
-              product_id, barcode 等字段
+              product_id, barcode, stock 等字段
         create_by: 导入人
     """
     if not rows:
@@ -76,8 +80,8 @@ def save_import_records(rows: List[Dict[str, Any]], create_by: str = "") -> None
         INSERT INTO `multi_channel_quote_import`
         (`oe`, `brand`, `car_brand`, `inquiry_supplier`, `system_oe`,
          `sell_price`, `cost_price`, `profit_rate`, `profit_amount`,
-         `product_id`, `barcode`, `create_by`, `create_time`)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+         `product_id`, `barcode`, `stock`, `create_by`, `create_time`)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
     """
 
     with db_cursor(dict_cursor=False) as cursor:
@@ -96,6 +100,7 @@ def save_import_records(rows: List[Dict[str, Any]], create_by: str = "") -> None
                     row.get("profit_amount", ""),
                     row.get("product_id", ""),
                     row.get("barcode", ""),
+                    row.get("stock") or 0,
                     create_by,
                 ),
             )
@@ -114,7 +119,7 @@ def fetch_recent_imports(hours: int = 36) -> List[Dict[str, Any]]:
     sql = """
         SELECT `oe`, `brand`, `car_brand`, `inquiry_supplier`, `system_oe`,
                `sell_price`, `cost_price`, `profit_rate`, `profit_amount`,
-               `product_id`, `barcode`
+               `product_id`, `barcode`, `stock`
         FROM `multi_channel_quote_import`
         WHERE `create_time` >= DATE_SUB(NOW(), INTERVAL %s HOUR)
         ORDER BY `create_time` DESC, `id` DESC
@@ -143,6 +148,7 @@ def fetch_recent_imports(hours: int = 36) -> List[Dict[str, Any]]:
             "new_profit_amount": "",
             "product_id": row["product_id"] or "",
             "barcode": row["barcode"] or "",
+            "stock": row["stock"] or "",
             "modify": "是",
             "qq": row["inquiry_supplier"] or "",
         }
@@ -416,13 +422,13 @@ def fetch_virtual_inventory_by_oes(oe_list: List[str]) -> List[Dict[str, Any]]:
         oe_list: OE 码列表
 
     Returns:
-        每条包含 oe_code, supplier_name, brand, price
+        每条包含 oe_code, supplier_name, brand, original_price
     """
     if not oe_list:
         return []
 
     sql = """
-        SELECT `oe_code`, `supplier_name`, `brand`, `price`
+        SELECT `oe_code`, `supplier_name`, `brand`, `original_price`
         FROM `virtual_inventory`
         WHERE `oe_code` IN (%s)
           AND `fetch_time` >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)

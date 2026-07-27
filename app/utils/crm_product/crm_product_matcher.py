@@ -2,13 +2,12 @@
 通用 CRM 产品匹配器
 
 职责：
-- 根据 OE + 品牌从 CRM 查询产品
-- 按统一规则过滤匹配结果
+- 根据 OE 从 CRM 查询产品
+- 过滤库存大于 0 的产品并返回
 """
 
 from typing import List, Dict, Any, Optional
 
-from app.utils.replace_number.constants import ORIGINAL_BRANDS
 from app.utils.replace_number.crm_api_client import search_products_by_numberlist
 
 
@@ -32,55 +31,47 @@ def extract_child_products(api_data: Optional[Dict]) -> List[Dict[str, Any]]:
     return products
 
 
-def match_products_by_oe_brand(oe: str, brand: str, products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def filter_products_by_stock(products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    根据 OE 和品牌匹配 CRM 产品
+    过滤库存大于 0 的产品
 
     规则：
-    - 原厂 / 原厂国内4S件：必须同时精确匹配 number 和 brand_name
-    - 其他品牌：只需精确匹配 brand_name
-
-    Args:
-        oe: OE 号
-        brand: 品牌名称
-        products: CRM child 产品列表
-
-    Returns:
-        匹配到的产品列表（可能多条）
+    - 只保留 child[].stock > 0 的产品
+    - stock 为空或非数值时跳过
     """
-    oe_clean = str(oe or "").strip()
-    brand_clean = str(brand or "").strip()
-
-    matched = []
+    result = []
     for product in products:
-        product_number = str(product.get("number", "") or "").strip()
-        product_brand = str(product.get("brand_name", "") or "").strip()
-
-        if brand_clean in ORIGINAL_BRANDS:
-            if product_number == oe_clean and product_brand == brand_clean:
-                matched.append(product)
-        else:
-            if product_brand == brand_clean:
-                matched.append(product)
-
-    return matched
+        stock = product.get("stock")
+        if stock is None or stock == "":
+            continue
+        try:
+            if float(stock) > 0:
+                result.append(product)
+        except (ValueError, TypeError):
+            continue
+    return result
 
 
-def fetch_matched_products(company: str, oe: str, brand: str) -> List[Dict[str, Any]]:
+def fetch_matched_products(company: str, oe: str, brand: str = "") -> List[Dict[str, Any]]:
     """
-    调用 CRM 接口并匹配产品
+    调用 CRM 接口并返回库存大于 0 的产品
+
+    流程：
+    - 调用 CRM Product.Product/list
+    - 提取 data.data[].child[]
+    - 过滤 stock > 0 的产品
 
     Args:
         company: 公司代码
         oe: OE 号
-        brand: 品牌名称
+        brand: 品牌名称（保留参数，暂不参与接口过滤）
 
     Returns:
-        匹配到的产品列表
+        库存大于 0 的产品列表
     """
     api_data = search_products_by_numberlist(company, oe)
     products = extract_child_products(api_data)
-    return match_products_by_oe_brand(oe, brand, products)
+    return filter_products_by_stock(products)
 
 
 def pick_product_fields(product: Dict[str, Any]) -> Dict[str, Any]:
@@ -100,4 +91,5 @@ def pick_product_fields(product: Dict[str, Any]) -> Dict[str, Any]:
         "frey_no": product.get("frey_no"),
         "store_cass_price": product.get("store_cass_price"),
         "cost_price": product.get("cost_price"),
+        "stock": product.get("stock"),
     }
