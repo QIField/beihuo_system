@@ -158,11 +158,29 @@
         }
 
         function indexRenderer(instance, td, row, col, prop, value, cellProperties) {
-            var page = window.builder ? window.builder.currentPage : 1;
-            var pageSize = window.builder ? window.builder.pageSize : 100;
-            td.innerText = (page - 1) * pageSize + row + 1;
+            var item = instance.getSourceDataAtRow(row);
+            td.innerText = item && item.group_index ? item.group_index : '';
             td.style.textAlign = 'center';
             return td;
+        }
+
+        function recalcGroupIndex(data) {
+            if (!data || data.length === 0) return;
+            var groupIndex = 0;
+            var lastPid = null;
+            for (var i = 0; i < data.length; i++) {
+                var pid = data[i].product_id;
+                if (pid) {
+                    if (pid !== lastPid) {
+                        groupIndex++;
+                        lastPid = pid;
+                    }
+                } else {
+                    groupIndex++;
+                    lastPid = null;
+                }
+                data[i].group_index = groupIndex;
+            }
         }
 
         var gridData = [];
@@ -312,6 +330,7 @@
                 if (Array.isArray(result.data.list)) {
                     gridData.push.apply(gridData, result.data.list);
                 }
+                recalcGroupIndex(gridData);
                 window.builder.refresh(1, window.builder.pageSize);
             })
             .catch(function(e) {
