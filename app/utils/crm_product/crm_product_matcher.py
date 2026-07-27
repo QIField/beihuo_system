@@ -49,30 +49,15 @@ def filter_products_by_stock(products: List[Dict[str, Any]]) -> List[Dict[str, A
     - stock 为空或非数值时跳过
     """
     result = []
-    skipped = 0
-    
     for product in products:
         stock = product.get("stock")
-        product_number = product.get("number", "unknown")
-        
         if stock is None or stock == "":
-            logger.debug("[过滤库存] 跳过 (stock为空): number=%s", product_number)
-            skipped += 1
             continue
-        
         try:
-            stock_num = float(stock)
-            if stock_num > 0:
+            if float(stock) > 0:
                 result.append(product)
-                logger.debug("[过滤库存] 保留: number=%s, stock=%s", product_number, stock)
-            else:
-                logger.debug("[过滤库存] 跳过 (stock<=0): number=%s, stock=%s", product_number, stock)
-                skipped += 1
         except (ValueError, TypeError):
-            logger.debug("[过滤库存] 跳过 (stock非数值): number=%s, stock=%s", product_number, stock)
-            skipped += 1
-    
-    logger.info("[过滤库存] 结果: 保留=%d, 跳过=%d", len(result), skipped)
+            continue
     return result
 
 
@@ -103,14 +88,7 @@ def fetch_matched_products(company: str, oe: str, brand: str = "") -> List[Dict[
         return []
     
     products = extract_child_products(api_data)
-    
-    if not products:
-        logger.warning("[产品匹配] 无 child 产品: oe=%s", oe)
-    
-    filtered_products = filter_products_by_stock(products)
-    
-    logger.info("[产品匹配] 完成: oe=%s, 返回产品数=%d", oe, len(filtered_products))
-    return filtered_products
+    return filter_products_by_stock(products)
 
 
 def pick_product_fields(product: Dict[str, Any]) -> Dict[str, Any]:
