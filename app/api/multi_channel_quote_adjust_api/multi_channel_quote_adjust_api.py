@@ -16,6 +16,7 @@ from app.services.multi_channel_quote_adjust_service.quote_adjust_service import
     get_template_download_url,
     save_import_pipeline,
     fetch_quote_list_data,
+    fetch_all_brand_quotes_by_oe,
 )
 from app.services.multi_channel_quote_adjust_service.price_update_service import (
     update_product_sell_price,
@@ -139,6 +140,39 @@ def quote_list():
             'list': data_list,
             'total': len(data_list)
         }
+    })
+
+
+@bp.route('/supplier-quote/all-brands', methods=['GET'])
+@multi_channel_quote_adjust_permission_required
+def all_brands():
+    """
+    获取单个 OE 的全部品牌供应商报价
+
+    请求参数: oe=xxx
+    响应:
+    {
+        "code": 0,
+        "msg": "success",
+        "data": [
+            {"supplier": "...", "brand": "...", "result_oe": "...", "price": "..."}
+        ]
+    }
+    """
+    oe = request.args.get('oe', '').strip()
+    if not oe:
+        return jsonify({'code': 1, 'msg': '缺少 oe 参数'}), 400
+
+    try:
+        data = fetch_all_brand_quotes_by_oe(oe, hours=36)
+    except Exception as e:
+        logger.exception("获取全部品牌报价异常")
+        return jsonify({'code': 1, 'msg': f'获取失败: {e}'}), 500
+
+    return jsonify({
+        'code': 0,
+        'msg': 'success',
+        'data': data
     })
 
 

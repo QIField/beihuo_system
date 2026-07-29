@@ -646,6 +646,27 @@ var HandsontableBuilder = (function() {
             return builder;
         };
 
+        builder.showPopover = function(options) {
+            if (typeof HandsontablePopover === 'undefined') {
+                console.error('HandsontablePopover 未加载，请先引入 handsontable-popover.js');
+                return;
+            }
+            HandsontablePopover.getInstance().show(options);
+            return builder;
+        };
+
+        builder.hidePopover = function() {
+            if (typeof HandsontablePopover === 'undefined') return builder;
+            HandsontablePopover.getInstance().hide();
+            return builder;
+        };
+
+        builder.schedulePopoverHide = function() {
+            if (typeof HandsontablePopover === 'undefined') return builder;
+            HandsontablePopover.getInstance().scheduleHide();
+            return builder;
+        };
+
         builder.reset = function() {
             reset(builder);
             return builder;

@@ -375,6 +375,33 @@ def fetch_qq_chat_message_results_by_oes(oe_list: List[str], hours: int = 36) ->
         return cursor.fetchall()
 
 
+def fetch_qq_chat_message_results_by_oe(oe: str, hours: int = 36) -> List[Dict[str, Any]]:
+    """
+    根据单个 OE 查询最近 N 小时内的 QQ 消息转换结果（不过滤品牌）
+
+    Args:
+        oe: 搜索 OE
+        hours: 时间窗口（小时），默认 36 小时
+
+    Returns:
+        结果列表，包含 供应商, brand, price, search_oe
+    """
+    if not oe:
+        return []
+
+    sql = """
+        SELECT `search_oe`, `result_oe`, `供应商`, `brand`, `price`
+        FROM `qq_chat_message_result`
+        WHERE `search_oe` = %s
+          AND `conversion_time` >= DATE_SUB(NOW(), INTERVAL %s HOUR)
+        ORDER BY `conversion_time` DESC
+    """
+
+    with db_cursor(dict_cursor=True) as cursor:
+        cursor.execute(sql, (oe, hours))
+        return cursor.fetchall()
+
+
 def fetch_recent_import_oes(hours: int = 36) -> List[str]:
     """
     查询最近 N 小时内 multi_channel_quote_import 表中的 distinct oe

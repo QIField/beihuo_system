@@ -61,6 +61,8 @@ api_bp.register_blueprint(wms_kanban_api_bp)
 from .task_manager_api import task_manager_bp
 api_bp.register_blueprint(task_manager_bp)
 
+# 注册 CRM 零件品牌别名 API
+from . import pp_alias_api
 
 
 
