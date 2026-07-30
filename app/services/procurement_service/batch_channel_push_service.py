@@ -19,32 +19,29 @@ COMPANY_COOKIE_MAP = {
 def push_to_batch_channel(upload_success_items: List[Dict[str, Any]], company: str):
     """
     批量推送渠道价格
+    只使用数据项中已有的 product_id，缺失则跳过
 
     Args:
-        upload_success_items: 上传成功的数据列表，每项包含 oe 和 brand
+        upload_success_items: 上传成功的数据列表，每项包含 product_id
         company: 门店代码
     """
     if not upload_success_items:
         print("[BatchChannel] 没有上传成功的数据，跳过推送")
         return
 
-    # 1. 提取 OE+Brand 列表
-    oe_brand_list = []
+    # 只提取 item 中的 product_id
+    product_ids = []
+    seen_product_ids = set()
     for item in upload_success_items:
-        oe = item.get('oe')
-        brand = item.get('mapped_brand') or item.get('brand')
-        if oe and brand:
-            oe_brand_list.append((oe, brand))
-
-    if not oe_brand_list:
-        print("[BatchChannel] 没有有效的 OE+Brand 数据")
-        return
-
-    # 2. 批量查询 product_id
-    product_ids = _query_product_ids(oe_brand_list, company)
+        pid = item.get('product_id')
+        if pid:
+            pid_str = str(pid).strip()
+            if pid_str and pid_str not in seen_product_ids:
+                product_ids.append(pid_str)
+                seen_product_ids.add(pid_str)
 
     if not product_ids:
-        print("[BatchChannel] 未找到任何 product_id")
+        print("[BatchChannel] 上传成功数据中未找到任何 product_id，跳过推送")
         return
 
     # 3. 根据门店获取 Cookie

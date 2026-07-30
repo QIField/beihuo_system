@@ -14,6 +14,7 @@ import pandas as pd
 from app.services.multi_channel_quote_adjust_service.repository import (
     fetch_suppliers_by_car_brand,
     fetch_qq_chat_message_results_by_oes,
+    fetch_qq_chat_message_results_by_oe,
     save_to_qq_msg,
     save_import_records,
     fetch_recent_imports,
@@ -340,6 +341,36 @@ def aggregate_qq_results_by_supplier_brand(results: List[Dict[str, Any]]) -> Lis
     return aggregated
 
 
+def _extract_allowed_suppliers(rows: List[Dict[str, Any]]) -> List[str]:
+    """
+    从表格行中提取所有允许的供应商（支持 '、' 分隔）
+    """
+    allowed = []
+    for row in rows:
+        supplier_text = row.get("supplier", "") or ""
+        for part in str(supplier_text).split("、"):
+            part = part.strip()
+            if part:
+                allowed.append(part)
+    return allowed
+
+
+def _is_supplier_allowed(result_supplier: str, allowed_suppliers: List[str]) -> bool:
+    """
+    判断结果供应商是否被允许，支持模糊匹配（双向包含）
+    """
+    if not result_supplier:
+        return False
+    result_supplier = str(result_supplier).strip()
+    for allowed in allowed_suppliers:
+        allowed = str(allowed).strip()
+        if not allowed:
+            continue
+        if allowed in result_supplier or result_supplier in allowed:
+            return True
+    return False
+
+
 def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> List[Dict[str, Any]]:
     """
     将导入行按 qq_chat_message_result 的匹配结果逐行展开
@@ -347,6 +378,7 @@ def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> 
     规则：
     - 用导入行的 oe 匹配结果表的 search_oe
     - 只取最近 N 小时内的结果
+    - 只保留表格中已存在的供应商（支持模糊匹配）
     - 对结果按供应商 + 品牌聚合，每组输出一行
     - 无结果时保留原行， supplier / return_brand / return_price 为空
 
@@ -360,8 +392,14 @@ def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> 
     if not rows:
         return []
 
+    allowed_suppliers = _extract_allowed_suppliers(rows)
+
     oe_list = [row.get("oe", "") for row in rows if row.get("oe")]
     results = fetch_qq_chat_message_results_by_oes(oe_list, hours)
+
+    # 按表格供应商过滤，只保留匹配的报价
+    results = [r for r in results if _is_supplier_allowed(r.get("供应商", ""), allowed_suppliers)]
+
     results = aggregate_qq_results_by_supplier_brand(results)
 
     results_by_oe: Dict[str, List[Dict[str, Any]]] = {}
@@ -374,7 +412,13 @@ def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> 
     expanded = []
     for row in rows:
         oe = row.get("oe", "")
-        matched = results_by_oe.get(oe, [])
+        row_brand = row.get("brand", "") or ""
+
+        # 按当前行品牌过滤，只展示系统返回品牌匹配的结果
+        matched = [
+            r for r in results_by_oe.get(oe, [])
+            if str(r.get("brand", "") or "").strip() == str(row_brand).strip()
+        ]
 
         if not matched:
             new_row = dict(row)
@@ -394,6 +438,31 @@ def expand_rows_with_qq_results(rows: List[Dict[str, Any]], hours: int = 36) -> 
             expanded.append(new_row)
 
     return expanded
+
+
+def fetch_all_brand_quotes_by_oe(oe: str, hours: int = 36) -> List[Dict[str, Any]]:
+    """
+    获取单个 OE 的全部品牌供应商报价（不过滤品牌，不过滤表格供应商）
+
+    Args:
+        oe: 搜索 OE
+        hours: 结果时间窗口（小时）
+
+    Returns:
+        聚合后的报价列表，每条包含 supplier, brand, result_oe, price
+    """
+    results = fetch_qq_chat_message_results_by_oe(oe, hours)
+    aggregated = aggregate_qq_results_by_supplier_brand(results)
+
+    return [
+        {
+            "supplier": r.get("供应商", ""),
+            "brand": r.get("brand", ""),
+            "result_oe": r.get("result_oe", ""),
+            "price": _to_str_price(r.get("price")),
+        }
+        for r in aggregated
+    ]
 
 
 def save_import_pipeline(expanded_rows: List[Dict[str, Any]], full_rows: List[Dict[str, Any]], create_by: str) -> None:

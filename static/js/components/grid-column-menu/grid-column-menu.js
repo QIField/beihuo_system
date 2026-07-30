@@ -411,7 +411,7 @@ var GridColumnMenu = (function() {
         if (TH.classList.contains('ht__corner')) return;
 
         if (!colDef) return;
-        var colId = colDef.field || colDef.colId || colDef.data || String(index);
+        var colId = colDef.field || colDef.colId || colDef.data || 'index';
 
         var menuBtn = _createMenuBtn(colId, gridSelector, { noHover: true });
         // Handsontable 表头：按钮绝对定位到标题右方，默认显示，大小与 AG Grid 一致

@@ -40,7 +40,10 @@ common_web_bp.register_blueprint(wms_kanban_web_bp)
 from .system_manager_web import system_manager_web_bp
 common_web_bp.register_blueprint(system_manager_web_bp)
 
+from .pp_alias_manager_web import pp_alias_manager_web_bp
+common_web_bp.register_blueprint(pp_alias_manager_web_bp)
 
 
-__all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp','warehouse_manager_web_bp','common_web_bp','excel_download_bp']
+
+__all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp','warehouse_manager_web_bp','common_web_bp','excel_download_bp','pp_alias_manager_web_bp']
 

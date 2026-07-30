@@ -602,7 +602,10 @@ def init_price_inquiry_table():
                 ("import_time", "DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '导入时间'"),
                 ("original_price", "DECIMAL(10,2) DEFAULT 0.00 COMMENT '原始单价（加价前）'"),
                 ("markup_rate", "DECIMAL(6,4) DEFAULT 1.0000 COMMENT '加价率（倍数，如1.1表示加价10%）'"),
-                ("markup_amount", "DECIMAL(10,2) DEFAULT 0.00 COMMENT '加价金额（售价-原价）'")
+                ("markup_amount", "DECIMAL(10,2) DEFAULT 0.00 COMMENT '加价金额（售价-原价）'"),
+                ("creator", "VARCHAR(100) DEFAULT NULL COMMENT '导入人'"),
+                ("matched_barcode", "VARCHAR(255) DEFAULT NULL COMMENT '匹配条码'"),
+                ("product_id", "VARCHAR(100) DEFAULT NULL COMMENT '产品编号'"),
             ]
             
             for col_name, col_def in alter_columns:
@@ -925,6 +928,19 @@ def init_all_tables():
         except Exception as e:
             completed.append('✗')
             print(f"  [失败] {name}表: {e}")
+
+    # 兼容旧表：卓之星库存表新增字段
+    zhuozhixing_fields_to_check = [
+        {
+            'name': 'sxpfprice',
+            'definition': "DECIMAL(10,2) DEFAULT 0.00 COMMENT '盛旻真实价格（接口sxpfprice字段）'"
+        },
+        {
+            'name': 'openprice1',
+            'definition': "DECIMAL(10,2) DEFAULT 0.00 COMMENT '盛旻开盘价（接口openprice1字段）'"
+        }
+    ]
+    check_and_add_fields('zhuozhixing_inventory', zhuozhixing_fields_to_check)
 
     # 结构优化和索引
     ensure_table_structure()

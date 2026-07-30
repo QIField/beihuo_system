@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>CRM 零件品牌别名管理</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+</head>
+<body>
+<div style="padding: 20px;">
+    <table id="aliasTable" lay-filter="aliasTable"></table>
+</div>
+
+<script src="/static/layui/layui.js"></script>
+<script>
+    layui.use(['table', 'form', 'layer'], function () {
+        var table = layui.table;
+        var form = layui.form;
+        var layer = layui.layer;
+        var $ = layui.$;
+
+        // 渲染表格
+        var tableIns = table.render({
+            elem: '#aliasTable',
+            url: '/new/api/pp-alias/list',
+            method: 'GET',
+            page: true,
+            limit: 20,
+            limits: [10, 20, 50, 100],
+            toolbar: '#toolbarDemo',
+            parseData: function(res) {
+                return {
+                    "code": res.code === 200 ? 0 : res.code,
+                    "msg": res.msg,
+                    "count": res.count,
+                    "data": res.data
+                };
+            },
+            cols: [[
+                {field: 'id', title: 'ID', width: 80, sort: true},
+                {field: 'pp_name', title: '品牌主名', minWidth: 160},
+                {field: 'alias_name', title: '别名', minWidth: 200},
+                {field: 'created_at', title: '创建时间', width: 170},
+                {title: '操作', toolbar: '#barDemo', width: 150, fixed: 'right'}
+            ]]
+        });
+
+        // 搜索栏
+        table.on('toolbar(aliasTable)', function (obj) {
+            if (obj.event === 'add') {
+                openForm();
+            } else if (obj.event === 'search') {
+                var ppName = $('#searchPpName').val();
+                var aliasName = $('#searchAliasName').val();
+                tableIns.reload({
+                    where: {
+                        pp_name: ppName,
+                        alias_name: aliasName
+                    },
+                    page: {curr: 1}
+                });
+            }
+        });
+
+        // 行工具：编辑、删除
+        table.on('tool(aliasTable)', function (obj) {
+            var data = obj.data;
+            if (obj.event === 'edit') {
+                openForm(data);
+            } else if (obj.event === 'del') {
+                layer.confirm('确定删除该记录吗？', function (index) {
+                    $.ajax({
+                        url: '/new/api/pp-alias/delete',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({id: data.id}),
+                        success: function (res) {
+                            if (res.code === 200) {
+                                layer.msg('删除成功');
+                                tableIns.reload();
+                            } else {
+                                layer.msg(res.msg || '删除失败');
+                            }
+                        },
+                        error: function () {
+                            layer.msg('删除失败');
+                        }
+                    });
+                    layer.close(index);
+                });
+            }
+        });
+
+        // 打开新增/编辑表单
+        function openForm(data) {
+            var isEdit = !!data;
+            var title = isEdit ? '编辑别名' : '新增别名';
+            var ppName = isEdit ? data.pp_name : '';
+            var aliasName = isEdit ? data.alias_name : '';
+
+            var html = '<form class="layui-form" style="padding: 20px;">' +
+                '<div class="layui-form-item">' +
+                '<label class="layui-form-label">品牌主名</label>' +
+                '<div class="layui-input-block">' +
+                '<input type="text" id="formPpName" value="' + ppName + '" required lay-verify="required" placeholder="请输入品牌主名" class="layui-input">' +
+                '</div>' +
+                '</div>' +
+                '<div class="layui-form-item">' +
+                '<label class="layui-form-label">别名</label>' +
+                '<div class="layui-input-block">' +
+                '<input type="text" id="formAliasName" value="' + aliasName + '" required lay-verify="required" placeholder="请输入别名" class="layui-input">' +
+                '</div>' +
+                '</div>' +
+                '</form>';
+
+            layer.open({
+                type: 1,
+                title: title,
+                area: ['450px', '260px'],
+                btn: ['保存', '取消'],
+                content: html,
+                yes: function (index, layero) {
+                    var ppNameVal = $.trim($('#formPpName').val());
+                    var aliasNameVal = $.trim($('#formAliasName').val());
+
+                    if (!ppNameVal) {
+                        layer.msg('品牌主名不能为空');
+                        return;
+                    }
+                    if (!aliasNameVal) {
+                        layer.msg('别名不能为空');
+                        return;
+                    }
+
+                    var postData = {
+                        pp_name: ppNameVal,
+                        alias_name: aliasNameVal
+                    };
+                    var url = '/new/api/pp-alias/create';
+                    if (isEdit) {
+                        postData.id = data.id;
+                        url = '/new/api/pp-alias/update';
+                    }
+
+                    $.ajax({
+                        url: url,
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify(postData),
+                        success: function (res) {
+                            if (res.code === 200) {
+                                layer.msg(isEdit ? '更新成功' : '新增成功');
+                                layer.close(index);
+                                tableIns.reload();
+                            } else {
+                                layer.msg(res.msg || '操作失败');
+                            }
+                        },
+                        error: function () {
+                            layer.msg('操作失败');
+                        }
+                    });
+                }
+            });
+        }
+    });
+</script>
+
+<script type="text/html" id="toolbarDemo">
+    <div class="layui-btn-container">
+        <button class="layui-btn layui-btn-sm" lay-event="add">新增</button>
+        <input type="text" id="searchPpName" placeholder="品牌主名" class="layui-input" style="display:inline-block;width:150px;height:30px;margin-left:10px;">
+        <input type="text" id="searchAliasName" placeholder="别名" class="layui-input" style="display:inline-block;width:150px;height:30px;margin-left:10px;">
+        <button class="layui-btn layui-btn-sm layui-btn-normal" lay-event="search">搜索</button>
+    </div>
+</script>
+
+<script type="text/html" id="barDemo">
+    <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+    <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+</script>
+</body>
+</html>

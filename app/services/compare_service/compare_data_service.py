@@ -470,6 +470,88 @@ class CompareDataService:
             return data, total
         
         conn.close()
+
+    @staticmethod
+    def list_data_by_oe_brand_pairs(
+        oe_brand_pairs: List[Tuple[str, str]],
+        company: str = ''
+    ) -> Tuple[List[Dict], int]:
+        """
+        根据OE+品牌对列表查询数据（用于导入模板搜索）
+
+        参数:
+            oe_brand_pairs: OE和品牌元组列表 [(oe, brand), ...]
+            company: 公司/组织筛选
+
+        返回:
+            (数据列表, 总记录数)
+        """
+        if not oe_brand_pairs:
+            return [], 0
+
+        # 去重并过滤空值
+        unique_pairs = []
+        for oe, brand in oe_brand_pairs:
+            oe = str(oe).strip() if oe is not None else ''
+            brand = str(brand).strip() if brand is not None else ''
+            if oe and brand and (oe, brand) not in unique_pairs:
+                unique_pairs.append((oe, brand))
+
+        if not unique_pairs:
+            return [], 0
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
+                where_conditions = []
+                params = []
+
+                if company:
+                    where_conditions.append("company = %s")
+                    params.append(company)
+
+                # 构建OR条件
+                or_conditions = []
+                for oe, brand in unique_pairs:
+                    or_conditions.append("(oe = %s AND brand = %s)")
+                    params.extend([oe, brand])
+
+                where_conditions.append("(" + " OR ".join(or_conditions) + ")")
+                where_clause = "WHERE " + " AND ".join(where_conditions)
+
+                # 查询总数
+                count_sql = f"SELECT COUNT(*) FROM {CompareDataService.TABLE_NAME} {where_clause}"
+                cursor.execute(count_sql, params)
+                total = cursor.fetchone()[0]
+
+                # 查询数据（不分页，导入数据量通常不大）
+                data_sql = f"""
+                    SELECT * FROM {CompareDataService.TABLE_NAME}
+                    {where_clause}
+                    ORDER BY updated_time DESC
+                """
+                cursor.execute(data_sql, params)
+
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+
+                data = []
+                for row in rows:
+                    item = dict(zip(columns, row))
+                    for time_field in ['price_update_time', 'updated_time']:
+                        if item.get(time_field):
+                            if hasattr(item[time_field], 'strftime'):
+                                item[time_field] = item[time_field].strftime('%Y-%m-%d %H:%M:%S')
+                    for price_field in ['max_price', 'min_price', 'supplier_price',
+                                       'dealer_purchase_price', 'dealer_sale_price',
+                                       'avg_sales_12m', 'avg_sales_6m']:
+                        if item.get(price_field) is not None:
+                            item[price_field] = float(item[price_field])
+                    data.append(item)
+
+                return data, total
+        finally:
+            conn.close()
     
     @staticmethod
     def get_all_data() -> List[Dict]:
@@ -844,6 +926,115 @@ class CompareDataService:
                 result[key] = False
         
         return result
+
+    @staticmethod
+    def save_import_log(
+        company: str,
+        file_name: str,
+        import_count: int,
+        match_count: int,
+        operator: str,
+        result_file_path: str
+    ) -> int:
+        """
+        保存比价导入日志
+
+        参数:
+            company: 公司代码
+            file_name: 上传的原始文件名
+            import_count: Excel 中有效 OE+品牌 行数
+            match_count: 数据库匹配到的记录数
+            operator: 操作人
+            result_file_path: 生成的结果 Excel 路径
+
+        返回:
+            日志记录 ID
+        """
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.Cursor) as cursor:
+                sql = """
+                    INSERT INTO crmapp_compare_import_log
+                    (company, file_name, import_count, match_count, operator, result_file_path, created_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                """
+                cursor.execute(sql, (company, file_name, import_count, match_count, operator, result_file_path))
+                conn.commit()
+                return cursor.lastrowid
+        except Exception as e:
+            conn.rollback()
+            print(f"保存导入日志失败: {str(e)}")
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_import_logs(company: str, limit: int = 50) -> List[Dict]:
+        """
+        查询导入日志列表
+
+        参数:
+            company: 公司代码
+            limit: 返回条数上限
+
+        返回:
+            日志记录列表
+        """
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                sql = """
+                    SELECT id, company, file_name, import_count, match_count,
+                           operator, result_file_path, created_time
+                    FROM crmapp_compare_import_log
+                    WHERE company = %s
+                    ORDER BY created_time DESC
+                    LIMIT %s
+                """
+                cursor.execute(sql, (company, limit))
+                rows = cursor.fetchall()
+                for row in rows:
+                    if row.get('created_time') and hasattr(row['created_time'], 'strftime'):
+                        row['created_time'] = row['created_time'].strftime('%Y-%m-%d %H:%M:%S')
+                return rows
+        except Exception as e:
+            print(f"查询导入日志失败: {str(e)}")
+            raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_import_log_by_id(log_id: int, company: str) -> Optional[Dict]:
+        """
+        根据ID查询单条导入日志
+
+        参数:
+            log_id: 日志ID
+            company: 公司代码（用于权限校验）
+
+        返回:
+            日志记录字典，不存在返回None
+        """
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                sql = """
+                    SELECT id, company, file_name, import_count, match_count,
+                           operator, result_file_path, created_time
+                    FROM crmapp_compare_import_log
+                    WHERE id = %s AND company = %s
+                    LIMIT 1
+                """
+                cursor.execute(sql, (log_id, company))
+                row = cursor.fetchone()
+                if row and row.get('created_time') and hasattr(row['created_time'], 'strftime'):
+                    row['created_time'] = row['created_time'].strftime('%Y-%m-%d %H:%M:%S')
+                return row
+        except Exception as e:
+            print(f"查询导入日志失败: {str(e)}")
+            raise
+        finally:
+            conn.close()
 
 
 # 便捷函数（模块级别）

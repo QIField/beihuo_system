@@ -15,5 +15,7 @@ from .crm_purchase_order_list import CrmPurchaseOrderList
 from .crm_purchase_order_details import CrmPurchaseOrderDetails
 from .warehouse_inventory_latest import WarehouseInventoryLatest
 from .inventory_record_latest import InventoryRecordLatest
+from .crm_pp_name import CrmPpName
+from .crm_pp_name_log import CrmPpNameLog
 
-__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest"]
+__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog"]

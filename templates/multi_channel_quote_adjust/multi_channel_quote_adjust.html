@@ -16,6 +16,10 @@
     <!-- Handsontable Builder -->
     <script src="/static/js/components/handsontable-builder/handsontable-builder.js"></script>
 
+    <!-- Handsontable Popover -->
+    <link rel="stylesheet" href="/static/js/components/handsontable-popover/handsontable-popover.css">
+    <script src="/static/js/components/handsontable-popover/handsontable-popover.js"></script>
+
     <!-- Grid Column Menu -->
     <link rel="stylesheet" href="/static/js/components/grid-column-menu/grid-column-menu.css">
     <script src="/static/js/components/grid-column-menu/grid-column-menu.js"></script>
@@ -182,6 +186,57 @@
             }
         }
 
+        var currentPopoverOe = null;
+        var currentPopoverTarget = null;
+        var POPOVER_TRIGGER_COLUMNS = ['supplier'];
+
+        function showOtherBrandsPopover(target, oe) {
+            if (!oe || currentPopoverOe === oe) return;
+            currentPopoverOe = oe;
+            currentPopoverTarget = target;
+
+            window.builder.showPopover({
+                target: target,
+                title: 'OE: ' + oe + ' 的其他品牌报价',
+                width: 420,
+                height: 220,
+                columns: [
+                    { data: 'brand', title: '品牌', width: 100 },
+                    { data: 'supplier', title: '供应商', width: 140 },
+                    { data: 'price', title: '价格', width: 100, type: 'numeric', numericFormat: { pattern: '0.00' } }
+                ],
+                onHide: function() {
+                    currentPopoverOe = null;
+                    currentPopoverTarget = null;
+                },
+                asyncLoader: function(callback) {
+                    fetch('/new/api/multi_channel_quote_adjust/supplier-quote/all-brands?oe=' + encodeURIComponent(oe), {
+                        method: 'GET',
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        if (!r.ok) {
+                            return r.text().then(function(text) {
+                                throw new Error('HTTP ' + r.status + ': ' + text);
+                            });
+                        }
+                        return r.json();
+                    })
+                    .then(function(result) {
+                        if (result.code !== 0) {
+                            callback(new Error(result.msg || '加载失败'));
+                            return;
+                        }
+                        callback(null, result.data || []);
+                    })
+                    .catch(function(err) {
+                        console.error('[供应商报价浮窗] 加载失败:', err);
+                        callback(err);
+                    });
+                }
+            });
+        }
+
         var gridData = [];
 
         var columns = [
@@ -308,6 +363,24 @@
                                 window.builder.hot.setDataAtRowProp(row, 'new_profit_amount', newProfitAmount, 'programmatic');
                             }
                         });
+                    },
+                    afterOnCellMouseOver: function(event, coords, td) {
+                        var colDef = columns[coords.col];
+                        if (!colDef || POPOVER_TRIGGER_COLUMNS.indexOf(colDef.data) === -1) return;
+
+                        var item = window.builder.hot.getSourceDataAtRow(coords.row);
+                        if (!item || !item.oe) return;
+
+                        if (!td.getAttribute('data-popover-bound')) {
+                            td.setAttribute('data-popover-bound', '1');
+                            td.addEventListener('mouseleave', function() {
+                                if (window.builder) {
+                                    window.builder.schedulePopoverHide();
+                                }
+                            });
+                        }
+
+                        showOtherBrandsPopover(td, item.oe);
                     }
                 }
             });

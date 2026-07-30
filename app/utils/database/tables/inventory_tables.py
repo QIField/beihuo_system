@@ -36,6 +36,8 @@ def init_zhuozhixing_table():
                 是否共享 TINYINT COMMENT '是否共享：0-否，1-是',
                 商家库存表自增ID VARCHAR(50) COMMENT '商家库存表自增ID',
                 库号 VARCHAR(50) COMMENT '库号（仓库）',
+                sxpfprice DECIMAL(10,2) DEFAULT 0.00 COMMENT '盛旻真实价格（接口sxpfprice字段）',
+                openprice1 DECIMAL(10,2) DEFAULT 0.00 COMMENT '盛旻开盘价（接口openprice1字段）',
                 sync_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '同步时间',
                 INDEX idx_supplier (supplier_name),
                 INDEX idx_零件编码 (零件编码),
