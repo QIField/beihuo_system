@@ -56,7 +56,9 @@ FIELD_MAPPING = {
     "hhcode": "互换码",
     "Isgx": "是否共享",
     "kcid": "商家库存表自增ID",
-    "kcdepot": "库号"
+    "kcdepot": "库号",
+    "sxpfprice": "sxpfprice",
+    "openprice1": "openprice1"
 }
 
 # 数据库字段列表（按顺序）
@@ -79,7 +81,9 @@ DB_FIELDS = [
     '互换码',
     '是否共享',
     '商家库存表自增ID',
-    '库号'
+    '库号',
+    'sxpfprice',
+    'openprice1'
 ]
 
 # 批量插入批次大小

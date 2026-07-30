@@ -121,7 +121,7 @@ def prepare_for_database(data_list: List[Dict[str, Any]], supplier_name: str) ->
             value = item.get(field)
 
             # 处理数值类型
-            if field == '价格' and value is not None:
+            if field in ('价格', 'sxpfprice', 'openprice1') and value is not None:
                 try:
                     value = float(value)
                 except (ValueError, TypeError):

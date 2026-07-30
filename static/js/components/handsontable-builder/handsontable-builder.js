@@ -10,6 +10,8 @@
  *   - /static/js/components/grid-column-menu/grid-column-menu.js
  *   - /static/js/components/custom-pagination/custom-pagination.js
  *
+ * CSS 依赖由本文件自动加载，页面无需手动引入。
+ *
  * 使用示例：
  *   var builder = HandsontableBuilder.create('#myGrid', {
  *       columns: [...],
@@ -28,6 +30,31 @@
 
 var HandsontableBuilder = (function() {
     'use strict';
+
+    /**
+     * 自动加载依赖 CSS（页面未引入时兜底）
+     */
+    function loadCssIfNotExists(cssPath) {
+        var fullPath = cssPath;
+        if (fullPath.indexOf('/') !== 0 && fullPath.indexOf('http') !== 0) {
+            fullPath = '/' + fullPath;
+        }
+        var links = document.querySelectorAll('link[rel="stylesheet"]');
+        for (var i = 0; i < links.length; i++) {
+            var href = links[i].getAttribute('href') || '';
+            if (href.indexOf(fullPath) !== -1 || href.indexOf(cssPath) !== -1) {
+                return;
+            }
+        }
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = fullPath;
+        document.head.appendChild(link);
+    }
+
+    // 自动加载列菜单和筛选面板样式，避免新页面漏引入
+    loadCssIfNotExists('/static/js/components/grid-column-menu/grid-column-menu.css');
+    loadCssIfNotExists('/static/js/components/filter_panel/filter-panel.css');
 
     /**
      * 合并对象（浅合并）
@@ -239,11 +266,7 @@ var HandsontableBuilder = (function() {
             builder.visibleColumns = columns.filter(function(col) {
                 return !col.hide;
             });
-            if (config.dataUrl === null || config.dataUrl === undefined) {
-                renderLocalData(builder);
-            } else {
-                refresh(builder);
-            }
+            renderByDataMode(builder);
             return;
         }
 
@@ -252,35 +275,113 @@ var HandsontableBuilder = (function() {
         fetch(url, { credentials: 'same-origin' })
             .then(function(r) { return r.json(); })
             .then(function(resp) {
-                var hiddenSet = new Set();
                 if (resp.code === 0 && resp.data && Array.isArray(resp.data) && resp.data.length > 0) {
-                    resp.data.forEach(function(s) {
-                        if (s && s.hide) hiddenSet.add(s.colId);
-                    });
+                    builder.applyingState = true;
+                    applyColumnState(columns, resp.data);
+                    builder.applyingState = false;
                 }
-                columns.forEach(function(col) {
-                    var f = col.field || col.colId || col.data;
-                    col.hide = hiddenSet.has(f);
-                });
                 builder.visibleColumns = columns.filter(function(col) {
                     return !col.hide;
                 });
-                if (config.dataUrl === null || config.dataUrl === undefined) {
-                    renderLocalData(builder);
-                } else {
-                    refresh(builder);
-                }
+                renderByDataMode(builder);
             })
             .catch(function(e) {
                 console.error('[HandsontableBuilder] 加载列偏好失败:', e);
                 columns.forEach(function(col) { col.hide = false; });
                 builder.visibleColumns = columns.slice();
-                if (config.dataUrl === null || config.dataUrl === undefined) {
-                    renderLocalData(builder);
-                } else {
-                    refresh(builder);
-                }
+                renderByDataMode(builder);
             });
+    }
+
+    /**
+     * 应用后端返回的列状态：顺序、宽度、显隐
+     */
+    function applyColumnState(columns, state) {
+        var stateMap = {};
+        state.forEach(function(s, index) {
+            if (!s || !s.colId) return;
+            stateMap[s.colId] = { state: s, index: index };
+        });
+
+        // 按后端记录的顺序排序，未记录的列保持原顺序放在后面
+        columns.sort(function(a, b) {
+            var idA = String(a.field || a.colId || a.data || '');
+            var idB = String(b.field || b.colId || b.data || '');
+            var infoA = stateMap[idA];
+            var infoB = stateMap[idB];
+            if (infoA && infoB) return infoA.index - infoB.index;
+            if (infoA) return -1;
+            if (infoB) return 1;
+            return 0;
+        });
+
+        // 应用 width 和 hide
+        columns.forEach(function(col) {
+            var colId = String(col.field || col.colId || col.data || '');
+            var info = stateMap[colId];
+            if (!info) return;
+            var s = info.state;
+            if (s.width !== undefined && s.width !== null && s.width !== '') {
+                col.width = parseInt(s.width, 10) || col.width;
+            }
+            if (s.hide !== undefined) {
+                col.hide = !!s.hide;
+            }
+        });
+    }
+
+    function renderByDataMode(builder) {
+        if (builder.config.dataUrl === null || builder.config.dataUrl === undefined) {
+            renderLocalData(builder);
+        } else {
+            refresh(builder);
+        }
+    }
+
+    /**
+     * 保存列偏好：顺序、宽度、显隐
+     */
+    function saveColumnPreference(builder) {
+        var config = builder.config;
+        var cmConfig = getComponentConfig(config.components, 'columnMenu') || {};
+        var cpConfig = getComponentConfig(config.components, 'columnPreference') || {};
+        var persist = isEnabled(config.components, 'columnPreference') ||
+                      (isEnabled(config.components, 'columnMenu') && cmConfig.persist);
+        var pageKey = cpConfig.pageKey || cmConfig.pageKey || config.pageKey || '';
+        var gridKey = cpConfig.gridKey || cmConfig.gridKey || config.gridKey || '';
+
+        if (!persist || !pageKey || !gridKey || builder.applyingState) {
+            return;
+        }
+
+        var columns = builder.columns || [];
+        var visibleColumns = builder.visibleColumns || [];
+        var visibleSet = {};
+        visibleColumns.forEach(function(col) {
+            visibleSet[String(col.field || col.colId || col.data || '')] = true;
+        });
+
+        var state = columns.map(function(col) {
+            var colId = String(col.field || col.colId || col.data || '');
+            return {
+                colId: colId,
+                hide: !visibleSet[colId],
+                width: col.width
+            };
+        });
+
+        fetch('/new/api/column_preference', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                page_key: pageKey,
+                grid_key: gridKey,
+                column_state: state
+            })
+        }).catch(function(e) {
+            console.error('[HandsontableBuilder] 保存列偏好失败:', e);
+        });
     }
 
     function renderLocalData(builder) {
@@ -510,7 +611,115 @@ var HandsontableBuilder = (function() {
 
         builder.hot = new Handsontable(builder.container, options);
 
+        initColumnStateHooks(builder);
         initColumnMenu(builder);
+    }
+
+    /**
+     * 初始化列状态变化监听：移动、调整宽度
+     */
+    function initColumnStateHooks(builder) {
+        var config = builder.config;
+        var cmConfig = getComponentConfig(config.components, 'columnMenu') || {};
+        var cpConfig = getComponentConfig(config.components, 'columnPreference') || {};
+        var persist = isEnabled(config.components, 'columnPreference') ||
+                      (isEnabled(config.components, 'columnMenu') && cmConfig.persist);
+        var pageKey = cpConfig.pageKey || cmConfig.pageKey || config.pageKey || '';
+        var gridKey = cpConfig.gridKey || cmConfig.gridKey || config.gridKey || '';
+
+        if (!persist || !pageKey || !gridKey) return;
+        if (!builder.hot) return;
+
+        var hot = builder.hot;
+
+        hot.addHook('afterColumnMove', function(movedColumns, finalIndex) {
+            // Handsontable 可能会复用并清空 movedColumns，立即复制一份
+            var movedColumnsCopy = Array.isArray(movedColumns) ? movedColumns.slice() : [];
+            var finalIndexCopy = finalIndex;
+            console.log('[列偏好] afterColumnMove 触发', { movedColumns: movedColumnsCopy, finalIndex: finalIndexCopy });
+            // 延迟一帧，让 Handsontable 完成内部状态更新
+            setTimeout(function() {
+                try {
+                    var visibleColumns = builder.visibleColumns || [];
+                    var allColumns = builder.columns || [];
+
+                    console.log('[列偏好] afterColumnMove 参数检查', {
+                        isArray: Array.isArray(movedColumnsCopy),
+                        length: movedColumnsCopy.length,
+                        finalIndex: finalIndexCopy,
+                        finalIndexType: typeof finalIndexCopy
+                    });
+                    if (!Array.isArray(movedColumnsCopy) || movedColumnsCopy.length === 0 ||
+                        typeof finalIndexCopy !== 'number') {
+                        console.log('[列偏好] afterColumnMove 参数无效，跳过');
+                        return;
+                    }
+
+                    // 按索引降序取出被移动的列，保持它们在移动前的相对顺序
+                    var sortedMovedIndices = movedColumnsCopy.slice().sort(function(a, b) { return b - a; });
+                    var movedCols = [];
+                    sortedMovedIndices.forEach(function(idx) {
+                        movedCols.unshift(visibleColumns[idx]);
+                    });
+
+                    // 移除被移动的列
+                    var remaining = visibleColumns.filter(function(_, idx) {
+                        return movedColumnsCopy.indexOf(idx) === -1;
+                    });
+
+                    // finalIndex 即为在剩余列中的插入位置（已移除移动列后的数组）
+                    var insertIndex = Math.max(0, Math.min(finalIndexCopy, remaining.length));
+
+                    var newVisibleOrder = remaining.slice(0, insertIndex)
+                        .concat(movedCols)
+                        .concat(remaining.slice(insertIndex));
+
+                    console.log('[列偏好] afterColumnMove 重排', {
+                        movedColumns: movedColumnsCopy,
+                        finalIndex: finalIndexCopy,
+                        insertIndex: insertIndex,
+                        newOrder: newVisibleOrder.map(function(c) { return c.field || c.colId || c.data; })
+                    });
+
+                    var visibleSet = {};
+                    newVisibleOrder.forEach(function(col) {
+                        visibleSet[String(col.field || col.colId || col.data || '')] = true;
+                    });
+
+                    var hiddenColumns = allColumns.filter(function(col) {
+                        return !visibleSet[String(col.field || col.colId || col.data || '')];
+                    });
+
+                    builder.columns = newVisibleOrder.concat(hiddenColumns);
+                    builder.visibleColumns = newVisibleOrder;
+                    saveColumnPreference(builder);
+                } catch (e) {
+                    console.warn('[列偏好] afterColumnMove 处理失败:', e);
+                }
+            }, 0);
+        });
+
+        hot.addHook('afterColumnResize', function() {
+            // 不同版本 Handsontable 参数顺序不同，直接从 grid 读取各列宽度
+            setTimeout(function() {
+                try {
+                    var visibleColumns = builder.visibleColumns || [];
+                    var changed = false;
+                    for (var i = 0; i < visibleColumns.length; i++) {
+                        var w = hot.getColWidth(i);
+                        if (typeof w === 'number' && w > 0) {
+                            visibleColumns[i].width = w;
+                            changed = true;
+                        }
+                    }
+                    if (changed) {
+                        saveColumnPreference(builder);
+                    }
+                } catch (e) {
+                    console.warn('[列偏好] afterColumnResize 处理失败:', e);
+                }
+            }, 0);
+        });
     }
 
     function initColumnMenu(builder) {
@@ -558,7 +767,17 @@ var HandsontableBuilder = (function() {
             if (typeof config.onColumnVisibilityChange === 'function') {
                 config.onColumnVisibilityChange(visibleCols);
             }
+            // 同步更新 builder.columns 中的 hide 状态
+            var visibleSet = {};
+            visibleCols.forEach(function(col) {
+                visibleSet[String(col.field || col.colId || col.data || '')] = true;
+            });
+            builder.columns.forEach(function(col) {
+                var colId = String(col.field || col.colId || col.data || '');
+                col.hide = !visibleSet[colId];
+            });
             renderLocalData(builder);
+            saveColumnPreference(builder);
         };
 
         menuOptions.onDataRefresh = function(filterState) {

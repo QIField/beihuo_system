@@ -28,6 +28,9 @@ from app.utils.b2b_inquiry_upload import get_recent_results
 # 创建蓝图
 inquiry_bp = Blueprint('inquiry', __name__)
 
+# 没有 CRM 匹配结果时，匹配条码列的提示文案
+NO_MATCH_BARCODE_TIP = '未搜索到系统产品，不进行上传'
+
 
 @inquiry_bp.route('/inquiry_module')
 def inquiry_module_page():
@@ -195,7 +198,11 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         '失效时间': 'expire_time', 'expire_time': 'expire_time',
         '备注': 'remark', 'remark': 'remark',
         '库存数量': 'stock_quantity', 'stock_quantity': 'stock_quantity',
-        '通用号': 'common_number', 'common_number': 'common_number'
+        '通用号': 'common_number', 'common_number': 'common_number',
+        '匹配OE': 'matched_oe', 'matched_oe': 'matched_oe',
+        '匹配品牌': 'matched_brand', 'matched_brand': 'matched_brand',
+        '匹配供应商': 'matched_supplier', 'matched_supplier': 'matched_supplier',
+        '最终价格': 'final_price', 'final_price': 'final_price'
     }
     
     rename_dict = {old: new for old, new in column_mapping.items() 
@@ -211,20 +218,60 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     except:
         markup_rate = 1
     
-    if markup_rate != 1 and 'price' in df.columns:
+    # 如果前端传了最终价格，直接作为上传价格；否则按加价率计算
+    if 'final_price' in df.columns:
+        df['original_price'] = pd.to_numeric(df['price'], errors='coerce')
+        df['price'] = pd.to_numeric(df['final_price'], errors='coerce')
+    elif markup_rate != 1 and 'price' in df.columns:
         df['price'] = pd.to_numeric(df['price'], errors='coerce')
         df['original_price'] = df['price'].copy()
         df['price'] = (df['price'] * markup_rate).round(2)
-    
+
+    # 应用前端编辑后的匹配值：OE/品牌/供应商优先使用匹配列
+    if 'matched_oe' in df.columns:
+        df['oe'] = df['matched_oe'].where(df['matched_oe'].notna() & (df['matched_oe'] != ''), df['oe'])
+    if 'matched_brand' in df.columns:
+        df['brand'] = df['matched_brand'].where(df['matched_brand'].notna() & (df['matched_brand'] != ''), df['brand'])
+    if 'matched_supplier' in df.columns:
+        df['supplier'] = df['matched_supplier'].where(df['matched_supplier'].notna() & (df['matched_supplier'] != ''), df['supplier'])
+    if 'matched_barcode' in df.columns:
+        df['common_number'] = df['matched_barcode'].where(
+            df['matched_barcode'].notna() &
+            (df['matched_barcode'] != '') &
+            (df['matched_barcode'] != NO_MATCH_BARCODE_TIP),
+            df.get('common_number', '')
+        )
+
+    # 应用前端编辑后的仓库、失效时间、备注、库存数量
+    for col in ['warehouse', 'expire_time', 'remark', 'stock_quantity']:
+        if col in df.columns:
+            df[col] = df[col].where(df[col].notna(), '')
+
     # 准备数据（询价模块不使用品牌别名映射）
     from app.utils.b2b_inquiry_upload.uploader import prepare_data, batch_upload_with_callback
     valid_items, skipped_items = prepare_data(df)
 
-    # 询价模块专用：过滤价格为空或为0的数据
+    # 补充前端传过来的匹配条码和产品编号
+    for col in ['matched_barcode', 'product_id']:
+        if col in df.columns:
+            for item in valid_items + skipped_items:
+                idx = item.get('index')
+                if idx is not None and idx < len(df):
+                    val = df.iloc[idx].get(col, '')
+                    item[col] = str(val).strip() if pd.notna(val) else ''
+
+    # 价格为空或为0的移到跳过列表
     for item in valid_items[:]:
         price = item.get('price', 0)
         if not price or price == 0:
             item['skip_reason'] = '价格为空或为0'
+            skipped_items.append(item)
+            valid_items.remove(item)
+
+    # 没有 product_id（未匹配到CRM产品）的行跳过不上传
+    for item in valid_items[:]:
+        if not item.get('product_id'):
+            item['skip_reason'] = NO_MATCH_BARCODE_TIP
             skipped_items.append(item)
             valid_items.remove(item)
 
@@ -257,55 +304,53 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         item['update_msg'] = result.get('update_msg', '未知错误')
         item['b2b_status'] = result.get('status', 'error')
     
-    # 步骤2：筛选需要CRM新建的项（询价模块保持原始品牌，不做别名映射）
-    need_create_items = []
-    for item in valid_items:
-        if '产品数据不存在' in item.get('update_msg', ''):
-            need_create_items.append({
-                'oe_number': item['oe'],
-                'brand': item['brand'],
-                'supplier_name': item.get('supplier', ''),
-                'mode': 'inquiry'
-            })
-    
-    # 步骤3：CRM新建
+    # 步骤2-4：CRM新建与二次上传（暂时关闭，只进行一次上传）
     create_results = {}
-    if need_create_items:
-        from config import create_crm_session
-        from app.utils.crm_product.crm_productAdd.excel_data_loader import load_alias_data, load_product_data
-        from app.utils.crm_product.crm_productAdd.crm_processor import process_items, _format_result_message
-
-        alias_df = load_alias_data()
-        product_df = load_product_data()
-        session = create_crm_session()
-        try:
-            raw_results = process_items(need_create_items, product_df, alias_df, session, use_brand_alias=False)
-            create_results = {
-                (oe, brand): _format_result_message(result)
-                for (oe, brand), result in raw_results.items()
-            }
-        finally:
-            session.close()
-
-        if progress_callback:
-            progress_callback(total, total, "CRM新建完成")
-    
-    # 步骤4：二次上传（针对新建成功的产品，询价模块保持原始品牌）
-    second_upload_items = []
-    for item in valid_items:
-        oe = item['oe']
-        brand = item['brand']
-        create_result = create_results.get((oe, brand), '')
-        if create_result and ('已存在' in create_result or ('成功' in create_result and '失败' not in create_result)):
-            second_upload_items.append(item)
-    
     second_upload_results = {}
-    if second_upload_items:
-        second_b2b_results = batch_upload_with_callback(second_upload_items, callback=item_callback, brand_mapping={})
-        for item in second_upload_items:
-            oe = item['oe']
-            result = second_b2b_results.get(oe, {})
-            second_upload_results[oe] = result.get('update_msg', '')
+    # need_create_items = []
+    # for item in valid_items:
+    #     if '产品数据不存在' in item.get('update_msg', ''):
+    #         need_create_items.append({
+    #             'oe_number': item['oe'],
+    #             'brand': item['brand'],
+    #             'supplier_name': item.get('supplier', ''),
+    #             'mode': 'inquiry'
+    #         })
+    #
+    # if need_create_items:
+    #     from config import create_crm_session
+    #     from app.utils.crm_product.crm_productAdd.excel_data_loader import load_alias_data, load_product_data
+    #     from app.utils.crm_product.crm_productAdd.crm_processor import process_items, _format_result_message
+    #
+    #     alias_df = load_alias_data()
+    #     product_df = load_product_data()
+    #     session = create_crm_session()
+    #     try:
+    #         raw_results = process_items(need_create_items, product_df, alias_df, session, use_brand_alias=False)
+    #         create_results = {
+    #             (oe, brand): _format_result_message(result)
+    #             for (oe, brand), result in raw_results.items()
+    #         }
+    #     finally:
+    #         session.close()
+    #
+    #     if progress_callback:
+    #         progress_callback(total, total, "CRM新建完成")
+    #
+    # second_upload_items = []
+    # for item in valid_items:
+    #     oe = item['oe']
+    #     brand = item['brand']
+    #     create_result = create_results.get((oe, brand), '')
+    #     if create_result and ('已存在' in create_result or ('成功' in create_result and '失败' not in create_result)):
+    #         second_upload_items.append(item)
+    #
+    # if second_upload_items:
+    #     second_b2b_results = batch_upload_with_callback(second_upload_items, callback=item_callback, brand_mapping={})
+    #     for item in second_upload_items:
+    #         oe = item['oe']
+    #         result = second_b2b_results.get(oe, {})
+    #         second_upload_results[oe] = result.get('update_msg', '')
     
     # 步骤5：九分类判断
     category_count = {
@@ -421,6 +466,11 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
             else:
                 expire_time = None
             
+            matched_barcode = item.get('matched_barcode') or None
+            product_id = item.get('product_id') or None
+            if matched_barcode == NO_MATCH_BARCODE_TIP:
+                matched_barcode = None
+
             insert_data.append({
                 'oe': oe, 'brand': brand, 'supplier': supplier, 'price': price,
                 'original_price': original_price, 'markup_rate': markup_rate,
@@ -428,7 +478,10 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
                 'warehouse': warehouse,
                 'expire_time': expire_time, 'remark': remark,
                 'stock_quantity': stock_quantity, 'common_number': None,
-                'company': company
+                'matched_barcode': matched_barcode,
+                'product_id': product_id,
+                'company': company,
+                'creator': creator
             })
         
         if insert_data:
@@ -438,10 +491,10 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
             for data in insert_data:
                 cursor.execute("""
                     SELECT replace_number, is_cass FROM crmapp_compare_summary 
-                    WHERE oe = %s AND brand = %s AND company = %s
-                """, (data['oe'], data['brand'], data['company']))
+                    WHERE product_id = %s AND company = %s
+                """, (data['product_id'], data['company']))
                 compare_result = cursor.fetchone()
-                
+
                 # 使用字段名访问，兼容字典和元组两种返回格式
                 if compare_result:
                     if isinstance(compare_result, dict):
@@ -457,7 +510,8 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
                 batch_insert_data.append((
                     data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['markup_rate'], data['markup_amount'], data['warehouse'],
                     data['expire_time'], data['remark'], data['stock_quantity'],
-                    sync_common_number, sync_ks_sync, data['company']
+                    sync_common_number, sync_ks_sync, data['company'], data['creator'],
+                    data['matched_barcode'], data['product_id']
                 ))
 
             # 使用 INSERT ... ON DUPLICATE KEY UPDATE 实现覆盖更新
@@ -465,8 +519,8 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
                 cursor.execute("""
                     INSERT INTO crmapp_price_inquiry
                     (oe, brand, supplier, price, original_price, markup_rate, markup_amount, warehouse, expire_time, remark,
-                     stock_quantity, common_number, ks_sync, company)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     stock_quantity, common_number, ks_sync, company, creator, matched_barcode, product_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
                         original_price = VALUES(original_price),
                         markup_rate = VALUES(markup_rate),
@@ -477,6 +531,9 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
                         stock_quantity = VALUES(stock_quantity),
                         common_number = VALUES(common_number),
                         ks_sync = VALUES(ks_sync),
+                        creator = VALUES(creator),
+                        matched_barcode = VALUES(matched_barcode),
+                        product_id = VALUES(product_id),
                         import_time = CURRENT_TIMESTAMP
                 """, row_data)
             
@@ -489,10 +546,30 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     if inserted_count > 0:
         _trigger_aggregate_async(company, upload_success_items)
 
+    # 按原始行索引汇总上传结果，供前端回显到预览表格
+    row_results = {}
+    for item in valid_items:
+        idx = item.get('index')
+        if idx is None:
+            continue
+        category = item.get('处理结果', '')
+        detail = item.get('详情', '')
+        second = item.get('二次上传', '')
+        if category == '上传成功':
+            row_results[idx] = detail or '上传成功'
+        elif second and ('上传add成功' in second or '上传update成功' in second):
+            row_results[idx] = f"新建后二次上传成功: {second}"
+        else:
+            row_results[idx] = detail or category or '上传失败'
+    for item in skipped_items:
+        idx = item.get('index')
+        if idx is not None:
+            row_results[idx] = f"跳过: {item.get('skip_reason', '')}"
+
     # 清理临时文件
     os.remove(file_path)
 
-    return result_path
+    return {'result_file': result_path, 'result_data': row_results}
 
 
 def _process_direct_import(valid_items, skipped_items, df, original_columns, column_mapping, 
@@ -504,7 +581,15 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
     from datetime import datetime
     
     total = len(valid_items)
-    
+
+    # 没有 product_id（未匹配到CRM产品）的行跳过不入库
+    for item in valid_items[:]:
+        if not item.get('product_id'):
+            item['skip_reason'] = NO_MATCH_BARCODE_TIP
+            skipped_items.append(item)
+            valid_items.remove(item)
+            total -= 1
+
     # 直接入库，所有数据都标记为成功（询价模块保持原始品牌，不做别名映射）
     for item in valid_items:
         item['处理结果'] = '直接入库'
@@ -579,6 +664,11 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
             remark = str(remark).strip() or None
         stock_quantity = item.get('stock_quantity', 0)
         
+        matched_barcode = item.get('matched_barcode') or None
+        product_id = item.get('product_id') or None
+        if matched_barcode == NO_MATCH_BARCODE_TIP:
+            matched_barcode = None
+        
         # 处理失效时间
         if expire_time and pd.notna(expire_time):
             if isinstance(expire_time, str):
@@ -603,6 +693,8 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
             'warehouse': warehouse,
             'expire_time': expire_time, 'remark': remark,
             'stock_quantity': stock_quantity, 'common_number': None,
+            'matched_barcode': matched_barcode,
+            'product_id': product_id,
             'company': company, 'creator': creator,
             'source_file': os.path.basename(file_path)
         })
@@ -615,10 +707,10 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
         for data in insert_data:
             cursor.execute("""
                 SELECT replace_number, is_cass FROM crmapp_compare_summary 
-                WHERE oe = %s AND brand = %s AND company = %s
-            """, (data['oe'], data['brand'], data['company']))
+                WHERE product_id = %s AND company = %s
+            """, (data['product_id'], data['company']))
             compare_result = cursor.fetchone()
-            
+
             # 使用字段名访问，兼容字典和元组两种返回格式
             if compare_result:
                 if isinstance(compare_result, dict):
@@ -634,7 +726,8 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
             batch_insert_data.append((
                 data['oe'], data['brand'], data['supplier'], data['price'], data['original_price'], data['markup_rate'], data['markup_amount'], data['warehouse'],
                 data['expire_time'], data['remark'], data['stock_quantity'],
-                sync_common_number, sync_ks_sync, data['company'], data['creator'], data['source_file']
+                sync_common_number, sync_ks_sync, data['company'], data['creator'], data['source_file'],
+                data['matched_barcode'], data['product_id']
             ))
 
         # 使用 INSERT ... ON DUPLICATE KEY UPDATE 实现覆盖更新
@@ -642,8 +735,8 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
             cursor.execute("""
                 INSERT INTO crmapp_price_inquiry_direct
                 (oe, brand, supplier, price, original_price, markup_rate, markup_amount, warehouse, expire_time, remark,
-                 stock_quantity, common_number, ks_sync, company, creator, source_file)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 stock_quantity, common_number, ks_sync, company, creator, source_file, matched_barcode, product_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     original_price = VALUES(original_price),
                     markup_rate = VALUES(markup_rate),
@@ -656,6 +749,8 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
                     ks_sync = VALUES(ks_sync),
                     creator = VALUES(creator),
                     source_file = VALUES(source_file),
+                    matched_barcode = VALUES(matched_barcode),
+                    product_id = VALUES(product_id),
                     import_time = CURRENT_TIMESTAMP
             """, row_data)
         
@@ -664,6 +759,17 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
         cursor.close()
         conn.close()
     
+    # 按原始行索引汇总上传结果，供前端回显到预览表格
+    row_results = {}
+    for item in valid_items:
+        idx = item.get('index')
+        if idx is not None:
+            row_results[idx] = item.get('详情') or '直接入库'
+    for item in skipped_items:
+        idx = item.get('index')
+        if idx is not None:
+            row_results[idx] = f"跳过: {item.get('skip_reason', '')}"
+
     # 触发聚合和同步（异步执行，不阻塞返回）
     # 直接入库模式不传 upload_success_items，跳过 BatchChannel 推送
     if inserted_count > 0:
@@ -672,7 +778,7 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
     # 清理临时文件
     os.remove(file_path)
 
-    return result_path
+    return {'result_file': result_path, 'result_data': row_results}
 
 
 def _trigger_aggregate_async(company: str, upload_success_items: list = None):
@@ -1111,7 +1217,11 @@ def _parse_inquiry_file(file):
             '失效时间': 'expire_time', 'expire_time': 'expire_time',
             '备注': 'remark', 'remark': 'remark',
             '库存数量': 'stock_quantity', 'stock_quantity': 'stock_quantity',
-            '通用号': 'common_number', 'common_number': 'common_number'
+            '通用号': 'common_number', 'common_number': 'common_number',
+            '匹配OE': 'matched_oe', 'matched_oe': 'matched_oe',
+            '匹配品牌': 'matched_brand', 'matched_brand': 'matched_brand',
+            '匹配供应商': 'matched_supplier', 'matched_supplier': 'matched_supplier',
+            '最终价格': 'final_price', 'final_price': 'final_price'
         }
         
         rename_dict = {old: new for old, new in column_mapping.items() 
@@ -1209,6 +1319,156 @@ def precheck_inquiry_file():
     finally:
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+@inquiry_bp.route('/parse_preview', methods=['POST'])
+@login_required
+def parse_preview():
+    """
+    解析上传文件，进行 CRM 产品匹配和供应商匹配，返回预览数据
+    
+    返回:
+    {
+        "code": 0,
+        "data": [
+            {
+                "oe": "原始OE",
+                "brand": "原始品牌",
+                "supplier": "原始供应商",
+                "price": "100",
+                "warehouse": "",
+                "expire_time": "",
+                "remark": "",
+                "stock_quantity": "",
+                "common_number": "",
+                "matched_oe": "匹配OE",
+                "matched_brand": "匹配品牌",
+                "matched_supplier": "匹配供应商",
+                "final_price": "100"
+            }
+        ]
+    }
+    """
+    if 'file' not in request.files:
+        return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'code': 1, 'msg': '请选择要上传的文件'}), 400
+
+    company = session.get('current_org', session.get('store', 'fsbbr'))
+
+    try:
+        # 保存临时文件
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        temp_path = os.path.join(tempfile.gettempdir(), f"parse_preview_{timestamp}_{file.filename}")
+        file.save(temp_path)
+
+        try:
+            # 读取文件
+            if file.filename.endswith('.csv'):
+                df = pd.read_csv(temp_path, encoding='utf-8', dtype=str)
+            else:
+                df = pd.read_excel(temp_path, dtype=str)
+
+            # 列名映射
+            column_mapping = {
+                'oe': 'oe', 'OE': 'oe', 'OE号': 'oe',
+                '品牌': 'brand', 'brand': 'brand',
+                '供应商': 'supplier', 'supplier': 'supplier',
+                '单价': 'price', 'price': 'price', '价格': 'price',
+                '仓库': 'warehouse', 'warehouse': 'warehouse',
+                '失效时间': 'expire_time', 'expire_time': 'expire_time',
+                '备注': 'remark', 'remark': 'remark',
+                '库存数量': 'stock_quantity', 'stock_quantity': 'stock_quantity',
+                '通用号': 'common_number', 'common_number': 'common_number'
+            }
+
+            rename_dict = {old: new for old, new in column_mapping.items()
+                           if old in df.columns and new not in df.columns}
+            if rename_dict:
+                df = df.rename(columns=rename_dict)
+
+            df = df.where(pd.notnull(df), None)
+
+            # 获取B2B供应商列表
+            from app.utils.b2b_inquiry_upload.uploader import login, getAllSupplierChannel
+            token = login('fsbbr')
+            supplier_df = getAllSupplierChannel(token)
+            supplier_names = set()
+            if supplier_df is not None and not supplier_df.empty:
+                supplier_names = set(supplier_df['name'].dropna().astype(str).tolist())
+
+            # 匹配数据
+            # 上传场景下不过滤 CRM 库存，只看 OE+品牌 是否匹配
+            from app.utils.crm_product.crm_product_matcher import fetch_matched_products, pick_product_fields
+
+            result_rows = []
+            for _, row in df.iterrows():
+                oe = str(row.get('oe', '') or '').strip()
+                brand = str(row.get('brand', '') or '').strip()
+                supplier = str(row.get('supplier', '') or '').strip()
+                price = str(row.get('price', '') or '').strip()
+                warehouse = str(row.get('warehouse', '') or '').strip()
+                expire_time = str(row.get('expire_time', '') or '').strip()
+                remark = str(row.get('remark', '') or '').strip()
+                stock_quantity = str(row.get('stock_quantity', '') or '').strip()
+
+                if not oe:
+                    continue
+
+                # 供应商精确匹配
+                matched_supplier = supplier if supplier in supplier_names else ''
+
+                # CRM 匹配：按 OE + 品牌匹配，不过滤 CRM 库存
+                matched_products = []
+                if brand:
+                    matched_products = fetch_matched_products(company, oe, brand, ignore_stock=True)
+
+                base_row = {
+                    'oe': oe,
+                    'brand': brand,
+                    'supplier': supplier,
+                    'price': price,
+                    'warehouse': warehouse,
+                    'expire_time': expire_time,
+                    'remark': remark,
+                    'stock_quantity': stock_quantity,
+                    'matched_supplier': matched_supplier,
+                    'final_price': price
+                }
+
+                if matched_products:
+                    for product in matched_products:
+                        picked = pick_product_fields(product)
+                        row_data = dict(base_row)
+                        row_data['matched_oe'] = picked.get('number', '')
+                        row_data['matched_brand'] = picked.get('brand_name', '')
+                        row_data['matched_barcode'] = picked.get('frey_no', '')
+                        row_data['product_id'] = picked.get('product_id', '')
+                        result_rows.append(row_data)
+                else:
+                    base_row['matched_oe'] = ''
+                    base_row['matched_brand'] = ''
+                    base_row['matched_barcode'] = NO_MATCH_BARCODE_TIP
+                    base_row['product_id'] = ''
+                    result_rows.append(base_row)
+
+            return jsonify({
+                'code': 0,
+                'msg': '解析成功',
+                'data': result_rows
+            })
+
+        finally:
+            # 清理临时文件
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'code': 1, 'msg': f'解析失败: {str(e)}'}), 500
 
 
 @inquiry_bp.route('/parse_oe_list', methods=['POST'])

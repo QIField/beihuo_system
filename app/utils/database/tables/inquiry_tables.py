@@ -167,6 +167,8 @@ def init_price_inquiry_direct_table():
                 company VARCHAR(50) DEFAULT NULL COMMENT '公司',
                 import_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '导入时间',
                 creator VARCHAR(100) DEFAULT NULL COMMENT '导入人',
+                matched_barcode VARCHAR(255) DEFAULT NULL COMMENT '匹配条码',
+                product_id VARCHAR(100) DEFAULT NULL COMMENT '产品编号',
                 source_file VARCHAR(255) DEFAULT NULL COMMENT '来源文件名',
                 INDEX idx_oe (oe),
                 INDEX idx_brand (brand),
@@ -199,6 +201,18 @@ def init_price_inquiry_direct_table():
             except Exception as e:
                 if "Duplicate column name" not in str(e):
                     print(f"  ! 添加列 markup_amount 时出错: {str(e)}")
+
+            # 检查并添加匹配条码、产品编号字段（兼容旧表）
+            for col_name, col_def in [
+                ("matched_barcode", "VARCHAR(255) DEFAULT NULL COMMENT '匹配条码'"),
+                ("product_id", "VARCHAR(100) DEFAULT NULL COMMENT '产品编号'"),
+            ]:
+                try:
+                    cursor.execute(f"ALTER TABLE crmapp_price_inquiry_direct ADD COLUMN {col_name} {col_def}")
+                    print(f"  [成功] 已添加列 {col_name}")
+                except Exception as e:
+                    if "Duplicate column name" not in str(e):
+                        print(f"  ! 添加列 {col_name} 时出错: {str(e)}")
 
             # 检查并添加唯一索引（兼容旧表）
             try:

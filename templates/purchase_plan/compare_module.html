@@ -305,34 +305,62 @@
     <div class="container">
         <h2>比价模块</h2>
 
-        <div class="data-container">
-            <div class="data-header">
-                <span>询价比价数据</span>
-                <div class="search-bar">
-                    <input type="text" class="search-input" id="searchOe" placeholder="搜索OE号">
-                    <input type="text" class="search-input" id="searchBrand" placeholder="搜索品牌">
-                    <input type="text" class="search-input" id="searchProductName" placeholder="搜索产品名称">
-                    <input type="text" class="search-input" id="searchVehicleBrand" placeholder="搜索车辆品牌">
-                    <button class="btn btn-default" id="searchBtn">搜索</button>
-                    <button class="btn btn-default" id="refreshBtn">刷新</button>
-                    <button class="btn btn-primary" id="exportExcelBtn">导出Excel</button>
-                    <button class="btn btn-default" id="exportCsvBtn">导出CSV</button>
-                </div>
+        <div class="data-header" style="border-bottom: none; padding: 0; margin-bottom: 20px;">
+            <div class="search-bar">
+                <!--
+                <input type="text" class="search-input" id="searchOe" placeholder="搜索OE号">
+                <input type="text" class="search-input" id="searchBrand" placeholder="搜索品牌">
+                <input type="text" class="search-input" id="searchProductName" placeholder="搜索产品名称">
+                <input type="text" class="search-input" id="searchVehicleBrand" placeholder="搜索车辆品牌">
+                <button class="btn btn-default" id="searchBtn">搜索</button>
+                <button class="btn btn-default" id="refreshBtn">刷新</button>
+                <button class="btn btn-primary" id="exportExcelBtn">导出Excel</button>
+                <button class="btn btn-default" id="exportCsvBtn">导出CSV</button>
+                -->
+                <a class="btn btn-default" href="{{ url_for('static', filename='excel/OE_Brand.xlsx') }}" download>下载模板</a>
+                <button class="btn btn-default" id="importBtn">导入文件</button>
+                <input type="file" id="importFileInput" accept=".xlsx,.xls" style="display: none;">
             </div>
-            <div id="handsontable-container"></div>
-            <div class="pagination" id="pagination">
-                <button class="btn btn-default" id="prevBtn">上一页</button>
-                <span class="pagination-info" id="pageInfo">第 1 页 / 共 1 页</span>
-                <button class="btn btn-default" id="nextBtn">下一页</button>
-                <span style="color: #000; font-size: 14px;">跳转到</span>
-                <input type="number" id="pageJumpInput" min="1" style="width: 60px; padding: 6px; border: 1px solid #d9d9d9; border-radius: 4px; text-align: center;">
-                <span style="color: #000; font-size: 14px;">页</span>
-                <button class="btn btn-default" id="pageJumpBtn">跳转</button>
-                <select id="pageSizeSelect" class="btn btn-default" style="padding: 6px 10px;">
-                    <option value="50">50条/页</option>
-                    <option value="100" selected>100条/页</option>
-                    <option value="200">200条/页</option>
-                </select>
+        </div>
+        <!--
+        <div id="handsontable-container"></div>
+        <div class="pagination" id="pagination">
+            <button class="btn btn-default" id="prevBtn">上一页</button>
+            <span class="pagination-info" id="pageInfo">第 1 页 / 共 1 页</span>
+            <button class="btn btn-default" id="nextBtn">下一页</button>
+            <span style="color: #000; font-size: 14px;">跳转到</span>
+            <input type="number" id="pageJumpInput" min="1" style="width: 60px; padding: 6px; border: 1px solid #d9d9d9; border-radius: 4px; text-align: center;">
+            <span style="color: #000; font-size: 14px;">页</span>
+            <button class="btn btn-default" id="pageJumpBtn">跳转</button>
+            <select id="pageSizeSelect" class="btn btn-default" style="padding: 6px 10px;">
+                <option value="50">50条/页</option>
+                <option value="100" selected>100条/页</option>
+                <option value="200">200条/页</option>
+            </select>
+        </div>
+        -->
+
+        <!-- 导入日志区域 -->
+        <div class="import-log-section" style="padding: 16px; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px;">
+            <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #333;">导入日志</h3>
+            <div style="overflow-x: auto;">
+                <table id="importLogTable" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <thead>
+                        <tr style="background: #fafafa;">
+                            <th style="padding: 10px; border: 1px solid #e8e8e8; text-align: left;">时间</th>
+                            <th style="padding: 10px; border: 1px solid #e8e8e8; text-align: left;">文件名</th>
+                            <th style="padding: 10px; border: 1px solid #e8e8e8; text-align: center;">导入条数</th>
+                            <th style="padding: 10px; border: 1px solid #e8e8e8; text-align: center;">匹配条数</th>
+                            <th style="padding: 10px; border: 1px solid #e8e8e8; text-align: left;">操作人</th>
+                            <th style="padding: 10px; border: 1px solid #e8e8e8; text-align: center;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="6" style="padding: 20px; text-align: center; color: #999; border: 1px solid #e8e8e8;">暂无导入记录</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -1541,6 +1569,146 @@
             });
         }
 
+        // 导入功能
+        function initImport() {
+            const importBtn = document.getElementById('importBtn');
+            const importFileInput = document.getElementById('importFileInput');
+
+            importBtn.addEventListener('click', () => {
+                importFileInput.click();
+            });
+
+            importFileInput.addEventListener('change', () => {
+                if (importFileInput.files.length > 0) {
+                    handleImportFile(importFileInput.files[0]);
+                }
+            });
+        }
+
+        async function handleImportFile(file) {
+            const validTypes = ['.xlsx', '.xls'];
+            const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+            if (validTypes.indexOf(fileExt) === -1) {
+                alert('请上传 Excel 文件 (.xlsx 或 .xls)');
+                document.getElementById('importFileInput').value = '';
+                return;
+            }
+
+            // const container = document.getElementById('handsontable-container');
+            // container.innerHTML = '<div class="loading-overlay">导入查询中...</div>';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/purchase_plan/compare/import_search', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.code !== 0) {
+                    alert(result.msg || '导入查询失败');
+                    // loadData();
+                    return;
+                }
+
+                // ===== 原逻辑：导入结果直接展示在表格中（保留注释，不删除）=====
+                // allData = result.data || [];
+                // currentPage = 1;
+                // totalPages = 1;
+                //
+                // // 清空搜索框，表示当前为导入结果
+                // document.getElementById('searchOe').value = '';
+                // document.getElementById('searchBrand').value = '';
+                // document.getElementById('searchProductName').value = '';
+                // document.getElementById('searchVehicleBrand').value = '';
+                // currentSearchParams = { oe: '', brand: '', productName: '', vehicleBrand: '' };
+                //
+                // renderCurrentPage();
+                //
+                // if (allData.length === 0) {
+                //     alert('未找到匹配数据');
+                // }
+                // ==============================================================
+
+                // 新逻辑：刷新导入日志，提示用户下载
+                alert(`导入完成：${result.file_name}\n导入 ${result.import_count} 条，匹配 ${result.match_count} 条`);
+                await loadImportLogs();
+
+                if (result.download_url) {
+                    downloadImportResultByUrl(result.download_url);
+                }
+
+                // 恢复表格为当前数据（加载动画覆盖了容器，需要重新渲染）
+                // renderCurrentPage();
+            } catch (error) {
+                console.error('导入查询失败:', error);
+                alert('导入查询失败: ' + error.message);
+                // loadData();
+            } finally {
+                document.getElementById('importFileInput').value = '';
+            }
+        }
+
+        // 下载导入结果（根据URL）
+        function downloadImportResultByUrl(url) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // 加载导入日志
+        async function loadImportLogs() {
+            try {
+                const response = await fetch('/api/purchase_plan/compare/import_logs?limit=50');
+                const result = await response.json();
+
+                if (result.code === 0) {
+                    renderImportLogs(result.data || []);
+                } else {
+                    console.error('加载导入日志失败:', result.msg);
+                }
+            } catch (error) {
+                console.error('加载导入日志失败:', error);
+            }
+        }
+
+        // 渲染导入日志表格
+        function renderImportLogs(logs) {
+            const tbody = document.querySelector('#importLogTable tbody');
+
+            if (!logs || logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #999; border: 1px solid #e8e8e8;">暂无导入记录</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => {
+                const downloadBtn = log.result_file_path
+                    ? `<button class="btn btn-primary btn-sm" onclick="downloadImportResult(${log.id})">下载结果</button>`
+                    : '<span style="color: #999;">无结果</span>';
+
+                return `
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #e8e8e8;">${log.created_time || '-'}</td>
+                        <td style="padding: 10px; border: 1px solid #e8e8e8;">${log.file_name || '-'}</td>
+                        <td style="padding: 10px; border: 1px solid #e8e8e8; text-align: center;">${log.import_count}</td>
+                        <td style="padding: 10px; border: 1px solid #e8e8e8; text-align: center;">${log.match_count}</td>
+                        <td style="padding: 10px; border: 1px solid #e8e8e8;">${log.operator || '-'}</td>
+                        <td style="padding: 10px; border: 1px solid #e8e8e8; text-align: center;">${downloadBtn}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 根据日志ID下载导入结果
+        function downloadImportResult(logId) {
+            downloadImportResultByUrl(`/api/purchase_plan/compare/download_import_result/${logId}`);
+        }
+
         async function exportData(format) {
             const oe = document.getElementById('searchOe').value;
             const brand = document.getElementById('searchBrand').value;
@@ -1580,10 +1748,12 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            initSearch();
-            initPagination();
-            initExport();
-            loadData();
+            // initSearch();
+            // initPagination();
+            // initExport();
+            initImport();
+            // loadData();
+            loadImportLogs();
         });
     </script>
 </body>

@@ -5,7 +5,6 @@
 from flask import Blueprint
 from .inquiry_api import inquiry_bp
 from .compare_api import compare_bp
-from .procurement_compare_api import procurement_compare_bp
 from .purchase_history_compare_api import bp as purchase_history_compare_bp
 
 # 创建主蓝图
@@ -14,7 +13,6 @@ purchase_plan_bp = Blueprint('purchase_plan', __name__)
 # 注册子蓝图
 purchase_plan_bp.register_blueprint(inquiry_bp, url_prefix='/inquiry')
 purchase_plan_bp.register_blueprint(compare_bp, url_prefix='/compare')
-purchase_plan_bp.register_blueprint(procurement_compare_bp)
 purchase_plan_bp.register_blueprint(purchase_history_compare_bp, url_prefix='/purchase_history_compare')
 
 # 导出注册函数供主应用使用
