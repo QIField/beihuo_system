@@ -6,6 +6,7 @@ from functools import wraps
 from flask import Blueprint, jsonify, request, session, send_file
 import os
 import tempfile
+import traceback
 from datetime import datetime
 
 from app.services.compare_service.procurement_compare_service import ProcurementCompareService
@@ -59,13 +60,22 @@ def export_compare_excel():
         items = data['items']
         if not items or not isinstance(items, list):
             return jsonify({'code': 1, 'msg': 'items不能为空'}), 400
-        
+
+        # 校验每个 item 必须有 oe 和 brand
+        for idx, item in enumerate(items):
+            if not item or not isinstance(item, dict):
+                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据格式错误'}), 400
+            if not item.get('oe'):
+                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据缺少OE号'}), 400
+            if not item.get('brand'):
+                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据缺少品牌'}), 400
+
         # 获取用户公司
         company = get_user_company()
-        
+
         # 批量生成比对结果
         results = ProcurementCompareService.batch_generate_compare_results(items, company)
-        
+
         if not results:
             return jsonify({'code': 1, 'msg': '没有查询到采购历史数据'}), 404
         
@@ -85,4 +95,7 @@ def export_compare_excel():
         )
         
     except Exception as e:
+        error_trace = traceback.format_exc()
+        print(f"[ERROR] export_compare_excel: {str(e)}")
+        print(error_trace)
         return jsonify({'code': 1, 'msg': f'生成失败: {str(e)}'}), 500
