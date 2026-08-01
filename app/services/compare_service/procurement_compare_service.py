@@ -3,10 +3,25 @@
 用于查询 crmapp_procurement_history 表的采购记录
 """
 import re
+import time
+from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 import pymysql
+from sqlalchemy.dialects.mysql import insert
 from app.utils.database_connection import get_db_connection
+from app.utils.orm.session import orm_session
 from app.models.purchase_history_compare_models import PurchaseRecord, MonthSummary, OECompareResult
+from app.models.orm_models.car_parts_library_bmw import CarPartsLibraryBmw
+from app.models.orm_models.car_parts_library_bmw_stock import CarPartsLibraryBmwStock
+from app.models.orm_models.car_parts_library_benz import CarPartsLibraryBenz
+from app.models.orm_models.crm_pp_name import CrmPpName
+from app.services.car_parts_library_service.bmw_crawler import (
+    external_data_crawler,
+    map_detail_cn_to_db,
+    map_stock_cn_to_db,
+)
+from app.services.car_parts_library_service.mercedes_dalfsc_service import fetch_mercedes_data
+from config.config_list_manager.config_cache import get_config_value
 
 
 class ProcurementCompareService:
@@ -250,13 +265,34 @@ class ProcurementCompareService:
             conn.close()
     
     @staticmethod
+    def _get_pp_names_by_alias(brand: str) -> List[str]:
+        """
+        根据品牌别名查询 crm_pp_name，返回对应的主名列表
+        一对一或一对多均返回所有匹配主名
+        """
+        if not brand:
+            return []
+        try:
+            with orm_session() as session:
+                rows = session.query(CrmPpName.pp_name).filter(
+                    CrmPpName.alias_name == brand
+                ).all()
+                return [row[0] for row in rows if row[0]]
+        except Exception as e:
+            print(f"[ERROR] 查询 crm_pp_name 失败: {brand}, {e}")
+            return []
+
+    @staticmethod
     def _get_match_brands(brand: str) -> List[str]:
         """
         获取需要匹配的品牌列表
-        原厂/原厂国内4s件 互相匹配，其余品牌一对一
+        原厂/原厂国内4s件 互相匹配，其余品牌先查 crm_pp_name 别名映射
         """
         if brand in ProcurementCompareService.OEM_BRANDS:
             return ProcurementCompareService.OEM_BRANDS
+        pp_names = ProcurementCompareService._get_pp_names_by_alias(brand)
+        if pp_names:
+            return pp_names
         return [brand]
 
     @staticmethod
@@ -371,6 +407,152 @@ class ProcurementCompareService:
         finally:
             conn.close()
     
+    @staticmethod
+    def _get_tax_rate(config_key: str) -> float:
+        """从配置读取税率，失败返回默认 1.13"""
+        try:
+            config = get_config_value(config_key)
+            if config and isinstance(config, dict):
+                return float(config.get('tax_rate', 1.13))
+        except Exception:
+            pass
+        return 1.13
+
+    @staticmethod
+    def _ensure_benz_oe_prefix(oe: str) -> str:
+        """奔驰 OE 统一加 A 前缀"""
+        if oe and not str(oe).upper().startswith('A'):
+            return 'A' + str(oe)
+        return str(oe) if oe else oe
+
+    @staticmethod
+    def _get_vehicle_brand(oe: str, company: str, summary_map: Dict = None) -> Optional[str]:
+        """根据 crmapp_compare_summary 判断 OE 品牌，无记录则按 OE 前缀兜底"""
+        if summary_map:
+            key = oe
+            if key in summary_map:
+                brand = summary_map[key].get('vehicle_brand')
+                if brand:
+                    return brand
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                sql = """
+                    SELECT vehicle_brand
+                    FROM crmapp_compare_summary
+                    WHERE company = %s AND (oe = %s OR replace_number LIKE %s)
+                    LIMIT 1
+                """
+                cursor.execute(sql, (company, oe, f"%{oe}%"))
+                row = cursor.fetchone()
+                if row and row.get('vehicle_brand'):
+                    return row['vehicle_brand']
+        finally:
+            conn.close()
+        if str(oe).upper().startswith('A'):
+            return '奔驰'
+        return '宝马'
+
+    @staticmethod
+    def _query_bmw_price_from_local(oe: str) -> Tuple[Optional[float], Optional[float]]:
+        """从 car_parts_library_bmw 查近两天的价格"""
+        cutoff = datetime.now() - timedelta(days=2)
+        tax_rate = ProcurementCompareService._get_tax_rate('bmw_car_parts_libray')
+        with orm_session() as session:
+            part = session.query(CarPartsLibraryBmw).filter(
+                CarPartsLibraryBmw.part_number == oe,
+                CarPartsLibraryBmw.updated_at >= cutoff
+            ).first()
+            if not part:
+                return (None, None)
+            cost = None
+            sale = None
+            if part.dealer_net_stock is not None:
+                try:
+                    cost = float(part.dealer_net_stock) * tax_rate
+                except (ValueError, TypeError):
+                    cost = None
+            if part.retail_price is not None:
+                try:
+                    sale = float(part.retail_price) * tax_rate
+                except (ValueError, TypeError):
+                    sale = None
+            return (cost, sale)
+
+    @staticmethod
+    def _query_benz_price_from_local(oe: str) -> Tuple[Optional[float], Optional[float]]:
+        """从 car_parts_library_benz 查近两天的价格"""
+        cutoff = datetime.now() - timedelta(days=2)
+        tax_rate = ProcurementCompareService._get_tax_rate('mercedes_benz')
+        with orm_session() as session:
+            part = session.query(CarPartsLibraryBenz).filter(
+                CarPartsLibraryBenz.part_number == oe,
+                CarPartsLibraryBenz.updated_at >= cutoff
+            ).first()
+            if not part:
+                return (None, None)
+            cost = None
+            sale = None
+            if part.wholesale_price is not None:
+                try:
+                    cost = float(part.wholesale_price) * tax_rate
+                except (ValueError, TypeError):
+                    cost = None
+            if part.msrp is not None:
+                try:
+                    sale = float(part.msrp) * tax_rate
+                except (ValueError, TypeError):
+                    sale = None
+            return (cost, sale)
+
+    @staticmethod
+    def _refresh_bmw_price(oe: str) -> bool:
+        """调用宝马官网接口更新本地库，不走兆配云回退"""
+        try:
+            data = external_data_crawler(oe, is_unit=False)
+            if not data or not isinstance(data, dict):
+                return False
+            detail = map_detail_cn_to_db(data.get('detail', {}))
+            stock = map_stock_cn_to_db(data.get('stock', {}))
+            if not detail and not stock:
+                return False
+            with orm_session() as session:
+                if detail and detail.get('part_number'):
+                    detail_stmt = insert(CarPartsLibraryBmw).values(**detail)
+                    detail_update = {
+                        c.name: c for c in detail_stmt.inserted
+                        if c.name not in ['part_number', 'created_at', 'updated_at']
+                    }
+                    detail_stmt = detail_stmt.on_duplicate_key_update(**detail_update)
+                    session.execute(detail_stmt)
+                if stock and stock.get('part_number'):
+                    stock_stmt = insert(CarPartsLibraryBmwStock).values(**stock)
+                    stock_update = {
+                        c.name: c for c in stock_stmt.inserted
+                        if c.name not in ['part_number', 'created_at', 'updated_at']
+                    }
+                    stock_stmt = stock_stmt.on_duplicate_key_update(**stock_update)
+                    session.execute(stock_stmt)
+            print(f"[BMW] 远程更新并入库成功: {oe}")
+            return True
+        except Exception as e:
+            print(f"[BMW] 远程更新失败: {oe}, {e}")
+            return False
+
+    @staticmethod
+    def _refresh_benz_price(oe: str) -> bool:
+        """调用奔驰接口更新本地库"""
+        try:
+            result = fetch_mercedes_data([oe])
+            if result and result.get('status'):
+                print(f"[Benz] 远程更新并入库成功: {oe}")
+                return True
+            print(f"[Benz] 远程更新失败: {oe}, {result}")
+            return False
+        except Exception as e:
+            print(f"[Benz] 远程更新失败: {oe}, {e}")
+            return False
+
     @staticmethod
     def _format_replace_stock_text(items: List[Dict]) -> str:
         """
@@ -574,23 +756,211 @@ class ProcurementCompareService:
         return results
 
     @staticmethod
-    def batch_generate_compare_results(items: List[Dict], company: str) -> List[OECompareResult]:
+    def _batch_query_compare_summary(items: List[Dict], company: str) -> Dict[str, List[Dict]]:
         """
-        批量生成比对结果
+        批量查询 crmapp_compare_summary
+        匹配条件：oe = search_oe 或 replace_number 中包含 search_oe
+        返回: {search_oe: [匹配行列表]}
+        """
+        all_oes = set()
+        all_brands = set()
+        oe_brand_map = {}
+
+        for item in items:
+            oe = item.get('oe', '')
+            brand = item.get('brand', '')
+            if not oe or not brand:
+                continue
+            all_oes.add(oe)
+            match_brands = ProcurementCompareService._get_match_brands(brand)
+            oe_brand_map[oe] = match_brands
+            all_brands.update(match_brands)
+
+        if not all_oes:
+            return {}
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                conditions = [f"oe IN ({', '.join(['%s'] * len(all_oes))})"]
+                params = list(all_oes)
+
+                for oe in all_oes:
+                    conditions.append("replace_number LIKE %s")
+                    params.append(f"%{oe}%")
+
+                brand_placeholders = ', '.join(['%s'] * len(all_brands))
+                params.extend(list(all_brands))
+
+                sql = f"""
+                    SELECT oe, brand, product_name, l_model_zh, replace_number, frey_no
+                    FROM crmapp_compare_summary
+                    WHERE company = %s
+                      AND ({' OR '.join(conditions)})
+                      AND brand IN ({brand_placeholders})
+                """
+                params.insert(0, company)
+                cursor.execute(sql, params)
+                rows = cursor.fetchall()
+
+                result = {oe: [] for oe in all_oes}
+                for row in rows:
+                    row_oe = row.get('oe') or ''
+                    row_replace = row.get('replace_number') or ''
+                    row_brand = row.get('brand') or ''
+
+                    for search_oe, match_brands in oe_brand_map.items():
+                        if row_brand not in match_brands:
+                            continue
+                        if row_oe == search_oe or ProcurementCompareService._oe_in_replace_number(search_oe, row_replace):
+                            result[search_oe].append(dict(row))
+                            break
+                return result
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _batch_query_procurement(frey_nos: List[str], company: str) -> Dict[str, List[PurchaseRecord]]:
+        """批量查询采购历史，返回 {frey_no: [PurchaseRecord列表]}"""
+        if not frey_nos:
+            return {}
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                placeholders = ', '.join(['%s'] * len(frey_nos))
+                sql = f"""
+                    SELECT number, brand, fullname, unit_cost, create_date, `year_month`, frey_no
+                    FROM crmapp_procurement_history_detail
+                    WHERE frey_no IN ({placeholders}) AND company = %s
+                    ORDER BY create_date DESC
+                """
+                cursor.execute(sql, list(frey_nos) + [company])
+                rows = cursor.fetchall()
+
+                grouped = {}
+                for row in rows:
+                    fn = row.get('frey_no') or ''
+                    if fn not in grouped:
+                        grouped[fn] = []
+                    grouped[fn].append(row)
+
+                return {
+                    fn: ProcurementCompareService._rows_to_purchase_records(rlist)
+                    for fn, rlist in grouped.items()
+                }
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _batch_query_beihuo(barcodes: List[str], company: str) -> Dict[str, Dict]:
+        """批量查询备货数据，返回 {barcode: beihuo_data}"""
+        if not barcodes:
+            return {}
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                placeholders = ', '.join(['%s'] * len(barcodes))
+                sql = f"""
+                    SELECT
+                        `库存数量`, `标签`, `近1个月询价量`, `近3个月月均询价量`,
+                        `近6个月月均销量`, `全国近1个月询价量`, `全国近3个月月均询价量`,
+                        `今日销量`, `昨日销量`, `近7天销量`, `本月销量`,
+                        `近6个月销量`, `近12个月销量`, `物料条码`
+                    FROM crmapp_beihuo
+                    WHERE `物料条码` IN ({placeholders}) AND company = %s
+                """
+                cursor.execute(sql, list(barcodes) + [company])
+                rows = cursor.fetchall()
+
+                result = {}
+                for row in rows:
+                    barcode = row.get('物料条码') or ''
+                    result[barcode] = {
+                        'stock_quantity': row['库存数量'],
+                        'tag': row['标签'],
+                        'inquiry_1m': row['近1个月询价量'],
+                        'inquiry_3m_avg': row['近3个月月均询价量'],
+                        'sales_6m_avg': row['近6个月月均销量'],
+                        'inquiry_1m_national': row['全国近1个月询价量'],
+                        'inquiry_3m_avg_national': row['全国近3个月月均询价量'],
+                        'sales_today': row['今日销量'],
+                        'sales_yesterday': row['昨日销量'],
+                        'sales_7d': row['近7天销量'],
+                        'sales_month': row['本月销量'],
+                        'sales_6m': row['近6个月销量'],
+                        'sales_12m': row['近12个月销量']
+                    }
+                return result
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _batch_query_4s_prices(oes: List[str]) -> Dict[str, Tuple[Optional[float], Optional[float]]]:
+        """批量查询4S价格，返回 {oe: (cost, sale)}"""
+        if not oes:
+            return {}
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                placeholders = ', '.join(['%s'] * len(oes))
+                sql = f"""
+                    SELECT `配件编号`, `4S含税进价`, `4S含税售价`
+                    FROM zhaopeiyun
+                    WHERE `配件编号` IN ({placeholders})
+                """
+                cursor.execute(sql, list(oes))
+                rows = cursor.fetchall()
+
+                result = {}
+                for row in rows:
+                    oe = row.get('配件编号') or ''
+                    cost = float(row['4S含税进价']) if row['4S含税进价'] is not None else None
+                    sale = float(row['4S含税售价']) if row['4S含税售价'] is not None else None
+                    result[oe] = (cost, sale)
+                return result
+        finally:
+            conn.close()
+
+    @staticmethod
+    def batch_generate_compare_results(
+        items: List[Dict],
+        company: str,
+        progress_callback=None
+    ) -> List[OECompareResult]:
+        """
+        批量生成比对结果（重构版：批量查询，大幅减少数据库往返）
 
         Args:
             items: OE和品牌列表，格式: [{"oe": "123", "brand": "博世", "price": "100"}, ...]
             company: 公司代码
+            progress_callback: 进度回调函数，签名为 (current, total, message)
 
         Returns:
             List[OECompareResult]: 比对结果列表
         """
-        groups = []
+        def _report(current: int, total: int, message: str):
+            if progress_callback:
+                try:
+                    progress_callback(current, total, message)
+                except Exception:
+                    pass
+
+        total_start = time.time()
+        print(f"[DEBUG] batch_generate_compare_results 开始，输入 items 数量: {len(items)}")
+
+        # 1. 收集有效 items
+        step_start = time.time()
+        valid_items = []
+        skipped_empty = 0
         for item in items:
             oe = item.get('oe', '')
             brand = item.get('brand', '')
             price_str = item.get('price', '')
             if not oe or not brand:
+                skipped_empty += 1
                 continue
 
             price = None
@@ -600,15 +970,184 @@ class ProcurementCompareService:
                 except (ValueError, TypeError):
                     price = None
 
-            oe_results = ProcurementCompareService.generate_compare_result(oe, brand, company, price=price)
-            if oe_results:
-                groups.append((oe, oe_results))
+            valid_items.append({'oe': oe, 'brand': brand, 'price': price})
+        print(f"[DEBUG] 步骤1-收集有效items: 有效={len(valid_items)}, 跳过(空oe/brand)={skipped_empty}, 耗时={time.time()-step_start:.3f}s")
 
-        # 按主号OE排序后展平，并设置组号（每组共享一个序号）
+        if not valid_items:
+            print(f"[DEBUG] 无有效items，直接返回空")
+            return []
+
+        _report(10, 100, '正在查询基础数据...')
+
+        # 2. 批量查询 compare_summary
+        step_start = time.time()
+        summary_map = ProcurementCompareService._batch_query_compare_summary(valid_items, company)
+        total_summary_rows = sum(len(v) for v in summary_map.values())
+        empty_summary_oes = [item['oe'] for item in valid_items if not summary_map.get(item['oe'])]
+        print(f"[DEBUG] 步骤2-批量查compare_summary: 返回总行数={total_summary_rows}, 无匹配OE数={len(empty_summary_oes)}, 耗时={time.time()-step_start:.3f}s")
+        if empty_summary_oes:
+            print(f"[DEBUG] 无匹配的OE(前10个): {empty_summary_oes[:10]}")
+
+        # 3. 收集所有 frey_no 和 display_oe（无匹配的OE也加入display_oes以查4S价格）
+        step_start = time.time()
+        all_frey_nos = set()
+        all_display_oes = set()
+        for item in valid_items:
+            search_oe = item['oe']
+            all_display_oes.add(search_oe)
+            rows = summary_map.get(search_oe, [])
+            for row in rows:
+                fn = row.get('frey_no') or ''
+                if fn:
+                    all_frey_nos.add(fn)
+                display_oe = row.get('oe') or search_oe
+                all_display_oes.add(display_oe)
+        print(f"[DEBUG] 步骤3-收集frey_no/display_oe: frey_nos={len(all_frey_nos)}, display_oes={len(all_display_oes)}, 耗时={time.time()-step_start:.3f}s")
+
+        # 4. 批量查询采购历史、备货、4S价格
+        step_start = time.time()
+        procurement_map = ProcurementCompareService._batch_query_procurement(list(all_frey_nos), company)
+        print(f"[DEBUG] 步骤4a-查采购历史: 返回{len(procurement_map)}个frey_no有数据, 耗时={time.time()-step_start:.3f}s")
+
+        step_start = time.time()
+        beihuo_map = ProcurementCompareService._batch_query_beihuo(list(all_frey_nos), company)
+        print(f"[DEBUG] 步骤4b-查备货: 返回{len(beihuo_map)}个barcode有数据, 耗时={time.time()-step_start:.3f}s")
+
+        step_start = time.time()
+        price_4s_map = ProcurementCompareService._batch_query_4s_prices(list(all_display_oes))
+        print(f"[DEBUG] 步骤4c-查4S价格: 返回{len(price_4s_map)}个oe有数据, 耗时={time.time()-step_start:.3f}s")
+        _report(40, 100, '正在补全 4S 价格...')
+
+        # 4d. 对缺失 4S 价格的 OE，先查本地库，再触发远程更新
+        step_start = time.time()
+        missing_4s_oes = list({
+            oe for oe in all_display_oes
+            if oe not in price_4s_map or price_4s_map.get(oe) == (None, None)
+        })
+        total_missing = len(missing_4s_oes)
+        for idx, oe in enumerate(missing_4s_oes, start=1):
+            vehicle_brand = ProcurementCompareService._get_vehicle_brand(oe, company, summary_map)
+            price_pair = (None, None)
+            if vehicle_brand == '宝马':
+                price_pair = ProcurementCompareService._query_bmw_price_from_local(oe)
+                if price_pair == (None, None):
+                    ProcurementCompareService._refresh_bmw_price(oe)
+                    price_pair = ProcurementCompareService._query_bmw_price_from_local(oe)
+            elif vehicle_brand == '奔驰':
+                normalized_oe = ProcurementCompareService._ensure_benz_oe_prefix(oe)
+                price_pair = ProcurementCompareService._query_benz_price_from_local(normalized_oe)
+                if price_pair == (None, None):
+                    ProcurementCompareService._refresh_benz_price(normalized_oe)
+                    price_pair = ProcurementCompareService._query_benz_price_from_local(normalized_oe)
+            if price_pair != (None, None):
+                price_4s_map[oe] = price_pair
+            _report(
+                int(40 + (idx / total_missing * 40)),
+                100,
+                f'正在补全 4S 价格 ({idx}/{total_missing})...'
+            )
+        print(f"[DEBUG] 步骤4d-本地库/远程更新4S价格: 处理缺失OE={total_missing}, 耗时={time.time()-step_start:.3f}s")
+
+        # 5. 内存组装结果（无匹配的OE也保留，生成空行）
+        step_start = time.time()
+        groups = []
+        no_summary_count = 0
+        total_result_rows = 0
+        for item in valid_items:
+            search_oe = item['oe']
+            brand = item['brand']
+            price = item['price']
+
+            summary_rows = summary_map.get(search_oe, [])
+            if not summary_rows:
+                # 无匹配OE：生成一行基础数据
+                no_summary_count += 1
+                price_4s_cost, price_4s_sale = price_4s_map.get(search_oe, (None, None))
+                result = ProcurementCompareService._build_oe_compare_result(
+                    oe=search_oe,
+                    search_oe=search_oe,
+                    brand=brand,
+                    company=company,
+                    product_name=None,
+                    spec=None,
+                    replace_name=None,
+                    frey_no=None,
+                    records=[],
+                    price_4s_cost=price_4s_cost,
+                    price_4s_sale=price_4s_sale,
+                    beihuo_data=ProcurementCompareService._empty_beihuo_data(),
+                    replace_stock_text=None,
+                    price=price
+                )
+                groups.append((search_oe, [result]))
+                total_result_rows += 1
+                continue
+
+            # 预查备货并汇总替换号有库存
+            replace_stock_items = []
+            rows_with_beihuo = []
+            for row in summary_rows:
+                frey_no = row.get('frey_no') or ''
+                beihuo_data = beihuo_map.get(frey_no, ProcurementCompareService._empty_beihuo_data())
+                rows_with_beihuo.append((row, beihuo_data))
+
+                if row.get('oe') != search_oe:
+                    stock = beihuo_data.get('stock_quantity')
+                    try:
+                        stock_int = int(stock) if stock is not None else 0
+                    except (ValueError, TypeError):
+                        stock_int = 0
+                    if stock_int > 0:
+                        replace_stock_items.append({'oe': row['oe'], 'stock': stock_int})
+
+            replace_stock_text = ProcurementCompareService._format_replace_stock_text(replace_stock_items)
+
+            results = []
+            for row, beihuo_data in rows_with_beihuo:
+                frey_no = row.get('frey_no') or ''
+                row_brand = row.get('brand') or brand
+                display_oe = row.get('oe') if row.get('oe') else search_oe
+                is_main_oe = (display_oe == search_oe)
+
+                records = procurement_map.get(frey_no, [])
+                price_4s_cost, price_4s_sale = price_4s_map.get(display_oe, (None, None))
+                row_replace_stock_text = replace_stock_text if is_main_oe else None
+
+                result = ProcurementCompareService._build_oe_compare_result(
+                    oe=display_oe,
+                    search_oe=search_oe,
+                    brand=row_brand,
+                    company=company,
+                    product_name=row.get('product_name') if row.get('product_name') else None,
+                    spec=row.get('l_model_zh') if row.get('l_model_zh') else None,
+                    replace_name=row.get('replace_number') if row.get('replace_number') else None,
+                    frey_no=frey_no if frey_no else None,
+                    records=records,
+                    price_4s_cost=price_4s_cost,
+                    price_4s_sale=price_4s_sale,
+                    beihuo_data=beihuo_data,
+                    replace_stock_text=row_replace_stock_text,
+                    price=price
+                )
+                results.append(result)
+
+            # 组内排序：主号行在前，replace_number匹配行按oe排序在后
+            results.sort(key=lambda r: (r.oe != search_oe, r.oe or ''))
+            groups.append((search_oe, results))
+            total_result_rows += len(results)
+
+        print(f"[DEBUG] 步骤5-内存组装: 有效组数={len(groups)}, 无匹配但保留={no_summary_count}, 总结果行数={total_result_rows}, 耗时={time.time()-step_start:.3f}s")
+        _report(90, 100, '正在整理比对结果...')
+
+        # 6. 按主号OE排序后展平，并设置组号
+        step_start = time.time()
         groups.sort(key=lambda x: x[0])
         results = []
         for group_index, (_, group_results) in enumerate(groups, start=1):
             for result in group_results:
                 result.group_index = group_index
             results.extend(group_results)
+        print(f"[DEBUG] 步骤6-展平排序: 最终组数={group_index}, 最终结果行数={len(results)}, 耗时={time.time()-step_start:.3f}s")
+        print(f"[DEBUG] 总耗时: {time.time()-total_start:.3f}s")
+        _report(100, 100, '比对结果生成完成')
         return results

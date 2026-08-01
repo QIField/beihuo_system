@@ -5,7 +5,7 @@
 from typing import List
 from openpyxl import load_workbook
 from openpyxl.comments import Comment
-from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from app.models.purchase_history_compare_models import OECompareResult
 
 
@@ -14,37 +14,38 @@ class PurchaseHistoryExcelWriter:
 
     # 列定义（根据模板文件 compare_price.xlsx）
     COL_INDEX = 1              # A列: 序号
-    COL_OE = 2                 # B列: oe
-    COL_PRICE = 3              # C列: 价格/促销价
-    COL_4S_COST = 4            # D列: 4s含税进价
-    COL_4S_PRICE = 5           # E列: 4s含税售价
-    COL_BRAND = 6              # F列: 品牌
-    COL_NAME = 7               # G列: 名称
-    COL_SPEC = 8               # H列: 规格
-    COL_REPLACE = 9            # I列: 替换号
-    COL_STOCK = 10             # J列: 库存数量
-    COL_REPLACE_STOCK = 11     # K列: 替换号有库存
-    COL_TAG = 12               # L列: 标签
-    COL_INQUIRY_1M = 13        # M列: 近1个月询价量
-    COL_INQUIRY_3M = 14        # N列: 近3个月月均询价量
-    COL_SALES_6M_AVG = 15      # O列: 近6个月月均销量
-    COL_INQUIRY_1M_NATIONAL = 16   # P列: 全国近1个月询价量
-    COL_INQUIRY_3M_NATIONAL = 17   # Q列: 全国近3个月月均询价量
-    COL_SALES_DATA = 18        # R列: 销量数据(合并列)
-    COL_LOWEST = 19            # S列: 最低价
-    COL_HIGHEST = 20           # T列: 最高价
-    COL_JAN = 21               # U列: 一月
-    COL_FEB = 22               # V列: 二月
-    COL_MAR = 23               # W列: 三月
-    COL_APR = 24               # X列: 四月
-    COL_MAY = 25               # Y列: 五月
-    COL_JUN = 26               # Z列: 六月
-    COL_JUL = 27               # AA列: 七月
-    COL_AUG = 28               # AB列: 八月
-    COL_SEP = 29               # AC列: 九月
-    COL_OCT = 30               # AD列: 十月
-    COL_NOV = 31               # AE列: 十一月
-    COL_DEC = 32               # AF列: 十二月
+    COL_ORIGIN_OE = 2          # B列: 原oe（主号，同一组合并）
+    COL_OE = 3                 # C列: oe
+    COL_PRICE = 4              # D列: 价格/促销价
+    COL_4S_COST = 5            # E列: 4s含税进价
+    COL_4S_PRICE = 6           # F列: 4s含税售价
+    COL_BRAND = 7              # G列: 品牌
+    COL_NAME = 8               # H列: 名称
+    COL_SPEC = 9               # I列: 规格
+    COL_REPLACE = 10           # J列: 替换号
+    COL_STOCK = 11             # K列: 库存数量
+    COL_REPLACE_STOCK = 12     # L列: 替换号有库存
+    COL_TAG = 13               # M列: 标签
+    COL_INQUIRY_1M = 14        # N列: 近1个月询价量
+    COL_INQUIRY_3M = 15        # O列: 近3个月月均询价量
+    COL_SALES_6M_AVG = 16      # P列: 近6个月月均销量
+    COL_INQUIRY_1M_NATIONAL = 17   # Q列: 全国近1个月询价量
+    COL_INQUIRY_3M_NATIONAL = 18   # R列: 全国近3个月月均询价量
+    COL_SALES_DATA = 19        # S列: 销量数据(合并列)
+    COL_LOWEST = 20            # T列: 最低价
+    COL_HIGHEST = 21           # U列: 最高价
+    COL_JAN = 22               # V列: 一月
+    COL_FEB = 23               # W列: 二月
+    COL_MAR = 24               # X列: 三月
+    COL_APR = 25               # Y列: 四月
+    COL_MAY = 26               # Z列: 五月
+    COL_JUN = 27               # AA列: 六月
+    COL_JUL = 28               # AB列: 七月
+    COL_AUG = 29               # AC列: 八月
+    COL_SEP = 30               # AD列: 九月
+    COL_OCT = 31               # AE列: 十月
+    COL_NOV = 32               # AF列: 十一月
+    COL_DEC = 33               # AG列: 十二月
 
     # 月份列映射
     MONTH_COLS = {
@@ -103,6 +104,9 @@ class PurchaseHistoryExcelWriter:
         current_row = start_row
         group_row_ranges = {}  # group_index -> (start_row, end_row)
 
+        # Excel "白色 背景1，深色25%" = #BFBFBF
+        alternate_fill = PatternFill(start_color='BFBFBF', end_color='BFBFBF', fill_type='solid')
+
         for result in results:
             # 使用组号作为序号，主号+replace_number匹配行共享同一序号
             group_index = result.group_index if result.group_index is not None else current_row - start_row + 1
@@ -111,15 +115,26 @@ class PurchaseHistoryExcelWriter:
             else:
                 group_row_ranges[group_index][1] = current_row
             self._write_oe_result(result, current_row, group_index)
+
+            # 偶数组（第2、4、6...组）设置交替背景色
+            if group_index % 2 == 0:
+                for col in range(1, 34):  # A到AG列
+                    self.ws.cell(row=current_row, column=col).fill = alternate_fill
+
             current_row += 1
 
-        # 合并序号列：同一组的多行A列纵向合并并垂直居中
+        # 合并序号列和原oe列：同一组的多行纵向合并并垂直居中
         for start, end in group_row_ranges.values():
             if start < end:
                 self.ws.merge_cells(start_row=start, start_column=self.COL_INDEX,
                                     end_row=end, end_column=self.COL_INDEX)
                 merged_cell = self.ws.cell(row=start, column=self.COL_INDEX)
                 merged_cell.alignment = Alignment(vertical='center')
+
+                self.ws.merge_cells(start_row=start, start_column=self.COL_ORIGIN_OE,
+                                    end_row=end, end_column=self.COL_ORIGIN_OE)
+                merged_cell_oe = self.ws.cell(row=start, column=self.COL_ORIGIN_OE)
+                merged_cell_oe.alignment = Alignment(vertical='center')
 
     def _write_oe_result(self, result: OECompareResult, row: int, index: int):
         """
@@ -132,6 +147,9 @@ class PurchaseHistoryExcelWriter:
         """
         # 写入序号（组号）
         self.ws.cell(row=row, column=self.COL_INDEX, value=index)
+
+        # 写入原oe（主号，同一组共享）
+        self.ws.cell(row=row, column=self.COL_ORIGIN_OE, value=result.search_oe)
 
         # 写入OE号（replace_number匹配时显示compare_summary.oe）
         self.ws.cell(row=row, column=self.COL_OE, value=result.oe)
@@ -253,34 +271,36 @@ class PurchaseHistoryExcelWriter:
         """设置列宽"""
         # 序号列
         self.ws.column_dimensions['A'].width = 8
-        # OE号列
+        # 原oe列
         self.ws.column_dimensions['B'].width = 20
+        # OE号列
+        self.ws.column_dimensions['C'].width = 20
         # 价格列
-        self.ws.column_dimensions['C'].width = 15
-        # 4s价格列
         self.ws.column_dimensions['D'].width = 15
+        # 4s价格列
         self.ws.column_dimensions['E'].width = 15
-        # 品牌列
         self.ws.column_dimensions['F'].width = 15
+        # 品牌列
+        self.ws.column_dimensions['G'].width = 15
         # 名称、规格、替换号列
-        self.ws.column_dimensions['G'].width = 20
-        self.ws.column_dimensions['H'].width = 15
-        self.ws.column_dimensions['I'].width = 20
+        self.ws.column_dimensions['H'].width = 20
+        self.ws.column_dimensions['I'].width = 15
+        self.ws.column_dimensions['J'].width = 20
         # 备货相关列
-        self.ws.column_dimensions['J'].width = 12  # 库存数量
-        self.ws.column_dimensions['K'].width = 25  # 替换号有库存
-        self.ws.column_dimensions['L'].width = 15  # 标签
-        self.ws.column_dimensions['M'].width = 15  # 近1个月询价量
-        self.ws.column_dimensions['N'].width = 18  # 近3个月月均询价量
-        self.ws.column_dimensions['O'].width = 18  # 近6个月月均销量
-        self.ws.column_dimensions['P'].width = 18  # 全国近1个月询价量
-        self.ws.column_dimensions['Q'].width = 20  # 全国近3个月月均询价量
-        self.ws.column_dimensions['R'].width = 20  # 销量数据(合并列)
+        self.ws.column_dimensions['K'].width = 12  # 库存数量
+        self.ws.column_dimensions['L'].width = 25  # 替换号有库存
+        self.ws.column_dimensions['M'].width = 15  # 标签
+        self.ws.column_dimensions['N'].width = 15  # 近1个月询价量
+        self.ws.column_dimensions['O'].width = 18  # 近3个月月均询价量
+        self.ws.column_dimensions['P'].width = 18  # 近6个月月均销量
+        self.ws.column_dimensions['Q'].width = 18  # 全国近1个月询价量
+        self.ws.column_dimensions['R'].width = 20  # 全国近3个月月均询价量
+        self.ws.column_dimensions['S'].width = 20  # 销量数据(合并列)
         # 最低价最高价列
-        self.ws.column_dimensions['S'].width = 30
         self.ws.column_dimensions['T'].width = 30
-        # 月份列 (U-AF)
-        for col_letter in ['U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF']:
+        self.ws.column_dimensions['U'].width = 30
+        # 月份列 (V-AG)
+        for col_letter in ['V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG']:
             self.ws.column_dimensions[col_letter].width = 12
 
     def save(self, output_path: str):
