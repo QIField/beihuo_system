@@ -1501,31 +1501,48 @@ def parse_oe_list():
             df = pd.read_csv(temp_path, encoding='utf-8', dtype=str)
         else:
             df = pd.read_excel(temp_path, dtype=str)
-        
+
+        print(f"[parse_oe_list] 文件: {file.filename}, 形状: {df.shape}")
+        print(f"[parse_oe_list] 原始列名: {list(df.columns)}")
+        print(f"[parse_oe_list] 前5行:\n{df.head().to_string()}")
+
         # 列名映射
         column_mapping = {
             'oe': 'oe', 'OE': 'oe', 'OE号': 'oe',
             '品牌': 'brand', 'brand': 'brand',
             '单价': 'price', '价格': 'price', 'price': 'price', '价格/促销价': 'price',
+            '品牌号': 'brand_code', 'brand_code': 'brand_code', '品牌编码': 'brand_code',
         }
-        
-        rename_dict = {old: new for old, new in column_mapping.items() 
+
+        rename_dict = {old: new for old, new in column_mapping.items()
                        if old in df.columns and new not in df.columns}
+        print(f"[parse_oe_list] 列名映射: {rename_dict}")
         if rename_dict:
             df = df.rename(columns=rename_dict)
-        
-        # 提取OE、品牌和价格
+
+        print(f"[parse_oe_list] 映射后列名: {list(df.columns)}")
+
+        # 提取OE、品牌、价格和品牌号
+        # 规则：oe+品牌 或 brand_code 有值其一即可；优先使用 brand_code
         oe_list = []
-        for _, row in df.iterrows():
+        for idx, row in df.iterrows():
             oe = str(row.get('oe', '')).strip() if pd.notna(row.get('oe')) else ''
             brand = str(row.get('brand', '')).strip() if pd.notna(row.get('brand')) else ''
             price = str(row.get('price', '')).strip() if pd.notna(row.get('price')) else ''
-            if oe:
-                oe_list.append({'oe': oe, 'brand': brand, 'price': price})
-        
+            brand_code = str(row.get('brand_code', '')).strip() if pd.notna(row.get('brand_code')) else ''
+            print(f"[parse_oe_list] 第{idx + 1}行: oe={oe!r}, brand={brand!r}, price={price!r}, brand_code={brand_code!r}")
+            if not ((oe and brand) or brand_code):
+                continue
+            item = {'oe': oe, 'brand': brand, 'price': price}
+            if brand_code:
+                item['brand_code'] = brand_code
+            oe_list.append(item)
+
+        print(f"[parse_oe_list] 解析结果: 共 {len(oe_list)} 条")
+
         # 清理临时文件
         os.remove(temp_path)
-        
+
         return jsonify({
             'code': 0,
             'msg': '解析成功',

@@ -16,24 +16,6 @@
     <script src="{{ url_for('static', filename='js/components/handsontable-builder/handsontable-builder.js') }}"></script>
     <script src="{{ url_for('static', filename='js/purchase_plan/common.js') }}"></script>
     <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        body {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            overflow: hidden;
-        }
 
         .file-input {
             display: none;
@@ -218,7 +200,7 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="inquiry-page">
         <h2>询价模块</h2>
 
         <!-- 数据标签页 -->
@@ -1320,7 +1302,8 @@
                 const items = oeList.map(item => ({
                     oe: item.oe,
                     brand: item.brand || '',
-                    price: item.price || ''
+                    price: item.price || '',
+                    brand_code: item.brand_code || ''
                 }));
 
                 layui.layer.close(loadingIndex);

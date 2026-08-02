@@ -12,6 +12,9 @@ from datetime import datetime
 from app.services.compare_service.procurement_compare_service import ProcurementCompareService
 from app.utils.export_tools.purchase_history_excel_writer import PurchaseHistoryExcelWriter
 from app.core.async_task_store import submit_excel_task, get_task_status
+from app.utils.logger_config import get_task_logger
+
+logger = get_task_logger('purchase_history_compare')
 
 # 创建蓝图
 bp = Blueprint('purchase_history_compare', __name__)
@@ -66,10 +69,10 @@ def export_compare_excel():
         for idx, item in enumerate(items):
             if not item or not isinstance(item, dict):
                 return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据格式错误'}), 400
-            if not item.get('oe'):
-                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据缺少OE号'}), 400
-            if not item.get('brand'):
-                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据缺少品牌'}), 400
+            has_oe_brand = bool(item.get('oe') and item.get('brand'))
+            has_brand_code = bool(item.get('brand_code'))
+            if not (has_oe_brand or has_brand_code):
+                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据缺少OE+品牌或品牌号'}), 400
 
         # 获取用户公司
         company = get_user_company()
@@ -97,12 +100,11 @@ def export_compare_excel():
 
     except Exception as e:
         error_trace = traceback.format_exc()
-        print(f"[ERROR] export_compare_excel: {str(e)}")
-        print(error_trace)
+        logger.exception(f"[ERROR] export_compare_excel: {str(e)}")
         return jsonify({'code': 1, 'msg': f'生成失败: {str(e)}'}), 500
 
 
-def _async_generate_excel(progress_callback, items, company):
+def _async_generate_excel(items, company, progress_callback=None):
     """
     异步生成采购历史比对 Excel
     供 submit_excel_task 调用
@@ -154,10 +156,10 @@ def export_compare_excel_async():
         for idx, item in enumerate(items):
             if not item or not isinstance(item, dict):
                 return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据格式错误'}), 400
-            if not item.get('oe'):
-                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据缺少OE号'}), 400
-            if not item.get('brand'):
-                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据缺少品牌'}), 400
+            has_oe_brand = bool(item.get('oe') and item.get('brand'))
+            has_brand_code = bool(item.get('brand_code'))
+            if not (has_oe_brand or has_brand_code):
+                return jsonify({'code': 1, 'msg': f'第{idx + 1}条数据缺少OE+品牌或品牌号'}), 400
 
         company = get_user_company()
         task_id = submit_excel_task(_async_generate_excel, items, company)
@@ -166,8 +168,7 @@ def export_compare_excel_async():
 
     except Exception as e:
         error_trace = traceback.format_exc()
-        print(f"[ERROR] export_compare_excel_async: {str(e)}")
-        print(error_trace)
+        logger.exception(f"[ERROR] export_compare_excel_async: {str(e)}")
         return jsonify({'code': 1, 'msg': f'提交失败: {str(e)}'}), 500
 
 
@@ -183,7 +184,7 @@ def export_compare_excel_status(task_id):
             return jsonify({'code': 1, 'msg': '任务不存在'}), 404
         return jsonify({'code': 0, 'msg': 'ok', 'data': task})
     except Exception as e:
-        print(f"[ERROR] export_compare_excel_status: {str(e)}")
+        logger.warning(f"[ERROR] export_compare_excel_status: {str(e)}")
         return jsonify({'code': 1, 'msg': f'查询失败: {str(e)}'}), 500
 
 
@@ -210,5 +211,5 @@ def export_compare_excel_download(task_id):
             download_name=os.path.basename(result_file)
         )
     except Exception as e:
-        print(f"[ERROR] export_compare_excel_download: {str(e)}")
+        logger.warning(f"[ERROR] export_compare_excel_download: {str(e)}")
         return jsonify({'code': 1, 'msg': f'下载失败: {str(e)}'}), 500

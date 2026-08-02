@@ -84,6 +84,7 @@ class PurchaseHistoryExcelWriter:
             results: 比对结果列表
             start_row: 开始写入的行号，默认从第2行开始（第1行为表头）
         """
+        print(f"[Excel写入] 步骤1-开始: 共 {len(results)} 条结果待写入，起始行={start_row}")
         # 预处理：按组统一标签优先级（A类>B类>C类>D类）
         group_tags = {}
         for result in results:
@@ -114,6 +115,19 @@ class PurchaseHistoryExcelWriter:
                 group_row_ranges[group_index] = [current_row, current_row]
             else:
                 group_row_ranges[group_index][1] = current_row
+            is_bc_item = (
+                result.search_oe
+                and result.oe == result.search_oe
+                and not result.product_name
+                and not result.brand
+                and not result.frey_no
+                and not result.records
+            ) or (
+                result.search_oe
+                and any(c in str(result.search_oe) for c in ' .,/')
+            )
+            bc_tag = "[brand_code空行]" if is_bc_item else ""
+            print(f"[Excel写入] 步骤2-写入行: row={current_row}, group={group_index}, search_oe={result.search_oe!r}, oe={result.oe!r}, brand={result.brand!r}, product_name={(result.product_name or '')!r}, 4S进价={result.price_4s_cost}, 4S售价={result.price_4s_sale} {bc_tag}")
             self._write_oe_result(result, current_row, group_index)
 
             # 偶数组（第2、4、6...组）设置交替背景色
@@ -123,6 +137,7 @@ class PurchaseHistoryExcelWriter:
 
             current_row += 1
 
+        print(f"[Excel写入] 步骤2-写入行完成: 共写入 {current_row - start_row} 行数据，组数={len(group_row_ranges)}")
         # 合并序号列和原oe列：同一组的多行纵向合并并垂直居中
         for start, end in group_row_ranges.values():
             if start < end:
@@ -135,6 +150,7 @@ class PurchaseHistoryExcelWriter:
                                     end_row=end, end_column=self.COL_ORIGIN_OE)
                 merged_cell_oe = self.ws.cell(row=start, column=self.COL_ORIGIN_OE)
                 merged_cell_oe.alignment = Alignment(vertical='center')
+        print(f"[Excel写入] 步骤2-合并单元格完成")
 
     def _write_oe_result(self, result: OECompareResult, row: int, index: int):
         """
@@ -310,7 +326,16 @@ class PurchaseHistoryExcelWriter:
         Args:
             output_path: 输出文件路径
         """
-        self.wb.save(output_path)
+        print(f"[Excel写入] 步骤4-保存文件: 路径={output_path}")
+        try:
+            self.wb.save(output_path)
+            import os
+            size = os.path.getsize(output_path) if os.path.exists(output_path) else -1
+            print(f"[Excel写入] 步骤4-保存文件: 成功，文件大小={size} bytes")
+        except Exception as e:
+            import traceback
+            print(f"[Excel写入] 步骤4-保存文件: 失败，错误={e}\n{traceback.format_exc()}")
+            raise
 
     @staticmethod
     def generate_excel(results: List[OECompareResult], template_path: str, output_path: str):
@@ -322,8 +347,10 @@ class PurchaseHistoryExcelWriter:
             template_path: 模板文件路径
             output_path: 输出文件路径
         """
+        print(f"[Excel写入] 步骤0-初始化: 模板={template_path}, 输出={output_path}, 结果数={len(results)}")
         writer = PurchaseHistoryExcelWriter(template_path)
         writer.write_compare_results(results)
+        print(f"[Excel写入] 步骤3-设置列宽")
         writer.set_column_widths()
         writer.save(output_path)
         return output_path
