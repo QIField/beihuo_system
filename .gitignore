@@ -64,3 +64,4 @@ docker/logs/
 /sql
 /.trae
 log.txt
+scripts/
