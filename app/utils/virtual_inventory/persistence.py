@@ -189,3 +189,101 @@ def save_supplier_to_virtual_inventory(df, supplier_name="供应商"):
 
     # 保存到各公司表
     save_to_company_tables(df, is_wantuo, is_changsheng, is_changsheng_special_fn)
+
+
+# 昌盛原始数据字段映射（API字段 -> 数据库字段）
+CHANGSHENG_RAW_COLUMNS = [
+    ('part_id', 'INT'),
+    ('part_name', 'VARCHAR(255)'),
+    ('part_number', 'VARCHAR(100)'),
+    ('oe_number', 'VARCHAR(100)'),
+    ('part_spec', 'VARCHAR(100)'),
+    ('brand_name', 'VARCHAR(100)'),
+    ('part_quality_name', 'VARCHAR(100)'),
+    ('unit', 'VARCHAR(20)'),
+    ('sale_price', 'VARCHAR(50)'),
+    ('min_sale_price', 'VARCHAR(50)'),
+    ('max_sale_price', 'VARCHAR(50)'),
+    ('wholesale_price', 'VARCHAR(50)'),
+    ('sale_price1', 'VARCHAR(50)'),
+    ('sale_price2', 'VARCHAR(50)'),
+    ('last_sale_price', 'VARCHAR(50)'),
+    ('cost_price', 'VARCHAR(50)'),
+    ('stock_amount', 'VARCHAR(50)'),
+    ('remark', 'TEXT'),
+    ('car_series', 'VARCHAR(255)'),
+    ('part_engine', 'VARCHAR(50)'),
+    ('part_standard', 'VARCHAR(50)'),
+    ('goods_class', 'VARCHAR(100)'),
+    ('custom_class', 'VARCHAR(100)'),
+    ('manufacturer_number', 'VARCHAR(100)'),
+    ('prices', 'TEXT'),
+]
+
+
+def _ensure_changsheng_raw_table(db_manager):
+    """确保昌盛原始数据表存在"""
+    columns_def = ",\n        ".join([f"{db_col} {db_type}" for api_col, db_type, db_col in
+                           [(c[0], c[1], c[0]) for c in CHANGSHENG_RAW_COLUMNS]])
+    create_sql = f"""
+        CREATE TABLE IF NOT EXISTS changsheng_raw_inventory (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            {columns_def},
+            fetch_time DATETIME NOT NULL,
+            INDEX idx_fetch_time (fetch_time),
+            INDEX idx_oe_number (oe_number),
+            INDEX idx_part_number (part_number)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """
+    db_manager.execute_update(create_sql)
+
+
+def save_changsheng_raw_data(df):
+    """
+    保存昌盛原始数据到 changsheng_raw_inventory 表
+    与现有清洗流程并行执行，失败不影响主流程
+    """
+    if df is None or df.empty:
+        logger.info("昌盛原始数据为空，跳过原始保存")
+        return
+
+    fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db_manager = get_db_connection()
+
+    try:
+        _ensure_changsheng_raw_table(db_manager)
+
+        # 准备数据
+        api_columns = [c[0] for c in CHANGSHENG_RAW_COLUMNS]
+        columns_str = ", ".join(api_columns + ['fetch_time'])
+        placeholders = ", ".join(["%s"] * (len(api_columns) + 1))
+
+        data = []
+        for _, row in df.iterrows():
+            row_data = []
+            for col in api_columns:
+                val = row.get(col)
+                if col == 'prices' and val is not None:
+                    # 嵌套对象转JSON字符串
+                    import json
+                    val = json.dumps(val, ensure_ascii=False) if not isinstance(val, str) else val
+                row_data.append(val)
+            row_data.append(fetch_time)
+            data.append(tuple(row_data))
+
+        # 批量插入
+        batch_size = 1000
+        total_inserted = 0
+        sql = f"INSERT INTO changsheng_raw_inventory ({columns_str}) VALUES ({placeholders})"
+        for i in range(0, len(data), batch_size):
+            batch = data[i:i + batch_size]
+            db_manager.execute_many(sql, batch)
+            total_inserted += len(batch)
+
+        logger.info(f"[changsheng_raw_inventory] 已保存 {total_inserted} 条原始数据")
+
+    except Exception:
+        logger.exception("[changsheng_raw_inventory] 保存昌盛原始数据失败")
+        # 失败不抛出，不影响主流程
+    finally:
+        db_manager.close()
