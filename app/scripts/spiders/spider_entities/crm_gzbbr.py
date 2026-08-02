@@ -314,7 +314,8 @@ class CrmGzbbrSpider:
                                  customer_id=None, is_stock=None, is_dangerstock=None,
                                  is_nostock=None, sale_type=None, is_zaitu=None,
                                  product_type_id=None, make_id=None, series_id=None,
-                                 car_id=None, chassis_id=None, engine_id=None):
+                                 car_id=None, chassis_id=None, engine_id=None,
+                                 aikeyword=None):
         """
         获取产品列表（开思产品数据）
 
@@ -337,6 +338,7 @@ class CrmGzbbrSpider:
         :param car_id: 车型ID
         :param chassis_id: 底盘ID
         :param engine_id: 发动机ID
+        :param aikeyword: 品牌编码
         :return: 请求响应对象
         """
         url = f"{self.BASE_URL}/api/Product.Product/list"
@@ -360,6 +362,7 @@ class CrmGzbbrSpider:
             "car_id": car_id,
             "chassis_id": chassis_id,
             "engine_id": engine_id,
+            "aikeyword": aikeyword,
         }
         print("【请求API地址】", url)
         print("【请求参数】", data)

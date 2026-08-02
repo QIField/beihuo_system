@@ -54,7 +54,8 @@ class MonthSummary:
 @dataclass
 class OECompareResult:
     """单个OE的比对结果"""
-    oe: str                                       # OE号
+    oe: str                                       # 显示在表格中的OE号（replace_number匹配时使用compare_summary.oe）
+    search_oe: str                                # 原始搜索OE号（用于兆配云查询）
     brand: str                                    # 人工输入的品牌
     month_summaries: Dict[int, MonthSummary]      # 1-12月汇总数据，key为月份(1-12)
     overall_lowest: Tuple[str, str, float]        # 整体最低价 (年月, 供应商, 价格)
@@ -65,7 +66,10 @@ class OECompareResult:
     spec: Optional[str] = None                    # 规格
     replace_name: Optional[str] = None            # 替换号
     price: Optional[float] = None                 # 价格/促销价（从导入文件读取）
-    
+    frey_no: Optional[str] = None                 # Frey编号（从crmapp_compare_summary获取）
+    replace_stock_text: Optional[str] = None      # 替换号有库存文本
+    group_index: Optional[int] = None             # 组号（主号+replace_number匹配行共享同一组号）
+
     # 从crmapp_beihuo表获取的字段
     stock_quantity: Optional[int] = None          # 库存数量
     tag: Optional[str] = None                     # 标签
