@@ -16,6 +16,7 @@
     <script src="{{ url_for('static', filename='js/components/handsontable-builder/handsontable-builder.js') }}"></script>
     <script src="{{ url_for('static', filename='js/purchase_plan/common.js') }}"></script>
     <style>
+
         .file-input {
             display: none;
         }
@@ -192,10 +193,14 @@
             margin-top: 20px;
         }
 
+        #handsontable-container {
+            height: calc(100vh - 220px);
+        }
+
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="inquiry-page">
         <h2>询价模块</h2>
 
         <!-- 数据标签页 -->
@@ -218,9 +223,10 @@
         <div class="upload-container" id="uploadContainer">
             <!-- 操作按钮区 -->
             <div class="upload-actions">
+                <button type="button" class="btn btn-primary" id="btnDownloadTemplate">下载询价模板</button>
                 <button type="button" class="btn btn-primary" id="btnImportUpload">导入文件（上传系统）</button>
-                <button type="button" class="btn btn-default" id="btnImportRecord">导入文件（仅记录入库不上传）</button>
-                <button type="button" class="btn btn-default" id="btnDownloadTemplate">下载模板</button>
+                <button type="button" class="btn btn-primary" id="btnImportRecord">导入文件（仅记录入库不上传）</button>
+                <button type="button" class="btn btn-default" id="btnDownloadCompareTemplate">下载比对模板</button>
                 <button type="button" class="btn btn-default" id="btnCompareHistory">采购历史比对</button>
             </div>
 
@@ -259,20 +265,6 @@
                 </div>
             </div>
             <div id="handsontable-container"></div>
-            <div class="pagination" id="pagination">
-                <button class="btn btn-default" id="prevBtn">上一页</button>
-                <span class="pagination-info" id="pageInfo">第 1 页 / 共 1 页</span>
-                <button class="btn btn-default" id="nextBtn">下一页</button>
-                <span style="color: #000; font-size: 14px;">跳转到</span>
-                <input type="number" id="pageJumpInput" min="1" style="width: 60px; padding: 6px; border: 1px solid #d9d9d9; border-radius: 4px; text-align: center;">
-                <span style="color: #000; font-size: 14px;">页</span>
-                <button class="btn btn-default" id="pageJumpBtn">跳转</button>
-                <select id="pageSizeSelect" class="btn btn-default" style="padding: 6px 10px;">
-                    <option value="50">50条/页</option>
-                    <option value="100" selected>100条/页</option>
-                    <option value="200">200条/页</option>
-                </select>
-            </div>
         </div>
 
         <!-- data.gzbbr 失效时间调整 -->
@@ -325,11 +317,8 @@
             }
         });
 
-        let hot;
+        let tableBuilder = null;
         let allData = [];
-        let currentPage = 1;
-        let pageSize = 100;
-        let totalPages = 1;
 
         // 当前数据类型：upload-上传文件, normal-正常询价数据, direct-直接入库数据
         let currentDataType = 'upload';
@@ -337,79 +326,51 @@
         // 行高固定为40px
         const DEFAULT_ROW_HEIGHT = 40;
 
-        // 记录哪些行被展开
+        // 记录哪些行被展开（用数据索引）
         let expandedRows = new Set();
 
-        // 处理数据并计算合并单元格（支持分页）
-        function processDataWithMerge(data, page = 1, limit = 100) {
-            const processedData = [];
+        // 格式化数据并计算合并单元格
+        function formatDataAndMergeCells(data) {
+            const formattedData = [];
             const mergeCells = [];
             let currentRow = 0;
 
-            // 按OE分组
+            // 按OE分组（保持原始顺序）
             const oeGroups = {};
+            const oeOrder = [];
             data.forEach(item => {
                 if (!oeGroups[item.oe]) {
                     oeGroups[item.oe] = [];
+                    oeOrder.push(item.oe);
                 }
                 oeGroups[item.oe].push(item);
             });
 
-            // 将OE组转换为数组并按原始顺序排序
-            const oeGroupArray = Object.entries(oeGroups);
-            
-            // 计算分页
-            const totalItems = data.length;
-            totalPages = Math.ceil(totalItems / limit);
-            const startIndex = (page - 1) * limit;
-            const endIndex = Math.min(startIndex + limit, totalItems);
-            
-            // 收集当前页需要显示的数据
-            let itemCount = 0;
-            let pageData = [];
-            
-            for (const [oe, oeItems] of oeGroupArray) {
-                for (const item of oeItems) {
-                    if (itemCount >= startIndex && itemCount < endIndex) {
-                        pageData.push(item);
-                    }
-                    itemCount++;
-                }
-            }
-            
-            // 重新按OE分组当前页数据
-            const pageOeGroups = {};
-            pageData.forEach(item => {
-                if (!pageOeGroups[item.oe]) {
-                    pageOeGroups[item.oe] = [];
-                }
-                pageOeGroups[item.oe].push(item);
-            });
-
-            // 处理每个OE组
-            for (const [oe, oeItems] of Object.entries(pageOeGroups)) {
+            for (const oe of oeOrder) {
+                const oeItems = oeGroups[oe];
                 const oeStartRow = currentRow;
                 const oeRowCount = oeItems.length;
 
                 // 按品牌分组
                 const brandGroups = {};
+                const brandOrder = [];
                 oeItems.forEach(item => {
                     const brand = item.brand || '未知品牌';
                     if (!brandGroups[brand]) {
                         brandGroups[brand] = [];
+                        brandOrder.push(brand);
                     }
                     brandGroups[brand].push(item);
                 });
 
-                // 处理每个品牌组
-                for (const [brand, brandItems] of Object.entries(brandGroups)) {
+                for (const brand of brandOrder) {
+                    const brandItems = brandGroups[brand];
                     const brandStartRow = currentRow;
                     const brandRowCount = brandItems.length;
 
-                    // 添加每一行数据
                     brandItems.forEach((item, index) => {
-                        processedData.push({
-                            rowNumber: startIndex + currentRow + 1,
+                        formattedData.push({
+                            rowNumber: currentRow + 1,
                             oe: index === 0 ? formatEmptyValue(item.oe) : '',
                             brand: index === 0 ? formatEmptyValue(item.brand) : '',
                             supplier: formatEmptyValue(item.supplier),
@@ -422,53 +383,25 @@
                             remark: formatEmptyValue(item.remark),
                             stock_quantity: formatEmptyValue(item.stock_quantity),
                             common_number: formatEmptyValue(item.common_number),
-                            import_time: formatEmptyValue(item.import_time),
-                            _oeGroup: oe,
-                            _brandGroup: brand
+                            import_time: formatEmptyValue(item.import_time)
                         });
                         currentRow++;
                     });
 
-                    // 添加品牌合并
                     if (brandRowCount > 1) {
-                        mergeCells.push({
-                            row: brandStartRow,
-                            col: 2,
-                            rowspan: brandRowCount,
-                            colspan: 1
-                        });
+                        mergeCells.push({ row: brandStartRow, col: 2, rowspan: brandRowCount, colspan: 1 });
                     }
                 }
 
-                // 添加OE合并
                 if (oeRowCount > 1) {
-                    mergeCells.push({
-                        row: oeStartRow,
-                        col: 1,
-                        rowspan: oeRowCount,
-                        colspan: 1
-                    });
+                    mergeCells.push({ row: oeStartRow, col: 1, rowspan: oeRowCount, colspan: 1 });
                 }
             }
 
-            return { data: processedData, mergeCells, totalItems };
+            return { formattedData, mergeCells };
         }
 
-        // 更新分页信息
-        function updatePagination() {
-            document.getElementById('pageInfo').textContent = `第 ${currentPage} 页 / 共 ${totalPages} 页 (共 ${allData.length} 条)`;
-            document.getElementById('prevBtn').disabled = currentPage <= 1;
-            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
-        }
-
-        // 渲染当前页
-        function renderCurrentPage() {
-            const { data, mergeCells } = processDataWithMerge(allData, currentPage, pageSize);
-            initHandsontable(data, mergeCells);
-            updatePagination();
-        }
-
-        // 创建带展开按钮的列renderer
+        // 创建带展开按钮的列renderer（适配Builder）
         function createExpandableRenderer(threshold) {
             return function(instance, td, row, col, prop, value, cellProperties) {
                 const isExpanded = expandedRows.has(row);
@@ -505,7 +438,7 @@
                         } else {
                             expandedRows.add(row);
                         }
-                        hot.render();
+                        if (tableBuilder) tableBuilder.refresh();
                     };
                     container.appendChild(btn);
                 }
@@ -516,7 +449,7 @@
             };
         }
 
-        // 创建通用号列的renderer（展开时逗号分隔换行）
+        // 创建通用号列的renderer（适配Builder）
         function createCommonNumberRenderer(threshold) {
             return function(instance, td, row, col, prop, value, cellProperties) {
                 const isExpanded = expandedRows.has(row);
@@ -528,7 +461,6 @@
                 container.style.position = 'relative';
 
                 const textSpan = document.createElement('span');
-                // 展开时将逗号替换为逗号+<br>，让内容自动换行
                 if (isExpanded && value) {
                     textSpan.innerHTML = value.replace(/,/g, ',<br>');
                 } else {
@@ -559,7 +491,7 @@
                         } else {
                             expandedRows.add(row);
                         }
-                        hot.render();
+                        if (tableBuilder) tableBuilder.refresh();
                     };
                     container.appendChild(btn);
                 }
@@ -570,24 +502,27 @@
             };
         }
 
-        function initHandsontable(data, mergeCells) {
+        function initTableBuilder(data, mergeCells) {
             const container = document.getElementById('handsontable-container');
-            
-            if (hot) {
-                hot.destroy();
+            container.innerHTML = '';
+
+            if (tableBuilder) {
+                tableBuilder.destroy();
+                tableBuilder = null;
             }
 
-            hot = new Handsontable(container, {
-                data: data,
+            const gridKey = currentDataType === 'direct' ? 'direct_list' : 'normal_list';
+
+            tableBuilder = HandsontableBuilder.create('#handsontable-container', {
                 columns: [
-                    { data: 'rowNumber', title: '行号', width: 70, className: 'row-number-cell', readOnly: true },
-                    { data: 'oe', title: 'OE号', width: 150, className: 'oe-cell', readOnly: true },
-                    { data: 'brand', title: '品牌', width: 120, className: 'brand-cell', readOnly: true },
+                    { data: 'rowNumber', title: '行号', width: 70, readOnly: true },
+                    { data: 'oe', title: 'OE号', width: 150, readOnly: true },
+                    { data: 'brand', title: '品牌', width: 120, readOnly: true },
                     { data: 'supplier', title: '供应商', width: 150, readOnly: true, renderer: createExpandableRenderer(10) },
-                    { data: 'original_price', title: '原价', width: 100, className: 'price-cell', readOnly: true },
-                    { data: 'price', title: '售价', width: 100, className: 'price-cell', readOnly: true },
-                    { data: 'markup_rate', title: '加价率', width: 100, className: 'price-cell', readOnly: true },
-                    { data: 'markup_amount', title: '加价金额', width: 100, className: 'price-cell', readOnly: true },
+                    { data: 'original_price', title: '原价', width: 100, readOnly: true },
+                    { data: 'price', title: '售价', width: 100, readOnly: true },
+                    { data: 'markup_rate', title: '加价率', width: 100, readOnly: true },
+                    { data: 'markup_amount', title: '加价金额', width: 100, readOnly: true },
                     { data: 'warehouse', title: '仓库', width: 120, readOnly: true, renderer: createExpandableRenderer(8) },
                     { data: 'expire_time', title: '失效时间', width: 160, readOnly: true },
                     { data: 'remark', title: '备注', width: 150, readOnly: true, renderer: createExpandableRenderer(8) },
@@ -595,43 +530,34 @@
                     { data: 'common_number', title: '通用号', width: 150, readOnly: true, renderer: createCommonNumberRenderer(10) },
                     { data: 'import_time', title: '上传时间', width: 160, readOnly: true }
                 ],
-                mergeCells: mergeCells,
-                rowHeaders: false,
-                colHeaders: true,
-                height: '100%',
-                width: '100%',
-                stretchH: 'all',
-                licenseKey: 'non-commercial-and-evaluation',
-
-                // 统一行高设置 - 展开的行自适应高度，未展开的行固定40px
-                rowHeights: function(row) {
-                    return expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
-                },
-                // 禁用自动行高
-                autoRowSize: false,
-                
-                // 只读模式 - 禁止编辑
+                localData: data,
                 readOnly: true,
-                disableVisualSelection: false,
-                
-                // 选中复制功能
-                selectionMode: 'multiple',
-                copyPaste: false,
-                contextMenu: false,
-
-                // 其他配置
-                manualColumnResize: true,
-                manualRowResize: false,
-                columnSorting: true,
-                sortIndicator: true,
-
-                // 禁用筛选和下拉菜单
-                filters: false,
-                dropdownMenu: false
+                pageKey: 'inquiry_module',
+                gridKey: gridKey,
+                components: {
+                    virtualScroll: false,
+                    doubleClickCopy: true,
+                    copyToast: true,
+                    columnMenu: { persist: true },
+                    pagination: { pageSizeOptions: [50, 100, 200], defaultPageSize: 100 },
+                    toolbar: true
+                },
+                handsontableOptions: {
+                    mergeCells: mergeCells,
+                    rowHeaders: false,
+                    height: '100%',
+                    rowHeights: function(row) {
+                        return expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                    },
+                    autoRowSize: false,
+                    manualColumnResize: true,
+                    manualRowResize: false,
+                    columnSorting: true,
+                    sortIndicator: true,
+                    filters: false,
+                    dropdownMenu: false
+                }
             });
-
-            // 添加自定义复制事件监听（使用公共函数）
-            setupCustomCopy(hot, container, 9);
         }
 
         async function loadData(oe = '', brand = '', supplier = '') {
@@ -640,8 +566,8 @@
                 container.innerHTML = '<div class="loading-overlay">加载中...</div>';
 
                 // 根据当前数据类型选择接口
-                let url = currentDataType === 'direct' 
-                    ? '/api/purchase_plan/inquiry/direct/list' 
+                let url = currentDataType === 'direct'
+                    ? '/api/purchase_plan/inquiry/direct/list'
                     : '/api/purchase_plan/inquiry/list';
                 const params = new URLSearchParams();
                 if (oe) params.append('oe', oe);
@@ -654,13 +580,14 @@
 
                 if (result.code === 0) {
                     allData = result.data;
-                    currentPage = 1;
                     console.log('数据条数:', allData.length);
-                    
+
                     // 更新标签页上的数量
                     updateTabBadge(currentDataType, allData.length);
-                    
-                    renderCurrentPage();
+
+                    // 格式化数据并计算合并单元格，然后用Builder创建表格
+                    const { formattedData, mergeCells } = formatDataAndMergeCells(allData);
+                    initTableBuilder(formattedData, mergeCells);
                 } else {
                     container.innerHTML = '<div class="loading-overlay">加载失败: ' + result.msg + '</div>';
                 }
@@ -715,6 +642,11 @@
                     gzbbrContainer.style.display = 'none';
                     dataTitle.textContent = activeType === 'normal' ? '询价比价数据' : '直接入库数据';
                     expandedRows.clear();
+                    // 切换标签时销毁旧表格，避免gridKey冲突
+                    if (tableBuilder) {
+                        tableBuilder.destroy();
+                        tableBuilder = null;
+                    }
                     loadData();
                 }
             }
@@ -754,49 +686,7 @@
             }
         }
 
-        // 分页事件监听
-        function initPagination() {
-            document.getElementById('prevBtn').addEventListener('click', () => {
-                if (currentPage > 1) {
-                    currentPage--;
-                    renderCurrentPage();
-                }
-            });
 
-            document.getElementById('nextBtn').addEventListener('click', () => {
-                if (currentPage < totalPages) {
-                    currentPage++;
-                    renderCurrentPage();
-                }
-            });
-
-            document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
-                pageSize = parseInt(e.target.value);
-                currentPage = 1;
-                renderCurrentPage();
-            });
-
-            // 页数跳转功能
-            const pageJumpInput = document.getElementById('pageJumpInput');
-            const pageJumpBtn = document.getElementById('pageJumpBtn');
-
-            pageJumpBtn.addEventListener('click', () => {
-                const targetPage = parseInt(pageJumpInput.value);
-                if (targetPage && targetPage >= 1 && targetPage <= totalPages) {
-                    currentPage = targetPage;
-                    renderCurrentPage();
-                    pageJumpInput.value = '';
-                } else if (targetPage > totalPages) {
-                    alert('页数超出范围，最大页数为 ' + totalPages);
-                }
-            });
-
-            pageJumpInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    pageJumpBtn.click();
-                }
-            });
-        }
 
         // data.gzbbr 失效时间调整相关变量和函数
         let gzbbrHot;
@@ -990,6 +880,7 @@
 
             // 下载模板
             btnDownloadTemplate.addEventListener('click', downloadTemplate);
+            document.getElementById('btnDownloadCompareTemplate').addEventListener('click', downloadCompareTemplate);
 
             // 确认上传
             btnConfirmUpload.addEventListener('click', handleConfirmUpload);
@@ -1020,7 +911,17 @@
 
         // 解析预览数据
         async function parsePreview(file) {
-            const loadingIndex = layui.layer.load(2, { shade: [0.3, '#000'] });
+            const loadingLayer = layui.layer.open({
+                type: 1,
+                title: false,
+                closeBtn: 0,
+                area: '280px',
+                shade: [0.3, '#000'],
+                content: `<div style="padding:25px;text-align:center;">
+                    <div style="margin-bottom:10px;font-size:14px;">正在读取并解析文件...</div>
+                    <div style="font-size:12px;color:#999;">请稍候</div>
+                </div>`
+            });
 
             const formData = new FormData();
             formData.append('file', file);
@@ -1032,7 +933,7 @@
                 });
                 const result = await response.json();
 
-                layui.layer.close(loadingIndex);
+                layui.layer.close(loadingLayer);
 
                 if (result.code !== 0) {
                     layui.layer.msg(result.msg || '解析失败', { icon: 2 });
@@ -1045,6 +946,8 @@
                     return;
                 }
 
+                layui.layer.msg(`共解析 ${previewData.length} 条数据`, { icon: 1 });
+
                 // 显示加价率区域和表格
                 document.getElementById('uploadMarkupSection').style.display = 'block';
                 document.getElementById('previewTableWrapper').style.display = 'block';
@@ -1056,7 +959,7 @@
                 renderPreviewTable();
 
             } catch (error) {
-                layui.layer.close(loadingIndex);
+                layui.layer.close(loadingLayer);
                 layui.layer.msg('解析请求失败: ' + error.message, { icon: 2 });
             }
         }
@@ -1262,9 +1165,19 @@
             return new File([csvContent], 'preview_data.csv', { type: 'text/csv' });
         }
 
-        // 轮询上传任务状态
+        // 轮询上传任务状态（展示处理条数）
         function pollUploadStatus(taskId) {
-            const loadingIndex = layui.layer.load(2, { shade: [0.3, '#000'], content: '任务处理中...' });
+            const progressLayer = layui.layer.open({
+                type: 1,
+                title: false,
+                closeBtn: 0,
+                area: '280px',
+                shade: [0.3, '#000'],
+                content: `<div style="padding:25px;text-align:center;">
+                    <div style="margin-bottom:10px;font-size:14px;">正在处理...</div>
+                    <div id="uploadProgressCount" style="font-size:12px;color:#999;">已处理 0 / ${previewData.length} 条</div>
+                </div>`
+            });
 
             const checkStatus = setInterval(async () => {
                 try {
@@ -1273,18 +1186,24 @@
 
                     if (statusResult.code !== 0) {
                         clearInterval(checkStatus);
-                        layui.layer.close(loadingIndex);
+                        layui.layer.close(progressLayer);
                         layui.layer.msg(statusResult.msg || '查询状态失败', { icon: 2 });
                         return;
                     }
 
                     const status = statusResult.data;
+                    const countEl = document.getElementById('uploadProgressCount');
+                    const current = status.progress || 0;
+                    const total = status.total || previewData.length;
+                    if (countEl) {
+                        countEl.innerText = `已处理 ${current} / ${total} 条`;
+                    }
 
                     if (status.status === 'running') {
-                        // 继续显示加载
+                        // 继续轮询
                     } else if (status.status === 'completed') {
                         clearInterval(checkStatus);
-                        layui.layer.close(loadingIndex);
+                        layui.layer.close(progressLayer);
 
                         // 将每行上传结果回显到预览表格
                         const rowResults = (status.result_data || {});
@@ -1301,12 +1220,12 @@
                         layui.layer.msg(`处理完成：成功 ${successCount} 条，失败/跳过 ${failCount} 条`, { icon: 1 });
                     } else if (status.status === 'failed') {
                         clearInterval(checkStatus);
-                        layui.layer.close(loadingIndex);
+                        layui.layer.close(progressLayer);
                         layui.layer.msg(status.error || '处理失败', { icon: 2 });
                     }
                 } catch (error) {
                     clearInterval(checkStatus);
-                    layui.layer.close(loadingIndex);
+                    layui.layer.close(progressLayer);
                     layui.layer.msg('查询状态失败: ' + error.message, { icon: 2 });
                 }
             }, 2000);
@@ -1328,6 +1247,33 @@
 
         // 采购历史比对（独立流程）
         async function handleCompareOnly(file) {
+            let progressLayer = null;
+
+            function showProgress(total) {
+                progressLayer = layui.layer.open({
+                    type: 1,
+                    title: false,
+                    closeBtn: 0,
+                    area: '280px',
+                    shade: [0.3, '#000'],
+                    content: `<div style="padding:25px;text-align:center;">
+                        <div style="margin-bottom:10px;font-size:14px;">正在比对采购历史...</div>
+                        <div style="font-size:12px;color:#999;" id="compareProgressText">共 ${total} 条 OE，准备中...</div>
+                    </div>`
+                });
+            }
+
+            function updateProgress(current, total, message) {
+                // 保持原有提示文本不变，仅用于轮询状态判断
+            }
+
+            function stopProgress() {
+                if (progressLayer !== null) {
+                    layui.layer.close(progressLayer);
+                    progressLayer = null;
+                }
+            }
+
             const loadingIndex = layui.layer.load(2, { shade: [0.3, '#000'] });
 
             try {
@@ -1356,35 +1302,65 @@
                 const items = oeList.map(item => ({
                     oe: item.oe,
                     brand: item.brand || '',
-                    price: item.price || ''
+                    price: item.price || '',
+                    brand_code: item.brand_code || ''
                 }));
 
-                const compareRes = await fetch('/api/purchase_plan/purchase_history_compare/export', {
+                layui.layer.close(loadingIndex);
+                showProgress(items.length);
+
+                // 提交异步任务
+                const submitRes = await fetch('/api/purchase_plan/purchase_history_compare/export_async', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({items: items})
                 });
-
-                layui.layer.close(loadingIndex);
-
-                if (compareRes.ok) {
-                    const blob = await compareRes.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'purchase_history_compare.xlsx';
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-
-                    layui.layer.msg('比对结果已生成', { icon: 1 });
-                } else {
-                    const errorResult = await compareRes.json();
-                    layui.layer.msg(errorResult.msg || '生成失败', { icon: 2 });
+                const submitResult = await submitRes.json();
+                if (submitResult.code !== 0) {
+                    stopProgress();
+                    layui.layer.msg(submitResult.msg || '提交失败', { icon: 2 });
+                    return;
                 }
+                const taskId = submitResult.data.task_id;
+
+                // 轮询任务进度
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch(`/api/purchase_plan/purchase_history_compare/export_status/${taskId}`);
+                        const statusResult = await statusRes.json();
+                        if (statusResult.code !== 0) {
+                            clearInterval(pollInterval);
+                            stopProgress();
+                            layui.layer.msg(statusResult.msg || '查询进度失败', { icon: 2 });
+                            return;
+                        }
+                        const task = statusResult.data;
+                        updateProgress(task.progress || 0, task.total || 100, task.message);
+
+                        if (task.status === 'completed') {
+                            clearInterval(pollInterval);
+                            stopProgress();
+                            const a = document.createElement('a');
+                            a.href = `/api/purchase_plan/purchase_history_compare/export_download/${taskId}`;
+                            a.download = 'purchase_history_compare.xlsx';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            layui.layer.msg('比对结果已生成', { icon: 1 });
+                        } else if (task.status === 'failed') {
+                            clearInterval(pollInterval);
+                            stopProgress();
+                            layui.layer.msg(task.message || '生成失败', { icon: 2 });
+                        }
+                    } catch (err) {
+                        clearInterval(pollInterval);
+                        stopProgress();
+                        layui.layer.msg('轮询进度失败: ' + err.message, { icon: 2 });
+                    }
+                }, 1000);
 
             } catch (error) {
+                stopProgress();
                 layui.layer.close(loadingIndex);
                 layui.layer.msg('处理失败: ' + error.message, { icon: 2 });
             }
@@ -1394,11 +1370,21 @@
             currentUploadMode = null;
         }
 
-        // 下载模板
+        // 下载询价模板
         function downloadTemplate() {
             const link = document.createElement('a');
             link.href = "{{ url_for('static', filename='excel/virtual_inventory.xlsx') }}";
             link.download = 'inquiry_template.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 下载采购历史比对模板
+        function downloadCompareTemplate() {
+            const link = document.createElement('a');
+            link.href = "{{ url_for('static', filename='excel/OE_Brand_Price_brandcode.xlsx') }}";
+            link.download = 'OE_Brand_Price_brandcode.xlsx';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1431,7 +1417,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             initUpload();
             initSearch();
-            initPagination();
             initTabs();
             initGzbbrTab();
             if (currentDataType !== 'upload') {

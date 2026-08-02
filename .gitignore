@@ -59,6 +59,7 @@ docker/logs/
 # Custom
 1.txt
 
+scripts/
 /demo
 /excel
 /sql
