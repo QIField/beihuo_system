@@ -324,25 +324,36 @@ class ProcurementCompareService:
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 brand_placeholders = ', '.join(['%s'] * len(match_brands))
-                # 先按 oe 或 replace_number 包含 oe 模糊查询，再在Python中精确校验
+                # 复合匹配：OE 长度 > 5 用包含匹配，≤ 5 用精确匹配
+                if len(oe) > 5:
+                    oe_condition = "oe LIKE %s"
+                    oe_param = f"%{oe}%"
+                else:
+                    oe_condition = "oe = %s"
+                    oe_param = oe
                 sql = f"""
                     SELECT oe, brand, product_name, l_model_zh, replace_number, frey_no, vehicle_brand
                     FROM crmapp_compare_summary
                     WHERE company = %s
-                      AND (oe = %s OR replace_number LIKE %s)
+                      AND ({oe_condition} OR replace_number LIKE %s)
                       AND brand IN ({brand_placeholders})
                 """
-                params = [company, oe, f"%{oe}%"]
+                params = [company, oe_param, f"%{oe}%"]
                 params.extend(match_brands)
                 cursor.execute(sql, params)
                 rows = cursor.fetchall()
 
-                # 精确过滤：oe 完全匹配 或 replace_number 中包含 search_oe
+                # 精确过滤：oe 匹配或 replace_number 中包含 search_oe
                 result = []
                 for row in rows:
                     row_oe = row.get('oe') or ''
                     row_replace = row.get('replace_number') or ''
-                    if row_oe == oe or ProcurementCompareService._oe_in_replace_number(oe, row_replace):
+                    # 复合匹配：OE 长度 > 5 用包含匹配，≤ 5 用精确匹配
+                    if len(oe) > 5:
+                        oe_matched = oe in row_oe
+                    else:
+                        oe_matched = row_oe == oe
+                    if oe_matched or ProcurementCompareService._oe_in_replace_number(oe, row_replace):
                         result.append(row)
                 return result
         finally:
@@ -852,12 +863,21 @@ class ProcurementCompareService:
         conn = get_db_connection()
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                conditions = [f"oe IN ({', '.join(['%s'] * len(all_oes))})"]
-                params = list(all_oes)
+                oe_conditions = []
+                replace_conditions = []
+                params = []
 
                 for oe in all_oes:
-                    conditions.append("replace_number LIKE %s")
+                    if len(oe) > 5:
+                        oe_conditions.append("oe LIKE %s")
+                        params.append(f"%{oe}%")
+                    else:
+                        oe_conditions.append("oe = %s")
+                        params.append(oe)
+                    replace_conditions.append("replace_number LIKE %s")
                     params.append(f"%{oe}%")
+
+                conditions = oe_conditions + replace_conditions
 
                 brand_placeholders = ', '.join(['%s'] * len(all_brands))
                 params.extend(list(all_brands))
@@ -882,7 +902,12 @@ class ProcurementCompareService:
                     for search_oe, match_brands in oe_brand_map.items():
                         if row_brand not in match_brands:
                             continue
-                        if row_oe == search_oe or ProcurementCompareService._oe_in_replace_number(search_oe, row_replace):
+                        # 复合匹配：OE 长度 > 5 用包含匹配，≤ 5 用精确匹配
+                        if len(search_oe) > 5:
+                            oe_matched = search_oe in row_oe
+                        else:
+                            oe_matched = row_oe == search_oe
+                        if oe_matched or ProcurementCompareService._oe_in_replace_number(search_oe, row_replace):
                             result[search_oe].append(dict(row))
                             break
                 return result

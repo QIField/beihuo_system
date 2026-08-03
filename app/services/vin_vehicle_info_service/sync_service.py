@@ -81,18 +81,83 @@ def _fetch_pending_records(cursor, limit=50):
     return cursor.fetchall()
 
 
+def _fetch_crm_inquiry_records(cursor):
+    """从 crmapp_ks_inquiry_detail 提取近两天 engine 或 chassis 为空的记录"""
+    sql = """
+        SELECT DISTINCT vin, engine, chassis
+        FROM crmapp_ks_inquiry_detail
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
+          AND vin IS NOT NULL AND vin != ''
+          AND (engine IS NULL OR engine = '' OR chassis IS NULL OR chassis = '')
+    """
+    cursor.execute(sql)
+    return cursor.fetchall()
+
+
+def _fetch_qpl_quote_records(cursor):
+    """从 qpl_quote_record 提取近两天内的 vin_code"""
+    sql = """
+        SELECT DISTINCT vin_code
+        FROM qpl_quote_record
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
+          AND vin_code IS NOT NULL AND vin_code != ''
+    """
+    cursor.execute(sql)
+    return cursor.fetchall()
+
+
+def _merge_into_vin_vehicle_info(cursor, crm_records, qpl_records):
+    """将数据整合到 vin_vehicle_info，利用唯一索引 uk_vin_code 去重"""
+    vin_map = {}
+    for row in crm_records:
+        vin = row['vin']
+        engine = row.get('engine') or None
+        chassis = row.get('chassis') or None
+        vin_map[vin] = (vin, engine, chassis)
+
+    for row in qpl_records:
+        vin = row['vin_code']
+        if vin not in vin_map:
+            vin_map[vin] = (vin, None, None)
+
+    if not vin_map:
+        return 0
+
+    values = list(vin_map.values())
+    sql = "INSERT IGNORE INTO vin_vehicle_info (vin_code, engine, chassis) VALUES (%s, %s, %s)"
+    cursor.executemany(sql, values)
+    return cursor.rowcount
+
+
 def run_vin_vehicle_info_sync(limit=50):
     """
     执行 VIN 车辆信息补全
 
-    :param limit: 最多处理条数，默认 50
+    流程：
+      1. 从 crmapp_ks_inquiry_detail 和 qpl_quote_record 提取近两天数据
+      2. 整合写入 vin_vehicle_info（利用 uk_vin_code 去重）
+      3. 对 engine/chassis 为空的记录执行爬虫补全
+
+    :param limit: 爬虫最多处理条数，默认 50
     :return: dict 统计信息
     """
     client = VinVehicleInfoApiClient()
-    stats = {'total': 0, 'updated': 0}
+    stats = {'total': 0, 'updated': 0, 'merged': 0}
 
     try:
         with db_cursor(dict_cursor=True) as cursor:
+            # Step 1: 数据提取与整合
+            logger.info("[VIN整合] 开始从数据源提取数据...")
+            crm_records = _fetch_crm_inquiry_records(cursor)
+            qpl_records = _fetch_qpl_quote_records(cursor)
+
+            merged_count = _merge_into_vin_vehicle_info(cursor, crm_records, qpl_records)
+            stats['merged'] = merged_count
+            logger.info(
+                f"[VIN整合] CRM={len(crm_records)}条, QPL={len(qpl_records)}条, 新增={merged_count}条"
+            )
+
+            # Step 2: 爬虫更新
             records = _fetch_pending_records(cursor, limit)
 
             for record in records:
@@ -101,6 +166,9 @@ def run_vin_vehicle_info_sync(limit=50):
                 vin_code = record['vin_code']
 
                 html = client.fetch_catalog_html(vin_code)
+                if html is None:
+                    logger.warning(f"[VIN补全] 获取HTML失败，跳过: {vin_code}")
+                    continue
                 parsed = parse_catalog_html(html)
 
                 sql, params = _build_update_sql(record_id, parsed)
@@ -113,5 +181,5 @@ def run_vin_vehicle_info_sync(limit=50):
     finally:
         client.close()
 
-    logger.info(f"[VIN补全完成] 处理={stats['total']} 更新={stats['updated']}")
+    logger.info(f"[VIN补全完成] 整合={stats['merged']} 处理={stats['total']} 更新={stats['updated']}")
     return stats

@@ -6,7 +6,11 @@ VIN 车辆信息 API 客户端
 封装开思 mall 爬虫，获取 catalog HTML
 """
 
+import logging
+
 from app.scripts.spiders.spider_entities.cassmall import CassmallSpider
+
+logger = logging.getLogger('vin_vehicle_info_sync')
 
 
 class VinVehicleInfoApiClient:
@@ -20,9 +24,12 @@ class VinVehicleInfoApiClient:
         根据 VIN 码抓取 catalog 页面 HTML
 
         :param vin_code: VIN 码
-        :return: HTML 字符串
+        :return: HTML 字符串，失败返回 None
         """
         response = self.spider.get_maindata_catalog(vin_code)
+        if response is None:
+            logger.warning(f"[VIN API] 请求无响应，跳过: {vin_code}")
+            return None
         response.raise_for_status()
         return response.text
 

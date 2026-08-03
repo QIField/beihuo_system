@@ -201,6 +201,19 @@ def start():
 
     df.loc[df['库存'] > 30, '库存'] = 30
 
+    # 库存为1的记录统一更新为12（原始数据表已在此之前保存，不受影响）
+    stock_eq_1_count = int((df['库存'] == 1).sum())
+    if stock_eq_1_count > 0:
+        df.loc[df['库存'] == 1, '库存'] = 12
+        logger.info(f"[昌盛库存] 库存为1的记录 {stock_eq_1_count} 条，已更新为12")
+    else:
+        logger.info("[昌盛库存] 无库存为1的记录，跳过更新")
+
+    # 验证：确认库存为1的记录已清零，且更新数量正确
+    remaining_eq_1 = int((df['库存'] == 1).sum())
+    updated_eq_12 = int((df['库存'] == 12).sum())
+    logger.info(f"[昌盛库存] 验证结果：库存为1剩余 {remaining_eq_1} 条，库存为12共 {updated_eq_12} 条")
+
     return df
 
 

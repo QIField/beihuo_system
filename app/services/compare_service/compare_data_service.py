@@ -383,8 +383,13 @@ class CompareDataService:
             if oe_list:
                 or_conditions = []
                 for item in oe_list:
-                    or_conditions.append("oe LIKE %s")
-                    params.append(f"%{item}%")
+                    # 复合匹配：OE 长度 > 5 用包含匹配，≤ 5 用精确匹配
+                    if len(item) > 5:
+                        or_conditions.append("oe LIKE %s")
+                        params.append(f"%{item}%")
+                    else:
+                        or_conditions.append("oe = %s")
+                        params.append(item)
                 where_conditions.append("(" + " OR ".join(or_conditions) + ")")
 
             if brand_list:

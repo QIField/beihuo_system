@@ -3,7 +3,7 @@
 
 """
 VIN 车辆信息补全定时任务
-每天 9:00 执行，每次最多补全 50 条
+每天 23:00 执行，先整合数据源再爬虫补全，每次最多补全 50 条
 """
 
 import logging
@@ -31,8 +31,8 @@ def register_vin_vehicle_info_sync_tasks(task_manager):
         vin_vehicle_info_sync_task,
         'cron',
         TASK_ID,
-        hour=9,
+        hour=23,
         minute=0,
         replace_existing=True
     )
-    logger.info("[VIN车辆信息补全] 定时任务已注册（每天9:00，最多50条）")
+    logger.info("[VIN车辆信息补全] 定时任务已注册（每天23:00，先整合再补全，最多50条）")

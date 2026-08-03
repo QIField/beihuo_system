@@ -116,6 +116,7 @@ class PurchaseHistoryExcelWriter:
             cell.alignment = HEADER_ALIGN
             cell.border = HEADER_BORDER
         self.ws.row_dimensions[1].height = HEADER_HEIGHT
+        self.ws.freeze_panes = "A2"
 
     def write_compare_results(self, results: List[OECompareResult], start_row: int = 2):
         """
@@ -159,6 +160,13 @@ class PurchaseHistoryExcelWriter:
 
         self._merge_group_cells(group_row_ranges)
         self._apply_alternating_fill(start_row, current_row - 1)
+
+        # 添加自动筛选（表头+数据范围）
+        from openpyxl.utils import get_column_letter
+        last_col = get_column_letter(len(_COLUMN_SPECS))
+        last_row = current_row - 1 if current_row > start_row else 1
+        self.ws.auto_filter.ref = f"A1:{last_col}{last_row}"
+
         print(f"[Excel写入] 步骤3-样式处理完成")
 
     def _normalize_group_tags(self, results: List[OECompareResult]):
