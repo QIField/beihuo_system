@@ -326,7 +326,7 @@ class ProcurementCompareService:
                 brand_placeholders = ', '.join(['%s'] * len(match_brands))
                 # 先按 oe 或 replace_number 包含 oe 模糊查询，再在Python中精确校验
                 sql = f"""
-                    SELECT oe, brand, product_name, l_model_zh, replace_number, frey_no
+                    SELECT oe, brand, product_name, l_model_zh, replace_number, frey_no, vehicle_brand
                     FROM crmapp_compare_summary
                     WHERE company = %s
                       AND (oe = %s OR replace_number LIKE %s)
@@ -592,7 +592,9 @@ class ProcurementCompareService:
         price_4s_sale: Optional[float],
         beihuo_data: Dict,
         replace_stock_text: Optional[str],
-        price: Optional[float] = None
+        price: Optional[float] = None,
+        search_brand: Optional[str] = None,
+        brand_code: Optional[str] = None
     ) -> OECompareResult:
         """
         根据已有数据构建 OECompareResult
@@ -625,7 +627,9 @@ class ProcurementCompareService:
                 sales_7d=beihuo_data.get('sales_7d'),
                 sales_month=beihuo_data.get('sales_month'),
                 sales_6m=beihuo_data.get('sales_6m'),
-                sales_12m=beihuo_data.get('sales_12m')
+                sales_12m=beihuo_data.get('sales_12m'),
+                search_brand=search_brand,
+                brand_code=brand_code
             )
 
         month_summaries = ProcurementCompareService.aggregate_by_month(records)
@@ -667,12 +671,15 @@ class ProcurementCompareService:
             sales_7d=beihuo_data.get('sales_7d'),
             sales_month=beihuo_data.get('sales_month'),
             sales_6m=beihuo_data.get('sales_6m'),
-            sales_12m=beihuo_data.get('sales_12m')
+            sales_12m=beihuo_data.get('sales_12m'),
+            search_brand=search_brand,
+            brand_code=brand_code
         )
     
     @staticmethod
     def generate_compare_result(
-        search_oe: str, brand: str, company: str, price: Optional[float] = None
+        search_oe: str, brand: str, company: str, price: Optional[float] = None,
+        search_brand: Optional[str] = None, brand_code: Optional[str] = None
     ) -> List[OECompareResult]:
         """
         生成单个OE的比对结果列表
@@ -754,7 +761,9 @@ class ProcurementCompareService:
                 price_4s_sale=price_4s_sale,
                 beihuo_data=beihuo_data,
                 replace_stock_text=row_replace_stock_text,
-                price=price
+                price=price,
+                search_brand=search_brand,
+                brand_code=brand_code
             )
             results.append(result)
 
@@ -854,7 +863,7 @@ class ProcurementCompareService:
                 params.extend(list(all_brands))
 
                 sql = f"""
-                    SELECT oe, brand, product_name, l_model_zh, replace_number, frey_no
+                    SELECT oe, brand, product_name, l_model_zh, replace_number, frey_no, vehicle_brand
                     FROM crmapp_compare_summary
                     WHERE company = %s
                       AND ({' OR '.join(conditions)})
@@ -1158,7 +1167,9 @@ class ProcurementCompareService:
                     price_4s_sale=price_4s_sale,
                     beihuo_data=ProcurementCompareService._empty_beihuo_data(),
                     replace_stock_text=None,
-                    price=price
+                    price=price,
+                    search_brand=brand,
+                    brand_code=brand_code
                 )
                 groups.append((display_label, [result]))
                 total_result_rows += 1
@@ -1208,7 +1219,9 @@ class ProcurementCompareService:
                     price_4s_sale=price_4s_sale,
                     beihuo_data=beihuo_data,
                     replace_stock_text=row_replace_stock_text,
-                    price=price
+                    price=price,
+                    search_brand=brand,
+                    brand_code=brand_code
                 )
                 results.append(result)
 

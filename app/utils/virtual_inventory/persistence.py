@@ -221,6 +221,18 @@ CHANGSHENG_RAW_COLUMNS = [
 ]
 
 
+def _clean_oe(oe_str):
+    """清洗OE码：去空格 → 去掉末尾非数字字符 → 12/13位末尾01-09去除"""
+    if oe_str is None:
+        return None
+    oe_str = str(oe_str).replace(' ', '')
+    while oe_str and not oe_str[-1].isdigit():
+        oe_str = oe_str[:-1]
+    if oe_str and len(oe_str) in (12, 13) and oe_str[-2:] in ('01', '02', '03', '04', '05', '06', '07', '08', '09'):
+        oe_str = oe_str[:-2]
+    return oe_str or None
+
+
 def _ensure_changsheng_raw_table(db_manager):
     """确保昌盛原始数据表存在"""
     columns_def = ",\n        ".join([f"{db_col} {db_type}" for api_col, db_type, db_col in
@@ -229,10 +241,12 @@ def _ensure_changsheng_raw_table(db_manager):
         CREATE TABLE IF NOT EXISTS changsheng_raw_inventory (
             id INT AUTO_INCREMENT PRIMARY KEY,
             {columns_def},
+            `清洗后的oe` VARCHAR(100) COMMENT 'part_number经去空格+去除末尾非数字字符后的标准化OE码',
             fetch_time DATETIME NOT NULL,
             INDEX idx_fetch_time (fetch_time),
             INDEX idx_oe_number (oe_number),
-            INDEX idx_part_number (part_number)
+            INDEX idx_part_number (part_number),
+            INDEX idx_cleaned_oe (`清洗后的oe`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """
     db_manager.execute_update(create_sql)
@@ -255,8 +269,8 @@ def save_changsheng_raw_data(df):
 
         # 准备数据
         api_columns = [c[0] for c in CHANGSHENG_RAW_COLUMNS]
-        columns_str = ", ".join(api_columns + ['fetch_time'])
-        placeholders = ", ".join(["%s"] * (len(api_columns) + 1))
+        columns_str = ", ".join(api_columns + ['`清洗后的oe`', 'fetch_time'])
+        placeholders = ", ".join(["%s"] * (len(api_columns) + 2))
 
         data = []
         for _, row in df.iterrows():
@@ -268,6 +282,9 @@ def save_changsheng_raw_data(df):
                     import json
                     val = json.dumps(val, ensure_ascii=False) if not isinstance(val, str) else val
                 row_data.append(val)
+            # 清洗后的OE码
+            cleaned_oe = _clean_oe(row.get('part_number'))
+            row_data.append(cleaned_oe)
             row_data.append(fetch_time)
             data.append(tuple(row_data))
 

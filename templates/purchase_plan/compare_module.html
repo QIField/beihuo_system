@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>比价模块 - 采购计划</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='js/handsontable/handsontable.full.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/purchase_plan/common.css') }}">
     <script src="{{ url_for('static', filename='js/handsontable/handsontable.full.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/purchase_plan/common.js') }}"></script>
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <style>
         /* 自定义浮窗样式 - 左右分栏布局 */
         .price-tooltip {
@@ -317,7 +319,7 @@
                 <button class="btn btn-primary" id="exportExcelBtn">导出Excel</button>
                 <button class="btn btn-default" id="exportCsvBtn">导出CSV</button>
                 -->
-                <a class="btn btn-default" href="{{ url_for('static', filename='excel/OE_Brand.xlsx') }}" download>下载模板</a>
+                <a class="btn btn-default" href="{{ url_for('static', filename='excel/OE_Brand_Price_brandcode.xlsx') }}" download>下载模板</a>
                 <button class="btn btn-default" id="importBtn">导入文件</button>
                 <input type="file" id="importFileInput" accept=".xlsx,.xls" style="display: none;">
             </div>
@@ -1594,8 +1596,7 @@
                 return;
             }
 
-            // const container = document.getElementById('handsontable-container');
-            // container.innerHTML = '<div class="loading-overlay">导入查询中...</div>';
+            const loadingIndex = layui.layer.load(2, { shade: [0.3, '#000'] });
 
             const formData = new FormData();
             formData.append('file', file);
@@ -1607,9 +1608,10 @@
                 });
                 const result = await response.json();
 
+                layui.layer.close(loadingIndex);
+
                 if (result.code !== 0) {
-                    alert(result.msg || '导入查询失败');
-                    // loadData();
+                    layui.layer.msg(result.msg || '导入查询失败', { icon: 2 });
                     return;
                 }
 
@@ -1633,7 +1635,7 @@
                 // ==============================================================
 
                 // 新逻辑：刷新导入日志，提示用户下载
-                alert(`导入完成：${result.file_name}\n导入 ${result.import_count} 条，匹配 ${result.match_count} 条`);
+                layui.layer.msg(`导入完成：${result.file_name}<br>导入 ${result.import_count} 条，匹配 ${result.match_count} 条`, { icon: 1 });
                 await loadImportLogs();
 
                 if (result.download_url) {
@@ -1643,8 +1645,9 @@
                 // 恢复表格为当前数据（加载动画覆盖了容器，需要重新渲染）
                 // renderCurrentPage();
             } catch (error) {
+                layui.layer.close(loadingIndex);
                 console.error('导入查询失败:', error);
-                alert('导入查询失败: ' + error.message);
+                layui.layer.msg('导入查询失败: ' + error.message, { icon: 2 });
                 // loadData();
             } finally {
                 document.getElementById('importFileInput').value = '';

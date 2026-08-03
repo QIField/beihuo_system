@@ -156,6 +156,16 @@ def remove_trailing_non_digit(oe_str):
     return oe_str
 
 
+def remove_trailing_sequence(oe_str):
+    """12/13位编码去除末尾01-09"""
+    if pd.isna(oe_str):
+        return oe_str
+    oe_str = str(oe_str)
+    if len(oe_str) in (12, 13) and oe_str[-2:] in ('01', '02', '03', '04', '05', '06', '07', '08', '09'):
+        return oe_str[:-2]
+    return oe_str
+
+
 def start():
     """
     广州昌盛库存数据
@@ -169,9 +179,10 @@ def start():
 
     df['stock_amount'] = df['stock_amount'].astype(int)
     df['供应商名称'] = '广州昌盛'
-    # OE码处理：去空格 → 去掉末尾非数字
+    # OE码处理：去空格 → 去掉末尾非数字 → 12/13位末尾01-09去除
     df['原厂OE码'] = df['part_number'].str.replace(' ', '')
     df['原厂OE码'] = df['原厂OE码'].apply(remove_trailing_non_digit)
+    df['原厂OE码'] = df['原厂OE码'].apply(remove_trailing_sequence)
     df['品牌'] = df['brand_name']
     df['价格'] = df['sale_price']
     tomorrow_ts = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")

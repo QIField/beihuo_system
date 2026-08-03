@@ -396,7 +396,6 @@ def external_data_crawler(oe, cookie=None, is_unit=True):
     :raises ParameterError: cookie 为空且配置中也没有设置时抛出
     :raises:              子接口可能抛出的所有异常（ParameterError / CrawlerError / DataError 等）
     """
-
     if not cookie or not str(cookie).strip():
         config = get_config_value('bmw_car_parts_libray')
         if config and isinstance(config, dict):
@@ -406,9 +405,6 @@ def external_data_crawler(oe, cookie=None, is_unit=True):
 
     stock = query_part_stock(oe, cookie)
     detail = query_part_detail(oe, cookie, is_unit=is_unit)
-
-
-
 
     return {
         'stock': stock,

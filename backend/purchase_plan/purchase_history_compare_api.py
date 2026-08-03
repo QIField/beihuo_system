@@ -84,12 +84,11 @@ def export_compare_excel():
             return jsonify({'code': 1, 'msg': '没有查询到采购历史数据'}), 404
         
         # 生成Excel文件
-        template_path = 'static/excel/compare_price.xlsx'
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         output_filename = f'purchase_history_compare_{timestamp}.xlsx'
         output_path = os.path.join(tempfile.gettempdir(), output_filename)
 
-        PurchaseHistoryExcelWriter.generate_excel(results, template_path, output_path)
+        PurchaseHistoryExcelWriter.generate_excel(results, output_path)
 
         # 返回文件
         return send_file(
@@ -115,12 +114,11 @@ def _async_generate_excel(items, company, progress_callback=None):
     if not results:
         raise ValueError('没有查询到采购历史数据')
 
-    template_path = 'static/excel/compare_price.xlsx'
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     output_filename = f'purchase_history_compare_{timestamp}.xlsx'
     output_path = os.path.join(tempfile.gettempdir(), output_filename)
 
-    PurchaseHistoryExcelWriter.generate_excel(results, template_path, output_path)
+    PurchaseHistoryExcelWriter.generate_excel(results, output_path)
     return output_path
 
 
