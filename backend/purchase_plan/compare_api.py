@@ -339,292 +339,12 @@ def export_compare_data():
         return jsonify({'code': 1, 'msg': f'导出失败: {str(e)}'}), 500
 
 
-def _build_procurement_map(data: list, company: str) -> dict:
-    """
-    批量查询采购历史，按 (oe, brand) 分组
-    """
-    procurement_map = {}
-    if not data or not company:
-        return procurement_map
-
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            placeholders = ', '.join(['(%s, %s)'] * len(data))
-            params = []
-            for item in data:
-                params.append(item.get('oe', ''))
-                params.append(item.get('brand', ''))
-
-            sql = f"""
-                SELECT oe, brand, supplier_name, unit_price, purchase_date
-                FROM crmapp_procurement_history t1
-                WHERE company = %s
-                AND (oe, brand) IN ({placeholders})
-                AND purchase_date >= '2024-01-01'
-                AND purchase_date <= '2026-12-31'
-                AND unit_price = (
-                    SELECT MIN(unit_price)
-                    FROM crmapp_procurement_history t2
-                    WHERE t2.oe = t1.oe
-                    AND t2.brand = t1.brand
-                    AND t2.company = t1.company
-                    AND DATE_FORMAT(t2.purchase_date, '%Y-%m') = DATE_FORMAT(t1.purchase_date, '%Y-%m')
-                )
-                ORDER BY purchase_date DESC
-            """
-            params.insert(0, company)
-            cursor.execute(sql, params)
-            rows = cursor.fetchall()
-            for row in rows:
-                key = (row[0], row[1])
-                if key not in procurement_map:
-                    procurement_map[key] = []
-                procurement_map[key].append({
-                    'supplier_name': row[2],
-                    'purchase_price': float(row[3]) if row[3] else 0.0,
-                    'purchase_date': row[4].strftime('%Y-%m-%d') if hasattr(row[4], 'strftime') else str(row[4])
-                })
-    except Exception as e:
-        print(f"查询采购记录失败: {e}")
-    finally:
-        conn.close()
-
-    return procurement_map
-
-
-def _build_beihuo_map(data: list, company: str) -> dict:
-    """
-    根据 frey_no 批量查询 crmapp_beihuo 销量数据
-    返回: {frey_no: {today_sales, yesterday_sales, month_sales, sales_7d, sales_6m, sales_12m}}
-    """
-    beihuo_map = {}
-    if not data or not company:
-        return beihuo_map
-
-    # 收集所有非空 frey_no
-    frey_nos = []
-    for item in data:
-        fn = item.get('frey_no', '')
-        if fn and fn not in frey_nos:
-            frey_nos.append(fn)
-
-    if not frey_nos:
-        print("[DEBUG] 没有 frey_no 可供匹配 crmapp_beihuo")
-        return beihuo_map
-
-    print(f"[DEBUG] 准备用 {len(frey_nos)} 个 frey_no 查询 crmapp_beihuo")
-
-    try:
-        conn = get_db_connection()
-        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # 分批查询，避免 SQL 过长
-            batch_size = 500
-            for i in range(0, len(frey_nos), batch_size):
-                batch = frey_nos[i:i + batch_size]
-                placeholders = ', '.join(['%s'] * len(batch))
-                sql = f"""
-                    SELECT `物料条码`, `今日销量`, `昨日销量`, `本月销量`,
-                           `近7天销量`, `近6个月销量`, `近12个月销量`
-                    FROM crmapp_beihuo
-                    WHERE company = %s AND `物料条码` IN ({placeholders})
-                """
-                params = [company] + batch
-                cursor.execute(sql, params)
-                rows = cursor.fetchall()
-                print(f"[DEBUG] crmapp_beihuo 查询到 {len(rows)} 条记录")
-                for row in rows:
-                    barcode = row.get('物料条码', '')
-                    if barcode:
-                        beihuo_map[barcode] = {
-                            'today_sales': row.get('今日销量', 0),
-                            'yesterday_sales': row.get('昨日销量', 0),
-                            'month_sales': row.get('本月销量', 0),
-                            'sales_7d': row.get('近7天销量', 0),
-                            'sales_6m': row.get('近6个月销量', 0),
-                            'sales_12m': row.get('近12个月销量', 0),
-                        }
-    except Exception as e:
-        print(f"[DEBUG] 查询 crmapp_beihuo 失败: {e}")
-    finally:
-        conn.close()
-
-    return beihuo_map
-
-
-def _format_export_row(idx: int, item: dict, procurement_map: dict, beihuo_map: dict) -> dict:
-    """
-    格式化单行导出数据
-    """
-    procurement_records_str = ''
-    key = (item.get('oe', ''), item.get('brand', ''))
-    if key in procurement_map and procurement_map[key]:
-        records = procurement_map[key]
-        monthly_records = {}
-        for record in records:
-            date = record.get('purchase_date', '')
-            if date:
-                year_month = date[:7]
-                if year_month not in monthly_records:
-                    monthly_records[year_month] = record
-        sorted_months = sorted(monthly_records.keys(), reverse=True)
-        lines = []
-        for year_month in sorted_months:
-            record = monthly_records[year_month]
-            supplier = record.get('supplier_name', '')
-            price = record.get('purchase_price', '')
-            if supplier:
-                lines.append(f"{year_month} {supplier}: ¥{price}")
-        procurement_records_str = '\n'.join(lines)
-
-    def format_price(value):
-        if value is None or value == '' or value == 0:
-            return ''
-        try:
-            return float(value)
-        except:
-            return value
-
-    def format_number(value):
-        if value is None or value == '' or value == 0:
-            return ''
-        try:
-            return int(float(value))
-        except:
-            return value
-
-    # 优先使用 crmapp_beihuo 的销量数据
-    frey_no = item.get('frey_no', '')
-    if frey_no and frey_no in beihuo_map:
-        bh = beihuo_map[frey_no]
-        today_sales = bh.get('today_sales', 0)
-        yesterday_sales = bh.get('yesterday_sales', 0)
-        month_sales = bh.get('month_sales', 0)
-        sales_7d = bh.get('sales_7d', 0)
-        sales_6m = bh.get('sales_6m', 0)
-        sales_12m = bh.get('sales_12m', 0)
-        print(f"[DEBUG] 使用 crmapp_beihuo 销量: frey_no={frey_no}, "
-              f"today={today_sales}, yesterday={yesterday_sales}, "
-              f"7d={sales_7d}, month={month_sales}, 6m={sales_6m}, 12m={sales_12m}")
-    else:
-        today_sales = item.get('today_sales', 0)
-        yesterday_sales = item.get('yesterday_sales', 0)
-        month_sales = item.get('month_sales', 0)
-        sales_7d = item.get('sales_7d', 0)
-        sales_6m = item.get('sales_6m', 0)
-        sales_12m = item.get('sales_12m', 0)
-        print(f"[DEBUG] 未匹配到 crmapp_beihuo, frey_no={frey_no}, 使用 compare_summary 销量")
-
-    return {
-        '行号': idx,
-        'OE': item.get('oe', ''),
-        '品牌': item.get('brand', ''),
-        '产品名称': item.get('product_name', ''),
-        '车辆品牌': item.get('vehicle_brand', ''),
-        '替换号': item.get('replace_number', ''),
-        '产品等级': item.get('product_level', ''),
-        '供应商价格': format_price(item.get('supplier_price')),
-        '最高价': format_price(item.get('max_price')),
-        '最低价': format_price(item.get('min_price')),
-        '4S含税进价': format_price(item.get('dealer_purchase_price')),
-        '4S含税售价': format_price(item.get('dealer_sale_price')),
-        '更新价格时间': item.get('price_update_time', ''),
-        '今日销量': format_number(today_sales),
-        '昨日销量': format_number(yesterday_sales),
-        '近7天销量': format_number(sales_7d),
-        '本月销量': format_number(month_sales),
-        '近6个月总销量': format_number(sales_6m),
-        '近12个月总销量': format_number(sales_12m),
-        '系统产品备注': item.get('product_remark', ''),
-        '品牌编码': item.get('brand_code', '')
-    }
-
-
-def generate_import_result_excel(data: list, company: str, original_filename: str) -> str:
-    """
-    生成比价导入结果Excel文件
-    供应商价格列会添加历史采购价批注
-    返回生成的文件路径
-    """
-    if not data:
-        raise ValueError("没有数据可导出")
-
-    from app.utils.logger_config import BASE_LOG_DIR
-    from openpyxl import load_workbook
-
-    procurement_map = _build_procurement_map(data, company)
-    beihuo_map = _build_beihuo_map(data, company)
-
-    export_data = []
-    for idx, item in enumerate(data, start=1):
-        export_data.append(_format_export_row(idx, item, procurement_map, beihuo_map))
-
-    df = pd.DataFrame(export_data)
-
-    task_dir = os.path.join(BASE_LOG_DIR, 'compare_import', company)
-    os.makedirs(task_dir, exist_ok=True)
-
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    safe_filename = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
-    file_path = os.path.join(task_dir, f"compare_import_{safe_filename}_{timestamp}.xlsx")
-
-    # 写入基础Excel
-    with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='比价导入结果')
-        worksheet = writer.sheets['比价导入结果']
-        column_widths = {
-            'A': 8, 'B': 15, 'C': 12, 'D': 25, 'E': 15, 'F': 15, 'G': 12,
-            'H': 12, 'I': 10, 'J': 10, 'K': 12, 'L': 12, 'M': 18,
-            'N': 10, 'O': 10, 'P': 12, 'Q': 12, 'R': 16, 'S': 16, 'T': 25, 'U': 12
-        }
-        for col, width in column_widths.items():
-            worksheet.column_dimensions[col].width = width
-
-    # 添加历史采购价批注到供应商价格列
-    wb = load_workbook(file_path)
-    ws = wb['比价导入结果']
-    supplier_price_col = 8  # H列
-
-    for row_idx, item in enumerate(data, start=2):
-        key = (item.get('oe', ''), item.get('brand', ''))
-        records = procurement_map.get(key, [])
-        if not records:
-            continue
-
-        monthly_records = {}
-        for record in records:
-            date = record.get('purchase_date', '')
-            if date:
-                year_month = date[:7]
-                if year_month not in monthly_records:
-                    monthly_records[year_month] = record
-
-        if not monthly_records:
-            continue
-
-        lines = []
-        for year_month in sorted(monthly_records.keys(), reverse=True):
-            record = monthly_records[year_month]
-            year, month = year_month.split('-')
-            supplier = record.get('supplier_name', '')
-            price = record.get('purchase_price', '')
-            if supplier:
-                lines.append(f"{year},{month},{supplier},{price:.2f}")
-
-        if lines:
-            cell = ws.cell(row=row_idx, column=supplier_price_col)
-            cell.comment = Comment('\n'.join(lines), 'System')
-
-    wb.save(file_path)
-    return file_path
-
-
 @compare_bp.route('/import_search', methods=['POST'])
 @compare_permission_required
 def import_search_compare_data():
     """
-    导入Excel模板，根据OE和品牌列查询匹配数据
-    生成结果Excel文件并记录导入日志
+    导入Excel模板，使用采购历史比对功能生成结果Excel并记录导入日志
+    支持列：OE、品牌、价格/促销价（可选）、品牌号（可选）
     """
     try:
         if 'file' not in request.files:
@@ -636,18 +356,20 @@ def import_search_compare_data():
 
         # 读取Excel
         try:
-            df = pd.read_excel(file)
+            df = pd.read_excel(file, dtype=str)
         except Exception as e:
             return jsonify({'code': 1, 'msg': f'读取Excel失败: {str(e)}'}), 400
 
         if df.empty:
             return jsonify({'code': 1, 'msg': 'Excel中没有数据'}), 400
 
-        # 查找OE和品牌列（不区分大小写）
+        # 列名映射（与询价模块 parse_oe_list 保持一致）
         columns = {str(col).strip().lower(): str(col).strip() for col in df.columns}
 
         oe_col = None
         brand_col = None
+        price_col = None
+        brand_code_col = None
 
         for key in ['oe', 'oe号', 'oe_no', 'oe编号']:
             if key in columns:
@@ -659,20 +381,38 @@ def import_search_compare_data():
                 brand_col = columns[key]
                 break
 
+        for key in ['价格', 'price', '单价', '价格/促销价']:
+            if key in columns:
+                price_col = columns[key]
+                break
+
+        for key in ['品牌号', 'brand_code', '品牌编码']:
+            if key in columns:
+                brand_code_col = columns[key]
+                break
+
         if not oe_col:
             return jsonify({'code': 1, 'msg': 'Excel中未找到 OE 列，请使用模板格式'}), 400
         if not brand_col:
             return jsonify({'code': 1, 'msg': 'Excel中未找到 品牌 列，请使用模板格式'}), 400
 
-        # 提取OE和品牌对
-        oe_brand_pairs = []
+        # 提取有效 items（oe+品牌 或 brand_code 有值其一即可）
+        items = []
         for _, row in df.iterrows():
             oe = str(row[oe_col]).strip() if pd.notna(row[oe_col]) else ''
             brand = str(row[brand_col]).strip() if pd.notna(row[brand_col]) else ''
-            if oe and brand:
-                oe_brand_pairs.append((oe, brand))
+            price = str(row[price_col]).strip() if price_col and pd.notna(row[price_col]) else ''
+            brand_code = str(row[brand_code_col]).strip() if brand_code_col and pd.notna(row[brand_code_col]) else ''
 
-        import_count = len(oe_brand_pairs)
+            if not ((oe and brand) or brand_code):
+                continue
+
+            item = {'oe': oe, 'brand': brand, 'price': price}
+            if brand_code:
+                item['brand_code'] = brand_code
+            items.append(item)
+
+        import_count = len(items)
         if import_count == 0:
             return jsonify({'code': 1, 'msg': 'Excel中没有有效的OE和品牌数据'}), 400
 
@@ -680,16 +420,31 @@ def import_search_compare_data():
         company = session.get('current_org', session.get('store', 'fsbbr'))
         operator = session.get('username', '')
 
-        # 查询匹配数据
-        data, match_count = CompareDataService.list_data_by_oe_brand_pairs(
-            oe_brand_pairs=oe_brand_pairs,
-            company=company
-        )
+        # 调用采购历史比对服务生成结果
+        from app.services.compare_service.procurement_compare_service import ProcurementCompareService
+        from app.utils.export_tools.purchase_history_excel_writer import PurchaseHistoryExcelWriter
+        from app.utils.logger_config import get_task_logger
 
+        logger = get_task_logger('purchase_history_compare')
+        logger.info(f"[比价导入] 开始处理: file={file.filename}, items={import_count}, company={company}")
+
+        results = ProcurementCompareService.batch_generate_compare_results(items, company)
+
+        match_count = len(results)
         result_file_path = ''
-        if data:
-            # 生成结果Excel
-            result_file_path = generate_import_result_excel(data, company, file.filename)
+
+        if results:
+            from app.utils.logger_config import BASE_LOG_DIR
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            safe_filename = file.filename.rsplit('.', 1)[0] if '.' in file.filename else file.filename
+            output_filename = f"compare_import_{safe_filename}_{timestamp}.xlsx"
+            task_dir = os.path.join(BASE_LOG_DIR, 'compare_import', company)
+            os.makedirs(task_dir, exist_ok=True)
+            output_path = os.path.join(task_dir, output_filename)
+
+            PurchaseHistoryExcelWriter.generate_excel(results, output_path)
+            result_file_path = output_path
+            logger.info(f"[比价导入] Excel生成完成: {output_path}, 结果行数={match_count}")
 
         # 保存导入日志
         log_id = CompareDataService.save_import_log(
@@ -712,6 +467,8 @@ def import_search_compare_data():
         })
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'code': 1, 'msg': f'导入查询失败: {str(e)}'}), 500
 
 

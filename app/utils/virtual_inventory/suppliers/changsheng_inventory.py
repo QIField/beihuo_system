@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from app.utils.logger_config import get_task_logger
 from ..brands import normalize_brand
+from ..persistence import save_changsheng_raw_data
 
 
 logger = get_task_logger('virtual_inventory')
@@ -82,21 +83,27 @@ def get_parts_list(access_token, page_index=1, page_size=1000, update_time=None)
     # 如果有更新时间参数
     if update_time:
         request_data["body"]["update_time"] = update_time
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(request_data))
-        if response.status_code == 200:
-            result = response.json()
-            if result["head"]["status"] == '200':
-                logger.info(f"成功获取第{page_index}页数据，共{len(result['body']['parts'])}条记录")
-                return result["body"]['parts']
+    for attempt in range(3):
+        try:
+            response = requests.post(url, headers=headers, data=json.dumps(request_data), timeout=30)
+            if response.status_code == 429:
+                wait_time = 3 + attempt * 2
+                logger.warning(f"获取第{page_index}页触发429限流，等待{wait_time}秒后重试({attempt + 1}/3)")
+                time.sleep(wait_time)
+                continue
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("head", {}).get("status") == '200':
+                    logger.info(f"成功获取第{page_index}页数据，共{len(result['body']['parts'])}条记录")
+                    return result["body"]['parts']
+                else:
+                    return []
             else:
                 return []
-        else:
+        except Exception:
+            logger.exception(f"获取配件列表第{page_index}页时发生异常")
             return []
-
-    except Exception:
-        logger.exception(f"获取配件列表第{page_index}页时发生异常")
-        return []
+    return []
 
 
 def get_all_parts(api_key, api_secret, page_size=1000, update_time=None):
@@ -132,7 +139,7 @@ def get_all_parts(api_key, api_secret, page_size=1000, update_time=None):
         # 下一页
         page_index += 1
         # 根据接口要求，每秒最多1次请求
-        time.sleep(2)
+        time.sleep(5)
 
     logger.info(f"共获取{len(all_parts)}条配件数据")
     all_parts = pd.DataFrame(all_parts)
@@ -149,18 +156,33 @@ def remove_trailing_non_digit(oe_str):
     return oe_str
 
 
+def remove_trailing_sequence(oe_str):
+    """12/13位编码去除末尾01-09"""
+    if pd.isna(oe_str):
+        return oe_str
+    oe_str = str(oe_str)
+    if len(oe_str) in (12, 13) and oe_str[-2:] in ('01', '02', '03', '04', '05', '06', '07', '08', '09'):
+        return oe_str[:-2]
+    return oe_str
+
+
 def start():
     """
     广州昌盛库存数据
     :return:
     """
-    df = get_all_parts('8364491E669A4E7BA272862935A60909', '39119D4F8B344124AEE6D20C90829034', page_size=2000,
+    df = get_all_parts('8364491E669A4E7BA272862935A60909', '2167511AE9734D7F80E5F010AF5A05B6', page_size=2000,
                        update_time=None)
+
+    # 保存原始数据到 changsheng_raw_inventory（与清洗流程并行，失败不影响主流程）
+    save_changsheng_raw_data(df.copy())
+
     df['stock_amount'] = df['stock_amount'].astype(int)
     df['供应商名称'] = '广州昌盛'
-    # OE码处理：去空格 → 去掉末尾非数字
+    # OE码处理：去空格 → 去掉末尾非数字 → 12/13位末尾01-09去除
     df['原厂OE码'] = df['part_number'].str.replace(' ', '')
     df['原厂OE码'] = df['原厂OE码'].apply(remove_trailing_non_digit)
+    df['原厂OE码'] = df['原厂OE码'].apply(remove_trailing_sequence)
     df['品牌'] = df['brand_name']
     df['价格'] = df['sale_price']
     tomorrow_ts = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")

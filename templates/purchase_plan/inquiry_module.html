@@ -226,8 +226,6 @@
                 <button type="button" class="btn btn-primary" id="btnDownloadTemplate">下载询价模板</button>
                 <button type="button" class="btn btn-primary" id="btnImportUpload">导入文件（上传系统）</button>
                 <button type="button" class="btn btn-primary" id="btnImportRecord">导入文件（仅记录入库不上传）</button>
-                <button type="button" class="btn btn-default" id="btnDownloadCompareTemplate">下载比对模板</button>
-                <button type="button" class="btn btn-default" id="btnCompareHistory">采购历史比对</button>
             </div>
 
             <!-- 隐藏的文件输入框 -->
@@ -850,7 +848,6 @@
             const btnImportUpload = document.getElementById('btnImportUpload');
             const btnImportRecord = document.getElementById('btnImportRecord');
             const btnDownloadTemplate = document.getElementById('btnDownloadTemplate');
-            const btnCompareHistory = document.getElementById('btnCompareHistory');
             const btnConfirmUpload = document.getElementById('btnConfirmUpload');
 
             // 导入文件（上传系统）
@@ -865,12 +862,6 @@
                 fileInput.click();
             });
 
-            // 采购历史比对
-            btnCompareHistory.addEventListener('click', () => {
-                currentUploadMode = 'compare';
-                fileInput.click();
-            });
-
             // 文件选择后处理
             fileInput.addEventListener('change', () => {
                 if (fileInput.files.length > 0) {
@@ -880,7 +871,6 @@
 
             // 下载模板
             btnDownloadTemplate.addEventListener('click', downloadTemplate);
-            document.getElementById('btnDownloadCompareTemplate').addEventListener('click', downloadCompareTemplate);
 
             // 确认上传
             btnConfirmUpload.addEventListener('click', handleConfirmUpload);
@@ -900,12 +890,6 @@
             }
 
             pendingFile = file;
-
-            if (currentUploadMode === 'compare') {
-                await handleCompareOnly(file);
-                return;
-            }
-
             await parsePreview(file);
         }
 
@@ -1245,146 +1229,11 @@
             currentUploadMode = null;
         }
 
-        // 采购历史比对（独立流程）
-        async function handleCompareOnly(file) {
-            let progressLayer = null;
-
-            function showProgress(total) {
-                progressLayer = layui.layer.open({
-                    type: 1,
-                    title: false,
-                    closeBtn: 0,
-                    area: '280px',
-                    shade: [0.3, '#000'],
-                    content: `<div style="padding:25px;text-align:center;">
-                        <div style="margin-bottom:10px;font-size:14px;">正在比对采购历史...</div>
-                        <div style="font-size:12px;color:#999;" id="compareProgressText">共 ${total} 条 OE，准备中...</div>
-                    </div>`
-                });
-            }
-
-            function updateProgress(current, total, message) {
-                // 保持原有提示文本不变，仅用于轮询状态判断
-            }
-
-            function stopProgress() {
-                if (progressLayer !== null) {
-                    layui.layer.close(progressLayer);
-                    progressLayer = null;
-                }
-            }
-
-            const loadingIndex = layui.layer.load(2, { shade: [0.3, '#000'] });
-
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const parseRes = await fetch('/api/purchase_plan/inquiry/parse_oe_list', {
-                    method: 'POST',
-                    body: formData
-                });
-                const parseResult = await parseRes.json();
-
-                if (parseResult.code !== 0) {
-                    layui.layer.close(loadingIndex);
-                    layui.layer.msg(parseResult.msg || '解析失败', { icon: 2 });
-                    return;
-                }
-
-                const oeList = parseResult.data;
-                if (!oeList || oeList.length === 0) {
-                    layui.layer.close(loadingIndex);
-                    layui.layer.msg('文件中没有找到OE数据', { icon: 0 });
-                    return;
-                }
-
-                const items = oeList.map(item => ({
-                    oe: item.oe,
-                    brand: item.brand || '',
-                    price: item.price || '',
-                    brand_code: item.brand_code || ''
-                }));
-
-                layui.layer.close(loadingIndex);
-                showProgress(items.length);
-
-                // 提交异步任务
-                const submitRes = await fetch('/api/purchase_plan/purchase_history_compare/export_async', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({items: items})
-                });
-                const submitResult = await submitRes.json();
-                if (submitResult.code !== 0) {
-                    stopProgress();
-                    layui.layer.msg(submitResult.msg || '提交失败', { icon: 2 });
-                    return;
-                }
-                const taskId = submitResult.data.task_id;
-
-                // 轮询任务进度
-                const pollInterval = setInterval(async () => {
-                    try {
-                        const statusRes = await fetch(`/api/purchase_plan/purchase_history_compare/export_status/${taskId}`);
-                        const statusResult = await statusRes.json();
-                        if (statusResult.code !== 0) {
-                            clearInterval(pollInterval);
-                            stopProgress();
-                            layui.layer.msg(statusResult.msg || '查询进度失败', { icon: 2 });
-                            return;
-                        }
-                        const task = statusResult.data;
-                        updateProgress(task.progress || 0, task.total || 100, task.message);
-
-                        if (task.status === 'completed') {
-                            clearInterval(pollInterval);
-                            stopProgress();
-                            const a = document.createElement('a');
-                            a.href = `/api/purchase_plan/purchase_history_compare/export_download/${taskId}`;
-                            a.download = 'purchase_history_compare.xlsx';
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            layui.layer.msg('比对结果已生成', { icon: 1 });
-                        } else if (task.status === 'failed') {
-                            clearInterval(pollInterval);
-                            stopProgress();
-                            layui.layer.msg(task.message || '生成失败', { icon: 2 });
-                        }
-                    } catch (err) {
-                        clearInterval(pollInterval);
-                        stopProgress();
-                        layui.layer.msg('轮询进度失败: ' + err.message, { icon: 2 });
-                    }
-                }, 1000);
-
-            } catch (error) {
-                stopProgress();
-                layui.layer.close(loadingIndex);
-                layui.layer.msg('处理失败: ' + error.message, { icon: 2 });
-            }
-
-            document.getElementById('fileInput').value = '';
-            pendingFile = null;
-            currentUploadMode = null;
-        }
-
         // 下载询价模板
         function downloadTemplate() {
             const link = document.createElement('a');
             link.href = "{{ url_for('static', filename='excel/virtual_inventory.xlsx') }}";
             link.download = 'inquiry_template.xlsx';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // 下载采购历史比对模板
-        function downloadCompareTemplate() {
-            const link = document.createElement('a');
-            link.href = "{{ url_for('static', filename='excel/OE_Brand_Price_brandcode.xlsx') }}";
-            link.download = 'OE_Brand_Price_brandcode.xlsx';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);

@@ -69,6 +69,8 @@ class OECompareResult:
     frey_no: Optional[str] = None                 # Frey编号（从crmapp_compare_summary获取）
     replace_stock_text: Optional[str] = None      # 替换号有库存文本
     group_index: Optional[int] = None             # 组号（主号+replace_number匹配行共享同一组号）
+    search_brand: Optional[str] = None            # 原始搜索品牌（从上传文件读取）
+    brand_code: Optional[str] = None              # 品牌号（当使用品牌号搜索时）
 
     # 从crmapp_beihuo表获取的字段
     stock_quantity: Optional[int] = None          # 库存数量
