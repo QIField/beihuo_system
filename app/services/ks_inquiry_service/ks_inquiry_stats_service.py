@@ -18,6 +18,44 @@ def _get_row_value(row, key_index, key_name):
     return row[key_index] if row else ''
 
 
+def _build_code_display_exprs(code_col, brand_col, mapping_type, table_alias='d'):
+    """
+    构建零部件代码展示表达式（先截取后映射）
+
+    处理逻辑：
+      1. 先对原始代码按规则截取（发动机：奔驰品牌且长度>6时取前6位；底盘：不截取）
+      2. 用截取后的值去 ks_part_mapping 匹配映射配置
+      3. 若匹配到则展示映射值，否则展示截取后的值
+
+    Args:
+        code_col: 原始代码列名（如 'engine'、'chassis'）
+        brand_col: 车辆品牌列名（如 'car_brand_name'）
+        mapping_type: 映射类型 ('engine' 或 'chassis')
+        table_alias: 表别名，默认 'd'
+
+    Returns:
+        tuple: (base_expr, display_expr, join_match_expr)
+            - base_expr: 截取后的基础值表达式
+            - display_expr: 完整展示值表达式（含映射回退）
+            - join_match_expr: JOIN 条件中映射表匹配表达式
+    """
+    full_code_col = f"{table_alias}.{code_col}"
+    full_brand_col = f"{table_alias}.{brand_col}"
+
+    if mapping_type == 'engine':
+        base_expr = (
+            f"CASE WHEN {full_brand_col} = '奔驰' AND LENGTH({full_code_col}) > 6 "
+            f"THEN LEFT({full_code_col}, 6) ELSE {full_code_col} END"
+        )
+    else:
+        base_expr = full_code_col
+
+    display_expr = f"COALESCE(m.display_code, {base_expr})"
+    join_match_expr = base_expr
+
+    return base_expr, display_expr, join_match_expr
+
+
 class KsInquiryStatsService:
     """
     开思询价统计服务
@@ -712,8 +750,10 @@ class KsInquiryStatsService:
         where_clause = " AND ".join(conditions)
         having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
 
-        # 底盘展示逻辑：优先应用映射配置
-        chassis_display_expr = "COALESCE(m.display_code, d.chassis)"
+        # 底盘展示逻辑：先截取后映射（底盘无需截取）
+        _, chassis_display_expr, chassis_join_expr = _build_code_display_exprs(
+            'chassis', 'car_brand_name', 'chassis'
+        )
 
         chassis_column_map = {
             'carBrandName': 'd.car_brand_name',
@@ -736,7 +776,7 @@ class KsInquiryStatsService:
                 ON m.company = %s
                 AND m.mapping_type = 'chassis'
                 AND m.car_brand_name = d.car_brand_name
-                AND m.original_code = d.chassis
+                AND m.original_code = {chassis_join_expr}
             WHERE {where_clause}
             GROUP BY d.car_brand_name, {chassis_display_expr}
             {having_clause}
@@ -822,16 +862,10 @@ class KsInquiryStatsService:
         where_clause = " AND ".join(conditions)
         having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
 
-        # 发动机展示逻辑：先判断奔驰取前6位，再应用映射配置
-        engine_display_expr = """
-            COALESCE(
-                m.display_code,
-                CASE
-                    WHEN d.car_brand_name = '奔驰' AND LENGTH(d.engine) > 6 THEN LEFT(d.engine, 6)
-                    ELSE d.engine
-                END
-            )
-        """.strip()
+        # 发动机展示逻辑：先截取后映射
+        _, engine_display_expr, engine_join_expr = _build_code_display_exprs(
+            'engine', 'car_brand_name', 'engine'
+        )
 
         engine_column_map = {
             'carBrandName': 'd.car_brand_name',
@@ -854,7 +888,7 @@ class KsInquiryStatsService:
                 ON m.company = %s
                 AND m.mapping_type = 'engine'
                 AND m.car_brand_name = d.car_brand_name
-                AND m.original_code = d.engine
+                AND m.original_code = {engine_join_expr}
             WHERE {where_clause}
             GROUP BY d.car_brand_name, {engine_display_expr}
             {having_clause}

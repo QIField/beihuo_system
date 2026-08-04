@@ -10,6 +10,7 @@ import json
 import time
 from app.utils.database_connection import db_cursor, db_query_one
 from app.utils.common_util_module.sql_builder import build_order_by
+from app.services.ks_inquiry_service.ks_inquiry_stats_service import _build_code_display_exprs
 
 
 class KsInquiryRecordsService:
@@ -113,84 +114,95 @@ class KsInquiryRecordsService:
 
         conditions, params = [], []
 
-        # 基础查询条件
-        if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
-        if parts_num:     conditions.append("partsNum LIKE %s");            params.append(f"%{parts_num}%")
-        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
-        if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
-        if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
+        # 基础查询条件（明细表已加别名 d，列名必须带前缀避免歧义）
+        if inquiry_id:    conditions.append("d.inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
+        if parts_num:     conditions.append("d.partsNum LIKE %s");            params.append(f"%{parts_num}%")
+        if parts_name:    conditions.append("d.resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
+        if brand_name:    conditions.append("d.brandName LIKE %s");           params.append(f"%{brand_name}%")
+        if brand:         conditions.append("d.brandNormalized = %s");        params.append(brand)
         if seller_status:
-            conditions.append("display_seller_status = %s")
+            conditions.append("d.display_seller_status = %s")
             params.append(seller_status)
-        if car_brand_name: conditions.append("car_brand_name = %s");        params.append(car_brand_name)
-        if garage_name:   conditions.append("garage_company_name LIKE %s");  params.append(f"%{garage_name}%")
-        if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
-        if end_date:      conditions.append("quote_date <= %s");            params.append(end_date)
-        if company:       conditions.append("company = %s");                params.append(company)
+        if car_brand_name: conditions.append("d.car_brand_name = %s");        params.append(car_brand_name)
+        if garage_name:   conditions.append("d.garage_company_name LIKE %s");  params.append(f"%{garage_name}%")
+        if begin_date:    conditions.append("d.quote_date >= %s");            params.append(begin_date)
+        if end_date:      conditions.append("d.quote_date <= %s");            params.append(end_date)
+        if company:       conditions.append("d.company = %s");                params.append(company)
 
-        # 列头下拉全量筛选
-        KsInquiryRecordsService._apply_filters(column_filters, KsInquiryRecordsService._DETAIL_FILTER_MAP, conditions, params)
+        # 列头下拉全量筛选（列名加别名前缀避免歧义）
+        detail_filter_map = {k: f"d.{v}" for k, v in KsInquiryRecordsService._DETAIL_FILTER_MAP.items()}
+        KsInquiryRecordsService._apply_filters(column_filters, detail_filter_map, conditions, params)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
-        # 先查询总条数
+        # 先查询总条数（count_sql 也需加别名，与 data_sql 共用 WHERE）
         count_sql = f"""
-            SELECT COUNT(*) FROM crmapp_ks_inquiry_detail
+            SELECT COUNT(*) FROM crmapp_ks_inquiry_detail d
             WHERE {where_clause}
         """
 
-        # 排序：白名单映射（前端列名 -> 数据库列名）
+        # 排序：白名单映射（前端列名 -> 数据库列名，加别名前缀）
         records_column_map = {
-            'inquiryId': 'inquiryId',
-            'partsNum': 'partsNum',
-            'resolve_parts_name': 'resolve_parts_name',
-            'partsName': 'partsName',
-            'brandName': 'brandName',
-            'brandNormalized': 'brandNormalized',
-            'brandId': 'brandId',
-            'sellerBtPrice': 'sellerBtPrice',
-            'sellerPrice': 'sellerPrice',
-            'displaySellerStatus': 'display_seller_status',
-            'vin': 'vin',
-            'engine': 'engine',
-            'productionDate': 'production_date',
-            'chassis': 'chassis',
-            'carBrandName': 'car_brand_name',
-            'customerName': 'garage_company_name',
-            'locationName': 'location_name',
-            'arrivalTime': 'arrival_time'
+            'inquiryId': 'd.inquiryId',
+            'partsNum': 'd.partsNum',
+            'resolve_parts_name': 'd.resolve_parts_name',
+            'partsName': 'd.partsName',
+            'brandName': 'd.brandName',
+            'brandNormalized': 'd.brandNormalized',
+            'brandId': 'd.brandId',
+            'sellerBtPrice': 'd.sellerBtPrice',
+            'sellerPrice': 'd.sellerPrice',
+            'displaySellerStatus': 'd.display_seller_status',
+            'vin': 'd.vin',
+            'engine': 'd.engine',
+            'productionDate': 'd.production_date',
+            'chassis': 'd.chassis',
+            'carBrandName': 'd.car_brand_name',
+            'customerName': 'd.garage_company_name',
+            'locationName': 'd.location_name',
+            'arrivalTime': 'd.arrival_time'
         }
         order_by = build_order_by(
             sort_column, sort_dir, records_column_map,
             numeric_columns={'sellerBtPrice', 'sellerPrice'},
-            default='inquiryId ASC, content_item_index ASC'
+            default='d.inquiryId ASC, d.content_item_index ASC'
         )
 
         # 查询数据（带分页）
+        # 发动机展示逻辑：先截取后映射
+        _, engine_display_expr, engine_join_expr = _build_code_display_exprs(
+            'engine', 'car_brand_name', 'engine'
+        )
+
         data_sql = f"""
             SELECT
-                inquiryId,
-                garage_company_name AS customerName,
-                partsNum,
-                resolve_parts_num,
-                resolve_parts_name,
-                partsName,
-                brandName,
-                brandNormalized,
-                brandId,
-                sellerBtPrice,
-                sellerPrice,
-                display_seller_status AS displaySellerStatus,
-                remark,
-                vin,
-                engine,
-                production_date AS productionDate,
-                chassis,
-                car_brand_name AS carBrandName,
-                location_name AS locationName,
-                arrival_time AS arrivalTime,
-                content_item_index
-            FROM crmapp_ks_inquiry_detail
+                d.inquiryId,
+                d.garage_company_name AS customerName,
+                d.partsNum,
+                d.resolve_parts_num,
+                d.resolve_parts_name,
+                d.partsName,
+                d.brandName,
+                d.brandNormalized,
+                d.brandId,
+                d.sellerBtPrice,
+                d.sellerPrice,
+                d.display_seller_status AS displaySellerStatus,
+                d.remark,
+                d.vin,
+                {engine_display_expr} AS engine,
+                d.production_date AS productionDate,
+                d.chassis,
+                d.car_brand_name AS carBrandName,
+                d.location_name AS locationName,
+                d.arrival_time AS arrivalTime,
+                d.content_item_index
+            FROM crmapp_ks_inquiry_detail d
+            LEFT JOIN ks_part_mapping m
+                ON m.company = %s
+                AND m.mapping_type = 'engine'
+                AND m.car_brand_name = d.car_brand_name
+                AND m.original_code = {engine_join_expr}
             WHERE {where_clause}
             ORDER BY {order_by}
             LIMIT %s OFFSET %s
@@ -208,11 +220,13 @@ class KsInquiryRecordsService:
         # 查询分页数据
         offset = (page - 1) * page_size
         data_params = params.copy()
+        # JOIN 条件中的 company 放在参数最前面
+        data_params.insert(0, company)
         data_params.append(page_size)
         data_params.append(offset)
 
         with db_cursor() as cursor:
-            cursor.execute(data_sql, data_params)
+            cursor.execute(data_sql, tuple(data_params))
             rows = cursor.fetchall()
 
             # 硬编码列名（确保与 SQL 一致）- 已删除：quote_date, partType, partsBrandQuality, company, created_at, updated_at
@@ -388,23 +402,17 @@ class KsInquiryRecordsService:
 
         db_col = config['columns'][column]
 
-        # 发动机/底盘统计：下拉值使用映射后的展示名称
-        if grid_type == 'garage_engine' and column == 'engine':
-            display_expr = """
-                COALESCE(
-                    m.display_code,
-                    CASE
-                        WHEN d.car_brand_name = '奔驰' AND LENGTH(d.engine) > 6 THEN LEFT(d.engine, 6)
-                        ELSE d.engine
-                    END
-                )
-            """.strip()
+        # 发动机/底盘统计：下拉值使用映射后的展示名称（先截取后映射）
+        if grid_type in ('garage_engine', 'detail') and column == 'engine':
+            _, display_expr, join_match_expr = _build_code_display_exprs(
+                'engine', 'car_brand_name', 'engine'
+            )
             mapping_type = 'engine'
-            original_col = 'd.engine'
         elif grid_type == 'garage_chassis' and column == 'chassis':
-            display_expr = "COALESCE(m.display_code, d.chassis)"
+            _, display_expr, join_match_expr = _build_code_display_exprs(
+                'chassis', 'car_brand_name', 'chassis'
+            )
             mapping_type = 'chassis'
-            original_col = 'd.chassis'
         else:
             display_expr = None
 
@@ -419,7 +427,7 @@ class KsInquiryRecordsService:
                         ON m.company = %s
                         AND m.mapping_type = '{mapping_type}'
                         AND m.car_brand_name = d.car_brand_name
-                        AND m.original_code = {original_col}
+                        AND m.original_code = {join_match_expr}
                     WHERE {where_clause}
                     GROUP BY {display_expr}
                 ) t

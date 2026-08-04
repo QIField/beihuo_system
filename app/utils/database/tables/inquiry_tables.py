@@ -56,7 +56,7 @@ def init_ks_inquiry_detail_table():
                 partsBrandQuality VARCHAR(50) DEFAULT NULL COMMENT '配件品质',
                 remark TEXT DEFAULT NULL COMMENT '备注',
                 order_status VARCHAR(20) DEFAULT '未下单' COMMENT 'content级别下单状态（已下单/未下单）',
-                display_seller_status VARCHAR(20) DEFAULT '未下单' COMMENT '前端显示卖家状态（未下单/同报本店未采/本店下单/非本店下单）',
+                display_seller_status VARCHAR(20) DEFAULT '未下单' COMMENT '前端显示卖家状态（未下单/已在本店其他品质/本店下单/非本店下单）',
                 vin VARCHAR(50) DEFAULT NULL COMMENT '车架号',
                 engine VARCHAR(100) DEFAULT NULL COMMENT '发动机',
                 production_date VARCHAR(50) DEFAULT NULL COMMENT '车辆生产日期',

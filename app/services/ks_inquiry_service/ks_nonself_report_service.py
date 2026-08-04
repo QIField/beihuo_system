@@ -177,7 +177,7 @@ def _export_to_excel(nonself_records, self_records, company: str, date_str: str)
     """
     将记录按状态分两个工作表导出：
     - 非本店下单
-    - 本店下单（含同报本店未采）
+    - 本店下单（含已在本店其他品质）
     """
     os.makedirs(EXPORT_DIR, exist_ok=True)
     file_name = f"{CATEGORY}_{company}_{date_str}.xlsx"
@@ -223,7 +223,7 @@ def _build_message(
         f"门店：{store_name}\n"
         f"非本店下单：{nonself_count} 条\n"
         f"本店下单：{self_count} 条\n"
-        f"  - 同报本店未采：{same_quote_not_self_count} 条\n"
+        f"  - 已在本店其他品质：{same_quote_not_self_count} 条\n"
         f"  - 本店下单：{self_order_count} 条\n"
         f"文件下载链接：{download_url}"
     )
@@ -250,7 +250,7 @@ def run_ks_nonself_daily_report() -> Dict[str, Any]:
 
     for company, store_name in KS_NONSELF_STORE_MAP.items():
         nonself_records = _fetch_records(company, date_str, ("非本店下单",))
-        same_quote_not_self_records = _fetch_records(company, date_str, ("同报本店未采",))
+        same_quote_not_self_records = _fetch_records(company, date_str, ("已在本店其他品质",))
         self_order_records = _fetch_records(company, date_str, ("本店下单",))
         self_records = same_quote_not_self_records + self_order_records
         nonself_count = len(nonself_records)
@@ -286,7 +286,7 @@ def run_ks_nonself_daily_report() -> Dict[str, Any]:
             push_resp = message_push("开思", message)
             store_result["pushed"] = True
             print(f"[开思下单汇报] {store_name}({company}) 推送成功，"
-                  f"非本店{nonself_count} 条，本店{self_count} 条（同报本店未采{same_quote_not_self_count} 条，"
+                  f"非本店{nonself_count} 条，本店{self_count} 条（已在本店其他品质{same_quote_not_self_count} 条，"
                   f"本店下单{self_order_count} 条），文件：{file_path}，响应：{push_resp}")
 
         summary["stores"].append(store_result)
