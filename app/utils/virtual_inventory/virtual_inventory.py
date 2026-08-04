@@ -120,18 +120,18 @@ def main_process():
     # 上传到B2B系统（使用品牌映射版本），只上传当天数据
     start_b2b_upload_with_brand_mapping(today_only=True)
     
-    # 运行CRM产品新建（数据库模式）
-    logger.info("\n" + "="*60)
-    logger.info("开始运行CRM产品新建（数据库模式）")
-    logger.info("="*60)
-    try:
-        from app.utils.crm_product.crm_productAdd.database_mode import process_database_mode_api
-        process_database_mode_api()
-        logger.info("="*60)
-        logger.info("CRM产品新建完成")
-        logger.info("="*60)
-    except Exception as e:
-        logger.exception(f"CRM产品新建失败")
+    # ===== [已注释] CRM产品新建（数据库模式）=====
+    # logger.info("\n" + "="*60)
+    # logger.info("开始运行CRM产品新建（数据库模式）")
+    # logger.info("="*60)
+    # try:
+    #     from app.utils.crm_product.crm_productAdd.database_mode import process_database_mode_api
+    #     process_database_mode_api()
+    #     logger.info("="*60)
+    #     logger.info("CRM产品新建完成")
+    #     logger.info("="*60)
+    # except Exception as e:
+    #     logger.exception(f"CRM产品新建失败")
 
     # ===== 保存当日统计数据到日志 =====
     logger.info("\n" + "="*60)
