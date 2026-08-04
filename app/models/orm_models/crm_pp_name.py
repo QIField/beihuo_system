@@ -70,6 +70,21 @@ class CrmPpName(BaseModels):
         return session.query(cls).filter(cls.id == alias_id).first()
 
     @classmethod
+    def get_by_pp_name(cls, session, pp_name):
+        """
+        根据品牌主名查询所有别名记录
+        """
+        return session.query(cls).filter(cls.pp_name == pp_name).all()
+
+    @classmethod
+    def delete_by_pp_name(cls, session, pp_name):
+        """
+        根据品牌主名删除所有别名记录
+        """
+        result = session.query(cls).filter(cls.pp_name == pp_name).delete(synchronize_session=False)
+        return result > 0
+
+    @classmethod
     def create(cls, session, pp_name, alias_name):
         """
         创建新别名
