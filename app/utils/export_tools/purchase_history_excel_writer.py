@@ -142,7 +142,7 @@ class PurchaseHistoryExcelWriter:
                 and not result.product_name
                 and not result.brand
                 and not result.frey_no
-                and not result.records
+                and not result.month_summaries
             ) or (
                 result.search_oe
                 and any(c in str(result.search_oe) for c in ' .,/')
