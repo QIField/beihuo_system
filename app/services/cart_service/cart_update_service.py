@@ -56,7 +56,7 @@ def update_cart_data(store: Optional[str] = None) -> None:
                 SELECT `供应商`, `品牌`, `物料名称`, `物料条码`, `车型品牌`, `标签`, 
                        `近1个月询价量`, `近3个月月均询价量`, `库存数量`, `昨日销量`, `本月销量`, `今日销量`,
                        `全国近1个月询价量`, `全国近3个月月均询价量`, `内部备注`, `品牌号`, `库存金额`,
-                       `成品可卖天数`, `成本价`, `近12个月月均销量`, `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`, `替换号`
+                       `成品可卖天数`, `成本价`, `近12个月月均销量`, `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`, `替换号`, `purchase_records`
                 FROM crmapp_beihuo 
                 WHERE `物料条码` IN ({placeholders}) AND `company` = %s
             """
@@ -97,6 +97,7 @@ def update_cart_data(store: Optional[str] = None) -> None:
                         latest_data['在途数量'],
                         latest_data['车型'],
                         latest_data['替换号'],
+                        latest_data['purchase_records'],
                         item['id']
                     ))
             
@@ -110,7 +111,7 @@ def update_cart_data(store: Optional[str] = None) -> None:
                         national_inquiry_3m = %s, internal_remarks = %s, brand_code = %s, 
                         stock_amount = %s, sellable_days = %s, cost_price = %s, 
                         avg_sales_12m = %s, avg_sales_6m = %s, sales_7d = %s, warning_status = %s, 
-                        on_way = %s, car_model = %s, replace_number = %s
+                        on_way = %s, car_model = %s, replace_number = %s, purchase_records = %s
                     WHERE id = %s
                 """
                 cursor.executemany(update_sql, update_data_for_batch)

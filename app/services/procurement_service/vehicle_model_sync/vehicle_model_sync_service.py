@@ -96,7 +96,10 @@ class VehicleModelSyncService:
 
     def _update_batch(self, cursor, batch: list, company: str) -> int:
         """
-        批量更新一批OE的车型
+        批量更新一批OE的车型（参数化查询，无SQL注入风险）
+
+        实现方式：使用临时表 + JOIN 更新，避免字符串拼接SQL。
+        所有数据通过 executemany 参数化传入，即使OE或车型包含特殊字符也安全。
 
         Args:
             cursor: 数据库游标
@@ -109,29 +112,30 @@ class VehicleModelSyncService:
         if not batch:
             return 0
 
-        # 构建CASE WHEN语句
-        cases = []
-        oes = []
+        # 1. 创建临时表（SESSION 级别，连接关闭自动清理）
+        cursor.execute("""
+            CREATE TEMPORARY TABLE IF NOT EXISTS temp_oe_model (
+                oe VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
+                l_model_zh TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+                PRIMARY KEY (oe)
+            ) ENGINE=MEMORY
+        """)
 
-        for oe, (model, priority) in batch:
-            # 转义单引号防止SQL注入
-            safe_model = model.replace("'", "''") if model else ''
-            cases.append(f"WHEN '{oe}' THEN '{safe_model}'")
-            oes.append(f"'{oe}'")
+        # 2. 清空临时表（确保当前批次无脏数据）
+        cursor.execute("TRUNCATE TABLE temp_oe_model")
 
-        case_sql = " ".join(cases)
-        oe_sql = ", ".join(oes)
+        # 3. 批量插入到临时表（完全参数化，无注入风险）
+        insert_sql = "INSERT INTO temp_oe_model (oe, l_model_zh) VALUES (%s, %s)"
+        data = [(oe, model) for oe, (model, priority) in batch]
+        cursor.executemany(insert_sql, data)
 
-        update_sql = f"""
-            UPDATE crmapp_compare_summary
-            SET l_model_zh = CASE oe
-                {case_sql}
-                ELSE l_model_zh
-            END
-            WHERE oe IN ({oe_sql})
-            AND company = %s
+        # 4. 通过 JOIN 更新目标表（参数化查询）
+        update_sql = """
+            UPDATE crmapp_compare_summary t
+            INNER JOIN temp_oe_model tmp ON t.oe = tmp.oe
+            SET t.l_model_zh = tmp.l_model_zh
+            WHERE t.company = %s
         """
-
         cursor.execute(update_sql, (company,))
         return cursor.rowcount
 

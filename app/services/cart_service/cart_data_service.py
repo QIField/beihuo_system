@@ -42,6 +42,7 @@ class CartDataService:
         'sales_month': 'sales_month',
         'avg_sales_6m': 'avg_sales_6m',
         'avg_sales_12m': 'avg_sales_12m',
+        'purchase_records': 'purchase_records',
     }
 
     def get_cart_data(self, store: str, dimension: str = 'product',

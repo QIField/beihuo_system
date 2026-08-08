@@ -134,6 +134,7 @@ def init_cart_table():
                 on_way INT DEFAULT 0 COMMENT '在途数量',
                 car_model TEXT COMMENT '车型',
                 replace_number TEXT COMMENT '替换号',
+                purchase_records TEXT COMMENT '采购记录(JSON格式)',
                 quantity INT DEFAULT 1 COMMENT '数量',
                 added_time DATETIME COMMENT '加入时间',
                 added_by VARCHAR(255) COMMENT '加入账户名',
@@ -158,6 +159,7 @@ def init_cart_table():
     # 修改购物车表字段类型
     modify_field_type('crmapp_cart', 'car_model', "TEXT COMMENT '车型'")
     modify_field_type('crmapp_cart', 'replace_number', "TEXT COMMENT '替换号'")
+    modify_field_type('crmapp_cart', 'purchase_records', "TEXT COMMENT '采购记录(JSON格式)'")
 
 
 def init_user_table():
@@ -357,6 +359,7 @@ def init_date_search_table():
                 waiting_time VARCHAR(50) COMMENT '待仓时间',
                 预警状态 VARCHAR(255) COMMENT '预警状态',
                 销量 INT DEFAULT 0 COMMENT '销量',
+                purchase_records TEXT COMMENT '采购记录(JSON格式)',
                 查询时间 TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '查询时间',
                 INDEX idx_username (username),
                 INDEX idx_dates (start_date, end_date),
@@ -384,6 +387,10 @@ def init_date_search_table():
         {
             'name': 'waiting_time',
             'definition': "VARCHAR(50) COMMENT '待仓时间'"
+        },
+        {
+            'name': 'purchase_records',
+            'definition': "TEXT COMMENT '采购记录(JSON格式)'"
         }
     ]
     check_and_add_fields('crmapp_date_search', date_search_fields_to_check)

@@ -101,30 +101,71 @@ def batch_insert_records(company: str, records: List[Dict[str, Any]]) -> int:
 def save_company_data(company: str, records: List[Dict[str, Any]]) -> int:
     """
     保存门店数据（清空+插入）
-    
+
+    原子性保证：DELETE 和 INSERT 在同一个数据库事务中执行。
+    如果 INSERT 失败，DELETE 会自动回滚，避免门店数据被清空后无法恢复。
+
     Args:
         company: 门店代码
         records: 记录字典列表
-        
+
     Returns:
         成功插入的记录数，失败返回 -1
     """
     if not records:
         print(f"[警告] 门店 {company} 没有数据需要保存")
         return 0
-    
-    print(f"[垃圾桶] 已清空门店 {company} 的现有数据，准备插入 {len(records)} 条记录")
-    
-    # 1. 清空数据
-    if not clear_company_data(company):
-        return -1
-    
-    # 2. 插入新数据
+
+    print(f"[保存] 门店 {company} 原子性保存开始，准备替换为 {len(records)} 条记录")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
     try:
-        return batch_insert_records(company, records)
+        # 1. 在同一个事务中清空旧数据
+        cursor.execute("DELETE FROM crmapp_beihuo WHERE company = %s", (company,))
+        deleted = cursor.rowcount
+        print(f"[保存] 门店 {company} 已清空 {deleted} 条旧数据")
+
+        # 2. 在同一个事务中批量插入新数据
+        columns = DB_FIELDS
+        columns_str = ", ".join([f"`{c}`" for c in columns])
+        placeholders = ", ".join([f"%({c})s" for c in columns])
+
+        insert_sql = f"""
+            INSERT INTO `crmapp_beihuo` ({columns_str})
+            VALUES ({placeholders})
+        """
+
+        total = len(records)
+        processed = 0
+        batch_count = 0
+
+        for i in range(0, total, BATCH_SIZE):
+            batch = records[i:i + BATCH_SIZE]
+
+            if batch:
+                cursor.executemany(insert_sql, batch)
+                processed += len(batch)
+                batch_count += 1
+
+                if batch_count % COMMIT_INTERVAL == 0:
+                    print(f"[统计] 门店 {company} 插入进度: {processed}/{total} ({processed * 100 // total}%)")
+
+        # 3. 全部成功后再统一提交
+        conn.commit()
+        print(f"[成功] 门店 {company} 数据原子性保存完成，共 {processed} 条记录")
+        return processed
+
     except Exception as e:
-        print(f"[失败] 保存门店 {company} 数据失败: {e}")
+        # 任何步骤失败都回滚整个事务，旧数据保留，不会出现空表
+        conn.rollback()
+        print(f"[失败] 门店 {company} 原子性保存失败，已回滚，旧数据保留: {e}")
         return -1
+
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def update_vehicle_fields(company: str) -> int:
@@ -144,9 +185,9 @@ def update_vehicle_fields(company: str) -> int:
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
     try:
-        # 1. 获取该门店在 crmapp_compare_summary 中的车型映射数据
+        # 1. 获取该门店在 crmapp_compare_summary 中的车型映射与采购记录数据
         cursor.execute("""
-            SELECT frey_no, l_model_zh, replace_number 
+            SELECT frey_no, l_model_zh, replace_number, purchase_records
             FROM crmapp_compare_summary 
             WHERE company = %s AND frey_no IS NOT NULL AND frey_no != ''
         """, (company,))
@@ -163,7 +204,8 @@ def update_vehicle_fields(company: str) -> int:
             frey_no = row['frey_no']
             mapping[frey_no] = {
                 'l_model_zh': row['l_model_zh'] or '',  # 车型
-                'replace_number': row['replace_number'] or ''  # 替换号
+                'replace_number': row['replace_number'] or '',  # 替换号
+                'purchase_records': row['purchase_records'] or None  # 采购记录
             }
         
         # 3. 获取该门店在 crmapp_beihuo 中的物料条码列表
@@ -189,13 +231,14 @@ def update_vehicle_fields(company: str) -> int:
                 update_data.append((
                     mapping[barcode]['l_model_zh'],
                     mapping[barcode]['replace_number'],
+                    mapping[barcode]['purchase_records'],
                     record_id
                 ))
         
         if update_data:
             cursor.executemany("""
                 UPDATE crmapp_beihuo 
-                SET 车型 = %s, 替换号 = %s 
+                SET 车型 = %s, 替换号 = %s, purchase_records = %s
                 WHERE id = %s
             """, update_data)
             conn.commit()

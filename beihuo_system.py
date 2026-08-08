@@ -1999,7 +1999,8 @@ def add_to_cart():
                 ('近7天销量', 'sales_7d', 0),
                 ('预警状态', 'warning_status', ''),
                 ('在途数量', 'on_way', 0),
-                ('车型', 'car_model', '')
+                ('车型', 'car_model', ''),
+                ('purchase_records', 'purchase_records', '')
             ]
             
             # 匹配并转换数据
@@ -2090,25 +2091,25 @@ def add_to_cart():
             for item in new_items:
                 items_to_add.append((
                     item['oe'], item['supplier'], item['brand'], item['material_name'],
-                    item['barcode'], item['car_brand'], item['tag'], 
+                    item['barcode'], item['car_brand'], item['tag'],
                     item['inquiry_1m'], item['inquiry_3m'], item['stock'],
                     item['sales_yesterday'], item['sales_month'], item['today_sales'],
                     item['national_inquiry_1m'], item['national_inquiry_3m'],
                     item['internal_remarks'], item['brand_code'], item['stock_amount'],
                     item['sellable_days'], item['cost_price'], item['avg_sales_12m'],
                     item['avg_sales_6m'], item['sales_7d'], item['warning_status'],
-                    item['on_way'], item['car_model'], item['store'], 
+                    item['on_way'], item['car_model'], item['purchase_records'], item['store'],
                     item['quantity'], item['added_time'], item['added_by']
                 ))
-            
+
             insert_sql = """
                 INSERT INTO crmapp_cart (
                     oe, supplier, brand, material_name, barcode, car_brand, tag,
                     inquiry_1m, inquiry_3m, stock, sales_yesterday, sales_month, today_sales,
                     national_inquiry_1m, national_inquiry_3m, internal_remarks, brand_code,
                     stock_amount, sellable_days, cost_price, avg_sales_12m, avg_sales_6m,
-                    sales_7d, warning_status, on_way, car_model, store, quantity, added_time, added_by
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    sales_7d, warning_status, on_way, car_model, purchase_records, store, quantity, added_time, added_by
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.executemany(insert_sql, items_to_add)
         
@@ -3714,7 +3715,7 @@ def date_ordercount():
                    `成本价`, `昨日销量`, `本月销量`, `标签`, `物料名称`, `物料条码`,
                    `车型品牌`, `近12个月月均销量`, `近1个月询价量`, `近3个月月均询价量`,
                    `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`, `company`,
-                   `近6个月销量`, `近12个月销量`
+                   `近6个月销量`, `近12个月销量`, `purchase_records`
             FROM crmapp_beihuo
             WHERE `物料条码` IN ({placeholders}) AND `company` = %s
             """
@@ -3780,7 +3781,8 @@ def date_ordercount():
                     item.get('内部备注', '') or '',
                     item.get('waiting_time', '') or '',
                     item.get('预警状态', '') or '',
-                    item.get('销量', 0)
+                    item.get('销量', 0),
+                    item.get('purchase_records', '') or ''
                 ))
 
             # 批量插入数据
@@ -3789,8 +3791,8 @@ def date_ordercount():
                 username, start_date, end_date, company, 物料条码, 物料名称, 品牌, 品牌号,
                 车型品牌, oe, 标签, 车型, 替换号, 今日销量, 昨日销量, 本月销量, 近7天销量, 近1个月询价量, 近3个月月均询价量,
                 近6个月月均销量, 近12个月月均销量, 近6个月销量, 近12个月销量, 成品可卖天数, 库存数量, 在途数量, 成本价, 库存金额, 供应商,
-                全国近1个月询价量, 全国近3个月月均询价量, 内部备注, waiting_time, 预警状态, 销量
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                全国近1个月询价量, 全国近3个月月均询价量, 内部备注, waiting_time, 预警状态, 销量, purchase_records
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.executemany(insert_sql, batch_data)
             insert_end_time = datetime.now()

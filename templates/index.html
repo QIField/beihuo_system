@@ -2950,13 +2950,28 @@ function renderBeihuoTable(table) {
             {field: '供应商', title: '供应商', width: 120, sort: true, unresize: false, fieldAlias: 'supplier', templet: function(d) {
                 // 确保数据正确获取
                 var supplierContent = d.供应商 || d.supplier || '';
-                
-                // 使用正则表达式匹配"供应商名称：价格"的模式
-                // 价格格式为：数字.数字（如 42.0, 19.9 等）
+                var jsonRecords = d.purchase_records || '';
+
+                // 优先从 purchase_records JSON 生成摘要文本
+                var displayText = supplierContent;
+                if (jsonRecords) {
+                    try {
+                        var records = JSON.parse(jsonRecords);
+                        if (Array.isArray(records) && records.length > 0) {
+                            var first = records[0];
+                            var summary = (first.supplier_name || '') + (first.purchase_price !== undefined ? ' ¥' + first.purchase_price : '');
+                            displayText = records.length > 1 ? summary + ' 等' + records.length + '条' : summary;
+                        }
+                    } catch (e) {
+                        // JSON 解析失败，回退到原始供应商字段
+                    }
+                }
+
+                // 使用正则表达式匹配"供应商名称：价格"的模式（备用tooltip内容）
                 var tooltipContent = '';
                 var regex = /(.+?)：(\d+\.?\d*)/g;
                 var match;
-                
+
                 while ((match = regex.exec(supplierContent)) !== null) {
                     var name = match[1].trim();
                     var price = match[2].trim();
@@ -2967,7 +2982,7 @@ function renderBeihuoTable(table) {
                         </div>`;
                     }
                 }
-                
+
                 // 如果没有匹配到任何供应商，显示原始内容
                 if (!tooltipContent && supplierContent) {
                     tooltipContent = `<div class="supplier-tooltip-row">
@@ -2977,9 +2992,9 @@ function renderBeihuoTable(table) {
                 }
 
                 // 创建一个包含供应商信息和工具提示的HTML结构
-                var tooltipHtml = `<div class="supplier-cell" style="position: relative; cursor: pointer; display: inline-block;">
-                    ${supplierContent}
-                    <div class="supplier-tooltip" style="display: none; position: absolute; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; min-width: 250px; font-size: 12px; z-index: 3000;">  /* 调整z-index层级，用于供应商悬浮面板 */
+                var tooltipHtml = `<div class="supplier-cell" data-purchase-records="${jsonRecords ? jsonRecords.replace(/"/g, '&quot;') : ''}" style="position: relative; cursor: pointer; display: inline-block;">
+                    ${displayText || supplierContent}
+                    <div class="supplier-tooltip" style="display: none; position: absolute; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; min-width: 250px; font-size: 12px; z-index: 3000;">
                         <div class="supplier-tooltip-header" style="padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #e6e6e6; font-weight: 500; color: #333; font-size: 14px;">供应商 - 单价</div>
                         <div class="supplier-tooltip-content" style="padding: 12px 16px; max-height: 300px; overflow-y: auto;">
                             ${tooltipContent || '<div class="supplier-tooltip-row">暂无供应商信息</div>'}
@@ -3209,17 +3224,26 @@ function bindSupplierTooltipEvents() {
             cell.addEventListener('mouseenter', function(e) {
                 // 防止重复创建tooltip
                 if (this._tooltip) return;
-                
-                // 获取供应商数据并解析
+
+                // 获取供应商数据并解析（优先JSON）
                 const supplierText = this.innerText.trim();
-                const suppliers = parseSupplierString(supplierText);
+                const jsonRecords = this.getAttribute('data-purchase-records') || '';
+                const suppliers = parseSupplierString(supplierText, jsonRecords);
+                const hasDate = suppliers.some(function(s) { return s.date; });
 
                 // 构建表格内容
                 let tableContent = '<table class="supplier-tooltip-table" style="margin:0;border-collapse:collapse;width:100%;font-size:12px;">';
-                tableContent += '<thead><tr><th style="width:70%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">供应商</th><th style="width:30%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">单价</th></tr></thead><tbody>';
-                suppliers.forEach(function(supplier) {
-                    tableContent += `<tr><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
-                });
+                if (hasDate) {
+                    tableContent += '<thead><tr><th style="width:25%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">日期</th><th style="width:45%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">供应商</th><th style="width:30%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">单价</th></tr></thead><tbody>';
+                    suppliers.forEach(function(supplier) {
+                        tableContent += `<tr><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.date || '-'}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                    });
+                } else {
+                    tableContent += '<thead><tr><th style="width:70%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">供应商</th><th style="width:30%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">单价</th></tr></thead><tbody>';
+                    suppliers.forEach(function(supplier) {
+                        tableContent += `<tr><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                    });
+                }
                 tableContent += '</tbody></table>';
 
                 // 创建tooltip元素
@@ -3356,28 +3380,37 @@ function bindSupplierTooltipEvents() {
         });
     }
 
-    // 解析供应商字符串的辅助函数
-    // 使用正则表达式匹配"供应商名称：价格"的模式
-    // 价格格式为：数字.数字（如 42.0, 19.9 等）
-    function parseSupplierString(supplierText) {
+    // 解析供应商数据（优先JSON格式，兼容旧字符串格式）
+    function parseSupplierString(supplierText, jsonRecords) {
+        // 优先解析 purchase_records JSON
+        if (jsonRecords) {
+            try {
+                const records = JSON.parse(jsonRecords);
+                if (Array.isArray(records) && records.length > 0) {
+                    return records.map(function(r) {
+                        return {
+                            name: r.supplier_name || '',
+                            price: r.purchase_price !== undefined ? String(r.purchase_price) : '',
+                            date: r.purchase_date || ''
+                        };
+                    });
+                }
+            } catch (e) {
+                // JSON 解析失败，回退到字符串解析
+            }
+        }
+        // 回退：解析旧格式字符串
         if (!supplierText) return [];
         const suppliers = [];
-        
-        // 正则表达式：匹配"任意字符：数字.数字"的模式
-        // 使用全局匹配，找到所有供应商
-        // 模式说明：(.+?)： - 非贪婪匹配名称和中文冒号
-        //           (\d+\.?\d*) - 匹配价格（支持 42, 42.0, 42.5 等格式）
         const regex = /(.+?)：(\d+\.?\d*)/g;
         let match;
-        
         while ((match = regex.exec(supplierText)) !== null) {
             const name = match[1].trim();
             const price = match[2].trim();
             if (name) {
-                suppliers.push({ name: name, price: price });
+                suppliers.push({ name: name, price: price, date: '' });
             }
         }
-        
         return suppliers;
     }
 
@@ -5084,13 +5117,28 @@ function showDateQueryResults(data) {
             {field: '供应商', title: '供应商', width: 120, sort: true, unresize: false, fieldAlias: 'supplier', templet: function(d) {
                 // 确保数据正确获取
                 var supplierContent = d.供应商 || d.supplier || '';
-                
-                // 使用正则表达式匹配"供应商名称：价格"的模式
-                // 价格格式为：数字.数字（如 42.0, 19.9 等）
+                var jsonRecords = d.purchase_records || '';
+
+                // 优先从 purchase_records JSON 生成摘要文本
+                var displayText = supplierContent;
+                if (jsonRecords) {
+                    try {
+                        var records = JSON.parse(jsonRecords);
+                        if (Array.isArray(records) && records.length > 0) {
+                            var first = records[0];
+                            var summary = (first.supplier_name || '') + (first.purchase_price !== undefined ? ' ¥' + first.purchase_price : '');
+                            displayText = records.length > 1 ? summary + ' 等' + records.length + '条' : summary;
+                        }
+                    } catch (e) {
+                        // JSON 解析失败，回退到原始供应商字段
+                    }
+                }
+
+                // 使用正则表达式匹配"供应商名称：价格"的模式（备用tooltip内容）
                 var tooltipContent = '';
                 var regex = /(.+?)：(\d+\.?\d*)/g;
                 var match;
-                
+
                 while ((match = regex.exec(supplierContent)) !== null) {
                     var name = match[1].trim();
                     var price = match[2].trim();
@@ -5101,7 +5149,7 @@ function showDateQueryResults(data) {
                         </div>`;
                     }
                 }
-                
+
                 // 如果没有匹配到任何供应商，显示原始内容
                 if (!tooltipContent && supplierContent) {
                     tooltipContent = `<div class="supplier-tooltip-row">
@@ -5111,9 +5159,9 @@ function showDateQueryResults(data) {
                 }
 
                 // 创建一个包含供应商信息和工具提示的HTML结构
-                var tooltipHtml = `<div class="supplier-cell" style="position: relative; cursor: pointer; display: inline-block;">
-                    ${supplierContent}
-                    <div class="supplier-tooltip" style="display: none; position: absolute; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; min-width: 250px; font-size: 12px; z-index: 3000;">  /* 调整z-index层级，用于供应商悬浮面板 */
+                var tooltipHtml = `<div class="supplier-cell" data-purchase-records="${jsonRecords ? jsonRecords.replace(/"/g, '&quot;') : ''}" style="position: relative; cursor: pointer; display: inline-block;">
+                    ${displayText || supplierContent}
+                    <div class="supplier-tooltip" style="display: none; position: absolute; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; min-width: 250px; font-size: 12px; z-index: 3000;">
                         <div class="supplier-tooltip-header" style="padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #e6e6e6; font-weight: 500; color: #333; font-size: 14px;">供应商 - 单价</div>
                         <div class="supplier-tooltip-content" style="padding: 12px 16px; max-height: 300px; overflow-y: auto;">
                             ${tooltipContent || '<div class="supplier-tooltip-row">暂无供应商信息</div>'}

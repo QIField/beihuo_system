@@ -169,6 +169,15 @@ class CRMDataCrawlService:
         else:
             stock_zaitu_list = None
 
+        # 解析采购记录：仅提取供应商、单价、日期三个关键字段
+        purchasing_record_raw = product.get('purchasing_record', '')
+        purchase_records_json = None
+        if purchasing_record_raw:
+            from app.services.procurement_service.procurement_record_service import parse_purchasing_record
+            parsed_records = parse_purchasing_record(purchasing_record_raw)
+            if parsed_records:
+                purchase_records_json = json.dumps(parsed_records, ensure_ascii=False)
+
         return {
             'product_id': product.get('product_id', ''),
             'oe': product.get('number', ''),
@@ -192,7 +201,8 @@ class CRMDataCrawlService:
             'store_cass_price': self._safe_float(product.get('store_cass_price')),
             'supplier_price': 0.0,
             'max_price': 0.0,
-            'min_price': 0.0
+            'min_price': 0.0,
+            'purchase_records': purchase_records_json
         }
 
     def clear_table(self, company=None) -> bool:
@@ -233,7 +243,7 @@ class CRMDataCrawlService:
             'replace_number', 'replace_number_with_keys', 'brand_code', 'is_cass', 'product_remark',
             'product_level', 'l_model_zh', 'stock_zaitu_list', 'frey_no',
             'company_remark', 'waiting_time', 'qpl_price', 'cost_price', 'store_cass_price',
-            'supplier_price', 'max_price', 'min_price'
+            'supplier_price', 'max_price', 'min_price', 'purchase_records'
         ]
         sql = f"INSERT INTO crmapp_compare_summary ({', '.join(columns)}) VALUES ({', '.join(['%s'] * len(columns))})"
 
@@ -261,7 +271,8 @@ class CRMDataCrawlService:
                 p.get('store_cass_price', 0.0),
                 p.get('supplier_price', 0.0),
                 p.get('max_price', 0.0),
-                p.get('min_price', 0.0)
+                p.get('min_price', 0.0),
+                p.get('purchase_records') or None
             )
 
         try:
