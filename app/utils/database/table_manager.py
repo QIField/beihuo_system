@@ -277,6 +277,7 @@ def init_beihuo_table():
                 在途数量 INT DEFAULT 0 COMMENT '在途数量',
                 车型 TEXT COMMENT '车型',
                 替换号 TEXT COMMENT '替换号',
+                purchase_records TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一',
                 INDEX idx_oe (oe),
                 INDEX idx_barcode (物料条码),
                 INDEX idx_company (company),
@@ -307,6 +308,10 @@ def init_beihuo_table():
         {
             'name': '近6个月销量',
             'definition': "INT DEFAULT 0 COMMENT '近6个月销量'"
+        },
+        {
+            'name': 'purchase_records',
+            'definition': "TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一'"
         }
     ]
     check_and_add_fields('crmapp_beihuo', beihuo_fields_to_check)
@@ -727,6 +732,7 @@ def init_compare_summary_table():
                 product_remark TEXT COMMENT '系统产品备注',
                 is_cass VARCHAR(10) COMMENT '是否同步开思',
                 l_model_zh TEXT COMMENT '车型中文名',
+                purchase_records TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一',
                 created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
                 INDEX idx_oe (oe),
@@ -763,6 +769,7 @@ def init_compare_summary_table():
                 ("sales_6m", "INT DEFAULT 0 COMMENT '近6个月总销量'"),
                 ("sales_12m", "INT DEFAULT 0 COMMENT '近12个月总销量'"),
                 ("replace_number_with_keys", "VARCHAR(500) COMMENT '替换号(含key信息，格式key1:num1;key2:num2)'"),
+                ("purchase_records", "TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一'"),
             ]
             
             for col_name, col_def in alter_columns:

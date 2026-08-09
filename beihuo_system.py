@@ -1924,7 +1924,7 @@ def add_to_cart():
     try:
         data = request.get_json()
         item_details = data.get('item_details', [])
-        
+
         print(f"[{start_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 收到添加购物车请求: 用户={session.get('username', 'default_user')}, 商品数量={len(item_details)}")
 
         if not item_details:
@@ -1932,142 +1932,48 @@ def add_to_cart():
 
         # 获取当前用户门店
         store = get_user_store()
-        
-        # ========== 从 beihuo 表批量查询完整商品数据 ==========
-        # 构建批量查询条件
-        oe_barcode_pairs = []
-        for item in item_details:
-            if isinstance(item, dict) and item.get('oe'):
-                oe = item.get('oe', '')
-                barcode = item.get('barcode', '')
-                oe_barcode_pairs.append((oe, barcode))
-        
+
+        # ========== 直接使用前端传入数据构建购物车数据（不再查询备货表） ==========
         complete_items = []
-        if oe_barcode_pairs:
-            conn = get_db_connection()
-            cursor = conn.cursor(pymysql.cursors.DictCursor)
-            
-            # 构建批量查询的 WHERE 子句
-            conditions = []
-            params = [store]
-            for oe, barcode in oe_barcode_pairs:
-                conditions.append("(oe = %s AND 物料条码 = %s)")
-                params.extend([oe, barcode])
-            
-            where_clause = " OR ".join(conditions)
-            query_sql = f"""
-                SELECT * FROM crmapp_beihuo 
-                WHERE company = %s AND ({where_clause})
-            """
-            
-            cursor.execute(query_sql, params)
-            beihuo_data_list = cursor.fetchall()
-            conn.close()
-            
-            # 构建字典便于查找
-            beihuo_dict = {}
-            for beihuo_data in beihuo_data_list:
-                oe_val = beihuo_data['oe'] if 'oe' in beihuo_data else ''
-                barcode_val = beihuo_data['物料条码'] if '物料条码' in beihuo_data else ''
-                key = (oe_val, barcode_val)
-                beihuo_dict[key] = beihuo_data
-            
-            # 字段映射配置：备货表键名 -> (购物车字段名，默认值)
-            field_config = [
-                ('oe', 'oe', ''),
-                ('供应商', 'supplier', ''),
-                ('品牌', 'brand', ''),
-                ('物料名称', 'material_name', ''),
-                ('物料条码', 'barcode', ''),
-                ('车型品牌', 'car_brand', ''),
-                ('标签', 'tag', ''),
-                ('近1个月询价量', 'inquiry_1m', 0),
-                ('近3个月月均询价量', 'inquiry_3m', 0),
-                ('库存数量', 'stock', 0),
-                ('昨日销量', 'sales_yesterday', 0),
-                ('本月销量', 'sales_month', 0),
-                ('今日销量', 'today_sales', 0),
-                ('全国近1个月询价量', 'national_inquiry_1m', 0),
-                ('全国近3个月月均询价量', 'national_inquiry_3m', 0),
-                ('内部备注', 'internal_remarks', ''),
-                ('品牌号', 'brand_code', ''),
-                ('库存金额', 'stock_amount', 0.0),
-                ('成品可卖天数', 'sellable_days', 0),
-                ('成本价', 'cost_price', 0.0),
-                ('近12个月月均销量', 'avg_sales_12m', 0),
-                ('近6个月月均销量', 'avg_sales_6m', 0),
-                ('近7天销量', 'sales_7d', 0),
-                ('预警状态', 'warning_status', ''),
-                ('在途数量', 'on_way', 0),
-                ('车型', 'car_model', ''),
-                ('purchase_records', 'purchase_records', '')
-            ]
-            
-            # 匹配并转换数据
-            for oe, barcode in oe_barcode_pairs:
-                key = (oe, barcode)
-                if key not in beihuo_dict:
-                    continue
-                
-                beihuo_data = beihuo_dict[key]
-                
-                # ========== 关键修复：双重字典映射 ==========
-                # 创建两个字典：一个保留原始键名，一个去除所有空白字符
-                original_data = dict(beihuo_data)  # 保留原始键名
-                normalized_data = {}
-                for raw_k, raw_v in beihuo_data.items():
-                    # 去除所有空白字符（空格、制表符等）
-                    clean_k = ''.join(str(raw_k).split())
-                    normalized_data[clean_k] = raw_v
-                
-                # 辅助函数：从两个字典中查找值
-                def find_value(key):
-                    # 先在原始字典找
-                    if key in original_data:
-                        return original_data[key]
-                    # 再在标准化字典找
-                    if key in normalized_data:
-                        return normalized_data[key]
-                    return None
-                
-                # 构建购物车数据
-                complete_item = {}
-                
-                # 特殊处理：今日销售如果存在且非 NULL，覆盖今日销量
-                today_sales_val = find_value('今日销售')
-                if today_sales_val is not None:
-                    complete_item['today_sales'] = int(today_sales_val) if isinstance(today_sales_val, (int, float)) else 0
-                
-                # 遍历配置，从双重字典取值
-                for beihuo_key, cart_key, default_val in field_config:
-                    if cart_key in complete_item:
-                        continue
-                    
-                    raw = find_value(beihuo_key)
-                    
-                    if raw is None:
-                        complete_item[cart_key] = default_val
-                    elif isinstance(raw, Decimal):
-                        complete_item[cart_key] = float(raw)
-                    elif isinstance(raw, bool):
-                        complete_item[cart_key] = int(raw)
-                    else:
-                        # 尝试将字符串转换为数值类型
-                        if cart_key in ['stock_amount', 'cost_price']:
-                            try:
-                                complete_item[cart_key] = float(raw)
-                            except (ValueError, TypeError):
-                                complete_item[cart_key] = 0.0
-                        else:
-                            complete_item[cart_key] = raw
-                
-                # 添加购物车特有字段
-                complete_item['quantity'] = 1
-                complete_item['added_time'] = datetime.now()
-                complete_item['added_by'] = session.get('username', 'unknown')
-                complete_item['store'] = store
-                
-                complete_items.append(complete_item)
+        for item in item_details:
+            if not isinstance(item, dict) or not item.get('oe'):
+                continue
+
+            complete_item = {
+                'oe': item.get('oe', ''),
+                'supplier': item.get('supplier') if item.get('supplier') else None,
+                'brand': item.get('brand', ''),
+                'material_name': item.get('material_name', ''),
+                'barcode': item.get('barcode', ''),
+                'car_brand': item.get('car_brand', ''),
+                'tag': item.get('tag', ''),
+                'inquiry_1m': item.get('inquiry_1m', 0) or 0,
+                'inquiry_3m': item.get('inquiry_3m', 0) or 0,
+                'stock': item.get('stock_quantity', 0) or item.get('stock', 0) or 0,
+                'sales_yesterday': item.get('sales_yesterday', 0) or 0,
+                'sales_month': item.get('sales_month', 0) or 0,
+                'today_sales': item.get('today_sales', 0) or 0,
+                'national_inquiry_1m': item.get('national_inquiry_1m', 0) or 0,
+                'national_inquiry_3m': item.get('national_inquiry_3m', 0) or 0,
+                'internal_remarks': item.get('internal_remarks', ''),
+                'brand_code': item.get('brand_code', ''),
+                'stock_amount': item.get('stock_amount', 0.0) or 0.0,
+                'sellable_days': item.get('sellable_days', 0) or 0,
+                'cost_price': item.get('cost_price', 0.0) or 0.0,
+                'avg_sales_12m': item.get('avg_sales_12m', 0) or 0,
+                'avg_sales_6m': item.get('avg_sales_6m', 0) or 0,
+                'sales_7d': item.get('sales_7d', 0) or 0,
+                'warning_status': item.get('warning_status', ''),
+                'on_way': item.get('on_way', 0) or 0,
+                'car_model': item.get('car_model', ''),
+                'replace_number': item.get('replace_number', ''),
+                'purchase_records': item.get('purchase_records', ''),
+                'quantity': 1,
+                'added_time': datetime.now(),
+                'added_by': session.get('username', 'unknown'),
+                'store': store,
+            }
+            complete_items.append(complete_item)
         
         # 查询已有记录，避免重复添加
         conn = get_db_connection()
@@ -2098,7 +2004,7 @@ def add_to_cart():
                     item['internal_remarks'], item['brand_code'], item['stock_amount'],
                     item['sellable_days'], item['cost_price'], item['avg_sales_12m'],
                     item['avg_sales_6m'], item['sales_7d'], item['warning_status'],
-                    item['on_way'], item['car_model'], item['purchase_records'], item['store'],
+                    item['on_way'], item['car_model'], item['replace_number'], item['purchase_records'], item['store'],
                     item['quantity'], item['added_time'], item['added_by']
                 ))
 
@@ -2108,24 +2014,69 @@ def add_to_cart():
                     inquiry_1m, inquiry_3m, stock, sales_yesterday, sales_month, today_sales,
                     national_inquiry_1m, national_inquiry_3m, internal_remarks, brand_code,
                     stock_amount, sellable_days, cost_price, avg_sales_12m, avg_sales_6m,
-                    sales_7d, warning_status, on_way, car_model, purchase_records, store, quantity, added_time, added_by
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    sales_7d, warning_status, on_way, car_model, replace_number, purchase_records, store, quantity, added_time, added_by
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.executemany(insert_sql, items_to_add)
         
         conn.commit()
         conn.close()
-        
+
+        # ========== 字段完整性校验 ==========
+        field_check_report = []
+        # 必填字段：这些字段为空时会影响业务使用
+        required_fields = ['oe', 'barcode', 'brand', 'material_name', 'cost_price', 'stock']
+        # 建议字段：这些字段为空时不会阻断业务，但影响信息完整性
+        optional_but_tracked = ['purchase_records', 'car_brand', 'car_model', 'brand_code', 'tag', 'internal_remarks']
+
+        for idx, item in enumerate(new_items):
+            missing_required = []
+            empty_optional = []
+
+            for field in required_fields:
+                val = item.get(field)
+                if val is None or val == '':
+                    missing_required.append(field)
+                elif field in ['cost_price', 'stock'] and val == 0:
+                    empty_optional.append(f"{field}(=0)")
+
+            for field in optional_but_tracked:
+                val = item.get(field)
+                if val is None or val == '':
+                    empty_optional.append(field)
+
+            if missing_required or empty_optional:
+                field_check_report.append({
+                    'index': idx + 1,
+                    'oe': item.get('oe', 'N/A'),
+                    'barcode': item.get('barcode', 'N/A'),
+                    'missing_required': missing_required,
+                    'empty_optional': empty_optional
+                })
+
         end_time = datetime.now()
         elapsed = (end_time - start_time).total_seconds()
-        print(f"[{end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 添加购物车完成，新增: {len(new_items)}, 跳过: {len(complete_items) - len(new_items)}, 耗时: {elapsed:.3f}s")
+        print(f"[{end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 添加购物车完成，新增: {len(new_items)}, 跳过: {len(complete_items) - len(new_items)}, 字段问题: {len(field_check_report)}, 耗时: {elapsed:.3f}s")
 
-        return jsonify({
+        result = {
             'code': 0,
             'msg': f'成功添加 {len(new_items)} 个商品到购物车',
             'added_count': len(new_items),
-            'skipped_count': len(complete_items) - len(new_items)
-        })
+            'skipped_count': len(complete_items) - len(new_items),
+            'field_check': {
+                'total_checked': len(new_items),
+                'issues_found': len(field_check_report),
+                'check_standard': {
+                    'required_fields': required_fields,
+                    'optional_tracked_fields': optional_but_tracked,
+                    'required_note': '必填字段缺失会影响商品正常使用',
+                    'optional_note': '建议字段缺失会影响信息展示完整性'
+                },
+                'details': field_check_report
+            }
+        }
+
+        return jsonify(result)
         
     except Exception as e:
         error_time = datetime.now()

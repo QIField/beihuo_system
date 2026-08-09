@@ -400,39 +400,32 @@ var CartPanel = (function() {
     }
 
     /**
-     * 解析供应商数据（优先JSON格式，兼容旧字符串格式）
+     * 解析供应商数据（使用公共 SupplierRender 模块，与 search_in_crm 页面统一）
      */
-    function parseSupplierString(supplierText, jsonRecords) {
-        // 优先解析 purchase_records JSON
-        if (jsonRecords) {
-            try {
-                var records = JSON.parse(jsonRecords);
-                if (Array.isArray(records) && records.length > 0) {
-                    return records.map(function(r) {
-                        return {
-                            name: r.supplier_name || '',
-                            price: r.purchase_price !== undefined ? String(r.purchase_price) : '',
-                            date: r.purchase_date || ''
-                        };
-                    });
-                }
-            } catch (e) {
-                // JSON 解析失败，回退到字符串解析
-            }
+    function parseSupplierString(jsonRecords) {
+        if (typeof SupplierRender !== 'undefined') {
+            return SupplierRender.parseRecords(jsonRecords);
         }
-        // 回退：解析旧格式字符串 "供应商A：123.00"
-        if (!supplierText) return [];
-        var suppliers = [];
-        var regex = /(.+?)：(\d+\.?\d*)/g;
-        var match;
-        while ((match = regex.exec(supplierText)) !== null) {
-            var name = match[1].trim();
-            var price = match[2].trim();
-            if (name) {
-                suppliers.push({ name: name, price: price, date: '' });
+
+        // 降级：只解析 purchase_records JSON，不再支持字符串格式
+        if (!jsonRecords) return [];
+
+        try {
+            var records = JSON.parse(jsonRecords);
+            if (Array.isArray(records) && records.length > 0) {
+                return records.map(function(r) {
+                    return {
+                        name: r.supplier_name || '',
+                        price: r.purchase_price !== undefined ? String(r.purchase_price) : '',
+                        date: r.purchase_date || ''
+                    };
+                });
             }
+        } catch (e) {
+            // JSON 解析失败，返回空数组
         }
-        return suppliers;
+
+        return [];
     }
 
     /**
@@ -452,48 +445,47 @@ var CartPanel = (function() {
     }
 
     /**
-     * 显示供应商悬浮窗（全局唯一元素，支持JSON格式展示日期+供应商+单价）
+     * 显示供应商悬浮窗（全局唯一元素，使用公共 SupplierRender 模块与 search_in_crm 页面统一）
      */
     function showSupplierTooltip(cell) {
         var layer = ensureSupplierTooltipLayer();
-        var supplierText = (cell.getAttribute('data-suppliers') || cell.innerText || '').trim();
         var jsonRecords = cell.getAttribute('data-purchase-records') || '';
-        var suppliers = parseSupplierString(supplierText, jsonRecords);
 
-        var hasDate = suppliers.some(function(s) { return s.date; });
-        var tooltipContent = '';
-        if (suppliers.length > 0) {
-            suppliers.forEach(function(supplier) {
-                if (hasDate) {
-                    tooltipContent += '<div class="supplier-tooltip-row" style="display: flex; justify-content: space-between; ' +
-                        'padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
-                        '<span style="flex: 1; padding-right: 8px; color: #333;">' + (supplier.date || '-') + '</span>' +
-                        '<span style="flex: 2; padding-right: 16px; color: #333;">' + supplier.name + '</span>' +
-                        '<span style="color: #666; white-space: nowrap;">' + supplier.price + '</span>' +
-                        '</div>';
-                } else {
-                    tooltipContent += '<div class="supplier-tooltip-row" style="display: flex; justify-content: space-between; ' +
-                        'padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
-                        '<span class="supplier-name" style="flex: 1; padding-right: 16px; color: #333;">' + supplier.name + '</span>' +
-                        '<span class="supplier-price" style="color: #666; white-space: nowrap;">' + supplier.price + '</span>' +
-                        '</div>';
-                }
-            });
-        } else if (supplierText) {
-            tooltipContent = '<div class="supplier-tooltip-row" style="display: flex; justify-content: space-between; ' +
-                'padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
-                '<span class="supplier-name" style="flex: 1; padding-right: 16px; color: #333;">' + supplierText + '</span>' +
-                '<span class="supplier-price" style="color: #666; white-space: nowrap;">-</span>' +
-                '</div>';
+        // 优先使用公共渲染模块构建 tooltip HTML
+        if (typeof SupplierRender !== 'undefined') {
+            var records = SupplierRender.parseRecords(jsonRecords);
+            layer.innerHTML = SupplierRender.buildTooltipHtml(records);
         } else {
-            tooltipContent = '<div class="supplier-tooltip-row" style="padding: 8px 16px; color: #999;">暂无供应商信息</div>';
+            // 降级：只解析 purchase_records JSON
+            var suppliers = parseSupplierString(jsonRecords);
+            var hasDate = suppliers.some(function(s) { return s.date; });
+            var tooltipContent = '';
+            if (suppliers.length > 0) {
+                suppliers.forEach(function(supplier) {
+                    if (hasDate) {
+                        tooltipContent += '<div class="supplier-tooltip-row" style="display: flex; justify-content: space-between; ' +
+                            'padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
+                            '<span style="flex: 1; padding-right: 8px; color: #333;">' + (supplier.date || '-') + '</span>' +
+                            '<span style="flex: 2; padding-right: 16px; color: #333;">' + supplier.name + '</span>' +
+                            '<span style="color: #666; white-space: nowrap;">' + supplier.price + '</span>' +
+                            '</div>';
+                    } else {
+                        tooltipContent += '<div class="supplier-tooltip-row" style="display: flex; justify-content: space-between; ' +
+                            'padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
+                            '<span class="supplier-name" style="flex: 1; padding-right: 16px; color: #333;">' + supplier.name + '</span>' +
+                            '<span class="supplier-price" style="color: #666; white-space: nowrap;">' + supplier.price + '</span>' +
+                            '</div>';
+                    }
+                });
+            } else {
+                tooltipContent = '<div class="supplier-tooltip-row" style="padding: 8px 16px; color: #999;">暂无供应商信息</div>';
+            }
+            var headerText = hasDate ? '日期 - 供应商 - 单价' : '供应商 - 单价';
+            layer.innerHTML = '<div class="supplier-tooltip-header" style="padding: 12px 16px; background: #f8f9fa; ' +
+                'border-bottom: 1px solid #e6e6e6; border-radius: 8px 8px 0 0; font-weight: 500; color: #333; font-size: 14px;">' +
+                headerText + '</div>' +
+                '<div class="supplier-tooltip-content" style="max-height: 300px; overflow-y: auto;">' + tooltipContent + '</div>';
         }
-
-        var headerText = hasDate ? '日期 - 供应商 - 单价' : '供应商 - 单价';
-        layer.innerHTML = '<div class="supplier-tooltip-header" style="padding: 12px 16px; background: #f8f9fa; ' +
-            'border-bottom: 1px solid #e6e6e6; border-radius: 8px 8px 0 0; font-weight: 500; color: #333; font-size: 14px;">' +
-            headerText + '</div>' +
-            '<div class="supplier-tooltip-content" style="max-height: 300px; overflow-y: auto;">' + tooltipContent + '</div>';
 
         var cellRect = cell.getBoundingClientRect();
         var viewportHeight = window.innerHeight;
