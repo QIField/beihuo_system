@@ -506,15 +506,32 @@
             },
             { field: '成品可卖天数', headerName: '成品可卖天数', width: 175, filter: true },
             { field: '预警状态', headerName: '预警状态', width: 140, filter: true },
-            { 
-                field: '供应商', 
-                headerName: '供应商', 
-                width: 140, 
+            {
+                field: '供应商',
+                headerName: '供应商',
+                width: 140,
                 filter: true,
                 cellRenderer: function(params) {
                     const supplierContent = params.value || '';
-                    if (!supplierContent) return '';
-                    
+                    const jsonRecords = params.data && params.data.purchase_records;
+
+                    // 优先从 purchase_records JSON 生成摘要文本
+                    let displayText = supplierContent;
+                    if (jsonRecords) {
+                        try {
+                            const records = JSON.parse(jsonRecords);
+                            if (Array.isArray(records) && records.length > 0) {
+                                const first = records[0];
+                                const summary = first.supplier_name + (first.purchase_price !== undefined ? ' ¥' + first.purchase_price : '');
+                                displayText = records.length > 1 ? summary + ' 等' + records.length + '条' : summary;
+                            }
+                        } catch (e) {
+                            // JSON 解析失败，回退到原始供应商字段
+                        }
+                    }
+
+                    if (!displayText && !supplierContent) return '';
+
                     // 创建容器
                     const container = document.createElement('div');
                     container.className = 'supplier-cell';
@@ -524,13 +541,13 @@
                     container.style.overflow = 'hidden';
                     container.style.textOverflow = 'ellipsis';
                     container.style.whiteSpace = 'nowrap';
-                    container.textContent = supplierContent;
-                    
-                    // 鼠标悬停显示浮窗
+                    container.textContent = displayText;
+
+                    // 鼠标悬停显示浮窗（传入 JSON 优先）
                     container.addEventListener('mouseenter', function(e) {
-                        showSupplierTooltip(container, supplierContent);
+                        showSupplierTooltip(container, supplierContent, jsonRecords);
                     });
-                    
+
                     container.addEventListener('mouseleave', function(e) {
                         setTimeout(() => {
                             const tooltip = container._tooltip;
@@ -542,7 +559,7 @@
                             }
                         }, 100);
                     });
-                    
+
                     return container;
                 }
             },
@@ -1193,28 +1210,47 @@
             });
         }
         
-        // 解析供应商数据
-        function parseSupplierData(content) {
+        // 解析供应商数据（优先JSON格式，兼容旧字符串格式）
+        function parseSupplierData(content, jsonRecords) {
+            // 优先解析 purchase_records JSON
+            if (jsonRecords) {
+                try {
+                    const records = JSON.parse(jsonRecords);
+                    if (Array.isArray(records) && records.length > 0) {
+                        return records.map(function(r) {
+                            return {
+                                name: r.supplier_name || '',
+                                price: r.purchase_price !== undefined ? String(r.purchase_price) : '',
+                                date: r.purchase_date || ''
+                            };
+                        });
+                    }
+                } catch (e) {
+                    // JSON 解析失败，回退到字符串解析
+                }
+            }
+            // 回退：解析旧格式字符串 "供应商A：123.00, 供应商B：456.00"
             const suppliers = [];
             const regex = /(.+?)：(\d+\.?\d*)/g;
             let match;
             while ((match = regex.exec(content)) !== null) {
                 suppliers.push({
                     name: match[1].trim(),
-                    price: match[2].trim()
+                    price: match[2].trim(),
+                    date: ''
                 });
             }
             return suppliers;
         }
-        
-        // 显示供应商浮窗
-        function showSupplierTooltip(element, supplierContent) {
-            const suppliers = parseSupplierData(supplierContent);
+
+        // 显示供应商浮窗（支持JSON格式展示供应商、单价、日期）
+        function showSupplierTooltip(element, supplierContent, jsonRecords) {
+            const suppliers = parseSupplierData(supplierContent, jsonRecords);
             if (suppliers.length === 0 && !supplierContent) return;
-            
+
             // 关闭其他浮窗
             closeAllSupplierTooltips();
-            
+
             // 创建浮窗
             const tooltip = document.createElement('div');
             tooltip.className = 'supplier-tooltip';
@@ -1224,34 +1260,48 @@
                 border: 1px solid #e6e6e6;
                 border-radius: 8px;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                max-width: 400px;
-                min-width: 250px;
+                max-width: 480px;
+                min-width: 280px;
                 font-size: 12px;
                 z-index: 9999;
                 pointer-events: auto;
             `;
-            
+
             // 构建表格内容
             let tableContent = '';
             if (suppliers.length > 0) {
+                const hasDate = suppliers.some(s => s.date);
                 tableContent = '<table style="margin:0;border-collapse:collapse;width:100%;font-size:12px;">';
-                tableContent += '<thead><tr><th style="width:70%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">供应商</th><th style="width:30%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">单价</th></tr></thead><tbody>';
+                tableContent += '<thead><tr>';
+                if (hasDate) {
+                    tableContent += '<th style="width:25%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">日期</th>';
+                    tableContent += '<th style="width:45%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">供应商</th>';
+                    tableContent += '<th style="width:30%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">单价</th>';
+                } else {
+                    tableContent += '<th style="width:70%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">供应商</th>';
+                    tableContent += '<th style="width:30%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">单价</th>';
+                }
+                tableContent += '</tr></thead><tbody>';
                 suppliers.forEach(function(supplier) {
-                    tableContent += `<tr><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                    if (hasDate) {
+                        tableContent += `<tr><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.date}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                    } else {
+                        tableContent += `<tr><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                    }
                 });
                 tableContent += '</tbody></table>';
             } else {
                 tableContent = `<div style="padding:12px;">${supplierContent}</div>`;
             }
-            
+
             tooltip.innerHTML = tableContent;
             document.body.appendChild(tooltip);
-            
+
             // 计算位置
             const rect = element.getBoundingClientRect();
             let left = rect.left;
             let top = rect.bottom + 5;
-            
+
             // 边界检查
             const tooltipRect = tooltip.getBoundingClientRect();
             if (left + tooltipRect.width > window.innerWidth) {
@@ -1260,10 +1310,10 @@
             if (top + tooltipRect.height > window.innerHeight) {
                 top = rect.top - tooltipRect.height - 5;
             }
-            
+
             tooltip.style.left = left + 'px';
             tooltip.style.top = top + 'px';
-            
+
             element._tooltip = tooltip;
         }
         

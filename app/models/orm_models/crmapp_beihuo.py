@@ -34,6 +34,7 @@ class CrmappBeihuo(BaseModels):
     car_model = Column('车型', Text, nullable=True, comment='车型')
     replacement_number = Column('替换号', Text, nullable=True, comment='替换号')
     supplier = Column('供应商', Text, nullable=True, comment='供应商')
+    purchase_records = Column('purchase_records', Text, nullable=True, comment='采购记录(JSON格式)')
     tags = Column('标签', String(255), nullable=True, comment='标签')
     internal_remark = Column('内部备注', Text, nullable=True, comment='内部备注')
     company = Column(String(100), nullable=True, comment='公司')  # 英文列名
@@ -94,6 +95,7 @@ class CrmappBeihuo(BaseModels):
             'car_model': self.car_model,
             'replacement_number': self.replacement_number,
             'supplier': self.supplier,
+            'purchase_records': self.purchase_records,
             'tags': self.tags,
             'internal_remark': self.internal_remark,
             'company': self.company,

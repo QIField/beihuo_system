@@ -42,6 +42,7 @@ class CartDataService:
         'sales_month': 'sales_month',
         'avg_sales_6m': 'avg_sales_6m',
         'avg_sales_12m': 'avg_sales_12m',
+        'purchase_records': 'purchase_records',
     }
 
     def get_cart_data(self, store: str, dimension: str = 'product',
@@ -290,46 +291,47 @@ class CartDataService:
         """
         按供应商拆分购物车数据
         一个产品如果有多个供应商，会拆分成多行
+        统一从 purchase_records JSON 解析，不再解析 supplier 字符串
         """
         expanded_result = []
 
         for item in cart_items:
-            supplier_raw = item.get('supplier', '')
-            suppliers = self._parse_supplier_string(supplier_raw)
+            purchase_records = item.get('purchase_records', '')
+            suppliers = self._parse_purchase_records(purchase_records)
 
             for supplier_name, price in suppliers:
                 supplier_item = item.copy()
-                # 使用中文冒号，与原始数据格式保持一致
+                # 使用中文冒号，与前端展示格式保持一致
                 supplier_item['supplier'] = f"{supplier_name}：{price}"
                 expanded_result.append(supplier_item)
 
         return expanded_result
 
-    def _parse_supplier_string(self, supplier_str: str) -> List[tuple]:
+    def _parse_purchase_records(self, records_json: str) -> List[tuple]:
         """
-        解析供应商字符串，提取供应商名称和价格
-
-        使用正则表达式匹配"供应商名称：价格"的模式
-        价格格式为：数字.数字（如 42.0, 19.9 等）
+        解析 purchase_records JSON，提取供应商名称和价格
+        与 crawl_service.py / search_in_crm.py 统一的数据格式
 
         示例：
-        "佛山颂沃德汽配：0.0 广州粤之星 品牌部：0.0 上海佳配：19.9"
-        -> [("佛山颂沃德汽配", "0.0"), ("广州粤之星 品牌部", "0.0"), ("上海佳配", "19.9")]
+        '[{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_date":"2026-01-12"}]'
+        -> [("佛山德孚", "15.00")]
         """
-        if not supplier_str or not isinstance(supplier_str, str):
-            return [(supplier_str or "未知供应商", "N/A")]
+        import json
 
-        # 使用正则表达式匹配"名称：价格"的模式
-        # (.+?)： - 非贪婪匹配任意字符（供应商名称）和中文冒号
-        # (\d+\.?\d*) - 匹配价格（支持 42, 42.0, 42.5 等格式）
-        pattern = r'(.+?)：(\d+\.?\d*)'
-        matches = re.findall(pattern, supplier_str)
+        if not records_json or not isinstance(records_json, str):
+            return [("未知供应商", "N/A")]
 
-        suppliers = []
-        for name, price in matches:
-            name = name.strip()
-            price = price.strip()
-            if name:
-                suppliers.append((name, price))
+        try:
+            records = json.loads(records_json)
+            if isinstance(records, list) and records:
+                suppliers = []
+                for r in records:
+                    name = r.get('supplier_name', '').strip()
+                    price = r.get('purchase_price', 0.0)
+                    if name:
+                        suppliers.append((name, f"{price:.2f}"))
+                return suppliers if suppliers else [("未知供应商", "N/A")]
+        except (json.JSONDecodeError, TypeError):
+            pass
 
-        return suppliers if suppliers else [(supplier_str, "N/A")]
+        return [("未知供应商", "N/A")]

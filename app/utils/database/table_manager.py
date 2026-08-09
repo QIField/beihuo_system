@@ -134,6 +134,7 @@ def init_cart_table():
                 on_way INT DEFAULT 0 COMMENT '在途数量',
                 car_model TEXT COMMENT '车型',
                 replace_number TEXT COMMENT '替换号',
+                purchase_records TEXT COMMENT '采购记录(JSON格式)',
                 quantity INT DEFAULT 1 COMMENT '数量',
                 added_time DATETIME COMMENT '加入时间',
                 added_by VARCHAR(255) COMMENT '加入账户名',
@@ -158,6 +159,7 @@ def init_cart_table():
     # 修改购物车表字段类型
     modify_field_type('crmapp_cart', 'car_model', "TEXT COMMENT '车型'")
     modify_field_type('crmapp_cart', 'replace_number', "TEXT COMMENT '替换号'")
+    modify_field_type('crmapp_cart', 'purchase_records', "TEXT COMMENT '采购记录(JSON格式)'")
 
 
 def init_user_table():
@@ -275,6 +277,7 @@ def init_beihuo_table():
                 在途数量 INT DEFAULT 0 COMMENT '在途数量',
                 车型 TEXT COMMENT '车型',
                 替换号 TEXT COMMENT '替换号',
+                purchase_records TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一',
                 INDEX idx_oe (oe),
                 INDEX idx_barcode (物料条码),
                 INDEX idx_company (company),
@@ -305,6 +308,10 @@ def init_beihuo_table():
         {
             'name': '近6个月销量',
             'definition': "INT DEFAULT 0 COMMENT '近6个月销量'"
+        },
+        {
+            'name': 'purchase_records',
+            'definition': "TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一'"
         }
     ]
     check_and_add_fields('crmapp_beihuo', beihuo_fields_to_check)
@@ -357,6 +364,7 @@ def init_date_search_table():
                 waiting_time VARCHAR(50) COMMENT '待仓时间',
                 预警状态 VARCHAR(255) COMMENT '预警状态',
                 销量 INT DEFAULT 0 COMMENT '销量',
+                purchase_records TEXT COMMENT '采购记录(JSON格式)',
                 查询时间 TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '查询时间',
                 INDEX idx_username (username),
                 INDEX idx_dates (start_date, end_date),
@@ -384,6 +392,10 @@ def init_date_search_table():
         {
             'name': 'waiting_time',
             'definition': "VARCHAR(50) COMMENT '待仓时间'"
+        },
+        {
+            'name': 'purchase_records',
+            'definition': "TEXT COMMENT '采购记录(JSON格式)'"
         }
     ]
     check_and_add_fields('crmapp_date_search', date_search_fields_to_check)
@@ -720,6 +732,7 @@ def init_compare_summary_table():
                 product_remark TEXT COMMENT '系统产品备注',
                 is_cass VARCHAR(10) COMMENT '是否同步开思',
                 l_model_zh TEXT COMMENT '车型中文名',
+                purchase_records TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一',
                 created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
                 INDEX idx_oe (oe),
@@ -756,6 +769,7 @@ def init_compare_summary_table():
                 ("sales_6m", "INT DEFAULT 0 COMMENT '近6个月总销量'"),
                 ("sales_12m", "INT DEFAULT 0 COMMENT '近12个月总销量'"),
                 ("replace_number_with_keys", "VARCHAR(500) COMMENT '替换号(含key信息，格式key1:num1;key2:num2)'"),
+                ("purchase_records", "TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一'"),
             ]
             
             for col_name, col_def in alter_columns:

@@ -126,10 +126,10 @@ def _merge_vehicle_mapping(company: str, records: list) -> list:
         if not barcodes:
             return records
         
-        # 查询车型映射（使用BINARY避免字符集冲突）
+        # 查询车型映射与采购记录（使用BINARY避免字符集冲突）
         placeholders = ','.join(['%s'] * len(barcodes))
         cursor.execute(f"""
-            SELECT frey_no, l_model_zh, replace_number
+            SELECT frey_no, l_model_zh, replace_number, purchase_records
             FROM crmapp_compare_summary
             WHERE company = %s 
               AND frey_no IN ({placeholders})
@@ -150,6 +150,9 @@ def _merge_vehicle_mapping(company: str, records: list) -> list:
                     record['车型'] = mapping['l_model_zh']
                 # 设置替换号
                 record['替换号'] = mapping.get('replace_number', '')
+                # 合并采购记录（JSON格式）
+                if mapping.get('purchase_records'):
+                    record['purchase_records'] = mapping['purchase_records']
                 merged_count += 1
         
         print(f"[车型] 门店 {company} 车型映射合并完成，共 {merged_count}/{len(records)} 条记录")
