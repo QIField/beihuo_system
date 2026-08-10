@@ -83,6 +83,7 @@ TASK_LOGGERS = [
     'quote_replace_number',         # 报价 OE 替换号自动同步
     'multi_channel_quote_adjust',   # 多渠道报价调价
     'purchase_history_compare',     # 采购历史比对功能
+    'crm_full_crawl',               # CRM 全量数据爬取
 ]
 
 

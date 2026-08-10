@@ -79,10 +79,30 @@ def execute_daily_pipeline():
 
         companies = list(STORE_KEY_MAP.keys())
         thread_safe_print(f"待处理组织: {', '.join(companies)}")
-        
+
+        # 先串行清空所有组织的旧数据，避免并发锁竞争
+        thread_safe_print(f"\n{'='*60}")
+        thread_safe_print("1a. 串行清空各组织旧数据...")
+        thread_safe_print(f"{'='*60}")
+
+        cleared_companies = []
+        for company in companies:
+            from app.services.procurement_service.crawl_service import CRMDataCrawlService
+            service = CRMDataCrawlService(company)
+            if service.clear_table(company):
+                cleared_companies.append(company)
+            else:
+                thread_safe_print(f"[跳过] {company} 清空失败，跳过爬取")
+
+        if not cleared_companies:
+            thread_safe_print("[警告] 所有组织清空均失败，本次CRM爬取取消")
+            return
+
+        thread_safe_print(f"\n[成功] 已清空 {len(cleared_companies)}/{len(companies)} 个组织，开始并发爬取...")
+
         # 使用线程池并发执行（最多3个线程，剩下的排队）
         with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {executor.submit(crawl_company_crm, company): company for company in companies}
+            futures = {executor.submit(crawl_company_crm, company): company for company in cleared_companies}
             
             for future in as_completed(futures):
                 company, result = future.result()

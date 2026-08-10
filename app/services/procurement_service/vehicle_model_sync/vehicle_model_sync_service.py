@@ -118,7 +118,7 @@ class VehicleModelSyncService:
                 oe VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
                 l_model_zh TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
                 PRIMARY KEY (oe)
-            ) ENGINE=MEMORY
+            ) ENGINE=InnoDB
         """)
 
         # 2. 清空临时表（确保当前批次无脏数据）
