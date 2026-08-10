@@ -732,6 +732,7 @@ def init_compare_summary_table():
                 product_remark TEXT COMMENT '系统产品备注',
                 is_cass VARCHAR(10) COMMENT '是否同步开思',
                 l_model_zh TEXT COMMENT '车型中文名',
+                frey_no VARCHAR(255) COMMENT 'Frey编号',
                 purchase_records TEXT COMMENT '采购记录(JSON格式)，与crmapp_cart统一',
                 created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 updated_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -744,18 +745,25 @@ def init_compare_summary_table():
                 INDEX idx_oe_brand (oe, brand),
                 INDEX idx_oe_brand_company (oe, brand, company),
                 INDEX idx_updated_time (updated_time),
-                UNIQUE INDEX uk_oe_brand_company (oe, brand, company)
+                UNIQUE INDEX uk_frey_no_company (frey_no, company)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='比价数据汇总表';
             """
             cursor.execute(create_table_sql)
-            
-            # 检查并添加唯一索引（兼容旧表）
+
+            # 兼容旧表：删除旧唯一索引，添加新唯一索引
+            try:
+                cursor.execute("ALTER TABLE crmapp_compare_summary DROP INDEX uk_oe_brand_company")
+                print("已删除旧唯一索引 uk_oe_brand_company")
+            except Exception as e:
+                if "doesn't exist" not in str(e) and "Duplicate key name" not in str(e):
+                    print(f"删除旧唯一索引时出错: {str(e)}")
+
             try:
                 cursor.execute("""
-                    ALTER TABLE crmapp_compare_summary 
-                    ADD UNIQUE INDEX uk_oe_brand_company (oe, brand, company)
+                    ALTER TABLE crmapp_compare_summary
+                    ADD UNIQUE INDEX uk_frey_no_company (frey_no, company)
                 """)
-                print("已添加唯一索引 uk_oe_brand_company 到 crmapp_compare_summary 表")
+                print("已添加唯一索引 uk_frey_no_company 到 crmapp_compare_summary 表")
             except Exception as e:
                 if "Duplicate key name" not in str(e) and "Duplicate entry" not in str(e):
                     print(f"添加唯一索引时出错: {str(e)}")

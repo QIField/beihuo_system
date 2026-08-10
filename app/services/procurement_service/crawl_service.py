@@ -206,24 +206,56 @@ class CRMDataCrawlService:
         }
 
     def clear_table(self, company=None) -> bool:
-        """清空 crmapp_compare_summary 表，支持按组织清空"""
-        conn = get_db_connection()
-        try:
-            with conn.cursor() as cursor:
-                if company:
-                    cursor.execute("DELETE FROM crmapp_compare_summary WHERE company = %s", (company,))
-                    print(f"[成功] 已清空 {company} 的 crmapp_compare_summary 数据")
-                else:
+        """清空 crmapp_compare_summary 表，支持按组织清空，带分批删除和重试"""
+        if not company:
+            conn = get_db_connection()
+            try:
+                with conn.cursor() as cursor:
                     cursor.execute("TRUNCATE TABLE crmapp_compare_summary")
                     print("[成功] 已清空 crmapp_compare_summary 表")
-                conn.commit()
+                    conn.commit()
+                    return True
+            except Exception as e:
+                conn.rollback()
+                print(f"[失败] 清空表失败: {e}")
+                return False
+            finally:
+                conn.close()
+
+        # 按组织分批删除 + 重试
+        max_retries = 3
+        for attempt in range(max_retries):
+            conn = get_db_connection()
+            try:
+                with conn.cursor() as cursor:
+                    total_deleted = 0
+                    while True:
+                        cursor.execute(
+                            "DELETE FROM crmapp_compare_summary WHERE company = %s LIMIT 10000",
+                            (company,)
+                        )
+                        deleted = cursor.rowcount
+                        conn.commit()
+                        if deleted == 0:
+                            break
+                        total_deleted += deleted
+                        print(f"[进度] 已删除 {company} 的 {total_deleted} 条数据")
+
+                print(f"[成功] 已清空 {company} 的 crmapp_compare_summary 数据 (共 {total_deleted} 条)")
                 return True
-        except Exception as e:
-            conn.rollback()
-            print(f"[失败] 清空表失败: {e}")
-            return False
-        finally:
-            conn.close()
+            except Exception as e:
+                conn.rollback()
+                if 'Lock wait timeout' in str(e) and attempt < max_retries - 1:
+                    wait_time = 2 * (attempt + 1)
+                    print(f"[重试] 清空表被锁，等待 {wait_time} 秒后重试 ({attempt + 1}/{max_retries})...")
+                    time.sleep(wait_time)
+                    continue
+                print(f"[失败] 清空表失败: {e}")
+                return False
+            finally:
+                conn.close()
+
+        return False
 
     def batch_save(self, products: List[Dict]) -> Dict[str, int]:
         """
@@ -335,10 +367,6 @@ class CRMDataCrawlService:
             print(f"\n[统计] 总记录数: {total}")
             print(f"[文档] 总页数: {last_page}")
             print(f"[包裹] 每页数量: {LIMIT}")
-
-            # 清空该组织的旧数据
-            if not self.clear_table(self.company):
-                return {'total': 0, 'saved': 0, 'failed': 0, 'company': self.company}
 
             batch_buffer = []
             total_processed = 0
@@ -468,12 +496,12 @@ class CRMDataCrawlService:
                         AND s.brand = b.`品牌` COLLATE utf8mb4_unicode_ci
                         AND s.company = b.company COLLATE utf8mb4_unicode_ci
                     SET
-                        s.today_sales = b.today_sales,
-                        s.yesterday_sales = b.sales_yesterday,
-                        s.month_sales = b.sales_month,
-                        s.sales_7d = b.sales_7d,
-                        s.avg_sales_6m = b.avg_sales_6m,
-                        s.avg_sales_12m = b.avg_sales_12m,
+                        s.today_sales = b.`今日销量`,
+                        s.yesterday_sales = b.`昨日销量`,
+                        s.month_sales = b.`本月销量`,
+                        s.sales_7d = b.`近7天销量`,
+                        s.avg_sales_6m = b.`近6个月月均销量`,
+                        s.avg_sales_12m = b.`近12个月月均销量`,
                         s.sales_6m = b.`近6个月销量`,
                         s.sales_12m = b.`近12个月销量`
                     WHERE s.company = %s
