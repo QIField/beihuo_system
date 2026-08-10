@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Tuple
 from config import create_crm_session
 from app.utils.database_connection import get_db_connection
 from app.services.procurement_service.vehicle_model_sync import VehicleModelSyncService
+from app.utils.logger_config import get_task_logger
 
 
 # 配置参数
@@ -41,6 +42,36 @@ class CRMDataCrawlService:
         self.total_saved = 0
         self.total_failed = 0
         self.model_sync_service = VehicleModelSyncService()
+        self.logger = get_task_logger('crm_full_crawl')
+
+    def _request_api(self, payload: Dict) -> Dict:
+        """
+        发送CRM API请求，带重试和session重建
+        返回响应中的data字段，失败返回空字典
+        """
+        for attempt in range(MAX_RETRY):
+            try:
+                response = self.session.post(
+                    CRM_PRODUCT_LIST_URL,
+                    json=payload,
+                    timeout=120
+                )
+                response.raise_for_status()
+                result = response.json()
+
+                if result.get('status') == 200 or result.get('msg') == '操作成功':
+                    return result.get('data', {})
+
+                self.logger.warning(f"API返回错误: {result.get('msg')}")
+            except Exception:
+                self.logger.exception(f"[{attempt + 1}/{MAX_RETRY}] API请求失败")
+                if attempt < MAX_RETRY - 1:
+                    time.sleep(RETRY_DELAY)
+                    try:
+                        self.session = create_crm_session(self.company)
+                    except Exception:
+                        pass
+        return {}
 
     def get_total_pages(self) -> Tuple[int, int]:
         """
@@ -48,68 +79,18 @@ class CRMDataCrawlService:
         同时初始化session
         """
         self.session = create_crm_session(self.company)
-        payload = {'page': 1, 'limit': LIMIT}
-
-        for attempt in range(MAX_RETRY):
-            try:
-                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=120)
-                response.raise_for_status()
-                result = response.json()
-
-                if result.get('status') == 200 or result.get('msg') == '操作成功':
-                    data = result.get('data', {})
-                    total = data.get('total', 0)
-                    last_page = data.get('last_page', 0)
-                    return total, last_page
-                else:
-                    print(f"API返回错误: {result.get('msg')}")
-            except Exception as e:
-                print(f"[{attempt + 1}/{MAX_RETRY}] 获取总页数失败: {e}")
-                import traceback
-                traceback.print_exc()
-                if attempt < MAX_RETRY - 1:
-                    time.sleep(RETRY_DELAY)
-                    # 重建session
-                    try:
-                        self.session = create_crm_session(self.company)
-                    except:
-                        pass
-                    continue
-                else:
-                    raise Exception(f"多次重试后仍无法获取总页数: {e}")
-
-        return 0, 0
+        data = self._request_api({'page': 1, 'limit': LIMIT})
+        if data:
+            return data.get('total', 0), data.get('last_page', 0)
+        raise Exception("多次重试后仍无法获取总页数")
 
     def crawl_page(self, page: int) -> List[Dict]:
         """爬取指定页，返回产品列表"""
-        payload = {'page': page, 'limit': LIMIT}
-
-        for attempt in range(MAX_RETRY):
-            try:
-                response = self.session.post(CRM_PRODUCT_LIST_URL, json=payload, timeout=120)
-                response.raise_for_status()
-                result = response.json()
-
-                if result.get('status') == 200 or result.get('msg') == '操作成功':
-                    data = result.get('data', {})
-                    return data.get('data', [])
-                else:
-                    print(f"[第{page}页] API返回错误: {result.get('msg')}")
-            except Exception as e:
-                print(f"[第{page}页][{attempt + 1}/{MAX_RETRY}] 请求失败: {e}")
-                import traceback
-                traceback.print_exc()
-                if attempt < MAX_RETRY - 1:
-                    time.sleep(RETRY_DELAY)
-                    # 尝试重建session
-                    try:
-                        self.session = create_crm_session(self.company)
-                    except:
-                        pass
-                    continue
-
-        print(f"[第{page}页] 多次重试后仍失败，跳过该页")
-        return []
+        data = self._request_api({'page': page, 'limit': LIMIT})
+        if not data:
+            self.logger.error(f"[第{page}页] 多次重试后仍失败，跳过该页")
+            return []
+        return data.get('data', [])
 
     def _extract_replace_numbers(self, display_number):
         """
@@ -207,17 +188,18 @@ class CRMDataCrawlService:
 
     def clear_table(self, company=None) -> bool:
         """清空 crmapp_compare_summary 表，支持按组织清空，带分批删除和重试"""
+        # 兜底分支：未传入组织时清空全表（当前调用方始终传入 company，此分支暂未被触发）
         if not company:
             conn = get_db_connection()
             try:
                 with conn.cursor() as cursor:
                     cursor.execute("TRUNCATE TABLE crmapp_compare_summary")
-                    print("[成功] 已清空 crmapp_compare_summary 表")
+                    self.logger.info("[成功] 已清空 crmapp_compare_summary 表")
                     conn.commit()
                     return True
             except Exception as e:
                 conn.rollback()
-                print(f"[失败] 清空表失败: {e}")
+                self.logger.error(f"[失败] 清空表失败: {e}")
                 return False
             finally:
                 conn.close()
@@ -239,18 +221,18 @@ class CRMDataCrawlService:
                         if deleted == 0:
                             break
                         total_deleted += deleted
-                        print(f"[进度] 已删除 {company} 的 {total_deleted} 条数据")
+                        self.logger.info(f"[进度] 已删除 {company} 的 {total_deleted} 条数据")
 
-                print(f"[成功] 已清空 {company} 的 crmapp_compare_summary 数据 (共 {total_deleted} 条)")
+                self.logger.info(f"[成功] 已清空 {company} 的 crmapp_compare_summary 数据 (共 {total_deleted} 条)")
                 return True
             except Exception as e:
                 conn.rollback()
                 if 'Lock wait timeout' in str(e) and attempt < max_retries - 1:
                     wait_time = 2 * (attempt + 1)
-                    print(f"[重试] 清空表被锁，等待 {wait_time} 秒后重试 ({attempt + 1}/{max_retries})...")
+                    self.logger.warning(f"[重试] 清空表被锁，等待 {wait_time} 秒后重试 ({attempt + 1}/{max_retries})...")
                     time.sleep(wait_time)
                     continue
-                print(f"[失败] 清空表失败: {e}")
+                self.logger.error(f"[失败] 清空表失败: {e}")
                 return False
             finally:
                 conn.close()
@@ -331,150 +313,154 @@ class CRMDataCrawlService:
                                 if len(failed_reasons) < 3:
                                     failed_reasons.append((p.get('oe', ''), p.get('brand', ''), str(e)))
                         
-                        # 打印前几条失败原因
+                        # 记录前几条失败原因
                         if failed_reasons:
-                            print(f"  [警告]  失败示例（前{len(failed_reasons)}条）：")
+                            self.logger.warning(f"  [警告]  失败示例（前{len(failed_reasons)}条）：")
                             for idx, (oe, brand, reason) in enumerate(failed_reasons, 1):
-                                print(f"     {idx}. OE: {oe}, 品牌: {brand}, 原因: {reason}")
+                                self.logger.warning(f"     {idx}. OE: {oe}, 品牌: {brand}, 原因: {reason}")
 
                 conn.commit()
 
         except Exception as e:
             conn.rollback()
-            print(f"批量保存失败: {e}")
+            self.logger.exception("批量保存失败")
         finally:
             conn.close()
 
         if total_failed > 0:
-            print(f"  [统计] 保存统计: 成功{total_saved}条, 失败{total_failed}条")
+            self.logger.warning(f"  [统计] 保存统计: 成功{total_saved}条, 失败{total_failed}条")
 
         return {'saved': total_saved, 'failed': total_failed}
 
-    def crawl_all(self) -> Dict[str, int]:
+    def _crawl_and_save_pages(self, total: int, last_page: int) -> Dict[str, int]:
         """
-        主入口：爬取所有产品并保存
-
-        Returns:
-            {'total': 总记录数, 'saved': 成功保存数, 'failed': 失败数, 'company': 组织代码}
+        阶段1：分页爬取、解析并批量保存
         """
-        print("=" * 80)
-        print(f"开始CRM全量爬取 - 组织: {self.company}")
-        print("=" * 80)
+        batch_buffer = []
+        page_failed = 0
 
-        try:
-            # 获取总页数
-            total, last_page = self.get_total_pages()
-            print(f"\n[统计] 总记录数: {total}")
-            print(f"[文档] 总页数: {last_page}")
-            print(f"[包裹] 每页数量: {LIMIT}")
+        for page in range(1, last_page + 1):
+            self.logger.info(f"{'=' * 80}")
+            self.logger.info(f"[文档] 正在处理第 {page}/{last_page} 页")
+            self.logger.info(f"{'=' * 80}")
 
-            batch_buffer = []
-            total_processed = 0
-            page_failed = 0
+            data_list = self.crawl_page(page)
+            if not data_list:
+                page_failed += 1
+                continue
 
-            # 遍历所有页
-            for page in range(1, last_page + 1):
-                print(f"\n{'=' * 80}")
-                print(f"[文档] 正在处理第 {page}/{last_page} 页")
-                print(f"{'=' * 80}")
+            page_products = []
+            for group in data_list:
+                for product in group.get('child', []):
+                    try:
+                        parsed = self.parse_product(product)
+                        page_products.append(parsed)
+                        oe = product.get('number', '')
+                        brand = product.get('brand_name', '')
+                        model = product.get('l_model_zh', '')
+                        self.model_sync_service.collect_model_mapping(oe, brand, model)
+                    except Exception as e:
+                        self.logger.warning(f"[警告]  解析产品失败: {e}")
+                        self.total_failed += 1
 
-                # 获取页面数据
-                data_list = self.crawl_page(page)
-                if not data_list:
-                    page_failed += 1
-                    continue
+            self.logger.info(f"[成功] 本页解析成功: {len(page_products)} 条")
 
-                # 解析产品
-                page_products = []
-                for group in data_list:
-                    for product in group.get('child', []):
-                        try:
-                            parsed = self.parse_product(product)
-                            page_products.append(parsed)
+            batch_buffer.extend(page_products)
+            self.logger.info(f"[包裹] 当前缓存: {len(batch_buffer)} 条")
 
-                            # 收集车型映射（用于后续同步）
-                            oe = product.get('number', '')
-                            brand = product.get('brand_name', '')
-                            model = product.get('l_model_zh', '')
-                            self.model_sync_service.collect_model_mapping(oe, brand, model)
-
-                        except Exception as e:
-                            print(f"[警告]  解析产品失败: {e}")
-                            self.total_failed += 1
-
-                print(f"[成功] 本页解析成功: {len(page_products)} 条")
-
-                # 加入批量缓存
-                batch_buffer.extend(page_products)
-                total_processed += len(page_products)
-                print(f"[包裹] 当前缓存: {len(batch_buffer)} 条")
-
-                # 检查是否需要批量保存
-                if len(batch_buffer) >= BATCH_SIZE:
-                    print(f"\n[软盘] 批量保存 {len(batch_buffer)} 条数据...")
-                    result = self.batch_save(batch_buffer)
-                    self.total_saved += result['saved']
-                    print(f"[成功] 保存成功: {result['saved']} 条")
-                    batch_buffer = []
-
-                # 每10页暂停
-                if page % 10 == 0:
-                    print(f"\n[暂停]  已处理10页，暂停2秒...")
-                    time.sleep(2)
-
-            # 保存最后一批
-            if batch_buffer:
-                print(f"\n[软盘] 保存最后一批数据: {len(batch_buffer)} 条...")
+            if len(batch_buffer) >= BATCH_SIZE:
+                self.logger.info(f"[软盘] 批量保存 {len(batch_buffer)} 条数据...")
                 result = self.batch_save(batch_buffer)
                 self.total_saved += result['saved']
-                print(f"[成功] 保存成功: {result['saved']} 条")
+                self.logger.info(f"[成功] 保存成功: {result['saved']} 条")
+                batch_buffer = []
 
-            # 输出统计
-            print("\n" + "=" * 80)
-            print(f"爬取完成统计 - 组织: {self.company}")
-            print("=" * 80)
-            print(f"[统计] 总记录数: {total}")
-            print(f"[成功] 成功保存: {self.total_saved} 条")
-            print(f"[失败] 失败: {self.total_failed} 条")
-            print(f"[文档] 总页数: {last_page}")
-            print(f"[警告]  失败页数: {page_failed}")
+            if page % 10 == 0:
+                self.logger.info(f"[暂停]  已处理10页，暂停2秒...")
+                time.sleep(2)
 
-            result = {
-                'total': total,
-                'saved': self.total_saved,
-                'failed': self.total_failed,
-                'company': self.company
-            }
-            
-            # 全量爬取完成后，同步车型数据
-            print("\n" + "="*80)
-            print(f"CRM全量爬取完成，开始同步车型数据 - 组织: {self.company}")
-            print("="*80)
-            self.model_sync_service.sync_to_database(company=self.company)
+        if batch_buffer:
+            self.logger.info(f"[软盘] 保存最后一批数据: {len(batch_buffer)} 条...")
+            result = self.batch_save(batch_buffer)
+            self.total_saved += result['saved']
+            self.logger.info(f"[成功] 保存成功: {result['saved']} 条")
 
-            # 从备货表同步销量数据
-            print("\n" + "="*80)
-            print(f"开始从备货表同步销量数据 - 组织: {self.company}")
-            print("="*80)
-            self._sync_sales_from_beihuo()
+        self.logger.info("=" * 80)
+        self.logger.info(f"爬取完成统计 - 组织: {self.company}")
+        self.logger.info("=" * 80)
+        self.logger.info(f"[统计] 总记录数: {total}")
+        self.logger.info(f"[成功] 成功保存: {self.total_saved} 条")
+        self.logger.info(f"[失败] 失败: {self.total_failed} 条")
+        self.logger.info(f"[文档] 总页数: {last_page}")
+        self.logger.warning(f"[警告]  失败页数: {page_failed}")
 
-            # 重建 replace_number_index 预处理表
-            print("\n" + "="*80)
-            print("开始重建 replace_number_index 预处理表")
-            print("="*80)
-            try:
-                from app.services.multi_channel_quote_adjust_service.oe_inventory_matcher import rebuild_replace_number_index
-                rebuild_result = rebuild_replace_number_index()
-                print(f"[成功] replace_number_index 重建完成，源数据 {rebuild_result['processed']} 条，索引行 {rebuild_result['saved']} 条，耗时 {rebuild_result['elapsed']:.1f}s")
-            except Exception as e:
-                print(f"[警告] 重建 replace_number_index 失败: {e}")
+        return {
+            'total': total,
+            'saved': self.total_saved,
+            'failed': self.total_failed,
+            'company': self.company
+        }
+
+    def _sync_vehicle_models(self):
+        """阶段2：同步车型数据到数据库"""
+        self.logger.info("=" * 80)
+        self.logger.info(f"CRM全量爬取完成，开始同步车型数据 - 组织: {self.company}")
+        self.logger.info("=" * 80)
+        self.model_sync_service.sync_to_database(company=self.company)
+
+    def _sync_sales_data(self):
+        """阶段3：从备货表同步销量数据"""
+        self.logger.info("=" * 80)
+        self.logger.info(f"开始从备货表同步销量数据 - 组织: {self.company}")
+        self.logger.info("=" * 80)
+        self._sync_sales_from_beihuo()
+
+    def _rebuild_indexes(self):
+        """阶段4：重建 replace_number_index 预处理表"""
+        self.logger.info("=" * 80)
+        self.logger.info("开始重建 replace_number_index 预处理表")
+        self.logger.info("=" * 80)
+        try:
+            from app.services.multi_channel_quote_adjust_service.oe_inventory_matcher import rebuild_replace_number_index
+            rebuild_result = rebuild_replace_number_index()
+            self.logger.info(
+                f"[成功] replace_number_index 重建完成，"
+                f"源数据 {rebuild_result['processed']} 条，"
+                f"索引行 {rebuild_result['saved']} 条，"
+                f"耗时 {rebuild_result['elapsed']:.1f}s"
+            )
+        except Exception as e:
+            self.logger.warning(f"[警告] 重建 replace_number_index 失败: {e}")
+
+    def crawl_all(self) -> Dict[str, int]:
+        """
+        主入口：编排所有爬取阶段
+
+        阶段：
+        1. _crawl_and_save_pages - 分页爬取并保存
+        2. _sync_vehicle_models   - 车型数据同步
+        3. _sync_sales_data       - 销量数据同步
+        4. _rebuild_indexes       - 索引重建
+        """
+        self.logger.info("=" * 80)
+        self.logger.info(f"开始CRM全量爬取 - 组织: {self.company}")
+        self.logger.info("=" * 80)
+
+        try:
+            total, last_page = self.get_total_pages()
+            self.logger.info(f"[统计] 总记录数: {total}")
+            self.logger.info(f"[文档] 总页数: {last_page}")
+            self.logger.info(f"[包裹] 每页数量: {LIMIT}")
+
+            result = self._crawl_and_save_pages(total, last_page)
+            self._sync_vehicle_models()
+            self._sync_sales_data()
+            self._rebuild_indexes()
 
             return result
 
-        except Exception as e:
-            print(f"\n[失败] 爬取过程出错: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
+            self.logger.exception(f"[失败] 爬取过程出错")
             return {'total': 0, 'saved': self.total_saved, 'failed': self.total_failed, 'company': self.company}
 
         finally:
@@ -510,12 +496,10 @@ class CRMDataCrawlService:
                 conn.commit()
                 affected = cursor.rowcount
 
-                print(f"\n[销量同步] 完成:")
-                print(f"  - 更新记录数: {affected}")
+                self.logger.info(f"[销量同步] 完成:")
+                self.logger.info(f"  - 更新记录数: {affected}")
 
         except Exception as e:
-            print(f"\n[销量同步] 失败: {e}")
-            import traceback
-            traceback.print_exc()
+            self.logger.exception(f"[销量同步] 失败")
 
 
