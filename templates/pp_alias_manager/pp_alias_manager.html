@@ -2,39 +2,48 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>CRM 零件品牌别名管理</title>
+    <title>CRM 品牌别名池管理</title>
     <link rel="stylesheet" href="/static/layui/css/layui.css">
     <style>
-        .alias-input-group {
+        .pool-input-group {
             display: flex;
             align-items: center;
             margin-bottom: 10px;
         }
-        .alias-input-group input {
+        .pool-input-group input {
             flex: 1;
         }
-        .alias-input-group .layui-btn {
+        .pool-input-group .layui-btn {
             margin-left: 10px;
+        }
+        .pool-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            border-radius: 4px;
+            color: #1890ff;
+            font-size: 13px;
         }
     </style>
 </head>
 <body>
 <div style="padding: 20px;">
-    <table id="aliasTable" lay-filter="aliasTable"></table>
+    <table id="poolTable" lay-filter="poolTable"></table>
 </div>
 
 <script src="/static/layui/layui.js"></script>
 <script>
     layui.use(['table', 'form', 'layer'], function () {
         var table = layui.table;
-        var form = layui.form;
         var layer = layui.layer;
         var $ = layui.$;
 
         // 渲染表格
         var tableIns = table.render({
-            elem: '#aliasTable',
-            url: '/new/api/pp-alias/list',
+            elem: '#poolTable',
+            url: '/new/api/pp-alias/pool/list',
             method: 'GET',
             page: true,
             limit: 20,
@@ -49,23 +58,22 @@
                 };
             },
             cols: [[
-                {field: 'pp_name', title: '品牌主名', minWidth: 200, sort: true},
-                {field: 'alias_text', title: '别名', minWidth: 300},
+                {field: 'pool_id', title: '池编号', width: 100, sort: true},
+                {field: 'name_text', title: '池内名称', minWidth: 400},
+                {field: 'count', title: '名称数', width: 100, sort: true},
                 {title: '操作', toolbar: '#barDemo', width: 150, fixed: 'right'}
             ]]
         });
 
         // 搜索栏
-        table.on('toolbar(aliasTable)', function (obj) {
+        table.on('toolbar(poolTable)', function (obj) {
             if (obj.event === 'add') {
                 openForm();
             } else if (obj.event === 'search') {
-                var ppName = $('#searchPpName').val();
-                var aliasName = $('#searchAliasName').val();
+                var name = $('#searchName').val();
                 tableIns.reload({
                     where: {
-                        pp_name: ppName,
-                        alias_name: aliasName
+                        name: name
                     },
                     page: {curr: 1}
                 });
@@ -73,17 +81,17 @@
         });
 
         // 行工具：编辑、删除
-        table.on('tool(aliasTable)', function (obj) {
+        table.on('tool(poolTable)', function (obj) {
             var data = obj.data;
             if (obj.event === 'edit') {
                 openForm(data);
             } else if (obj.event === 'del') {
-                layer.confirm('确定删除该品牌主名【' + data.pp_name + '】及其所有别名吗？', function (index) {
+                layer.confirm('确定删除别名池 #' + data.pool_id + ' 吗？', function (index) {
                     $.ajax({
-                        url: '/new/api/pp-alias/delete',
+                        url: '/new/api/pp-alias/pool/delete',
                         type: 'POST',
                         contentType: 'application/json',
-                        data: JSON.stringify({pp_name: data.pp_name}),
+                        data: JSON.stringify({pool_id: data.pool_id}),
                         success: function (res) {
                             if (res.code === 200) {
                                 layer.msg('删除成功');
@@ -104,31 +112,25 @@
         // 打开新增/编辑表单
         function openForm(data) {
             var isEdit = !!data;
-            var title = isEdit ? '编辑别名' : '新增别名';
-            var ppName = isEdit ? data.pp_name : '';
-            var aliases = isEdit ? (data.items || []) : [{id: null, alias_name: ''}];
+            var title = isEdit ? '编辑别名池 #' + data.pool_id : '新增别名池';
+            var names = isEdit ? (data.names || []) : ['', ''];
 
-            var aliasInputsHtml = '';
-            aliases.forEach(function (item, index) {
-                aliasInputsHtml += buildAliasInput(item.alias_name || '', item.id || '', index);
+            var inputsHtml = '';
+            names.forEach(function (name, index) {
+                inputsHtml += buildNameInput(name, index);
             });
 
             var html = '<form class="layui-form" style="padding: 20px;">' +
                 '<div class="layui-form-item">' +
-                '<label class="layui-form-label">品牌主名</label>' +
-                '<div class="layui-input-block">' +
-                '<input type="text" id="formPpName" value="' + ppName + '" required lay-verify="required" placeholder="请输入品牌主名" class="layui-input">' +
-                '</div>' +
-                '</div>' +
-                '<div class="layui-form-item">' +
-                '<label class="layui-form-label">别名列表</label>' +
-                '<div class="layui-input-block" id="aliasInputsContainer">' +
-                aliasInputsHtml +
+                '<label class="layui-form-label">名称列表</label>' +
+                '<div class="layui-input-block" id="nameInputsContainer">' +
+                inputsHtml +
                 '</div>' +
                 '</div>' +
                 '<div class="layui-form-item">' +
                 '<div class="layui-input-block">' +
-                '<button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="btnAddAliasInput"><i class="layui-icon">&#xe608;</i> 新增别名</button>' +
+                '<button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="btnAddNameInput"><i class="layui-icon">&#xe608;</i> 添加名称</button>' +
+                '<span class="layui-word-aux" style="margin-left: 10px;">别名池至少需要 2 个名称</span>' +
                 '</div>' +
                 '</div>' +
                 '</form>';
@@ -141,62 +143,69 @@
                 btn: ['保存', '取消'],
                 content: html,
                 success: function(layero, index) {
-                    // 绑定新增别名输入框按钮
-                    layero.find('#btnAddAliasInput').on('click', function() {
-                        var container = layero.find('#aliasInputsContainer');
-                        var count = container.find('.alias-input-group').length;
-                        container.append(buildAliasInput('', '', count));
+                    // 绑定添加名称按钮
+                    layero.find('#btnAddNameInput').on('click', function() {
+                        var container = layero.find('#nameInputsContainer');
+                        var count = container.find('.pool-input-group').length;
+                        container.append(buildNameInput('', count));
                     });
 
-                    // 绑定删除别名输入框按钮（事件委托）
-                    layero.find('#aliasInputsContainer').on('click', '.btn-remove-alias', function() {
-                        var container = layero.find('#aliasInputsContainer');
-                        if (container.find('.alias-input-group').length <= 1) {
-                            layer.msg('至少保留一个别名');
+                    // 绑定删除名称按钮（事件委托）
+                    layero.find('#nameInputsContainer').on('click', '.btn-remove-name', function() {
+                        var container = layero.find('#nameInputsContainer');
+                        if (container.find('.pool-input-group').length <= 2) {
+                            layer.msg('至少保留两个名称');
                             return;
                         }
-                        $(this).closest('.alias-input-group').remove();
+                        $(this).closest('.pool-input-group').remove();
                     });
                 },
                 yes: function (index, layero) {
-                    var ppNameVal = $.trim(layero.find('#formPpName').val());
-                    var aliasInputs = layero.find('.alias-input');
-                    var aliasNames = [];
-                    var aliasesData = [];
-
-                    if (!ppNameVal) {
-                        layer.msg('品牌主名不能为空');
-                        return;
-                    }
+                    var nameInputs = layero.find('.name-input');
+                    var names = [];
 
                     var hasEmpty = false;
-                    aliasInputs.each(function() {
+                    nameInputs.each(function() {
                         var val = $.trim($(this).val());
                         if (!val) {
                             hasEmpty = true;
                             return false;
                         }
-                        aliasNames.push(val);
-                        aliasesData.push({
-                            id: $(this).data('id') || null,
-                            alias_name: val
-                        });
+                        names.push(val);
                     });
 
                     if (hasEmpty) {
-                        layer.msg('别名不能为空');
+                        layer.msg('名称不能为空');
+                        return;
+                    }
+
+                    if (names.length < 2) {
+                        layer.msg('别名池至少需要 2 个名称');
+                        return;
+                    }
+
+                    // 去重
+                    var uniqueNames = [];
+                    var seen = {};
+                    for (var i = 0; i < names.length; i++) {
+                        var lower = names[i].toLowerCase();
+                        if (!seen[lower]) {
+                            seen[lower] = true;
+                            uniqueNames.push(names[i]);
+                        }
+                    }
+                    if (uniqueNames.length !== names.length) {
+                        layer.msg('名称列表中存在重复项');
                         return;
                     }
 
                     if (isEdit) {
-                        // 编辑：批量更新
                         var postData = {
-                            old_pp_name: data.pp_name,
-                            pp_name: ppNameVal,
-                            aliases: aliasesData
+                            pool_id: data.pool_id,
+                            names: uniqueNames
                         };
                         $.ajax({
-                            url: '/new/api/pp-alias/update',
+                            url: '/new/api/pp-alias/pool/update',
                             type: 'POST',
                             contentType: 'application/json',
                             data: JSON.stringify(postData),
@@ -214,27 +223,25 @@
                             }
                         });
                     } else {
-                        // 新增：批量创建
                         var postData = {
-                            pp_name: ppNameVal,
-                            alias_names: aliasNames
+                            names: uniqueNames
                         };
                         $.ajax({
-                            url: '/new/api/pp-alias/create',
+                            url: '/new/api/pp-alias/pool/create',
                             type: 'POST',
                             contentType: 'application/json',
                             data: JSON.stringify(postData),
                             success: function (res) {
                                 if (res.code === 200) {
-                                    layer.msg('新增成功');
+                                    layer.msg('创建成功');
                                     layer.close(index);
                                     tableIns.reload();
                                 } else {
-                                    layer.msg(res.msg || '新增失败');
+                                    layer.msg(res.msg || '创建失败');
                                 }
                             },
                             error: function () {
-                                layer.msg('新增失败');
+                                layer.msg('创建失败');
                             }
                         });
                     }
@@ -242,11 +249,11 @@
             });
         }
 
-        // 构建别名输入框 HTML
-        function buildAliasInput(value, id, index) {
-            return '<div class="alias-input-group">' +
-                '<input type="text" class="layui-input alias-input" data-id="' + (id || '') + '" value="' + value + '" placeholder="请输入别名" required>' +
-                '<button type="button" class="layui-btn layui-btn-danger layui-btn-sm btn-remove-alias"><i class="layui-icon">&#xe640;</i></button>' +
+        // 构建名称输入框 HTML
+        function buildNameInput(value, index) {
+            return '<div class="pool-input-group">' +
+                '<input type="text" class="layui-input name-input" value="' + (value || '') + '" placeholder="请输入品牌名称" required>' +
+                '<button type="button" class="layui-btn layui-btn-danger layui-btn-sm btn-remove-name"><i class="layui-icon">&#xe640;</i></button>' +
                 '</div>';
         }
     });
@@ -254,9 +261,8 @@
 
 <script type="text/html" id="toolbarDemo">
     <div class="layui-btn-container">
-        <button class="layui-btn layui-btn-sm" lay-event="add">新增</button>
-        <input type="text" id="searchPpName" placeholder="品牌主名" class="layui-input" style="display:inline-block;width:150px;height:30px;margin-left:10px;">
-        <input type="text" id="searchAliasName" placeholder="别名" class="layui-input" style="display:inline-block;width:150px;height:30px;margin-left:10px;">
+        <button class="layui-btn layui-btn-sm" lay-event="add">新增别名池</button>
+        <input type="text" id="searchName" placeholder="搜索名称" class="layui-input" style="display:inline-block;width:200px;height:30px;margin-left:10px;">
         <button class="layui-btn layui-btn-sm layui-btn-normal" lay-event="search">搜索</button>
     </div>
 </script>

@@ -1,350 +1,318 @@
 # -*- coding:utf-8 -*-
 """
-CRM 零件品牌别名服务层
+CRM 品牌别名池服务层
 
-负责别名映射的增删改查业务逻辑，并记录操作日志
+负责别名池的增删改查业务逻辑，并记录操作日志
 """
 
-from app.models.orm_models.crm_pp_name import CrmPpName
-from app.models.orm_models.crm_pp_name_log import CrmPpNameLog
+from app.models.orm_models.crm_pp_alias_pool import CrmPpAliasPool
+from app.models.orm_models.crm_pp_alias_pool_log import CrmPpAliasPoolLog
 from app.utils.orm import orm_session
+from app.services.pp_alias_service.pp_alias_pool_service import clear_pool_cache
 
 
-def _validate_input(pp_name, alias_name):
+def _validate_names(names):
     """
-    校验输入参数
+    校验名称列表
     """
-    if not pp_name or not pp_name.strip():
-        raise ValueError("品牌主名不能为空")
-    if not alias_name or not alias_name.strip():
-        raise ValueError("别名不能为空")
+    if not names or not isinstance(names, list):
+        raise ValueError("名称列表不能为空")
+    valid_names = [n.strip() for n in names if n and str(n).strip()]
+    if len(valid_names) < 2:
+        raise ValueError("别名池至少需要 2 个不同名称")
+    if len(set(n.lower() for n in valid_names)) != len(valid_names):
+        raise ValueError("名称列表中存在重复项（不区分大小写）")
+    return valid_names
 
 
-def _validate_pp_name(pp_name):
+def _get_next_pool_id(session):
     """
-    校验品牌主名
+    获取下一个可用的 pool_id
     """
-    if not pp_name or not pp_name.strip():
-        raise ValueError("品牌主名不能为空")
-    return pp_name.strip()
+    from sqlalchemy import func as sql_func
+    max_id = session.query(sql_func.max(CrmPpAliasPool.pool_id)).scalar()
+    return (max_id or 0) + 1
 
 
-def get_paged_aliases(page, page_size, pp_name=None, alias_name=None):
+def _check_names_conflict(session, names, exclude_pool_id=None):
     """
-    分页获取别名列表（按品牌主名分组聚合）
+    检查名称是否已存在于其他池中
+    :return: 冲突的名称列表 [(name, existing_pool_id), ...]
+    """
+    conflicts = []
+    for name in names:
+        existing = session.query(CrmPpAliasPool).filter(
+            CrmPpAliasPool.name == name
+        ).first()
+        if existing and existing.pool_id != exclude_pool_id:
+            conflicts.append((name, existing.pool_id))
+    return conflicts
+
+
+def get_paged_pools(page, page_size, name_keyword=None):
+    """
+    分页获取别名池列表
 
     :param page: 页码
     :param page_size: 每页条数
-    :param pp_name: 主名模糊搜索
-    :param alias_name: 别名模糊搜索
+    :param name_keyword: 名称关键词模糊搜索
     :return: {"total": 总条数, "data_list": 当前页数据}
     """
     page = max(1, int(page or 1))
     page_size = max(1, min(int(page_size or 10), 100))
 
     with orm_session() as session:
-        # 先获取匹配条件的主名列表（去重）
-        pp_query = session.query(CrmPpName.pp_name.distinct())
-        if pp_name:
-            pp_query = pp_query.filter(CrmPpName.pp_name.like(f"%{pp_name}%"))
-        if alias_name:
-            pp_query = pp_query.filter(CrmPpName.alias_name.like(f"%{alias_name}%"))
+        query = session.query(CrmPpAliasPool)
 
-        total = pp_query.count()
+        if name_keyword:
+            # 先查出匹配的名称对应的 pool_id
+            matched = session.query(CrmPpAliasPool.pool_id).filter(
+                CrmPpAliasPool.name.like(f"%{name_keyword}%")
+            ).distinct().all()
+            matched_pool_ids = [m[0] for m in matched]
+            if not matched_pool_ids:
+                return {"total": 0, "data_list": []}
+            query = query.filter(CrmPpAliasPool.pool_id.in_(matched_pool_ids))
 
-        pp_names = (
-            pp_query.order_by(CrmPpName.pp_name.desc())
-            .limit(page_size)
-            .offset((page - 1) * page_size)
-            .all()
-        )
-        pp_names = [p[0] for p in pp_names]
+        # 获取所有涉及的 pool_id（去重）
+        all_pool_ids = [r[0] for r in session.query(
+            CrmPpAliasPool.pool_id.distinct()
+        ).order_by(CrmPpAliasPool.pool_id.desc()).all()]
 
-        if not pp_names:
+        total = len(all_pool_ids)
+
+        start = (page - 1) * page_size
+        page_pool_ids = all_pool_ids[start:start + page_size]
+
+        if not page_pool_ids:
             return {"total": 0, "data_list": []}
 
-        # 查询这些主名对应的所有别名记录
-        all_aliases = (
-            session.query(CrmPpName)
-            .filter(CrmPpName.pp_name.in_(pp_names))
-            .all()
-        )
+        # 查询这些 pool 的所有成员
+        members = session.query(CrmPpAliasPool).filter(
+            CrmPpAliasPool.pool_id.in_(page_pool_ids)
+        ).all()
 
-        # 按主名分组
         grouped = {}
-        for alias in all_aliases:
-            if alias.pp_name not in grouped:
-                grouped[alias.pp_name] = []
-            grouped[alias.pp_name].append(alias)
+        for m in members:
+            grouped.setdefault(m.pool_id, []).append(m)
 
         data_list = []
-        for name in pp_names:
-            aliases = grouped.get(name, [])
-            alias_names = [a.alias_name for a in aliases]
+        for pid in page_pool_ids:
+            pool_members = grouped.get(pid, [])
+            names = [m.name for m in pool_members]
             data_list.append({
-                "pp_name": name,
-                "alias_text": "，".join(alias_names),
-                "items": [{"id": a.id, "alias_name": a.alias_name} for a in aliases]
+                "pool_id": pid,
+                "names": names,
+                "name_text": ", ".join(names),
+                "count": len(names),
+                "items": [{"id": m.id, "name": m.name} for m in pool_members]
             })
 
-        return {
-            "total": total,
-            "data_list": data_list
-        }
+        return {"total": total, "data_list": data_list}
 
 
-def create_alias(pp_name, alias_name, operator=None):
+def create_pool(names, operator=None):
     """
-    创建别名映射，并记录操作日志
+    创建新别名池
+
+    :param names: 名称列表（如 ["博世", "BOSCH"]）
+    :param operator: 操作人
+    :return: 创建后的池数据 {"pool_id": ..., "names": [...]}
     """
-    pp_name = pp_name.strip() if pp_name else ""
-    alias_name = alias_name.strip() if alias_name else ""
-    _validate_input(pp_name, alias_name)
+    names = _validate_names(names)
 
     with orm_session() as session:
-        alias = CrmPpName.create(session, pp_name, alias_name)
+        conflicts = _check_names_conflict(session, names)
+        if conflicts:
+            conflict_names = ", ".join([c[0] for c in conflicts])
+            raise ValueError(f"以下名称已存在于其他池中: {conflict_names}")
 
-        # 记录创建日志
-        CrmPpNameLog.create_log(
+        pool_id = _get_next_pool_id(session)
+
+        for name in names:
+            CrmPpAliasPool.create(session, pool_id, name)
+
+        CrmPpAliasPoolLog.create_log(
             session,
-            record_id=alias.id,
             action='create',
-            pp_name_new=alias.pp_name,
-            alias_name_new=alias.alias_name,
+            pool_id=pool_id,
+            names_new=names,
             operator=operator
         )
 
         session.commit()
-        return alias.to_dict()
+        clear_pool_cache()
+
+        return {
+            "pool_id": pool_id,
+            "names": names,
+            "name_text": ", ".join(names),
+            "count": len(names)
+        }
+
+
+def update_pool(pool_id, names, operator=None):
+    """
+    更新别名池成员（全量替换）
+
+    :param pool_id: 池编号
+    :param names: 新的名称列表
+    :param operator: 操作人
+    :return: 更新后的池数据
+    """
+    if not pool_id:
+        raise ValueError("池编号不能为空")
+    names = _validate_names(names)
+
+    with orm_session() as session:
+        existing = CrmPpAliasPool.get_by_pool_id(session, pool_id)
+        if not existing:
+            raise ValueError("别名池不存在")
+
+        old_names = [e.name for e in existing]
+
+        conflicts = _check_names_conflict(session, names, exclude_pool_id=pool_id)
+        if conflicts:
+            conflict_names = ", ".join([c[0] for c in conflicts])
+            raise ValueError(f"以下名称已存在于其他池中: {conflict_names}")
+
+        # 删除旧成员
+        CrmPpAliasPool.delete_by_pool_id(session, pool_id)
+        session.flush()
+
+        # 插入新成员
+        for name in names:
+            CrmPpAliasPool.create(session, pool_id, name)
+
+        CrmPpAliasPoolLog.create_log(
+            session,
+            action='update',
+            pool_id=pool_id,
+            names_old=old_names,
+            names_new=names,
+            operator=operator
+        )
+
+        session.commit()
+        clear_pool_cache()
+
+        return {
+            "pool_id": pool_id,
+            "names": names,
+            "name_text": ", ".join(names),
+            "count": len(names)
+        }
+
+
+def delete_pool(pool_id, operator=None):
+    """
+    删除整个别名池
+
+    :param pool_id: 池编号
+    :param operator: 操作人
+    :return: 是否删除成功
+    """
+    if not pool_id:
+        raise ValueError("池编号不能为空")
+
+    with orm_session() as session:
+        existing = CrmPpAliasPool.get_by_pool_id(session, pool_id)
+        if not existing:
+            return False
+
+        old_names = [e.name for e in existing]
+
+        CrmPpAliasPool.delete_by_pool_id(session, pool_id)
+
+        CrmPpAliasPoolLog.create_log(
+            session,
+            action='delete',
+            pool_id=pool_id,
+            names_old=old_names,
+            operator=operator
+        )
+
+        session.commit()
+        clear_pool_cache()
+        return True
+
+
+# ============ 兼容旧接口（内部调用仍可用） ============
+
+def create_alias(pp_name, alias_name, operator=None):
+    """
+    【兼容】创建别名映射（单条）
+    实际行为：将 pp_name + alias_name 作为一个 2 成员池创建
+    """
+    pp_name = (pp_name or "").strip()
+    alias_name = (alias_name or "").strip()
+    if not pp_name or not alias_name:
+        raise ValueError("名称不能为空")
+    return create_pool([pp_name, alias_name], operator=operator)
 
 
 def create_aliases_batch(pp_name, alias_names, operator=None):
     """
-    批量创建别名映射（为同一主名添加多个别名），并记录操作日志
-
-    :param pp_name: 品牌主名
-    :param alias_names: 别名列表
-    :param operator: 操作人
-    :return: 创建的记录列表
+    【兼容】批量创建别名映射
+    实际行为：将 pp_name + 所有 alias_names 作为一个池创建
     """
-    pp_name = _validate_pp_name(pp_name)
-
+    pp_name = (pp_name or "").strip()
+    if not pp_name:
+        raise ValueError("品牌主名不能为空")
     if not alias_names or not isinstance(alias_names, list):
         raise ValueError("别名列表不能为空")
-
-    results = []
-    with orm_session() as session:
-        for alias_name in alias_names:
-            alias_name = alias_name.strip() if alias_name else ""
-            if not alias_name:
-                continue
-
-            alias = CrmPpName.create(session, pp_name, alias_name)
-
-            # 记录创建日志
-            CrmPpNameLog.create_log(
-                session,
-                record_id=alias.id,
-                action='create',
-                pp_name_new=alias.pp_name,
-                alias_name_new=alias.alias_name,
-                operator=operator
-            )
-            results.append(alias.to_dict())
-
-        session.commit()
-        return results
+    names = [pp_name] + [n.strip() for n in alias_names if n and str(n).strip()]
+    return create_pool(names, operator=operator)
 
 
 def update_alias_group(old_pp_name, pp_name, aliases, operator=None):
     """
-    按品牌主名批量更新别名映射（增删改），并记录操作日志
-
-    :param old_pp_name: 原来的品牌主名
-    :param pp_name: 新的品牌主名
-    :param aliases: 别名列表，每项包含 id 和 alias_name，id 为空表示新增
-    :param operator: 操作人
-    :return: 更新后的主名及别名列表
+    【兼容】按品牌主名批量更新别名映射
+    实际行为：找到包含 old_pp_name 的池，全量替换为 pp_name + 所有 alias_names
     """
-    old_pp_name = old_pp_name.strip() if old_pp_name else ""
-    pp_name = _validate_pp_name(pp_name)
-
+    old_pp_name = (old_pp_name or "").strip()
+    pp_name = (pp_name or "").strip()
+    if not old_pp_name or not pp_name:
+        raise ValueError("品牌主名不能为空")
     if not aliases or not isinstance(aliases, list):
         raise ValueError("别名列表不能为空")
 
     with orm_session() as session:
-        # 获取该主名下现有的所有别名记录
-        existing = CrmPpName.get_by_pp_name(session, old_pp_name)
-        existing_map = {a.id: a for a in existing}
+        # 查找包含 old_pp_name 的池
+        member = session.query(CrmPpAliasPool).filter(
+            CrmPpAliasPool.name == old_pp_name
+        ).first()
+        if not member:
+            raise ValueError("记录不存在")
 
-        kept_ids = set()
-
-        for item in aliases:
-            alias_name = item.get('alias_name', '').strip()
-            if not alias_name:
-                continue
-
-            alias_id = item.get('id')
-
-            if alias_id and alias_id in existing_map:
-                # 更新现有别名
-                old_alias = existing_map[alias_id]
-                changes = {}
-                if old_alias.pp_name != pp_name:
-                    changes['pp_name_old'] = old_alias.pp_name
-                    changes['pp_name_new'] = pp_name
-                    old_alias.pp_name = pp_name
-                if old_alias.alias_name != alias_name:
-                    changes['alias_name_old'] = old_alias.alias_name
-                    changes['alias_name_new'] = alias_name
-                    old_alias.alias_name = alias_name
-
-                if changes:
-                    session.flush()
-                    CrmPpNameLog.create_log(
-                        session,
-                        record_id=alias_id,
-                        action='update',
-                        operator=operator,
-                        **changes
-                    )
-                kept_ids.add(alias_id)
-            else:
-                # 新增别名
-                new_alias = CrmPpName.create(session, pp_name, alias_name)
-                session.flush()
-                CrmPpNameLog.create_log(
-                    session,
-                    record_id=new_alias.id,
-                    action='create',
-                    pp_name_new=new_alias.pp_name,
-                    alias_name_new=new_alias.alias_name,
-                    operator=operator
-                )
-                kept_ids.add(new_alias.id)
-
-        # 删除未保留的现有别名
-        for eid, ealias in existing_map.items():
-            if eid not in kept_ids:
-                CrmPpNameLog.create_log(
-                    session,
-                    record_id=eid,
-                    action='delete',
-                    pp_name_old=ealias.pp_name,
-                    alias_name_old=ealias.alias_name,
-                    operator=operator
-                )
-                session.delete(ealias)
-                session.flush()
-
-        session.commit()
-
-        # 返回更新后的数据
-        updated = CrmPpName.get_by_pp_name(session, pp_name)
-        return {
-            "pp_name": pp_name,
-            "alias_text": "，".join([a.alias_name for a in updated]),
-            "items": [{"id": a.id, "alias_name": a.alias_name} for a in updated]
-        }
+        pool_id = member.pool_id
+        names = [pp_name] + [a.get('alias_name', '').strip() for a in aliases if a.get('alias_name')]
+        names = list(dict.fromkeys(names))  # 去重保序
+        return update_pool(pool_id, names, operator=operator)
 
 
 def delete_alias_group(pp_name, operator=None):
     """
-    根据品牌主名删除该主名对应的所有别名映射，并记录操作日志
-
-    :param pp_name: 品牌主名
-    :param operator: 操作人
-    :return: 是否删除成功
+    【兼容】按品牌主名删除别名组
+    实际行为：找到包含 pp_name 的池并删除
     """
-    if not pp_name or not pp_name.strip():
+    pp_name = (pp_name or "").strip()
+    if not pp_name:
         raise ValueError("品牌主名不能为空")
 
     with orm_session() as session:
-        existing = CrmPpName.get_by_pp_name(session, pp_name)
-        if not existing:
+        member = session.query(CrmPpAliasPool).filter(
+            CrmPpAliasPool.name == pp_name
+        ).first()
+        if not member:
             return False
-
-        for alias in existing:
-            CrmPpNameLog.create_log(
-                session,
-                record_id=alias.id,
-                action='delete',
-                pp_name_old=alias.pp_name,
-                alias_name_old=alias.alias_name,
-                operator=operator
-            )
-            session.delete(alias)
-            session.flush()
-
-        session.commit()
-        return True
+        return delete_pool(member.pool_id, operator=operator)
 
 
-def update_alias(alias_id, pp_name, alias_name, operator=None):
+def get_paged_aliases(page, page_size, pp_name=None, alias_name=None):
     """
-    更新别名映射（单条），并记录操作日志
+    【兼容】分页获取别名列表（按品牌主名分组聚合）
+    实际行为：调用 get_paged_pools，将 name_keyword 设为 pp_name 或 alias_name
     """
-    if not alias_id:
-        raise ValueError("ID 不能为空")
-
-    pp_name = pp_name.strip() if pp_name else ""
-    alias_name = alias_name.strip() if alias_name else ""
-    _validate_input(pp_name, alias_name)
-
-    with orm_session() as session:
-        # 先查询旧数据
-        old_alias = CrmPpName.get_by_id(session, alias_id)
-        if not old_alias:
-            return None
-
-        pp_name_old = old_alias.pp_name
-        alias_name_old = old_alias.alias_name
-
-        alias = CrmPpName.update(session, alias_id, pp_name, alias_name)
-
-        # 记录更新日志
-        CrmPpNameLog.create_log(
-            session,
-            record_id=alias_id,
-            action='update',
-            pp_name_old=pp_name_old,
-            alias_name_old=alias_name_old,
-            pp_name_new=alias.pp_name,
-            alias_name_new=alias.alias_name,
-            operator=operator
-        )
-
-        session.commit()
-        return alias.to_dict()
-
-
-def delete_alias(alias_id, operator=None):
-    """
-    删除别名映射（单条），并记录操作日志
-    """
-    if not alias_id:
-        raise ValueError("ID 不能为空")
-
-    with orm_session() as session:
-        # 先查询被删数据
-        old_alias = CrmPpName.get_by_id(session, alias_id)
-        if not old_alias:
-            return False
-
-        pp_name_old = old_alias.pp_name
-        alias_name_old = old_alias.alias_name
-
-        result = CrmPpName.delete(session, alias_id)
-
-        # 记录删除日志
-        CrmPpNameLog.create_log(
-            session,
-            record_id=alias_id,
-            action='delete',
-            pp_name_old=pp_name_old,
-            alias_name_old=alias_name_old,
-            operator=operator
-        )
-
-        session.commit()
-        return result
+    name_keyword = pp_name or alias_name
+    return get_paged_pools(page, page_size, name_keyword=name_keyword)

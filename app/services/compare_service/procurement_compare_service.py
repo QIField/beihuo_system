@@ -17,6 +17,7 @@ from app.models.orm_models.car_parts_library_bmw import CarPartsLibraryBmw
 from app.models.orm_models.car_parts_library_bmw_stock import CarPartsLibraryBmwStock
 from app.models.orm_models.car_parts_library_benz import CarPartsLibraryBenz
 from app.models.orm_models.crm_pp_name import CrmPpName
+from app.services.pp_alias_service.pp_alias_pool_service import get_match_brands
 from app.services.car_parts_library_service.bmw_crawler import (
     external_data_crawler,
     map_detail_cn_to_db,
@@ -270,35 +271,12 @@ class ProcurementCompareService:
             conn.close()
     
     @staticmethod
-    def _get_pp_names_by_alias(brand: str) -> List[str]:
-        """
-        根据品牌别名查询 crm_pp_name，返回对应的主名列表
-        一对一或一对多均返回所有匹配主名
-        """
-        if not brand:
-            return []
-        try:
-            with orm_session() as session:
-                rows = session.query(CrmPpName.pp_name).filter(
-                    CrmPpName.alias_name == brand
-                ).all()
-                return [row[0] for row in rows if row[0]]
-        except Exception as e:
-            logger.warning(f"[ERROR] 查询 crm_pp_name 失败: {brand}, {e}")
-            return []
-
-    @staticmethod
     def _get_match_brands(brand: str) -> List[str]:
         """
         获取需要匹配的品牌列表
-        原厂/原厂国内4s件 互相匹配，其余品牌先查 crm_pp_name 别名映射
+        原厂/原厂国内4s件 互相匹配，其余品牌查别名池
         """
-        if brand in ProcurementCompareService.OEM_BRANDS:
-            return ProcurementCompareService.OEM_BRANDS
-        pp_names = ProcurementCompareService._get_pp_names_by_alias(brand)
-        if pp_names:
-            return pp_names
-        return [brand]
+        return get_match_brands(brand, oem_brands=ProcurementCompareService.OEM_BRANDS)
 
     @staticmethod
     def _oe_in_replace_number(search_oe: str, replace_number: str) -> bool:
