@@ -63,3 +63,7 @@ def expansion_tasks(task_manager):
     # 注册wms拣货订单定时任务
     from app.scripts.tasks.wms.get_status_orders_tasks import get_wms_picking_list_half_hour_register
     get_wms_picking_list_half_hour_register()
+
+    # 注册库存安全体系每日全流程定时任务（每日凌晨4:00）
+    from app.scripts.tasks.stock_safe_tasks import stock_safe_daily_register
+    stock_safe_daily_register(task_manager)

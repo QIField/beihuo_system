@@ -57,6 +57,35 @@ class CrmGzbbrSpider:
     #     url = f"{self.BASE_URL}/user/info"
     #     return self.spider_tool.fetch(url, headers=self._get_auth_header())
 
+    # https://crm.gzbbr.com/api/Crm.Orders/salesOrderHistory
+    # page 分页页码
+    # limit 分页每页数量
+    # customer 客户
+    # create_date 创建时间范围 格式：[开始时间, 结束时间] 如 [1782835200000, 1782921599000]
+    def get_sales_order_history(self, page=1, limit=200, customer=None,
+                                create_date_start=None, create_date_end=None):
+        """
+        获取销售订单历史记录
+
+        :param page: 分页页码，默认1
+        :param limit: 分页每页数量，默认200
+        :param customer: 客户
+        :param create_date_start: 创建开始时间戳
+        :param create_date_end: 创建结束时间戳
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/Crm.Orders/salesOrderHistory"
+        params = {
+            "page": page,
+            "limit": limit,
+            "customer": customer,
+        }
+        if create_date_start and create_date_end:
+            params["create_date[]"] = [create_date_start, create_date_end]
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{params}")
+        return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
     # https://crm.gzbbr.com/api/Crm.Orders/mergeOrderList
     # level_id 客户等级 维修厂（27）、同行（25）
     # page 分页页码 
