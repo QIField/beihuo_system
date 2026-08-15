@@ -139,6 +139,105 @@ def _parse_created_time(created_time_str):
         return None
 
 
+def _collect_item_details(demand_list, extra_quote_items, failed_items,
+                          failed_brand_names, failed_item_prices,
+                          failure_categories, retry_counts,
+                          enquiry_no, company):
+    """遍历 demand_list 收集所有 item 的 details"""
+    details = []
+    for demand in demand_list:
+        supplier_demand_id = demand.get('supplerDemandId')
+        for item in demand.get('supplierEnquiryItemList', []):
+            enquiry_item_id = item.get('enquiryItemId')
+            item_oe = item.get('itemOe')
+            item_name = item.get('itemName')
+            item_description = item.get('itemDescription')
+            quote_status = item.get('quoteStatus')
+            quote_list = item.get('supplierQuoteItemList', [])
+
+            # 自动报价项
+            if enquiry_item_id in extra_quote_items:
+                _extract_auto_quote(
+                    details=details, supplier_demand_id=supplier_demand_id,
+                    enquiry_item_id=enquiry_item_id, item_oe=item_oe,
+                    item_name=item_name, item_description=item_description,
+                    quote_status=quote_status, quote_items=extra_quote_items[enquiry_item_id]
+                )
+
+            # 已有报价项
+            if quote_list:
+                _extract_with_quotes(
+                    details=details, supplier_demand_id=supplier_demand_id,
+                    enquiry_item_id=enquiry_item_id, item_oe=item_oe,
+                    item_name=item_name, item_description=item_description,
+                    quote_status=quote_status, quote_list=quote_list
+                )
+            elif enquiry_item_id in failed_items:
+                _extract_without_quotes(
+                    details=details, supplier_demand_id=supplier_demand_id,
+                    enquiry_item_id=enquiry_item_id, item_oe=item_oe,
+                    item_name=item_name, item_description=item_description,
+                    quote_status=quote_status, failed_items=failed_items,
+                    failed_brand_names=failed_brand_names,
+                    failed_item_prices=failed_item_prices,
+                    enquiry_no=enquiry_no,
+                    failure_categories=failure_categories,
+                    retry_counts=retry_counts
+                )
+            elif str(quote_status).strip() == 'WAITING_QUOTE':
+                qpl_log(
+                    f"[{company or 'unknown'}] 项目 {enquiry_item_id} 无报价且未进入失败记录 "
+                    f"(quote_status={quote_status})，按规则跳过",
+                    order_no=enquiry_no
+                )
+                continue
+            else:
+                qpl_log(
+                    f"[{company or 'unknown'}] 项目 {enquiry_item_id} 状态异常 "
+                    f"(quote_status={quote_status}) 无报价记录",
+                    order_no=enquiry_no
+                )
+                raise RuntimeError(
+                    f"订单 {enquiry_no} 项目 {enquiry_item_id} 状态异常，"
+                    f"quote_status={quote_status}，无报价记录"
+                )
+    return details
+
+
+def _enrich_result_fields(details, order_meta, item_submit_results, order_success):
+    """给每个 detail 追加订单级别字段及新表结构化字段"""
+    fail_type_map = {
+        'business': '业务错误',
+        'temporary': '临时错误',
+        'retry_exhausted': '重试耗尽',
+    }
+    for detail in details:
+        detail.update(order_meta)
+        item_id = detail.get('enquiry_item_id')
+        item_result = item_submit_results.get(item_id)
+        failure_category = detail.get('_failure_category')
+        detail['fail_type'] = fail_type_map.get(
+            failure_category, '业务错误' if failure_category else '成功'
+        )
+
+        if isinstance(item_result, dict):
+            detail['quote_source'] = item_result.get('quote_source', '已有报价')
+            detail['is_quoted'] = item_result.get('is_quoted', 1 if detail['_has_quote'] else 0)
+            detail['fail_stage'] = item_result.get('fail_stage', '无')
+            detail['fail_reason'] = item_result.get('fail_reason') or detail.get('_failure_reason')
+            detail['submit_status'] = item_result.get('submit_status', '未提交')
+            detail['submit_message'] = item_result.get('submit_message', '')
+        else:
+            detail['quote_source'] = '已有报价'
+            detail['is_quoted'] = 1 if detail['_has_quote'] else 0
+            detail['fail_stage'] = '无'
+            detail['fail_reason'] = detail.get('_failure_reason')
+            detail['submit_status'] = '提交成功' if order_success else '提交失败'
+            detail['submit_message'] = ''
+
+        detail['retry_count'] = detail.get('_retry_count', 0)
+
+
 def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None,
                           item_submit_results=None, order_success=True,
                           failed_brand_names=None, failed_item_prices=None,
@@ -169,123 +268,24 @@ def extract_quote_details(detail_data, failed_items=None, extra_quote_items=None
     failed_item_prices = failed_item_prices or {}
     failure_categories = failure_categories or {}
     retry_counts = retry_counts or {}
-    details = []
 
     demand_list = detail_data.get('supplierEnquiryDemandList', [])
     enquiry_no = detail_data.get('supplierEnquiryNo')
 
-    # 订单级别字段
     order_meta = {
         'created_time': _parse_created_time(detail_data.get('createdTime')),
         'vin_code': detail_data.get('vinCode'),
         'car_type': detail_data.get('carType5')
     }
 
-    # 默认 submit_result：未走 CRM/B/C 流程的已有报价项
-    order_part = '操作成功' if order_success else '操作失败'
-    default_submit_result = f"[{order_part}][][]"
-    default_order_submit_status = 'success' if order_success else 'failure'
-    default_crm_flow_status = 'none'
-    default_bc_flow_status = 'none'
+    details = _collect_item_details(
+        demand_list, extra_quote_items, failed_items,
+        failed_brand_names, failed_item_prices,
+        failure_categories, retry_counts,
+        enquiry_no, company
+    )
 
-    for demand in demand_list:
-        supplier_demand_id = demand.get('supplerDemandId')
-
-        for item in demand.get('supplierEnquiryItemList', []):
-            enquiry_item_id = item.get('enquiryItemId')
-            item_oe = item.get('itemOe')
-            item_name = item.get('itemName')
-            item_description = item.get('itemDescription')
-            quote_status = item.get('quoteStatus')
-
-            quote_list = item.get('supplierQuoteItemList', [])
-
-            # 自动报价项（CRM 新查到 / 奔驰宝马适配）
-            if enquiry_item_id in extra_quote_items:
-                _extract_auto_quote(
-                    details=details,
-                    supplier_demand_id=supplier_demand_id,
-                    enquiry_item_id=enquiry_item_id,
-                    item_oe=item_oe,
-                    item_name=item_name,
-                    item_description=item_description,
-                    quote_status=quote_status,
-                    quote_items=extra_quote_items[enquiry_item_id]
-                )
-
-            # 已有报价项：保留原有报价记录；与上面的自动报价项可同时存在
-            if quote_list:
-                _extract_with_quotes(
-                    details=details,
-                    supplier_demand_id=supplier_demand_id,
-                    enquiry_item_id=enquiry_item_id,
-                    item_oe=item_oe,
-                    item_name=item_name,
-                    item_description=item_description,
-                    quote_status=quote_status,
-                    quote_list=quote_list
-                )
-            elif enquiry_item_id in failed_items:
-                _extract_without_quotes(
-                    details=details,
-                    supplier_demand_id=supplier_demand_id,
-                    enquiry_item_id=enquiry_item_id,
-                    item_oe=item_oe,
-                    item_name=item_name,
-                    item_description=item_description,
-                    quote_status=quote_status,
-                    failed_items=failed_items,
-                    failed_brand_names=failed_brand_names,
-                    failed_item_prices=failed_item_prices,
-                    enquiry_no=enquiry_no,
-                    failure_categories=failure_categories,
-                    retry_counts=retry_counts
-                )
-            elif str(quote_status).strip() == 'WAITING_QUOTE':
-                # CRM 未匹配 / 无原厂 等明确不记录场景：跳过
-                qpl_log(
-                    f"[{company or 'unknown'}] 项目 {enquiry_item_id} 无报价且未进入失败记录 "
-                    f"(quote_status={quote_status})，按规则跳过",
-                    order_no=enquiry_no
-                )
-                continue
-            else:
-                # 非 WAITING_QUOTE 且无报价：属于数据异常，记录并暴露
-                qpl_log(
-                    f"[{company or 'unknown'}] 项目 {enquiry_item_id} 状态异常 "
-                    f"(quote_status={quote_status}) 无报价记录",
-                    order_no=enquiry_no
-                )
-                raise RuntimeError(
-                    f"订单 {enquiry_no} 项目 {enquiry_item_id} 状态异常，"
-                    f"quote_status={quote_status}，无报价记录"
-                )
-
-    # 给每个明细追加订单级别字段、submit_result、result_source 及各流程状态
-    for detail in details:
-        detail.update(order_meta)
-        item_id = detail.get('enquiry_item_id')
-        item_result = item_submit_results.get(item_id)
-        if isinstance(item_result, dict):
-            detail['_submit_result'] = item_result.get('submit_result', default_submit_result)
-            detail['_order_submit_status'] = item_result.get('order_submit_status', default_order_submit_status)
-            detail['_crm_flow_status'] = item_result.get('crm_flow_status', default_crm_flow_status)
-            detail['_bc_flow_status'] = item_result.get('bc_flow_status', default_bc_flow_status)
-            detail['_result_source'] = item_result.get('result_source', 'unknown')
-        elif item_result:
-            # 兼容旧格式字符串
-            detail['_submit_result'] = item_result
-            detail['_order_submit_status'] = default_order_submit_status
-            detail['_crm_flow_status'] = default_crm_flow_status
-            detail['_bc_flow_status'] = default_bc_flow_status
-            detail['_result_source'] = 'unknown'
-        else:
-            # 未走 CRM/B/C 流程的已有报价项
-            detail['_submit_result'] = default_submit_result
-            detail['_order_submit_status'] = default_order_submit_status
-            detail['_crm_flow_status'] = default_crm_flow_status
-            detail['_bc_flow_status'] = default_bc_flow_status
-            detail['_result_source'] = 'existing_quote'
+    _enrich_result_fields(details, order_meta, item_submit_results, order_success)
 
     return details
 
@@ -319,10 +319,10 @@ def _build_failure_result(detail, submit_result):
 
 def save_quote_records(enquiry_no, details, submit_result, submit_time, company='fsbbr'):
     """
-    保存报价记录到数据库（含失败项目），幂等写入。
+    保存报价记录到 qpl_quote_result_v2（含失败项目），幂等写入。
 
-    同一个 (company, supplier_enquiry_no, enquiry_item_id) 已存在时更新，
-    不存在时插入。
+    同一个 (company, supplier_enquiry_no, enquiry_item_id, brand_name) 已存在时更新，
+    不存在时插入。brand_name 为 NULL 时也被视为唯一键的一部分。
 
     Args:
         enquiry_no: 询价单号
@@ -335,13 +335,13 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
 
     with conn.cursor() as cursor:
         sql = """
-        INSERT INTO qpl_quote_record (
-            supplier_enquiry_no, supplier_demand_id, enquiry_item_id,
+        INSERT INTO qpl_quote_result_v2 (
+            supplier_enquiry_no, company, enquiry_item_id, supplier_demand_id,
             item_oe, item_name, item_description, brand_id, brand_name,
             item_sell_price, delivery_aging, item_quality, parts_no,
-            quote_status, submit_result, order_submit_status, crm_flow_status, bc_flow_status,
-            result_source, submit_time, company,
-            created_time, vin_code, car_type, retry_count, failure_category
+            quote_source, is_quoted, fail_stage, fail_reason, fail_type,
+            retry_count, submit_status, submit_message, order_status,
+            created_time, vin_code, submit_time
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             supplier_demand_id = VALUES(supplier_demand_id),
@@ -349,37 +349,30 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
             item_name = VALUES(item_name),
             item_description = VALUES(item_description),
             brand_id = VALUES(brand_id),
-            brand_name = VALUES(brand_name),
             item_sell_price = VALUES(item_sell_price),
             delivery_aging = VALUES(delivery_aging),
             item_quality = VALUES(item_quality),
             parts_no = VALUES(parts_no),
-            quote_status = VALUES(quote_status),
-            submit_result = VALUES(submit_result),
-            order_submit_status = VALUES(order_submit_status),
-            crm_flow_status = VALUES(crm_flow_status),
-            bc_flow_status = VALUES(bc_flow_status),
-            result_source = VALUES(result_source),
-            submit_time = VALUES(submit_time),
+            quote_source = VALUES(quote_source),
+            is_quoted = VALUES(is_quoted),
+            fail_stage = VALUES(fail_stage),
+            fail_reason = VALUES(fail_reason),
+            fail_type = VALUES(fail_type),
+            retry_count = VALUES(retry_count),
+            submit_status = VALUES(submit_status),
+            submit_message = VALUES(submit_message),
+            order_status = VALUES(order_status),
             created_time = VALUES(created_time),
             vin_code = VALUES(vin_code),
-            car_type = VALUES(car_type),
-            retry_count = VALUES(retry_count),
-            failure_category = VALUES(failure_category)
+            submit_time = VALUES(submit_time)
         """
 
         for detail in details:
-            # 用布尔值作为字典键分发，消除 if/else
-            record_result = _RESULT_BUILDERS[detail['_has_quote']](detail, submit_result)
-            result_source = detail.get('_result_source', 'unknown')
-            order_submit_status = detail.get('_order_submit_status')
-            crm_flow_status = detail.get('_crm_flow_status')
-            bc_flow_status = detail.get('_bc_flow_status')
-
             cursor.execute(sql, (
                 enquiry_no,
-                detail.get('supplier_demand_id'),
+                company,
                 detail.get('enquiry_item_id'),
+                detail.get('supplier_demand_id'),
                 detail.get('item_oe'),
                 detail.get('item_name'),
                 detail.get('item_description'),
@@ -389,111 +382,127 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
                 detail.get('delivery_aging'),
                 detail.get('item_quality'),
                 detail.get('parts_no'),
-                detail.get('quote_status'),
-                record_result,
-                order_submit_status,
-                crm_flow_status,
-                bc_flow_status,
-                result_source,
-                submit_time,
-                company,
+                detail.get('quote_source'),
+                detail.get('is_quoted', 0),
+                detail.get('fail_stage'),
+                detail.get('fail_reason'),
+                detail.get('fail_type'),
+                detail.get('retry_count', 0),
+                detail.get('submit_status'),
+                detail.get('submit_message'),
+                detail.get('order_status'),
                 detail.get('created_time'),
                 detail.get('vin_code'),
-                detail.get('car_type'),
-                detail.get('_retry_count', 0),
-                detail.get('_failure_category')
+                submit_time,
             ))
 
         conn.commit()
-        qpl_log(f"[{company}] 保存报价记录 {len(details)} 条", order_no=enquiry_no)
+        qpl_log(f"[{company}] 保存报价记录到v2表 {len(details)} 条", order_no=enquiry_no)
 
     conn.close()
+
+
+def save_flow_trace_records(flow_trace_list, company='fsbbr'):
+    """
+    保存流程追踪记录到 qpl_quote_flow_trace。
+
+    Args:
+        flow_trace_list: 流程追踪列表，每个元素为 dict
+        company: 组织代码
+    """
+    if not flow_trace_list:
+        return
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            sql = """
+            INSERT INTO qpl_quote_flow_trace (
+                supplier_enquiry_no, company, enquiry_item_id, item_oe, item_name,
+                flow_name, flow_status, fail_stage, fail_reason, stage_detail
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            for trace in flow_trace_list:
+                cursor.execute(sql, (
+                    trace.get('supplier_enquiry_no'),
+                    company,
+                    trace.get('enquiry_item_id'),
+                    trace.get('item_oe'),
+                    trace.get('item_name'),
+                    trace.get('flow_name'),
+                    trace.get('flow_status'),
+                    trace.get('fail_stage'),
+                    trace.get('fail_reason'),
+                    trace.get('stage_detail'),
+                ))
+        conn.commit()
+        qpl_log(f"[{company}] 保存流程追踪记录 {len(flow_trace_list)} 条")
+    finally:
+        conn.close()
 
 
 # ============================================================================
 # 主流程
 # ============================================================================
 
-_CRM_FAIL_REASON_MAP = {
-    FAIL_PART_NO_MISMATCH: 'crm_part_no_mismatch',
-    FAIL_NO_EFFECTIVE_PRICE: 'crm_no_price',
-    FAIL_PRICE_CHECK_FAILED: 'crm_price_check_failed',
+# ============================================================================
+# 新表字段映射（中文枚举）
+# ============================================================================
+
+_CRM_FAIL_STAGE_MAP = {
+    FAIL_PART_NO_MISMATCH: 'partNo匹配',
+    FAIL_NO_EFFECTIVE_PRICE: '价格校验',
+    FAIL_PRICE_CHECK_FAILED: 'priceCheck',
+}
+
+_BC_FAIL_STAGE_MAP = {
+    FAIL_ADAPT_LIST_EMPTY: '无',
+    FAIL_ORIGINAL_PRODUCT_NO_OE: '无',
+    FAIL_OE_DATA_MISSING: '库存检查',
+    FAIL_NO_STOCK: '库存检查',
+    FAIL_INVALID_PRICE: '价格校验',
+    FAIL_PRICE_CHECK_FAILED: 'priceCheck',
+}
+
+_BC_SOURCE_NAME = {
+    'B': '奔驰接口',
+    'C': '宝马接口',
 }
 
 
-_BC_FAIL_REASON_MAP = {
-    FAIL_ADAPT_LIST_EMPTY: 'adapt_list_empty',
-    FAIL_ORIGINAL_PRODUCT_NO_OE: 'original_product_no_oe',
-    FAIL_OE_DATA_MISSING: 'oe_data_missing',
-    FAIL_NO_STOCK: 'no_stock',
-    FAIL_INVALID_PRICE: 'invalid_price',
-    FAIL_PRICE_CHECK_FAILED: 'price_check_failed',
-}
+def _map_crm_fail_stage(reason):
+    """CRM失败原因映射到失败环节"""
+    return _CRM_FAIL_STAGE_MAP.get(reason, '品牌匹配')
 
 
-_BC_SOURCE_MAP = {
-    'B': 'mercedes',
-    'C': 'bmw',
-}
+def _map_bc_fail_stage(reason):
+    """B/C失败原因映射到失败环节"""
+    return _BC_FAIL_STAGE_MAP.get(reason, '无')
 
 
-def _map_crm_fail_reason(reason):
-    return _CRM_FAIL_REASON_MAP.get(reason, 'crm_failed')
-
-
-def _map_bc_fail_reason(reason, category):
-    if reason in _BC_FAIL_REASON_MAP:
-        return _BC_FAIL_REASON_MAP[reason]
-    return _BC_SOURCE_MAP.get(category, 'bc') + '_failed'
-
-
-def _map_crm_flow_status(item_id, crm_quote_item_ids, crm_failed_items):
-    """按项目判定 CRM 流程状态"""
+def _map_quote_source(item_id, category, crm_quote_item_ids, bc_quote_item_ids,
+                      crm_failed_items, bc_failed_items):
+    """判定报价来源（中文）"""
     if item_id in crm_quote_item_ids:
-        return 'quoted'
-    if item_id in crm_failed_items:
-        reason = crm_failed_items[item_id][0]
-        if reason == FAIL_PART_NO_MISMATCH:
-            return 'part_no_mismatch'
-        if reason == FAIL_NO_EFFECTIVE_PRICE:
-            return 'no_effective_price'
-        if reason == FAIL_PRICE_CHECK_FAILED:
-            return 'crm_price_check_failed'
-        return 'crm_failed'
-    return 'none'
-
-
-def _map_bc_flow_status(item_id, bc_quote_item_ids, bc_failed_items, category):
-    """按项目判定 B/C 接口流程状态"""
+        return 'CRM现货'
     if item_id in bc_quote_item_ids:
-        return 'quoted'
+        return _BC_SOURCE_NAME.get(category, '未知')
+    if item_id in crm_failed_items:
+        return 'CRM现货'
     if item_id in bc_failed_items:
-        reason = bc_failed_items[item_id]
-        if reason == FAIL_ADAPT_LIST_EMPTY:
-            return 'adapt_list_empty'
-        if reason == FAIL_ORIGINAL_PRODUCT_NO_OE:
-            return 'original_product_no_oe'
-        if reason == FAIL_OE_DATA_MISSING:
-            return 'oe_data_missing'
-        if reason == FAIL_NO_STOCK:
-            return 'no_stock'
-        if reason == FAIL_INVALID_PRICE:
-            return 'invalid_price'
-        if reason == FAIL_PRICE_CHECK_FAILED:
-            return 'bc_price_check_failed'
-        return _BC_SOURCE_MAP.get(category, 'bc') + '_failed'
-    return 'none'
+        return _BC_SOURCE_NAME.get(category, '未知')
+    return '已有报价'
 
 
 def _build_item_submit_results(order_success, crm_quote_item_ids, crm_failed_items,
                                original_quoted_ids, bc_quote_item_ids, bc_failed_items,
-                               category):
+                               category, submit_message=''):
     """
-    按项目构造 submit_result 字符串、result_source 及各流程状态
+    按项目构造新表字段
 
-    submit_result 格式：[操作成功/失败][crm流程][奔驰宝马接口]
-    result_source 格式：前端展示/筛选用的结构化标签
-    order_submit_status / crm_flow_status / bc_flow_status 用于结构化筛选
+    Returns:
+        dict: {item_id: {'quote_source', 'is_quoted', 'fail_stage', 'fail_reason',
+                         'fail_type', 'submit_status', 'submit_message'}}
     """
     item_results = {}
     all_item_ids = (
@@ -503,63 +512,40 @@ def _build_item_submit_results(order_success, crm_quote_item_ids, crm_failed_ite
         set(bc_failed_items.keys())
     )
 
-    order_part = '操作成功' if order_success else '操作失败'
-
     for item_id in all_item_ids:
-        # CRM 段
-        crm_part = ''
-        if item_id in crm_quote_item_ids:
-            crm_part = 'crm报价成功'
-        elif item_id in crm_failed_items:
-            crm_part = crm_failed_items[item_id][0]
+        # 判定是否报价成功
+        is_quoted = 1 if (item_id in crm_quote_item_ids or item_id in bc_quote_item_ids) else 0
 
-        # 是否显示 B/C 段
-        show_bc = True
-        if item_id in original_quoted_ids:
-            # CRM 已报原厂，B/C 被跳过
-            show_bc = False
-        elif item_id in crm_failed_items:
-            _, is_original = crm_failed_items[item_id]
-            if not is_original:
-                # CRM 处理的是非原厂且失败，不写 B/C 段
-                show_bc = False
-
-        # B/C 段
-        bc_part = ''
-        if show_bc:
-            if item_id in bc_quote_item_ids:
-                bc_part = '接口报价成功'
+        # 判定失败环节和原因
+        fail_stage = '无'
+        fail_reason = None
+        if is_quoted == 0:
+            if item_id in crm_failed_items:
+                fail_stage = _map_crm_fail_stage(crm_failed_items[item_id][0])
+                fail_reason = crm_failed_items[item_id][0]
             elif item_id in bc_failed_items:
-                bc_part = bc_failed_items[item_id]
+                fail_stage = _map_bc_fail_stage(bc_failed_items[item_id])
+                fail_reason = bc_failed_items[item_id]
 
-        submit_result = f"[{order_part}][{crm_part}][{bc_part}]"
+        # 提交状态（订单级统一）
+        if order_success:
+            submit_status = '提交成功'
+        else:
+            submit_status = '提交失败'
 
         item_results[item_id] = {
-            'submit_result': submit_result,
-            'order_submit_status': 'success' if order_success else 'failure',
-            'crm_flow_status': _map_crm_flow_status(item_id, crm_quote_item_ids, crm_failed_items),
-            'bc_flow_status': _map_bc_flow_status(item_id, bc_quote_item_ids, bc_failed_items, category),
-            'result_source': _resolve_result_source(
+            'quote_source': _map_quote_source(
                 item_id, category, crm_quote_item_ids, bc_quote_item_ids,
                 crm_failed_items, bc_failed_items
             ),
+            'is_quoted': is_quoted,
+            'fail_stage': fail_stage,
+            'fail_reason': fail_reason,
+            'submit_status': submit_status,
+            'submit_message': submit_message,
         }
 
     return item_results
-
-
-def _resolve_result_source(item_id, category, crm_quote_item_ids, bc_quote_item_ids,
-                           crm_failed_items, bc_failed_items):
-    """按来源类型判定 result_source"""
-    if item_id in crm_quote_item_ids:
-        return 'crm'
-    if item_id in bc_quote_item_ids:
-        return _BC_SOURCE_MAP.get(category, 'bc')
-    if item_id in crm_failed_items:
-        return _map_crm_fail_reason(crm_failed_items[item_id][0])
-    if item_id in bc_failed_items:
-        return _map_bc_fail_reason(bc_failed_items[item_id], category)
-    return 'unknown'
 
 
 def process_and_save_quotes_for_company(company, begin_date=None, end_date=None):
@@ -585,7 +571,17 @@ def process_and_save_quotes_for_company(company, begin_date=None, end_date=None)
     fail_count = 0
 
     for result in results:
-        # 构造每个项目的 submit_result 和 result_source
+        # 判定提交状态
+        message = result.get('message', '')
+        is_cannot_quote = message.startswith('cannotQuote')
+        if is_cannot_quote:
+            submit_status = 'cannot_quote成功' if result.get('success') else 'cannot_quote失败'
+        elif result.get('success'):
+            submit_status = '提交成功'
+        else:
+            submit_status = '提交失败'
+
+        # 构造每个项目的新表字段
         item_submit_results = _build_item_submit_results(
             result.get('success', False),
             result.get('crm_quote_item_ids', set()),
@@ -593,8 +589,13 @@ def process_and_save_quotes_for_company(company, begin_date=None, end_date=None)
             result.get('original_quoted_ids', set()),
             result.get('bc_quote_item_ids', set()),
             result.get('bc_failed_items', {}),
-            result.get('order_category', 'A')
+            result.get('order_category', 'A'),
+            submit_message=message
         )
+
+        # 覆盖提交状态（根据订单级别统一）
+        for item_id in item_submit_results:
+            item_submit_results[item_id]['submit_status'] = submit_status
 
         # 提取明细并保存（所有结果都保存，不再判断 success）
         failed_items = result.get('failed_items', {})
@@ -617,10 +618,15 @@ def process_and_save_quotes_for_company(company, begin_date=None, end_date=None)
             save_quote_records(
                 enquiry_no=result['enquiry_no'],
                 details=details,
-                submit_result=result['message'],
+                submit_result=message,
                 submit_time=result['submit_time'],
                 company=company
             )
+
+        # 保存流程追踪记录
+        flow_trace_list = result.get('flow_trace_list', [])
+        if flow_trace_list:
+            save_flow_trace_records(flow_trace_list, company=company)
 
         # 统计
         category_counts[result['order_category']] += 1

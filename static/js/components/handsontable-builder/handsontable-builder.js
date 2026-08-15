@@ -73,6 +73,46 @@ var HandsontableBuilder = (function() {
     }
 
     /**
+     * 注入文本截断所需的 CSS（按 selector 隔离，避免全局污染）
+     */
+    function injectEllipsisCss(selector) {
+        var styleId = 'htb-ellipsis-' + selector.replace(/[^a-zA-Z0-9]/g, '-');
+        if (document.getElementById(styleId)) return;
+
+        var css = selector + ' .htb-ellipsis-cell {' +
+            'white-space: nowrap;' +
+            'overflow: hidden;' +
+            'text-overflow: ellipsis;' +
+            'display: block;' +
+            'max-width: 100%;' +
+            'line-height: 1.4;' +
+        '}' +
+        selector + ' .handsontable .htCore td {' +
+            'white-space: nowrap !important;' +
+        '}';
+
+        var style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = css;
+        document.head.appendChild(style);
+    }
+
+    /**
+     * 创建文本截断渲染器（单行省略 + title tooltip）
+     */
+    function createEllipsisRenderer() {
+        return function(instance, td, row, col, prop, value, cellProperties) {
+            Handsontable.renderers.TextRenderer.apply(this, arguments);
+            var text = (value === null || value === undefined) ? '' : String(value);
+            td.innerHTML = '<div class="htb-ellipsis-cell" title="' +
+                text.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">' +
+                text.replace(/\n/g, ' ') +
+                '</div>';
+            return td;
+        };
+    }
+
+    /**
      * 判断某个组件开关是否启用
      */
     function isEnabled(components, key) {
@@ -563,6 +603,16 @@ var HandsontableBuilder = (function() {
         var enableContextMenu = isEnabled(components, 'contextMenu');
         var enableShortcuts = isEnabled(components, 'shortcuts');
         var enableVirtualScroll = isEnabled(components, 'virtualScroll');
+
+        // ellipsisText: 为所有未设置 renderer 的文本列自动添加截断渲染器
+        if (isEnabled(components, 'ellipsisText')) {
+            injectEllipsisCss(builder.selector);
+            builder.visibleColumns.forEach(function(col) {
+                if (!col.renderer && (!col.type || col.type === 'text')) {
+                    col.renderer = createEllipsisRenderer();
+                }
+            });
+        }
 
         var userAfterGetColHeader = null;
         if (config.handsontableOptions && typeof config.handsontableOptions.afterGetColHeader === 'function') {

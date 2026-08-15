@@ -3,8 +3,8 @@
 机器人/卓智行数据抓取模块
 
 包含：
-- 鑫峰、广星库存抓取（get_zhuozhixing_multi）
-- 从 jqr_data 表读取机器人数据并与鑫峰/广星合并后保存（fetch_and_process_latest_data）
+- 广星库存抓取（get_zhuozhixing_multi）
+- 从 jqr_data 表读取机器人数据并与广星合并后保存（fetch_and_process_latest_data）
 """
 
 import json
@@ -28,14 +28,14 @@ BASE_URL = 'http://api.inheartsoft.com/dw-api/kc2018'
 PSIGN = '7be06d54152d0bd916f09b0b055f76ad'
 
 SUPPLIERS = [
-    {'name': '鑫峰', 'gsign': 'B810A2A5ABAE10EAEE19B3BE563B24A9'},
+    # {'name': '鑫峰', 'gsign': 'B810A2A5ABAE10EAEE19B3BE563B24A9'},  # 鑫峰数据已停用
     {'name': '广星', 'gsign': '9F478C130BCD573232B129C5928F0B42'},
 ]
 
 
 def get_zhuozhixing_multi():
     """
-    获取鑫峰和广星库存
+    获取广星库存（鑫峰已停用）
     :return: DataFrame
     """
     all_dataframes = []
@@ -163,7 +163,7 @@ def get_zhuozhixing_multi():
 
 
 def fetch_and_process_latest_data():
-    """读取 jqr_data 最新日期数据，合并鑫峰/广星，处理后保存"""
+    """读取 jqr_data 最新日期数据，合并广星（鑫峰已停用），处理后保存"""
     host = '113.45.176.129'
     port = 3306
     user = 'fsbbr_data'
@@ -205,7 +205,7 @@ def fetch_and_process_latest_data():
 
         # 读取数据
         df = pd.read_sql_query(data_query, conn)
-        df2 = get_zhuozhixing_multi()  # 使用新函数获取鑫峰和广星数据
+        df2 = get_zhuozhixing_multi()  # 使用新函数获取广星数据（鑫峰已停用）
         df = pd.concat([df, df2])
 
         if df.empty:

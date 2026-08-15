@@ -11,6 +11,7 @@
 import os
 import sys
 import time
+import math
 import pandas as pd
 import pymysql
 import requests
@@ -29,7 +30,7 @@ os.environ['DB_NAME'] = 'bbr_test'
 
 from app.utils.database_connection import get_db_connection
 from config.cookie_config import create_crm_session
-from app.utils.crm_updateview_logger import execute_update_view_with_log
+from app.utils.crm_updateview_logger import execute_update_view_with_log, fetch_view_then_update
 
 
 def get_oe_by_brand_code(brand_code, cursor):
@@ -142,7 +143,7 @@ def find_product_id_by_number_and_brand(api_response, number, brand_name):
 def update_product_view(session, product_id, cass_desc, store_cass_price, store_peer_price, qpl_price):
     """
     调用API: POST /api/Product.Product/updateView
-    更新产品视图信息
+    更新产品视图信息（先查view再回传完整字段）
     """
     headers = {
         'accept': 'application/json, text/plain, */*',
@@ -150,24 +151,46 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
         'origin': 'https://crm.gzbbr.com',
         'referer': 'https://crm.gzbbr.com/',
     }
-    
+
     # 从session获取authorization
     auth_token = session.headers.get('authorization')
     if auth_token:
         headers['authorization'] = auth_token
-    
-    # 构建payload
-    payload = {
-        "product_id": str(product_id),
-        "cass_desc": str(cass_desc) if cass_desc else "",
-        "store_cass_price": float(store_cass_price) if store_cass_price and str(store_cass_price).strip() else None,
-        "store_peer_price": float(store_peer_price) if store_peer_price and str(store_peer_price).strip() else None,
-        "qpl_price": float(qpl_price) if qpl_price and str(qpl_price).strip() else None
-    }
-    
-    return execute_update_view_with_log(
+
+    # 只收集有值的字段
+    new_values = {}
+
+    if cass_desc and str(cass_desc).strip():
+        new_values["cass_desc"] = str(cass_desc).strip()
+
+    if store_cass_price and str(store_cass_price).strip():
+        try:
+            val = float(store_cass_price)
+            if not math.isnan(val):
+                new_values["store_cass_price"] = val
+        except (ValueError, TypeError):
+            pass
+
+    if store_peer_price and str(store_peer_price).strip():
+        try:
+            val = float(store_peer_price)
+            if not math.isnan(val):
+                new_values["store_peer_price"] = val
+        except (ValueError, TypeError):
+            pass
+
+    if qpl_price and str(qpl_price).strip():
+        try:
+            val = float(qpl_price)
+            if not math.isnan(val):
+                new_values["qpl_price"] = val
+        except (ValueError, TypeError):
+            pass
+
+    return fetch_view_then_update(
         session=session,
-        payload=payload,
+        product_id=str(product_id),
+        new_values=new_values,
         source="batch_update_view",
         store_code="fsbbr",
         headers=headers,

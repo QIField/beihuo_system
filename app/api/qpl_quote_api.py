@@ -13,27 +13,6 @@ from datetime import datetime
 qpl_quote_bp = Blueprint('qpl_quote', __name__, url_prefix='/qpl_quote')
 
 
-# result_source 英文值到中文展示名的映射
-_RESULT_SOURCE_CN_MAP = {
-    'existing_quote': '已有报价',
-    'crm': 'CRM现货',
-    'mercedes': '奔驰接口',
-    'bmw': '宝马接口',
-    'adapt_list_empty': '适配列表为空',
-    'original_product_no_oe': '原厂产品无 OE',
-    'crm_part_no_mismatch': 'CRM-partNo未匹配',
-    'crm_no_price': 'CRM无有效价格',
-    'crm_price_check_failed': 'CRM价格校验失败',
-    'oe_data_missing': '零件信息请求失败',
-    'no_stock': '无库存',
-    'invalid_price': '价格无效',
-    'price_check_failed': '价格检测失败',
-    'unknown': '未知',
-}
-
-_RESULT_SOURCE_EN_MAP = {v: k for k, v in _RESULT_SOURCE_CN_MAP.items()}
-
-
 def login_required(f):
     """登录验证装饰器"""
     @wraps(f)
@@ -85,9 +64,6 @@ def _build_conditions(current_store, supplier_enquiry_no='', item_oe='', item_na
         conditions.append('submit_time <= %s')
         params.append(f'{end_date} 23:59:59')
     if filter_column and allowed_filter_columns and filter_column in allowed_filter_columns and filter_values:
-        # result_source 前端传中文，查库前转英文
-        if filter_column == 'result_source':
-            filter_values = [_RESULT_SOURCE_EN_MAP.get(v, v) for v in filter_values]
         placeholders = ', '.join(['%s'] * len(filter_values))
         conditions.append(f'{filter_column} IN ({placeholders})')
         params.extend(filter_values)
@@ -136,8 +112,8 @@ def get_records():
         allowed_columns = {
             'supplier_enquiry_no', 'submit_time', 'item_oe', 'item_name',
             'brand_name', 'item_sell_price', 'delivery_aging', 'item_quality',
-            'parts_no', 'quote_status', 'result_source', 'submit_result',
-            'order_submit_status', 'crm_flow_status', 'bc_flow_status'
+            'parts_no', 'quote_source', 'is_quoted', 'fail_stage', 'fail_reason',
+            'submit_status', 'order_status'
         }
         
         # 获取用户当前门店
@@ -159,12 +135,12 @@ def get_records():
         )
 
         # 构建SQL查询
-        sql = 'SELECT * FROM qpl_quote_record'
+        sql = 'SELECT * FROM qpl_quote_result_v2'
         if conditions:
             sql += ' WHERE ' + ' AND '.join(conditions)
         
         # 先获取总数
-        count_sql = 'SELECT COUNT(*) FROM qpl_quote_record'
+        count_sql = 'SELECT COUNT(*) FROM qpl_quote_result_v2'
         if conditions:
             count_sql += ' WHERE ' + ' AND '.join(conditions)
         
@@ -186,10 +162,10 @@ def get_records():
                     inner_where = ' WHERE ' + ' AND '.join(conditions) if conditions else ''
                     outer_conditions = _prefix_conditions(conditions, 'q1')
                     outer_where = ' WHERE ' + ' AND '.join(outer_conditions) if outer_conditions else ''
-                    sql = f'''SELECT q1.* FROM qpl_quote_record q1
+                    sql = f'''SELECT q1.* FROM qpl_quote_result_v2 q1
                         INNER JOIN (
                             SELECT supplier_enquiry_no, MAX(submit_time) as max_submit_time
-                            FROM qpl_quote_record
+                            FROM qpl_quote_result_v2
                             {inner_where}
                             GROUP BY supplier_enquiry_no
                         ) q2 ON q1.supplier_enquiry_no = q2.supplier_enquiry_no
@@ -209,10 +185,6 @@ def get_records():
                         record['submit_time'] = record['submit_time'].strftime('%Y-%m-%d %H:%M:%S')
                     if record.get('created_at') and hasattr(record['created_at'], 'strftime'):
                         record['created_at'] = record['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-                    # result_source 英文值转中文展示
-                    record['result_source'] = _RESULT_SOURCE_CN_MAP.get(
-                        record.get('result_source'), record.get('result_source', '未知')
-                    )
                     result.append(record)
             
             return jsonify({
@@ -241,8 +213,8 @@ def get_filter_values():
         allowed_columns = {
             'supplier_enquiry_no', 'submit_time', 'item_oe', 'item_name',
             'brand_name', 'item_sell_price', 'delivery_aging', 'item_quality',
-            'parts_no', 'quote_status', 'result_source', 'submit_result',
-            'order_submit_status', 'crm_flow_status', 'bc_flow_status'
+            'parts_no', 'quote_source', 'is_quoted', 'fail_stage', 'fail_reason',
+            'submit_status', 'order_status'
         }
         if not column or column not in allowed_columns:
             return jsonify({'code': 1, 'msg': '无效的列名'})
@@ -285,7 +257,7 @@ def get_filter_values():
                 SELECT {column} AS value, COUNT(*) AS count
                 FROM (
                     SELECT DISTINCT {distinct_fields}
-                    FROM qpl_quote_record
+                    FROM qpl_quote_result_v2
                     {where_clause}
                 ) t
                 GROUP BY {column}
@@ -295,7 +267,7 @@ def get_filter_values():
         else:
             sql = f'''
                 SELECT {column} AS value, COUNT(*) AS count
-                FROM qpl_quote_record
+                FROM qpl_quote_result_v2
                 {where_clause}
                 GROUP BY {column}
                 ORDER BY {column} ASC
@@ -317,9 +289,6 @@ def get_filter_values():
                         cnt = int(row[1]) if len(row) > 1 else 0
                     if val is None:
                         val = '(空)'
-                    # result_source 英文值转中文展示
-                    if column == 'result_source':
-                        val = _RESULT_SOURCE_CN_MAP.get(val, val)
                     values.append({'value': str(val), 'count': cnt})
                 return jsonify({'code': 0, 'msg': 'success', 'data': values})
         finally:
@@ -337,15 +306,15 @@ def get_stats():
             with conn.cursor() as cursor:
                 # 今日数量
                 today = datetime.now().strftime('%Y-%m-%d')
-                cursor.execute('SELECT COUNT(*) FROM qpl_quote_record WHERE DATE(submit_time) = %s', (today,))
+                cursor.execute('SELECT COUNT(*) FROM qpl_quote_result_v2 WHERE DATE(submit_time) = %s', (today,))
                 today_count = cursor.fetchone()[0]
                 
                 # 本周数量
-                cursor.execute('SELECT COUNT(*) FROM qpl_quote_record WHERE YEARWEEK(submit_time, 1) = YEARWEEK(NOW(), 1)')
+                cursor.execute('SELECT COUNT(*) FROM qpl_quote_result_v2 WHERE YEARWEEK(submit_time, 1) = YEARWEEK(NOW(), 1)')
                 week_count = cursor.fetchone()[0]
                 
                 # 总数量
-                cursor.execute('SELECT COUNT(*) FROM qpl_quote_record')
+                cursor.execute('SELECT COUNT(*) FROM qpl_quote_result_v2')
                 total_count = cursor.fetchone()[0]
             
             return jsonify({
@@ -432,7 +401,7 @@ def get_oe_stats():
                     item_oe,
                     COALESCE(item_name, '') as item_name,
                     {_build_oe_stats_select()}
-                FROM qpl_quote_record
+                FROM qpl_quote_result_v2
                 {where_clause}
                 GROUP BY item_oe, COALESCE(item_name, '')
                 HAVING 1=1 {having_filter_condition}
@@ -452,7 +421,7 @@ def get_oe_stats():
                 item_oe,
                 COALESCE(item_name, '') as item_name,
                 {_build_oe_stats_select()}
-            FROM qpl_quote_record
+            FROM qpl_quote_result_v2
             {where_clause}
             GROUP BY item_oe, COALESCE(item_name, '')
             HAVING 1=1 {having_filter_condition}
@@ -526,7 +495,7 @@ def get_oe_filter_values():
                 FROM (
                     SELECT
                         {_build_oe_stats_select()}
-                    FROM qpl_quote_record
+                    FROM qpl_quote_result_v2
                     {where_clause}
                     GROUP BY item_oe, COALESCE(item_name, '')
                 ) t
@@ -537,7 +506,7 @@ def get_oe_filter_values():
         else:
             sql = f'''
                 SELECT {column} AS value, COUNT(DISTINCT supplier_enquiry_no) AS count
-                FROM qpl_quote_record
+                FROM qpl_quote_result_v2
                 {where_clause}
                 GROUP BY {column}
                 ORDER BY {column} ASC
@@ -568,7 +537,7 @@ def get_oe_filter_values():
 
 
 def _build_vin_base_conditions(current_store, company='', begin_date='', end_date=''):
-    """构建 VIN 维度统计的公共 WHERE 条件（使用 q 作为 qpl_quote_record 别名）"""
+    """构建 VIN 维度统计的公共 WHERE 条件（使用 q 作为 qpl_quote_result_v2 别名）"""
     conditions = ['q.company = %s']
     params = [current_store]
 
@@ -652,7 +621,7 @@ def _query_vin_stats(dimension, current_store, company, begin_date, end_date,
     count_sql = f'''
         SELECT COUNT(*) FROM (
             SELECT {config['select_expr']} AS {config['label_column']}, COUNT(DISTINCT q.supplier_enquiry_no) AS occurrence_count
-            FROM qpl_quote_record q
+            FROM qpl_quote_result_v2 q
             {config['join_clause']}
             {where_clause}
             GROUP BY {config['group_expr']}
@@ -669,7 +638,7 @@ def _query_vin_stats(dimension, current_store, company, begin_date, end_date,
 
     data_sql = f'''
         SELECT {config['select_expr']} AS {config['label_column']}, COUNT(DISTINCT q.supplier_enquiry_no) AS occurrence_count
-        FROM qpl_quote_record q
+        FROM qpl_quote_result_v2 q
         {config['join_clause']}
         {where_clause}
         GROUP BY {config['group_expr']}
@@ -726,7 +695,7 @@ def _query_vin_filter_values(dimension, column, current_store, company, begin_da
             SELECT occurrence_count AS value, COUNT(*) AS count
             FROM (
                 SELECT COUNT(DISTINCT q.supplier_enquiry_no) AS occurrence_count
-                FROM qpl_quote_record q
+                FROM qpl_quote_result_v2 q
                 {config['join_clause']}
                 {where_clause}
                 GROUP BY {config['group_expr']}
@@ -739,7 +708,7 @@ def _query_vin_filter_values(dimension, column, current_store, company, begin_da
     else:
         sql = f'''
             SELECT {config['value_select']} AS value, COUNT(DISTINCT q.supplier_enquiry_no) AS count
-            FROM qpl_quote_record q
+            FROM qpl_quote_result_v2 q
             {config['join_clause']}
             {where_clause}
             GROUP BY {config['group_expr']}

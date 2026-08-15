@@ -15,6 +15,13 @@ from app.utils.database_connection import db_execute
 
 
 UPDATE_VIEW_URL = "https://crm.gzbbr.com/api/Product.Product/updateView"
+VIEW_URL = "https://crm.gzbbr.com/api/Product.Product/view"
+
+ALL_VIEW_FIELDS = [
+    "product_id", "cass_desc", "brand_code", "l_name_zh_store",
+    "brand_barcode", "store_cass_price", "store_peer_price",
+    "qpl_price", "cost_price", "manufacturer_price",
+]
 
 
 def _extract_product_id(payload):
@@ -85,3 +92,62 @@ def execute_update_view_with_log(session, payload, source, store_code, headers=N
         error_msg = f"API调用失败: {e}"
         log_update_view_request(source, store_code, payload, "error", f"{error_msg}\n{traceback.format_exc()}")
         return False, error_msg
+
+
+def fetch_view_then_update(session, product_id, new_values, source, store_code, headers=None, timeout=30):
+    """
+    先查询产品视图获取完整字段，将新值与原值合并后调用 updateView。
+
+    :param session: requests.Session 已携带认证信息的会话
+    :param product_id: str 产品ID
+    :param new_values: dict 需要更新的字段（仅包含有值的字段）
+    :param source: str 调用来源标识
+    :param store_code: str 门店/组织代码
+    :param headers: dict 可选的自定义请求头
+    :param timeout: int 请求超时时间（秒）
+    :return: (success: bool, msg: str)
+    """
+    # 1. 查询 view 接口
+    try:
+        response = session.get(
+            VIEW_URL,
+            params={"product_id": product_id},
+            headers=headers,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("status") != 200:
+            error_msg = f"查询view失败: {data.get('msg', '未知错误')}"
+            log_update_view_request(source, store_code, {"product_id": product_id}, "error", error_msg)
+            return False, error_msg
+
+        view_data = data.get("data", {})
+    except Exception as e:
+        error_msg = f"查询view失败: {e}"
+        log_update_view_request(source, store_code, {"product_id": product_id}, "error", error_msg)
+        return False, error_msg
+
+    # 2. 合并字段：view 原值为底，new_values 覆盖
+    payload = {}
+    for field in ALL_VIEW_FIELDS:
+        if field in new_values:
+            payload[field] = new_values[field]
+        elif field in view_data:
+            payload[field] = view_data[field]
+        else:
+            payload[field] = None if field != "product_id" else str(product_id)
+
+    # 确保 product_id 正确
+    payload["product_id"] = str(product_id)
+
+    # 3. 调用 updateView
+    return execute_update_view_with_log(
+        session=session,
+        payload=payload,
+        source=source,
+        store_code=store_code,
+        headers=headers,
+        timeout=timeout,
+    )

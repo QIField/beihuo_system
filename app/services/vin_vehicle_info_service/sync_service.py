@@ -95,10 +95,10 @@ def _fetch_crm_inquiry_records(cursor):
 
 
 def _fetch_qpl_quote_records(cursor):
-    """从 qpl_quote_record 提取近两天内的 vin_code"""
+    """从 qpl_quote_result_v2 提取近两天内的 vin_code"""
     sql = """
         SELECT DISTINCT vin_code
-        FROM qpl_quote_record
+        FROM qpl_quote_result_v2
         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
           AND vin_code IS NOT NULL AND vin_code != ''
     """
@@ -134,7 +134,7 @@ def run_vin_vehicle_info_sync(limit=50):
     执行 VIN 车辆信息补全
 
     流程：
-      1. 从 crmapp_ks_inquiry_detail 和 qpl_quote_record 提取近两天数据
+      1. 从 crmapp_ks_inquiry_detail 和 qpl_quote_result_v2 提取近两天数据
       2. 整合写入 vin_vehicle_info（利用 uk_vin_code 去重）
       3. 对 engine/chassis 为空的记录执行爬虫补全
 

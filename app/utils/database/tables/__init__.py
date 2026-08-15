@@ -49,6 +49,8 @@ from .safety_stock_tables import (
 
 from .qpl_quote_tables import (
     init_qpl_quote_record_table,
+    init_qpl_quote_result_v2_table,
+    init_qpl_quote_flow_trace_table,
 )
 
 from .crm_updateview_log_tables import (
@@ -74,5 +76,7 @@ __all__ = [
     'init_safety_stock_calculation_table',
     'init_all_virtual_inventory_tables',
     'init_qpl_quote_record_table',
+    'init_qpl_quote_result_v2_table',
+    'init_qpl_quote_flow_trace_table',
     'init_crm_updateview_log_table',
 ]

@@ -4,7 +4,7 @@
 """汽配龙下单状态同步
 
 从汽配龙查询 supplier_enquiry_status=3 的询价单，
-按 item 级别的 quoteStatusStr 更新 qpl_quote_record.order_status。
+按 item 级别的 quoteStatusStr 更新 qpl_quote_result_v2.order_status。
 只更新已有记录，不插入缺失记录。
 """
 
@@ -63,13 +63,13 @@ def sync_order_status(target_date, company='fsbbr'):
 
                     cursor.execute(
                         """
-                        UPDATE qpl_quote_record
-                        SET order_status = %s
+                        UPDATE qpl_quote_result_v2
+                        SET order_status = '已下单'
                         WHERE supplier_enquiry_no = %s
                           AND enquiry_item_id = %s
                           AND company = %s
                         """,
-                        (quote_status_str, supplier_enquiry_no, str(enquiry_item_id), company)
+                        (supplier_enquiry_no, str(enquiry_item_id), company)
                     )
                     updated_total += cursor.rowcount
 

@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 """
-CRM 零件品牌别名操作日志 ORM 模型
+CRM 零件品牌别名操作日志 ORM 模型（旧表，保留兼容）
 对应数据库表：crm_pp_name_log
 """
 
@@ -28,9 +28,7 @@ class CrmPpNameLog(BaseModels):
     created_at = Column(DateTime, nullable=True, default=func.now(), comment="操作时间")
 
     def to_dict(self):
-        """
-        将模型对象转换为字典
-        """
+        """将模型对象转换为字典"""
         return {
             "id": self.id,
             "record_id": self.record_id,
@@ -45,9 +43,7 @@ class CrmPpNameLog(BaseModels):
 
     @classmethod
     def list_to_dict_list(cls, items):
-        """
-        对象列表转字典列表
-        """
+        """对象列表转字典列表"""
         return [item.to_dict() for item in items]
 
     @classmethod
@@ -55,9 +51,7 @@ class CrmPpNameLog(BaseModels):
                    pp_name_old=None, alias_name_old=None,
                    pp_name_new=None, alias_name_new=None,
                    operator=None):
-        """
-        创建操作日志
-        """
+        """创建操作日志"""
         log = cls(
             record_id=record_id,
             action=action,

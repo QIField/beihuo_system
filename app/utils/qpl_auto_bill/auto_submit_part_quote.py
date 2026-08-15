@@ -227,17 +227,17 @@ def _classify_failure_reason(reason):
 
 def _filter_processed_orders(order_nos, company, begin_date, end_date):
     """
-    查询数据库，返回已处理完成的 item 集合，以及每个 item 的重试信息。
+    查询 qpl_quote_result_v2，返回已处理完成的 item 集合，以及每个 item 的重试信息。
 
     处理完成判定：
-        - 成功提交（failure_category 为 NULL）
-        - 业务错误（business）
-        - 临时错误但重试次数已达上限（retry_exhausted）
+        - 成功提交（fail_type 为 '成功'）
+        - 业务错误（'业务错误'）
+        - 临时错误但重试次数已达上限（'重试耗尽'）
 
     Returns:
         tuple: (processed_items, item_retry_info)
             - processed_items: set((supplier_enquiry_no, enquiry_item_id))
-            - item_retry_info: dict{(supplier_enquiry_no, enquiry_item_id): {'retry_count': int, 'failure_category': str}}
+            - item_retry_info: dict{(supplier_enquiry_no, enquiry_item_id): {'retry_count': int, 'fail_type': str}}
     """
     if not order_nos:
         return set(), {}
@@ -250,8 +250,8 @@ def _filter_processed_orders(order_nos, company, begin_date, end_date):
         with conn.cursor(DictCursor) as cursor:
             placeholders = ','.join(['%s'] * len(order_nos))
             sql = f"""
-                SELECT supplier_enquiry_no, enquiry_item_id, retry_count, failure_category
-                FROM qpl_quote_record
+                SELECT supplier_enquiry_no, enquiry_item_id, retry_count, fail_type
+                FROM qpl_quote_result_v2
                 WHERE company = %s
                   AND supplier_enquiry_no IN ({placeholders})
                   AND submit_time >= %s
@@ -266,13 +266,13 @@ def _filter_processed_orders(order_nos, company, begin_date, end_date):
             for row in rows:
                 item_key = (row['supplier_enquiry_no'], row['enquiry_item_id'])
                 retry_count = row.get('retry_count', 0) or 0
-                category = row.get('failure_category')
+                fail_type = row.get('fail_type')
                 item_retry_info[item_key] = {
                     'retry_count': retry_count,
-                    'failure_category': category,
+                    'fail_type': fail_type,
                 }
-                # 成功的记录 category 为 NULL；临时错误未达上限才不算处理完成
-                if category == FAILURE_CATEGORY_TEMPORARY and retry_count < MAX_RETRY_COUNT:
+                # 成功的记录 fail_type 为 '成功'；临时错误未达上限才不算处理完成
+                if fail_type == '临时错误' and retry_count < MAX_RETRY_COUNT:
                     continue
                 processed_items.add(item_key)
             return processed_items, item_retry_info
@@ -532,15 +532,16 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
         processed_item_ids: 已处理 item 集合，set((enquiry_no, enquiry_item_id))
 
     Returns:
-        tuple: (crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices)
+        tuple: (crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices, flow_trace_list)
             - crm_quote_items: {enquiry_item_id: [quote_item, ...]}
             - original_quoted_ids: CRM 报上原厂品牌的 enquiry_item_id 集合
             - crm_failed_items: {enquiry_item_id: reason}
             - crm_failed_brand_names: {enquiry_item_id: 实际匹配到的 CRM 候选品牌名}
             - crm_failed_item_prices: {enquiry_item_id: 价格检测失败时的尝试价格}
+            - flow_trace_list: 流程追踪记录列表
     """
     if not CRM_SPIDER_AVAILABLE:
-        return {}, set(), {}, {}, {}
+        return {}, set(), {}, {}, {}, []
 
     processed_item_ids = processed_item_ids or set()
 
@@ -549,6 +550,7 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
     crm_failed_items = {}
     crm_failed_brand_names = {}
     crm_failed_item_prices = {}
+    flow_trace_list = []
 
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
@@ -749,11 +751,24 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                     if brand_type_desc == '原厂':
                         has_original = True
 
+                stage_map = {0: '品牌匹配', 1: 'partNo匹配', 2: '价格校验', 3: 'priceCheck'}
                 if quoted_for_item:
                     crm_quote_items[enquiry_item_id] = quoted_for_item
                     # 仅对等待报价项记录“CRM 已报原厂”，用于跳过 B/C 流程
                     if is_waiting and has_original:
                         original_quoted_ids.add(enquiry_item_id)
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no,
+                        'company': company,
+                        'enquiry_item_id': enquiry_item_id,
+                        'item_oe': item_oe,
+                        'item_name': item_name,
+                        'flow_name': 'CRM现货',
+                        'flow_status': '成功',
+                        'fail_stage': '无',
+                        'fail_reason': None,
+                        'stage_detail': None,
+                    })
                 elif is_waiting and max_failure_stage > 0:
                     # 等待报价项：品牌已匹配但后续失败才记录；品牌未匹配（stage=0）不记录
                     reason_map = {
@@ -769,12 +784,24 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                         crm_failed_brand_names[enquiry_item_id] = matched_brand_name
                     if max_failure_stage == 3 and matched_sell_price is not None:
                         crm_failed_item_prices[enquiry_item_id] = matched_sell_price
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no,
+                        'company': company,
+                        'enquiry_item_id': enquiry_item_id,
+                        'item_oe': item_oe,
+                        'item_name': item_name,
+                        'flow_name': 'CRM现货',
+                        'flow_status': '失败',
+                        'fail_stage': stage_map.get(max_failure_stage, '无'),
+                        'fail_reason': reason,
+                        'stage_detail': None,
+                    })
 
             except Exception as e:
                 qpl_log(f"[{company}] CRM现货流程处理异常: {e}", order_no=enquiry_no)
                 raise
 
-    return crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices
+    return crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices, flow_trace_list
 
 
 def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, processed_item_ids=None):
@@ -788,10 +815,10 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, pro
         processed_item_ids: 已处理 item 集合，set((enquiry_no, enquiry_item_id))
 
     Returns:
-        tuple: (mercedes_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices)
+        tuple: (mercedes_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices, flow_trace_list)
     """
     if not MERCEDES_SERVICE_AVAILABLE:
-        return {}, [], {}, {}, {}
+        return {}, [], {}, {}, {}, []
 
     skip_item_ids = skip_item_ids or set()
     processed_item_ids = processed_item_ids or set()
@@ -800,6 +827,7 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, pro
     failed_items = {}
     failed_brand_names = {}
     failed_item_prices = {}
+    flow_trace_list = []
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
     car_brand = detail_data.get('carBrand', '')
@@ -831,6 +859,12 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, pro
                 if error == FAIL_ADAPT_LIST_EMPTY:
                     failed_items[enquiry_item_id] = error
                     failed_brand_names[enquiry_item_id] = '无法报价'
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no, 'company': company,
+                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                        'flow_name': '奔驰接口', 'flow_status': '失败', 'fail_stage': '无',
+                        'fail_reason': FAIL_ADAPT_LIST_EMPTY, 'stage_detail': None,
+                    })
                 # 无原厂产品：不记录
                 continue
 
@@ -846,20 +880,37 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, pro
                 failed_items[enquiry_item_id] = FAIL_ORIGINAL_PRODUCT_NO_OE
                 if factory_brand_name:
                     failed_brand_names[enquiry_item_id] = factory_brand_name
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': '奔驰接口', 'flow_status': '失败', 'fail_stage': '无',
+                    'fail_reason': FAIL_ORIGINAL_PRODUCT_NO_OE, 'stage_detail': None,
+                })
                 continue
 
             oe_price_map, has_request_error, has_price_but_no_stock, has_invalid_price = query_mercedes_service_all(product_oe_list)
             if not oe_price_map:
                 if has_request_error:
-                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
+                    fail_reason = FAIL_OE_DATA_MISSING
+                    fail_stage = '无'
                 elif has_price_but_no_stock:
-                    failed_items[enquiry_item_id] = FAIL_NO_STOCK
+                    fail_reason = FAIL_NO_STOCK
+                    fail_stage = '库存检查'
                 elif has_invalid_price:
-                    failed_items[enquiry_item_id] = FAIL_INVALID_PRICE
+                    fail_reason = FAIL_INVALID_PRICE
+                    fail_stage = '价格校验'
                 else:
-                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
+                    fail_reason = FAIL_OE_DATA_MISSING
+                    fail_stage = '无'
+                failed_items[enquiry_item_id] = fail_reason
                 if factory_brand_name:
                     failed_brand_names[enquiry_item_id] = factory_brand_name
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': '奔驰接口', 'flow_status': '失败', 'fail_stage': fail_stage,
+                    'fail_reason': fail_reason, 'stage_detail': None,
+                })
                 continue
 
             # 筛选有价格+库存的产品（query_mercedes_service_all 已过滤，此处不再产生新失败原因）
@@ -902,6 +953,12 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, pro
                     failed_brand_names[enquiry_item_id] = factory_brand_name
                 if last_failed_sell_price is not None:
                     failed_item_prices[enquiry_item_id] = last_failed_sell_price
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': '奔驰接口', 'flow_status': '失败', 'fail_stage': 'priceCheck',
+                    'fail_reason': fail_reason, 'stage_detail': None,
+                })
                 continue
 
             # 构造报价项
@@ -926,8 +983,14 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, pro
                 'days': prepare_good_timespan,
                 'product_count': len(quote_items_for_item)
             })
+            flow_trace_list.append({
+                'supplier_enquiry_no': enquiry_no, 'company': company,
+                'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                'flow_name': '奔驰接口', 'flow_status': '成功', 'fail_stage': '无',
+                'fail_reason': None, 'stage_detail': None,
+            })
 
-    return mercedes_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices
+    return mercedes_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices, flow_trace_list
 
 
 def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processed_item_ids=None):
@@ -941,10 +1004,10 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processe
         processed_item_ids: 已处理 item 集合，set((enquiry_no, enquiry_item_id))
 
     Returns:
-        tuple: (bmw_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices)
+        tuple: (bmw_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices, flow_trace_list)
     """
     if not BMW_SERVICE_AVAILABLE:
-        return {}, [], {}, {}, {}
+        return {}, [], {}, {}, {}, []
 
     skip_item_ids = skip_item_ids or set()
     processed_item_ids = processed_item_ids or set()
@@ -953,6 +1016,7 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processe
     failed_items = {}
     failed_brand_names = {}
     failed_item_prices = {}
+    flow_trace_list = []
     enquiry_no = detail_data.get('supplierEnquiryNo', '')
     tid = detail_data.get('tid', '')
     car_brand = detail_data.get('carBrand', '')
@@ -984,6 +1048,12 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processe
                 if error == FAIL_ADAPT_LIST_EMPTY:
                     failed_items[enquiry_item_id] = error
                     failed_brand_names[enquiry_item_id] = '无法报价'
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no, 'company': company,
+                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                        'flow_name': '宝马接口', 'flow_status': '失败', 'fail_stage': '无',
+                        'fail_reason': FAIL_ADAPT_LIST_EMPTY, 'stage_detail': None,
+                    })
                 # 无原厂产品：不记录
                 continue
 
@@ -999,20 +1069,37 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processe
                 failed_items[enquiry_item_id] = FAIL_ORIGINAL_PRODUCT_NO_OE
                 if factory_brand_name:
                     failed_brand_names[enquiry_item_id] = factory_brand_name
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': '宝马接口', 'flow_status': '失败', 'fail_stage': '无',
+                    'fail_reason': FAIL_ORIGINAL_PRODUCT_NO_OE, 'stage_detail': None,
+                })
                 continue
 
             oe_price_map, has_request_error, has_price_but_no_stock, has_invalid_price = query_bmw_service_all(product_oe_list)
             if not oe_price_map:
                 if has_request_error:
-                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
+                    fail_reason = FAIL_OE_DATA_MISSING
+                    fail_stage = '无'
                 elif has_price_but_no_stock:
-                    failed_items[enquiry_item_id] = FAIL_NO_STOCK
+                    fail_reason = FAIL_NO_STOCK
+                    fail_stage = '库存检查'
                 elif has_invalid_price:
-                    failed_items[enquiry_item_id] = FAIL_INVALID_PRICE
+                    fail_reason = FAIL_INVALID_PRICE
+                    fail_stage = '价格校验'
                 else:
-                    failed_items[enquiry_item_id] = FAIL_OE_DATA_MISSING
+                    fail_reason = FAIL_OE_DATA_MISSING
+                    fail_stage = '无'
+                failed_items[enquiry_item_id] = fail_reason
                 if factory_brand_name:
                     failed_brand_names[enquiry_item_id] = factory_brand_name
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': '宝马接口', 'flow_status': '失败', 'fail_stage': fail_stage,
+                    'fail_reason': fail_reason, 'stage_detail': None,
+                })
                 continue
 
             # 筛选有价格+库存的产品（query_bmw_service_all 已过滤，此处不再产生新失败原因）
@@ -1055,6 +1142,12 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processe
                     failed_brand_names[enquiry_item_id] = factory_brand_name
                 if last_failed_sell_price is not None:
                     failed_item_prices[enquiry_item_id] = last_failed_sell_price
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': '宝马接口', 'flow_status': '失败', 'fail_stage': 'priceCheck',
+                    'fail_reason': fail_reason, 'stage_detail': None,
+                })
                 continue
 
             # 构造报价项
@@ -1079,8 +1172,14 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processe
                 'days': prepare_good_timespan,
                 'product_count': len(quote_items_for_item)
             })
+            flow_trace_list.append({
+                'supplier_enquiry_no': enquiry_no, 'company': company,
+                'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                'flow_name': '宝马接口', 'flow_status': '成功', 'fail_stage': '无',
+                'fail_reason': None, 'stage_detail': None,
+            })
 
-    return bmw_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices
+    return bmw_quote_items, summary_list, failed_items, failed_brand_names, failed_item_prices, flow_trace_list
 
 
 def classify_order(order_data, processed_item_ids=None):
@@ -1170,10 +1269,10 @@ def _handle_bc_category(detail_data, company, bc_process_func, category, process
         dict: handler 结果
     """
     processed_item_ids = processed_item_ids or set()
-    crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices = process_crm_spot_quote(
+    crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices, crm_flow_trace = process_crm_spot_quote(
         detail_data, company, processed_item_ids=processed_item_ids
     )
-    bc_quote_items, summary_list, bc_failed_items, bc_failed_brand_names, bc_failed_item_prices = bc_process_func(
+    bc_quote_items, summary_list, bc_failed_items, bc_failed_brand_names, bc_failed_item_prices, bc_flow_trace = bc_process_func(
         detail_data, company, skip_item_ids=original_quoted_ids, processed_item_ids=processed_item_ids
     )
 
@@ -1204,7 +1303,8 @@ def _handle_bc_category(detail_data, company, bc_process_func, category, process
         'crm_failed_items': crm_failed_items,
         'original_quoted_ids': original_quoted_ids,
         'bc_quote_item_ids': set(bc_quote_items.keys()),
-        'bc_failed_items': bc_failed_items
+        'bc_failed_items': bc_failed_items,
+        'flow_trace_list': crm_flow_trace + bc_flow_trace,
     }
 
 
@@ -1212,7 +1312,7 @@ def _handle_bc_category(detail_data, company, bc_process_func, category, process
 def handle_category_a(detail_data, company, processed_item_ids=None):
     """处理 A 类订单：全 PART_QUOTE，先走 CRM 现货流程"""
     processed_item_ids = processed_item_ids or set()
-    crm_quote_items, _, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices = process_crm_spot_quote(
+    crm_quote_items, _, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices, crm_flow_trace = process_crm_spot_quote(
         detail_data, company, processed_item_ids=processed_item_ids
     )
     return {
@@ -1226,7 +1326,8 @@ def handle_category_a(detail_data, company, processed_item_ids=None):
         'crm_failed_items': crm_failed_items,
         'original_quoted_ids': set(),
         'bc_quote_item_ids': set(),
-        'bc_failed_items': {}
+        'bc_failed_items': {},
+        'flow_trace_list': crm_flow_trace,
     }
 
 
@@ -1258,7 +1359,8 @@ def _get_process_meta(process_result):
         'failed_brand_names': process_result.get('failed_brand_names', {}),
         'failed_item_prices': process_result.get('failed_item_prices', {}),
         'failure_categories': process_result.get('failure_categories', {}),
-        'retry_counts': process_result.get('retry_counts', {})
+        'retry_counts': process_result.get('retry_counts', {}),
+        'flow_trace_list': process_result.get('flow_trace_list', [])
     }
 
 

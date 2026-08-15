@@ -114,14 +114,17 @@ window.QplQuoteGridConfig = (function() {
                 { data: 'brand_name', title: '品牌', width: 120, className: 'brand-cell', readOnly: true },
                 { data: 'item_sell_price', title: '销售价格', width: 100, className: 'price-cell', readOnly: true, type: 'numeric', numericFormat: { pattern: '0.00' } },
                 { data: 'delivery_aging', title: '交货周期(天)', width: 120, readOnly: true },
-                { data: 'item_quality', title: '产品品质', width: 100, readOnly: true },
                 { data: 'parts_no', title: '零件号', width: 130, readOnly: true },
-                { data: 'quote_status', title: '报价状态', width: 100, readOnly: true },
-                { data: 'result_source', title: '报价来源', width: 120, readOnly: true },
-                { data: 'order_submit_status', title: '订单提交状态', width: 120, readOnly: true },
-                { data: 'crm_flow_status', title: 'CRM流程状态', width: 120, readOnly: true },
-                { data: 'bc_flow_status', title: 'BC接口状态', width: 120, readOnly: true },
-                { data: 'submit_result', title: '提交结果(日志)', width: 150, readOnly: true }
+                { data: 'quote_source', title: '来源', width: 120, readOnly: true },
+                { data: 'is_quoted', title: '报价', width: 80, readOnly: true, renderer: function(instance, td, row, col, prop, value) {
+                    td.innerHTML = value === 1 || value === '1' ? '成功' : (value === 0 || value === '0' ? '失败' : '');
+                    td.className = 'htCenter';
+                    return td;
+                }},
+                { data: 'fail_stage', title: '环节', width: 100, readOnly: true },
+                { data: 'fail_reason', title: '详情', width: 180, readOnly: true },
+                { data: 'submit_status', title: '提交状态', width: 130, readOnly: true },
+                { data: 'order_status', title: '下单状态', width: 100, readOnly: true }
             ],
             paramsBuilder: buildDetailParams,
             mergeCellsBuilder: computeMergeCells,
