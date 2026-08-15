@@ -21,9 +21,6 @@ def expansion_tasks(task_manager):
     # test()
     
    
-    # #注册wms定时业务（关联旧版仓库看板）
-    # from app.scripts.tasks.wms_get_status_orders_tasks import two_minutes_register
-    # two_minutes_register(task_manager)
 
     # 注册合并订单列表定时任务（订单列表爬虫，关联额度管理）
     from app.scripts.tasks.get_mergeOrderList_tasks import merge_order_list_register

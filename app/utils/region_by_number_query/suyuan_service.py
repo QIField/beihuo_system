@@ -2,6 +2,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from app.models.orm_models.ks_suyuanma import KsSuyuanma
+from app.utils.common_util_module.server_push import message_push
 from app.utils.orm import orm_session
 
 
@@ -100,7 +101,38 @@ def get_suyuan_statistics(md=None):
         dict_list = KsSuyuanma.list_to_dict_list(results)
         return dict_list
 
+# 统计溯源码是否数量是否足够
+def is_source_code(md='fs',name='佛山'):
+    """
+    统计溯源码是否数量是否足够
+    Args:
+        md: 组织编码，默认为 'fs' (佛山)
+        name: 组织名称，默认为 'fs' (佛山)
+)
+    
+    Returns:
+        bool: 如果溯源码数量足够则返回True，否则返回False
+    """
+    dict_list = get_suyuan_statistics(md)
+    
+
+
+    sum_count = 0
+    for item in dict_list:
+        sum_count += item['count']
+
+    if sum_count < 2000:
+        message_push(type="溯源数据定时任务", message=f"{name}溯源码数量不足,现在还剩余{sum_count}条")
+        return False
+
+
+    return True
+    
+    
+
+
+
 # if __name__ == '__main__':
 
-#     a=query_suyuan_data('fs','','')
+#     a=is_source_code('fs')
 #     print(a)

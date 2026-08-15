@@ -4,7 +4,7 @@
 from datetime import datetime
 
 from app.utils.common_util_module.server_push import message_push
-from app.utils.region_by_number_query.suyuan_service import query_suyuan_data
+from app.utils.region_by_number_query.suyuan_service import is_source_code, query_suyuan_data
 
 
 
@@ -38,71 +38,53 @@ def query_suyuan_data_task():
     """
     查询溯源数据任务
     """
-    try:
-        #佛山
-        fs = query_suyuan_data('fs', '', '')
-        if not fs or fs['success']:
-            information_push('佛山')
-            return
-    except Exception as e:
-        information_push('佛山',e)
-        return
+
+    store_list=[
+        {'md':'fs','name':'佛山'},
+        {'md':'zs','name':'中山'},
+        {'md':'zh','name':'珠海'},
+        {'md':'hf','name':'合峰'},
+        {'md':'by','name':'百业'}
+    ]
+
+    
        
-        
+    for store in store_list:
+        md=store['md']
+        name=store['name']
+        try:
+            data = query_suyuan_data(md, '', '')
+            if not data or data['success']:
+                information_push(name)
+                continue
+             
+        except Exception as e:
+            information_push(name,e)
+            continue
+     
 
 
 
-    try:
-        #中山
-        zs = query_suyuan_data('zs', '', '')
-        if not zs or zs['success']:
-            information_push('中山')
-            return
-      
-    except Exception as e:
-        information_push('中山',e)
-        return
-       
-        
-
-    try:
-        #珠海
-        zh = query_suyuan_data('zh', '', '')
-        if not zh or zh['success']:
-            information_push('珠海')
-            return
-    except Exception as e:
-        information_push('珠海',e)
-        return
-       
-        
 
 
 
-    try:
-        #合峰
-        hf = query_suyuan_data('hf', '', '')
-        if not hf or hf['success']:
-            information_push('合峰')
-            return
-    except Exception as e:
-        information_push('合峰',e)
-        return
-       
-        
+    for store in store_list:
+        md=store['md']
+        name=store['name']
+        is_source_code(md,name)
+     
+
+
+    
+
+    
 
 
 
-    try:
-        #百业
-        by = query_suyuan_data('by', '', '')
-        if not by or by['success']:
-            information_push('百业')
-            return
-    except Exception as e:
-        information_push('百业',e)
-        return
-       
+
+
+
+
         
 
 
