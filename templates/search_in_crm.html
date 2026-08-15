@@ -256,15 +256,11 @@
                                 enableCopy: true,
                                 enableAddToCart: true,
                                 onAddToCart: function(selectedRows, tableId) {
-                                    // 从选中行提取商品信息
+                                    // 从选中行提取商品完整信息
                                     var itemDetails = [];
                                     selectedRows.forEach(function(item) {
                                         if (item.oe) {
-                                            itemDetails.push({
-                                                oe: item.oe,
-                                                barcode: item.barcode || item['物料条码'] || '',
-                                                purchase_records: item.purchase_records || ''
-                                            });
+                                            itemDetails.push(app.buildCartItem(item));
                                         }
                                     });
                                     
@@ -340,6 +336,40 @@
             });
         },
         
+        // 构建购物车数据项（从表格行提取完整字段）
+        buildCartItem: function(item) {
+            return {
+                'oe': item.oe || '',
+                'purchase_records': item.purchase_records || '',
+                'brand': item.品牌 || '',
+                'material_name': item.物料名称 || '',
+                'barcode': item.物料条码 || '',
+                'car_brand': item.车型品牌 || '',
+                'tag': item.标签 || '',
+                'inquiry_1m': item['近1个月询价量'] || 0,
+                'inquiry_3m': item['近3个月月均询价量'] || 0,
+                'national_inquiry_1m': item['全国近1个月询价量'] || 0,
+                'national_inquiry_3m': item['全国近3个月月均询价量'] || 0,
+                'brand_code': item.品牌号 || '',
+                'internal_remarks': item.内部备注 || '',
+                'stock_amount': item.库存金额 || 0,
+                'cost_price': item.成本价 || 0,
+                'stock_quantity': item['库存数量'] || 0,
+                'avg_sales_12m': item['近12个月月均销量'] || 0,
+                'avg_sales_6m': item['近6个月月均销量'] || 0,
+                'sales_7d': item['近7天销量'] || 0,
+                'sales_yesterday': item['昨日销量'] || 0,
+                'sales_month': item['本月销量'] || 0,
+                'today_sales': item['今日销量'] || 0,
+                'sellable_days': item['成品可卖天数'] || 0,
+                'warning_status': item['预警状态'] || '',
+                'on_way': item['在途数量'] || 0,
+                'car_model': item.车型 || '',
+                'replace_number': item['替换号'] || '',
+                'supplier': item.供应商 || ''
+            };
+        },
+
         // 初始化页面
         init: function() {
             // 监听搜索表单提交
@@ -426,32 +456,7 @@
                     
                     // 准备要添加到购物车的数据
                     var cartItems = selectedData.map(function(item) {
-                        return {
-                            'oe': item.oe || '',
-                            'purchase_records': item.purchase_records || '',
-                            'brand': item.品牌 || '',
-                            'material_name': item.物料名称 || '',
-                            'barcode': item.物料条码 || '',
-                            'car_brand': item.车型品牌 || '',
-                            'tag': item.标签 || '',
-                            'inquiry_1m': item['近1个月询价量'] || 0,
-                            'inquiry_3m': item['近3个月月均询价量'] || 0,
-                            'national_inquiry_1m': item['全国近1个月询价量'] || 0,
-                            'national_inquiry_3m': item['全国近3个月月均询价量'] || 0,
-                            'brand_code': item.品牌号 || '',
-                            'internal_remarks': item.内部备注 || '',
-                            'stock_amount': item.库存金额 || 0,
-                            'cost_price': item.成本价 || 0,
-                            'stock_quantity': item['库存数量'] || 0,
-                            'avg_sales_12m': item['近12个月月均销量'] || 0,
-                            'avg_sales_6m': item['近6个月月均销量'] || 0,
-                            'sales_7d': item['近7天销量'] || 0,
-                            'warning_status': item['预警状态'] || '',
-                            'on_way': item['在途数量'] || 0,
-                            'car_model': item.车型 || '',
-                            'replace_number': item['替换号'] || '',
-                            'company': item.company || ''
-                        };
+                        return app.buildCartItem(item);
                     });
                     
                     // 发送请求到后端添加到购物车

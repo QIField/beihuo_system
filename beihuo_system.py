@@ -1933,51 +1933,93 @@ def add_to_cart():
         # 获取当前用户门店
         store = get_user_store()
 
-        # ========== 直接使用前端传入数据构建购物车数据（不再查询备货表） ==========
+        # 收集所有条码
+        barcodes = []
+        for item in item_details:
+            if isinstance(item, dict):
+                bc = item.get('barcode') or item.get('物料条码')
+                if bc:
+                    barcodes.append(bc)
+
+        # 查询备货表补全数据
+        beihuo_map = {}
+        conn = get_db_connection()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+        if barcodes:
+            placeholders = ','.join(['%s'] * len(barcodes))
+            select_sql = f"""
+                SELECT `供应商`, `品牌`, `物料名称`, `物料条码`, `车型品牌`, `标签`,
+                       `近1个月询价量`, `近3个月月均询价量`, `库存数量`, `昨日销量`, `本月销量`, `今日销量`,
+                       `全国近1个月询价量`, `全国近3个月月均询价量`, `内部备注`, `品牌号`, `库存金额`,
+                       `成品可卖天数`, `成本价`, `近12个月月均销量`, `近6个月月均销量`, `近7天销量`, `预警状态`, `在途数量`, `车型`, `替换号`, `purchase_records`
+                FROM crmapp_beihuo
+                WHERE `物料条码` IN ({placeholders}) AND `company` = %s
+            """
+            cursor.execute(select_sql, barcodes + [store])
+            for row in cursor.fetchall():
+                beihuo_map[row['物料条码']] = row
+
+        def get_merged_value(item, beihuo_row, cart_field, beihuo_field, default=None):
+            """优先使用前端传入的值，缺失时从备货表补全"""
+            if cart_field == 'stock':
+                val = item.get('stock_quantity')
+                if val is not None and val != '':
+                    return val
+            val = item.get(cart_field)
+            if val is not None and val != '':
+                return val
+            if beihuo_row and beihuo_field:
+                val = beihuo_row.get(beihuo_field)
+                if val is not None and val != '':
+                    return val
+            return default
+
         complete_items = []
         for item in item_details:
             if not isinstance(item, dict) or not item.get('oe'):
                 continue
 
+            barcode = item.get('barcode') or item.get('物料条码', '')
+            beihuo_row = beihuo_map.get(barcode, {})
+
             complete_item = {
                 'oe': item.get('oe', ''),
-                'supplier': item.get('supplier') if item.get('supplier') else None,
-                'brand': item.get('brand', ''),
-                'material_name': item.get('material_name', ''),
-                'barcode': item.get('barcode', ''),
-                'car_brand': item.get('car_brand', ''),
-                'tag': item.get('tag', ''),
-                'inquiry_1m': item.get('inquiry_1m', 0) or 0,
-                'inquiry_3m': item.get('inquiry_3m', 0) or 0,
-                'stock': item.get('stock_quantity', 0) or item.get('stock', 0) or 0,
-                'sales_yesterday': item.get('sales_yesterday', 0) or 0,
-                'sales_month': item.get('sales_month', 0) or 0,
-                'today_sales': item.get('today_sales', 0) or 0,
-                'national_inquiry_1m': item.get('national_inquiry_1m', 0) or 0,
-                'national_inquiry_3m': item.get('national_inquiry_3m', 0) or 0,
-                'internal_remarks': item.get('internal_remarks', ''),
-                'brand_code': item.get('brand_code', ''),
-                'stock_amount': item.get('stock_amount', 0.0) or 0.0,
-                'sellable_days': item.get('sellable_days', 0) or 0,
-                'cost_price': item.get('cost_price', 0.0) or 0.0,
-                'avg_sales_12m': item.get('avg_sales_12m', 0) or 0,
-                'avg_sales_6m': item.get('avg_sales_6m', 0) or 0,
-                'sales_7d': item.get('sales_7d', 0) or 0,
-                'warning_status': item.get('warning_status', ''),
-                'on_way': item.get('on_way', 0) or 0,
-                'car_model': item.get('car_model', ''),
-                'replace_number': item.get('replace_number', ''),
-                'purchase_records': item.get('purchase_records', ''),
+                'supplier': get_merged_value(item, beihuo_row, 'supplier', '供应商') or None,
+                'brand': get_merged_value(item, beihuo_row, 'brand', '品牌', ''),
+                'material_name': get_merged_value(item, beihuo_row, 'material_name', '物料名称', ''),
+                'barcode': get_merged_value(item, beihuo_row, 'barcode', '物料条码', ''),
+                'car_brand': get_merged_value(item, beihuo_row, 'car_brand', '车型品牌', ''),
+                'tag': get_merged_value(item, beihuo_row, 'tag', '标签', ''),
+                'inquiry_1m': get_merged_value(item, beihuo_row, 'inquiry_1m', '近1个月询价量', 0) or 0,
+                'inquiry_3m': get_merged_value(item, beihuo_row, 'inquiry_3m', '近3个月月均询价量', 0) or 0,
+                'stock': get_merged_value(item, beihuo_row, 'stock', '库存数量', 0) or 0,
+                'sales_yesterday': get_merged_value(item, beihuo_row, 'sales_yesterday', '昨日销量', 0) or 0,
+                'sales_month': get_merged_value(item, beihuo_row, 'sales_month', '本月销量', 0) or 0,
+                'today_sales': get_merged_value(item, beihuo_row, 'today_sales', '今日销量', 0) or 0,
+                'national_inquiry_1m': get_merged_value(item, beihuo_row, 'national_inquiry_1m', '全国近1个月询价量', 0) or 0,
+                'national_inquiry_3m': get_merged_value(item, beihuo_row, 'national_inquiry_3m', '全国近3个月月均询价量', 0) or 0,
+                'internal_remarks': get_merged_value(item, beihuo_row, 'internal_remarks', '内部备注', ''),
+                'brand_code': get_merged_value(item, beihuo_row, 'brand_code', '品牌号', ''),
+                'stock_amount': get_merged_value(item, beihuo_row, 'stock_amount', '库存金额', 0.0) or 0.0,
+                'sellable_days': get_merged_value(item, beihuo_row, 'sellable_days', '成品可卖天数', 0) or 0,
+                'cost_price': get_merged_value(item, beihuo_row, 'cost_price', '成本价', 0.0) or 0.0,
+                'avg_sales_12m': get_merged_value(item, beihuo_row, 'avg_sales_12m', '近12个月月均销量', 0) or 0,
+                'avg_sales_6m': get_merged_value(item, beihuo_row, 'avg_sales_6m', '近6个月月均销量', 0) or 0,
+                'sales_7d': get_merged_value(item, beihuo_row, 'sales_7d', '近7天销量', 0) or 0,
+                'warning_status': get_merged_value(item, beihuo_row, 'warning_status', '预警状态', ''),
+                'on_way': get_merged_value(item, beihuo_row, 'on_way', '在途数量', 0) or 0,
+                'car_model': get_merged_value(item, beihuo_row, 'car_model', '车型', ''),
+                'replace_number': get_merged_value(item, beihuo_row, 'replace_number', '替换号', ''),
+                'purchase_records': get_merged_value(item, beihuo_row, 'purchase_records', 'purchase_records', ''),
                 'quantity': 1,
                 'added_time': datetime.now(),
                 'added_by': session.get('username', 'unknown'),
                 'store': store,
             }
             complete_items.append(complete_item)
-        
+
         # 查询已有记录，避免重复添加
-        conn = get_db_connection()
-        cursor = conn.cursor()
         
         barcodes = [item['barcode'] for item in complete_items if item.get('barcode')]
         if barcodes:

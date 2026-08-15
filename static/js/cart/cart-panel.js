@@ -265,7 +265,8 @@ var CartPanel = (function() {
                 doubleClickCopy: false,
                 contextMenu: false,
                 shortcuts: true,
-                virtualScroll: true
+                virtualScroll: true,
+                ellipsisText: true
             },
             handsontableOptions: {
                 fixedColumnsLeft: fixedLeft,

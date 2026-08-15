@@ -8,6 +8,7 @@ UpdateView Service - 批量更新CRM产品视图信息
 import os
 import sys
 import time
+import math
 import pandas as pd
 import pymysql
 from pathlib import Path
@@ -26,7 +27,7 @@ os.environ['DB_NAME'] = 'bbr_test'
 
 from app.utils.database_connection import get_db_connection
 from config.cookie_config import create_crm_session
-from app.utils.crm_updateview_logger import execute_update_view_with_log
+from app.utils.crm_updateview_logger import execute_update_view_with_log, fetch_view_then_update
 
 SPECIAL_BRAND_GROUPS = [
     ['FAG', '舍弗勒FAG'],
@@ -136,8 +137,7 @@ def find_product_id_by_number_and_brand(api_response, number, brand_name):
 def update_product_view(session, product_id, cass_desc, store_cass_price, store_peer_price, qpl_price):
     """
     调用API: POST /api/Product.Product/updateView
-    更新产品视图信息
-    只包含有值的字段，空字段不作为参数传递
+    更新产品视图信息（先查view再回传完整字段）
     """
     headers = {
         'accept': 'application/json, text/plain, */*',
@@ -145,23 +145,19 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
         'origin': 'https://crm.gzbbr.com',
         'referer': 'https://crm.gzbbr.com/',
     }
-    
+
     # 从session获取authorization
     auth_token = session.headers.get('authorization')
     if auth_token:
         headers['authorization'] = auth_token
-    
-    # 构建payload，只包含有值的字段
-    payload = {
-        "product_id": str(product_id)
-    }
-    
+
+    # 只收集有值的字段
+    new_values = {}
+
     # 开思描述：有值才添加
     if cass_desc and str(cass_desc).strip():
-        payload["cass_desc"] = str(cass_desc).strip()
-    
-    import math
-    
+        new_values["cass_desc"] = str(cass_desc).strip()
+
     # 辅助函数：检查值是否有效（不是空、不是nan、不是null字符串）
     def is_valid_value(val):
         if not val:
@@ -170,40 +166,41 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
         if val_str in ['', 'nan', 'null', 'none']:
             return False
         return True
-    
+
     # 开思价：有值才添加，转为float
     if is_valid_value(store_cass_price):
         try:
             val = float(store_cass_price)
-            if not math.isnan(val):  # 过滤nan值
-                payload["store_cass_price"] = val
+            if not math.isnan(val):
+                new_values["store_cass_price"] = val
         except (ValueError, TypeError):
-            pass  # 转换失败则不添加
-    
+            pass
+
     # 同行价：有值才添加，转为float
     if is_valid_value(store_peer_price):
         try:
             val = float(store_peer_price)
-            if not math.isnan(val):  # 过滤nan值
-                payload["store_peer_price"] = val
+            if not math.isnan(val):
+                new_values["store_peer_price"] = val
         except (ValueError, TypeError):
-            pass  # 转换失败则不添加
-    
+            pass
+
     # 汽配龙价格：有值才添加，转为float
     if is_valid_value(qpl_price):
         try:
             val = float(qpl_price)
-            if not math.isnan(val):  # 过滤nan值
-                payload["qpl_price"] = val
+            if not math.isnan(val):
+                new_values["qpl_price"] = val
         except (ValueError, TypeError):
-            pass  # 转换失败则不添加
-    
+            pass
+
     # 打印调试信息
-    print(f"    [DEBUG] 发送的payload: {payload}")
-    
-    return execute_update_view_with_log(
+    print(f"    [DEBUG] 准备更新的字段: {new_values}")
+
+    return fetch_view_then_update(
         session=session,
-        payload=payload,
+        product_id=str(product_id),
+        new_values=new_values,
         source="updateview_service",
         store_code="fsbbr",
         headers=headers,

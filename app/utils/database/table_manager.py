@@ -22,6 +22,8 @@ from .tables import (
     init_safety_stock_calculation_table,
     init_all_virtual_inventory_tables,
     init_qpl_quote_record_table,
+    init_qpl_quote_result_v2_table,
+    init_qpl_quote_flow_trace_table,
     init_crm_updateview_log_table,
 )
 
@@ -939,6 +941,8 @@ def init_all_tables():
         ('安全库存计算', init_safety_stock_calculation_table),
         ('虚拟库存', init_all_virtual_inventory_tables),
         ('汽配龙报价记录', init_qpl_quote_record_table),
+        ('汽配龙报价结果v2', init_qpl_quote_result_v2_table),
+        ('汽配龙报价流程追踪', init_qpl_quote_flow_trace_table),
         ('CRM updateView 日志', init_crm_updateview_log_table),
     ]
 
