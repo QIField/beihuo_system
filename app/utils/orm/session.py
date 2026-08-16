@@ -86,3 +86,5 @@ def orm_session():
     finally:
         # 无论成功或失败，都关闭 Session（归还连接到连接池）
         session.close()
+        # 从 scoped_session 的线程本地注册表中移除，避免同线程后续调用复用已关闭的 Session
+        session_factory.remove()

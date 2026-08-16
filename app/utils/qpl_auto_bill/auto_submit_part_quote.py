@@ -579,6 +579,7 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                 continue
 
             item_oe = item.get('itemOe')
+            item_name = item.get('itemName', '')
             quote_status = item.get('quoteStatus')
             quote_status_str = str(quote_status).strip()
             is_waiting = quote_status_str == 'WAITING_QUOTE'

@@ -35,15 +35,14 @@ def _load_pool_cache() -> Dict[int, List[str]]:
     if _pool_cache is not None:
         return _pool_cache
 
+    pool_map: Dict[int, List[str]] = defaultdict(list)
+    name_to_pool: Dict[str, int] = {}
     with orm_session() as session:
         from app.models.orm_models.crm_pp_alias_pool import CrmPpAliasPool
         rows = session.query(CrmPpAliasPool).all()
-
-    pool_map: Dict[int, List[str]] = defaultdict(list)
-    name_to_pool: Dict[str, int] = {}
-    for row in rows:
-        pool_map[row.pool_id].append(row.name)
-        name_to_pool[row.name] = row.pool_id
+        for row in rows:
+            pool_map[row.pool_id].append(row.name)
+            name_to_pool[row.name] = row.pool_id
 
     # 每个池内名称排序，保证输出稳定
     _pool_cache = {
