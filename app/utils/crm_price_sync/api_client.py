@@ -10,7 +10,7 @@ import time
 import requests
 
 from config.cookie_config import create_crm_session
-from app.utils.crm_updateview_logger import execute_update_view_with_log
+from app.utils.crm_updateview_logger import execute_update_view_with_log, _extract_extra_values
 
 
 CRM_BASE_URL = "https://crm.gzbbr.com"
@@ -86,17 +86,24 @@ class CrmPriceSyncApiClient:
 
         return data.get("data", {})
 
-    def update_product_view(self, payload):
+    def update_product_view(self, payload, original_values=None, extra_original_values=None):
         """
         更新产品视图信息。
 
         :param payload: dict 更新字段
+        :param original_values: dict 可选，更新前从 view 接口获取的原始字段值
+        :param extra_original_values: dict 可选，更新前从 view 接口获取的额外记录字段值
         :return: (success: bool, msg: str)
         """
+        if extra_original_values is None and original_values:
+            extra_original_values = _extract_extra_values(original_values)
+
         return execute_update_view_with_log(
             session=self.session,
             payload=payload,
             source="crm_price_sync",
             store_code=self.store_code,
             timeout=30,
+            original_values=original_values,
+            extra_original_values=extra_original_values,
         )

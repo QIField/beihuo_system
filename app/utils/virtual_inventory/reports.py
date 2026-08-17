@@ -9,6 +9,7 @@
 """
 
 import os
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -20,6 +21,13 @@ from app.utils.logger_config import get_task_logger
 
 
 logger = get_task_logger('virtual_inventory')
+
+
+def signed_number(value):
+    """数字格式化：正数前加 '+'，负数保留 '-'，零显示 '0'"""
+    if value > 0:
+        return f"+{value}"
+    return str(value)
 
 
 # 佛山总部表固定统计的 18 个供应商
@@ -86,7 +94,7 @@ def generate_virtual_inventory_compare_excel(business_date):
     # 价格变化
     df_price = df_today.merge(df_yesterday, on=key_cols, how='inner', suffixes=('_今天', '_昨天'))
     df_price = df_price[df_price['price_今天'] != df_price['price_昨天']].copy()
-    df_price['变化量'] = df_price['price_今天'] - df_price['price_昨天']
+    df_price['变化量'] = (df_price['price_今天'] - df_price['price_昨天']).apply(signed_number)
     df_price = df_price[key_cols + ['price_昨天', 'price_今天', '变化量', 'remark_今天']]
     df_price.rename(columns={
         'supplier_name': '供应商名称', 'oe_code': 'OE码', 'brand': '品牌', 'warehouse': '仓库',
@@ -96,7 +104,7 @@ def generate_virtual_inventory_compare_excel(business_date):
     # 库存变化
     df_stock = df_today.merge(df_yesterday, on=key_cols, how='inner', suffixes=('_今天', '_昨天'))
     df_stock = df_stock[df_stock['stock_今天'] != df_stock['stock_昨天']].copy()
-    df_stock['变化量'] = df_stock['stock_今天'] - df_stock['stock_昨天']
+    df_stock['变化量'] = (df_stock['stock_今天'] - df_stock['stock_昨天']).apply(signed_number)
     df_stock = df_stock[key_cols + ['stock_昨天', 'stock_今天', '变化量', 'remark_今天']]
     df_stock.rename(columns={
         'supplier_name': '供应商名称', 'oe_code': 'OE码', 'brand': '品牌', 'warehouse': '仓库',
@@ -106,7 +114,45 @@ def generate_virtual_inventory_compare_excel(business_date):
     filename = f"virtual_inventory_compare_fsbbr_{date_str}.xlsx"
     filepath = os.path.join(export_dir, filename)
 
+    # ---------- 构建「七天明细」工作表 ----------
+    week_start = today - timedelta(days=6)
+    week_start_dt = datetime.combine(week_start, datetime.min.time())
+    week_end_dt = datetime.combine(today, datetime.max.time().replace(microsecond=0))
+
+    week_placeholders = ','.join(['%s'] * len(FSBBR_SUPPLIER_NAMES))
+    week_sql = f"""
+        SELECT supplier_name, DATE(fetch_time) as dt, COUNT(*) as cnt
+        FROM virtual_inventory
+        WHERE supplier_name IN ({week_placeholders})
+          AND fetch_time >= %s AND fetch_time <= %s
+        GROUP BY supplier_name, DATE(fetch_time)
+    """
+
+    db_manager = get_db_connection()
+    try:
+        week_rows = db_manager.execute_query(
+            week_sql, FSBBR_SUPPLIER_NAMES + [week_start_dt, week_end_dt]
+        )
+    finally:
+        db_manager.close()
+
+    week_map = defaultdict(int)
+    for row in week_rows:
+        week_map[(row['supplier_name'], str(row['dt']))] = row['cnt']
+
+    dates = [(today - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(6, -1, -1)]
+    weekly_data = []
+    for name in FSBBR_SUPPLIER_NAMES:
+        row_data = {'供应商名称': name}
+        for d in dates:
+            row_data[d] = week_map.get((name, d), 0)
+        weekly_data.append(row_data)
+
+    df_weekly = pd.DataFrame(weekly_data)
+    # -------------------------------------------
+
     with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
+        df_weekly.to_excel(writer, sheet_name='七天明细', index=False)
         df_new.to_excel(writer, sheet_name='新增OE', index=False)
         df_price.to_excel(writer, sheet_name='价格变化', index=False)
         df_stock.to_excel(writer, sheet_name='库存变化', index=False)
@@ -129,31 +175,48 @@ def generate_virtual_inventory_compare_excel(business_date):
 
 
 def _build_supplier_summary_lines():
-    """统计佛山总部表当天 18 个固定供应商的爬取总量，返回消息行列表"""
+    """统计佛山总部表 18 个固定供应商最近七天累计量，返回消息行列表"""
     placeholders = ','.join(['%s'] * len(FSBBR_SUPPLIER_NAMES))
-    business_start, business_end = get_business_time_range(datetime.now())
+    today = datetime.now().date()
 
-    supplier_sql = f"""
-        SELECT supplier_name, COUNT(*) as cnt
+    # 需覆盖「昨日 7 天窗口」与「今日 7 天窗口」，共 8 天
+    start_dt = today - timedelta(days=7)
+    start_time = datetime.combine(start_dt, datetime.min.time())
+    end_time = datetime.combine(today, datetime.max.time().replace(microsecond=0))
+
+    daily_sql = f"""
+        SELECT supplier_name, DATE(fetch_time) as dt, COUNT(*) as cnt
         FROM virtual_inventory
         WHERE supplier_name IN ({placeholders})
           AND fetch_time >= %s AND fetch_time <= %s
-        GROUP BY supplier_name
+        GROUP BY supplier_name, DATE(fetch_time)
     """
 
     db_manager = get_db_connection()
     try:
-        supplier_rows = db_manager.execute_query(
-            supplier_sql, FSBBR_SUPPLIER_NAMES + [business_start, business_end]
+        rows = db_manager.execute_query(
+            daily_sql, FSBBR_SUPPLIER_NAMES + [start_time, end_time]
         )
     finally:
         db_manager.close()
 
-    supplier_count_map = {row['supplier_name']: row['cnt'] for row in supplier_rows}
+    daily_map = defaultdict(int)
+    for row in rows:
+        daily_map[(row['supplier_name'], str(row['dt']))] = row['cnt']
 
-    lines = ['', '===【各供应商当天爬取量】===']
+    lines = ['', '===【各供应商最近七天爬取量】===']
     for name in FSBBR_SUPPLIER_NAMES:
-        lines.append(f'{name}：{supplier_count_map.get(name, 0)}条')
+        today_7d = sum(
+            daily_map.get((name, (today - timedelta(days=i)).strftime('%Y-%m-%d')), 0)
+            for i in range(7)
+        )
+        yesterday_7d = sum(
+            daily_map.get((name, (today - timedelta(days=i + 1)).strftime('%Y-%m-%d')), 0)
+            for i in range(7)
+        )
+        change = today_7d - yesterday_7d
+        change_str = signed_number(change)
+        lines.append(f'{name}：{yesterday_7d} → {today_7d} ({change_str})')
     return lines
 
 

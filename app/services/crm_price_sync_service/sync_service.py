@@ -141,7 +141,7 @@ def sync_crm_prices():
                 both_records.append(record)
                 continue
 
-            ok, msg = zh_client.update_product_view(payload)
+            ok, msg = zh_client.update_product_view(payload, original_values=view_data)
             record["msg"] = msg
 
             time.sleep(REQUEST_DELAY)
