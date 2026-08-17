@@ -10,13 +10,13 @@
 
 职责：
 1. 读取 oe_parts_sales 销量统计结果，作为安全库存计算的基础输入
-2. 从 crmapp_beihuo 表获取可用库存，使用 (number, brand_name, frey_no) 三字段匹配
+2. 从 crmapp_beihuo 表获取可用库存，使用 (number, frey_no) 两字段匹配
 3. 批量写入安全库存计算结果到 stock_safe 表
 4. 每日全量刷新：TRUNCATE 清空 + 批量插入
 
 数据流：
     oe_parts_sales (销量数据)  ──→  stock_safe 计算
-    crmapp_beihuo (库存数据)   ──→  available_stock（三字段匹配）
+    crmapp_beihuo (库存数据)   ──→  available_stock（两字段匹配）
 """
 
 from sqlalchemy import text
@@ -31,9 +31,8 @@ def fetch_sales_with_inventory(company: str = 'fsbbr') -> list:
     1. oe_parts_sales 中存在但 crmapp_beihuo 中无匹配的产品（available_stock 为 0）
     2. crmapp_beihuo 中有库存但 oe_parts_sales 中无销售记录的产品（销量字段为 0/NULL）
 
-    三字段匹配关系：
+    两字段匹配关系：
     - oe_parts_sales.number = crmapp_beihuo.oe
-    - oe_parts_sales.brand_name = crmapp_beihuo.品牌
     - oe_parts_sales.frey_no = crmapp_beihuo.物料条码
 
     crmapp_beihuo 按 company 过滤，保证数据的组织隔离性。
@@ -46,7 +45,6 @@ def fetch_sales_with_inventory(company: str = 'fsbbr') -> list:
         - number, brand_name, frey_no, pdname（产品标识）
         - avg_daily_sales_1y, sales_std_dev_1y, annual_sales_1y（销量统计）
         - monthly_sales_json（月度销量JSON，用于季节系数计算）
-        - cost_price（成本价，来自crmapp_beihuo.成本价，无匹配则为0）
         - available_stock（可用库存，来自crmapp_beihuo，无匹配则为0）
     """
     sql = text("""
@@ -60,12 +58,11 @@ def fetch_sales_with_inventory(company: str = 'fsbbr') -> list:
             s.sales_std_dev_1y,
             s.annual_sales_1y,
             s.monthly_sales_json,
-            COALESCE(b.成本价, 0) AS cost_price,
-            COALESCE(b.库存数量, 0) AS available_stock
+            COALESCE(b.库存数量, 0) AS available_stock,
+            COALESCE(b.在途数量, 0) AS transit_quantity
         FROM oe_parts_sales s
         LEFT JOIN crmapp_beihuo b
             ON s.number = b.oe COLLATE utf8mb4_unicode_ci
-            AND s.brand_name = b.品牌 COLLATE utf8mb4_unicode_ci
             AND s.frey_no = b.物料条码 COLLATE utf8mb4_unicode_ci
             AND b.company = :company
 
@@ -81,12 +78,11 @@ def fetch_sales_with_inventory(company: str = 'fsbbr') -> list:
             0 AS sales_std_dev_1y,
             0 AS annual_sales_1y,
             NULL AS monthly_sales_json,
-            COALESCE(b.成本价, 0) AS cost_price,
-            COALESCE(b.库存数量, 0) AS available_stock
+            COALESCE(b.库存数量, 0) AS available_stock,
+            COALESCE(b.在途数量, 0) AS transit_quantity
         FROM crmapp_beihuo b
         LEFT JOIN oe_parts_sales s
             ON s.number = b.oe COLLATE utf8mb4_unicode_ci
-            AND s.brand_name = b.品牌 COLLATE utf8mb4_unicode_ci
             AND s.frey_no = b.物料条码 COLLATE utf8mb4_unicode_ci
         WHERE s.number IS NULL
           AND b.company = :company
@@ -135,6 +131,7 @@ def batch_insert(rows: list, batch_size: int = 2000) -> int:
             stock_lower_limit,
             stock_upper_limit,
             available_stock,
+            transit_quantity,
             sellable_days,
             stock_status
         )
@@ -151,6 +148,7 @@ def batch_insert(rows: list, batch_size: int = 2000) -> int:
             :stock_lower_limit,
             :stock_upper_limit,
             :available_stock,
+            :transit_quantity,
             :sellable_days,
             :stock_status
         )

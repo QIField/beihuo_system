@@ -8,9 +8,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='ag-grid/ag-grid.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='ag-grid/ag-theme-alpine.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
-    <!-- 通用组件样式 -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/filter_panel/filter-panel.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.css') }}">
+    <!--
+        本模块不再引用任何项目自写公共组件的 CSS / JS（filter-panel、grid-column-menu、
+        column-preference、custom-pagination 均不引用），只依赖第三方库 layui 和 AG Grid。
+    -->
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -162,11 +163,14 @@
         .grid-wrapper {
             background: #fff;
             border-radius: 10px;
-            padding: 14px;
+            padding: 0;
             box-shadow: 0 2px 12px rgba(0,0,0,0.05);
             border: 1px solid #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
-        .grid-container { height: 620px; width: 100%; }
+        .grid-container { height: 620px; width: 100%; padding: 14px 14px 0 14px; }
         #stockSafeGrid { height: 100%; width: 100%; }
         .ag-theme-alpine {
             --ag-background-color: #fff;
@@ -287,9 +291,6 @@
         }
 
         /* ===== 响应式 ===== */
-        @media (max-width: 1400px) {
-            .stat-cards { grid-template-columns: repeat(3, 1fr); }
-        }
         @media (max-width: 900px) {
             .stat-cards { grid-template-columns: repeat(2, 1fr); }
             .toolbar { flex-direction: column; gap: 14px; align-items: stretch; }
@@ -393,11 +394,12 @@
             </div>
         </div>
 
-        <!-- AG Grid 表格 -->
+        <!-- AG Grid 表格 + 分页（分页 div 直接放在模板中，由 pagination.js 渲染内容） -->
         <div class="grid-wrapper">
             <div class="grid-container">
                 <div id="stockSafeGrid" class="ag-theme-alpine"></div>
             </div>
+            <div id="stockSafePagination"></div>
         </div>
     </div>
 
@@ -420,14 +422,12 @@
         </div>
     </div>
 
-    <!-- 基础依赖 -->
+    <!-- 第三方依赖：layui 和 AG Grid（仅此两个第三方库，不含任何项目自写公共组件） -->
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script src="{{ url_for('static', filename='ag-grid/ag-grid-community.min.js') }}"></script>
     <script src="{{ url_for('static', filename='ag-grid/ag-grid-utils.js') }}"></script>
-    <!-- 通用组件 -->
-    <script src="{{ url_for('static', filename='js/components/column-preference/column-preference.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/components/custom-pagination/custom-pagination.js') }}"></script>
-    <!-- 页面脚本 -->
+    <!-- 本模块私有代码：分页（复制自公共 CustomPagination 重新封装，零公共依赖）+ 页面逻辑 -->
+    <script src="{{ url_for('static', filename='js/stock_safe/pagination.js') }}"></script>
     <script src="{{ url_for('static', filename='js/stock_safe/stock_safe.js') }}"></script>
 </body>
 </html>

@@ -1,16 +1,16 @@
 /**
  * 安全库存看板页面
  *
- * 设计说明（按用户 3 点需求实现）：
- *  1) 表头列菜单仅保留【升序 / 降序】两项；其他功能（列显示、筛选）从菜单移除
- *  2) 【列显示】放到独立的工具栏按钮里，点击弹出列勾选面板（全选/全不选 + 确定）
- *  3) 工具栏加回搜索筛选（关键词、库存状态、ABC分类 + 查询/重置），所有筛选项 + 分页 + 排序 统一走后端
+ * 【本模块"零公共代码依赖"原则】
+ *  仅引用第三方库：layui + AG Grid Community（ag-grid-community.min.js / ag-grid-utils.js）
+ *  分页组件：复制并重新封装项目公共 CustomPagination 源码 → 放本模块同目录 pagination.js（全局 StockSafePagination）
+ *  不引用任何项目自写公共组件（column-preference / custom-pagination / filter-panel / grid-column-menu 全部不引用）
  *
- * 技术栈：
- *  - AG Grid 原生 sortable（onSortChanged 拦截 → 后端 ORDER BY）
- *  - CustomPagination 服务端分页（onPageChange → 后端 LIMIT/OFFSET）
- *  - ColumnPreference 持久化：列宽 / 顺序 / 显示隐藏 自动保存
- *  - 列显示独立弹窗：通过 applyColumnState 批量设置 hide
+ *  功能：
+ *   1) 排序：AG Grid 原生 sortable + onSortChanged（同步前端排序箭头显示 + 调用后端 sort_field/sort_order）
+ *   2) 分页：模块私有 StockSafePagination（onPageChange 回调走后端 LIMIT/OFFSET）
+ *   3) 搜索筛选：工具栏关键词 / 库存状态 / ABC 分类（查询/重置按钮），走后端过滤
+ *   4) 列显示：独立的工具栏按钮弹窗（批量勾选显隐），通过 gridColumnApi.applyColumnStat#e 应用
  */
 
 (function () {
@@ -21,6 +21,8 @@
     // ============================================================
     var gridApi = null;
     var gridColumnApi = null;
+
+    // 模块私有分页组件（来自 pagination.js 暴露的全局 StockSafePagination）
     var pagination = null;
 
     // 排序状态（通过 onSortChanged 同步）
@@ -39,7 +41,19 @@
 
     // 列定义（升序/降序通过 onSortChanged 走后端）
     var COLUMN_DEFS = [
-        { headerName: 'OE号', field: 'number', flex: 1.5, minWidth: 180 },
+        {
+            headerName: '序号', width: 70,
+            cellRenderer: function (p) {
+                // 根据当前分页计算全局序号： (page-1) * pageSize + rowIndex + 1
+                var idx = p.rowIndex + 1;
+                if (pagination) {
+                    idx = (pagination.currentPage - 1) * pagination.currentPageSize + p.rowIndex + 1;
+                }
+                return '<span style="color:#8c8c8c;font-family:Roboto Mono,Consolas,monospace;font-weight:500;">' + idx + '</span>';
+            },
+            sortable: false
+        },
+        { headerName: 'OE号', field: 'number', flex: 1.5, minWidth: 120 },
         { headerName: '品牌', field: 'brand_name', width: 120 },
         { headerName: '条码', field: 'frey_no', width: 150 },
         {
@@ -64,6 +78,8 @@
                 return null;
             }
         },
+        { headerName: '在途数量', field: 'transit_quantity', width: 100, cellClass: 'cell-number',
+            valueFormatter: intFormatter },
         { headerName: '日均销量',         field: 'avg_daily_sales',     width: 110, cellClass: 'cell-number', valueFormatter: decFormatter },
         { headerName: '基础安全库存',     field: 'base_safety_stock',   width: 130, cellClass: 'cell-number', valueFormatter: decFormatter },
         {
@@ -130,16 +146,18 @@
 
     // ============================================================
     // 初始化 AG Grid
+    // 重要：这里 pagination=false，不使用 AG Grid 内置分页；
+    //       分页使用模块私有组件 StockSafePagination（零公共依赖）
     // ============================================================
     function initGrid() {
         var gridOptions = {
             columnDefs: COLUMN_DEFS,
             rowData: [],
             defaultColDef: {
-                sortable: true,      // 启用 AG Grid 原生的表头点选排序（通过 onSortChanged 走后端）
+                sortable: true,      // AG Grid 原生表头排序（点击表头显示箭头；实际排序走后端）
                 resizable: true,
-                filter: false,       // 禁止 AG Grid 内置筛选
-                suppressMenu: true,  // 禁止 AG Grid 内置列菜单（不在菜单里放任何功能）
+                filter: false,       // 禁用 AG Grid 内置客户端过滤（过滤统一走后端）
+                suppressMenu: true,  // 禁用 AG Grid 内置列菜单（筛选/列显隐全部移到独立按钮/弹窗）
                 minWidth: 80
             },
             pagination: false,
@@ -149,39 +167,19 @@
             animateRows: false,
             enableCellTextSelection: true,
             ensureDomOrder: true,
-            localeText: {
-                loadingOoo: '加载中...',
-                noRowsToShow: '暂无数据'
-            },
-            // ---- 排序变化：清除前端排序，改走后端 ----
+            // ---- 排序变化：保留前端箭头显示；切回第 1 页；走后端 ORDER BY ----
             onSortChanged: function (params) {
                 if (!gridColumnApi) return;
                 var state = [];
-                try {
-                    state = gridColumnApi.getColumnState() || [];
-                } catch (e) {}
+                try { state = gridColumnApi.getColumnState() || []; } catch (e) {}
                 var sortEntry = null;
-                // sortIndex 最小者为当前排序目标（AG Grid 支持多列排序）
                 state.forEach(function (s) {
                     if (s.sort === 'asc' || s.sort === 'desc') {
-                        if (!sortEntry || (s.sortIndex != null && s.sortIndex < sortEntry.sortIndex)) {
-                            sortEntry = s;
-                        }
+                        if (!sortEntry || (s.sortIndex != null && s.sortIndex < sortEntry.sortIndex)) sortEntry = s;
                     }
                 });
                 currentSortField = sortEntry ? sortEntry.colId : '';
                 currentSortOrder = sortEntry ? sortEntry.sort : 'asc';
-
-                // 关键：清除 AG Grid 的前端排序状态，前端不参与实际排序
-                try {
-                    gridColumnApi.applyColumnState({
-                        state: state.map(function (s) {
-                            return { colId: s.colId, sort: null, sortIndex: null };
-                        }),
-                        applyOrder: false
-                    });
-                } catch (e) {}
-
                 if (pagination) pagination.currentPage = 1;
                 fetchData();
             },
@@ -190,24 +188,18 @@
                 gridColumnApi = params.columnApi;
                 console.log('[stock_safe] AG Grid 初始化完成');
 
-                // ① 服务器端分页
-                pagination = CustomPagination.init({
+                // 模块私有分页组件（复制自公共 CustomPagination 源码，零公共依赖，全局 StockSafePagination）
+                // container: '#stockSafePagination' 对应模板中 grid-wrapper 内摆放的 div，
+                // 分页组件直接渲染到该元素中，与表格融为一体。
+                pagination = StockSafePagination.init({
+                    container: '#stockSafePagination',
                     gridSelector: '#stockSafeGrid',
-                    pageSizeOptions: [50, 100, 200, 500],
+                    pageSizeOptions: [20, 50, 100, 200, 500],
                     defaultPageSize: 50,
                     onPageChange: function (page, pageSize) {
                         fetchData(page, pageSize);
                     }
                 });
-
-                // ② 列状态持久化（列宽/顺序/显隐按用户保存）
-                if (typeof ColumnPreference !== 'undefined') {
-                    ColumnPreference.init(gridApi, {
-                        columnApi: gridColumnApi,
-                        pageKey: 'stock_safe',
-                        gridKey: 'main_grid'
-                    });
-                }
 
                 initDoubleClickCopy();
             }
@@ -259,22 +251,14 @@
 
     function bindColVisibilityModalEvents() {
         var modal = document.getElementById('colVisibilityModal');
-        // 关闭按钮 & 取消
         document.getElementById('btnColClose').addEventListener('click', closeColVisibilityModal);
         document.getElementById('btnColCancel').addEventListener('click', closeColVisibilityModal);
-        // 全选 / 全不选
         document.getElementById('btnColAll').addEventListener('click', function () { toggleAllInColModal(true); });
         document.getElementById('btnColNone').addEventListener('click', function () { toggleAllInColModal(false); });
-        // 确定
         document.getElementById('btnColConfirm').addEventListener('click', function () {
             applyColVisibilityFromModal();
             closeColVisibilityModal();
-            // 保存列偏好
-            if (typeof ColumnPreference !== 'undefined') {
-                ColumnPreference.flush('stock_safe', 'main_grid');
-            }
         });
-        // 点击遮罩关闭
         modal.addEventListener('click', function (e) {
             if (e.target === modal) closeColVisibilityModal();
         });
@@ -286,14 +270,12 @@
         var list = document.getElementById('colVisibilityList');
         list.innerHTML = '';
 
-        // 列状态快照（用于确定/取消）
         try {
             colModalOpenSnapshot = (gridColumnApi.getColumnState() || []).map(function (s) {
                 return { colId: s.colId, hide: !!s.hide };
             });
         } catch (e) { colModalOpenSnapshot = []; }
 
-        // 生成复选框列表，按当前列的实际顺序显示
         var colStates = [];
         try {
             colStates = gridColumnApi.getColumnState() || [];
@@ -303,7 +285,6 @@
         } catch (e) {}
 
         colStates.forEach(function (st) {
-            // 找对应的 colDef（获取 label）
             var def = COLUMN_DEFS.find(function (c) { return (c.field || c.colId) === st.colId; });
             var label = def ? def.headerName : st.colId;
             var checked = !st.hide ? 'checked' : '';
@@ -334,7 +315,6 @@
         inputs.forEach(function (i) {
             hideMap[i.getAttribute('data-col-id')] = !i.checked;
         });
-        // 以快照为基础修改 hide，保持其他状态不变
         var base = (colModalOpenSnapshot && colModalOpenSnapshot.length) ? colModalOpenSnapshot : [];
         var state = base.map(function (s) {
             return { colId: s.colId, hide: (hideMap[s.colId] !== undefined) ? hideMap[s.colId] : !!s.hide };
@@ -405,6 +385,7 @@
                     var list = data.list || [];
                     if (gridApi) gridApi.setRowData(list);
 
+                    // 更新公共分页组件
                     if (pagination) {
                         pagination.update(
                             data.total || 0,
@@ -463,10 +444,10 @@
             return;
         }
         var headers = ['OE号', '品牌', '条码', '产品名称', 'ABC分类',
-            '可用库存', '日均销量', '基础安全库存', '季节系数',
+            '可用库存', '在途数量', '日均销量', '基础安全库存', '季节系数',
             '调整后安全库存', '库存下限', '库存上限', '可卖天数', '库存状态'];
         var keys = ['number', 'brand_name', 'frey_no', 'pdname', 'abc_classification',
-            'available_stock', 'avg_daily_sales', 'base_safety_stock', 'season_coefficient',
+            'available_stock', 'transit_quantity', 'avg_daily_sales', 'base_safety_stock', 'season_coefficient',
             'safety_stock', 'stock_lower_limit', 'stock_upper_limit', 'sellable_days', 'stock_status'];
 
         function esc(v) {

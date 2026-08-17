@@ -15,11 +15,11 @@
   4. TRUNCATE 清空 stock_safe 表后，批量写入新计算结果
 
 ABC 分类规则：
-  - 按年消耗金额（annual_sales_1y × cost_price）降序排列
-  - A 类（前 20% 金额）：Z 值 = 1.5（较高服务水平），覆盖天数 = 10 天
-  - B 类（中间 60% 金额）：Z 值 = 1.2（中等服务水平），覆盖天数 = 20 天
-  - C 类（后 20% 金额）：Z 值 = 0.8（较低服务水平），覆盖天数 = 30 天
-  - 年销量为 0 或成本价为 0 的产品强制归为 C 类（无成本数据无法衡量价值）
+  - 按年销量（annual_sales_1y）降序排列
+  - A 类（前 20% 销量）：Z 值 = 1.5（较高服务水平），覆盖天数 = 10 天
+  - B 类（中间 60% 销量）：Z 值 = 1.2（中等服务水平），覆盖天数 = 20 天
+  - C 类（后 20% 销量）：Z 值 = 0.8（较低服务水平），覆盖天数 = 30 天
+  - 年销量为 0 的产品强制归为 C 类（无销量数据无法衡量需求）
 
 季节系数：当月销量 / 月均销量，钳制到 [0.7, 1.3] 范围内，用于修正安全库存
 
@@ -62,9 +62,9 @@ logger = get_stock_safe_logger()
 #   z     - 安全库存 Z 值（标准正态分布分位数，决定服务水平）
 #   cover - 覆盖天数，用于计算库存上限中的备货天数
 ABC_CFG = {
-    'A': {'pct': 0.2, 'z': 1.5, 'cover': 10},   # 高价值/高销量，高服务水平，短覆盖
-    'B': {'pct': 0.6, 'z': 1.2, 'cover': 20},   # 中价值/中销量，中等服务水平，中覆盖
-    'C': {'pct': 0.2, 'z': 0.8, 'cover': 30},   # 低价值/低销量，低服务水平，长覆盖
+    'A': {'pct': 0.2, 'z': 1.5, 'cover': 20},   # 高价值/高销量，高服务水平，短覆盖
+    'B': {'pct': 0.6, 'z': 1.2, 'cover': 15},   # 中价值/中销量，中等服务水平，中覆盖
+    'C': {'pct': 0.2, 'z': 0.8, 'cover': 5},   # 低价值/低销量，低服务水平，长覆盖
 }
 
 # 采购提前期（天）：从下单到到货的周期
@@ -86,45 +86,40 @@ SEASON_MIN, SEASON_MAX = 0.7, 1.3
 
 def _calc_abc(rows: list) -> dict:
     """
-    按年消耗金额（annual_sales_1y × cost_price）降序对产品进行 ABC 分类。
+    按年销量（annual_sales_1y）降序对产品进行 ABC 分类。
 
     分类逻辑：
-      1. 计算每个产品的年消耗金额 = annual_sales_1y × cost_price
-      2. 按年消耗金额降序排列
-      3. 前 20% 的产品 → A 类（高价值/高消耗）
-      4. 接下来的 60% 的产品 → B 类（中等）
-      5. 剩余 20% 的产品 → C 类（低价值/低消耗）
-      6. 年销量为 0 或成本价为 0 的产品强制归为 C 类
-         （无成本数据无法衡量价值，保守归入 C 类）
+      1. 按年销量（annual_sales_1y）降序排列
+      2. 前 20% 的产品 → A 类（高销量/高频次）
+      3. 接下来的 60% 的产品 → B 类（中等）
+      4. 剩余 20% 的产品 → C 类（低销量/低频次）
+      5. 年销量为 0 的产品强制归为 C 类（无销量数据无法衡量需求）
 
     Args:
         rows: 从数据库查询到的原始数据行列表，每行包含 'number'、'brand_name'、
-              'annual_sales_1y'、'cost_price' 字段
+              'annual_sales_1y' 字段
 
     Returns:
         dict: 键为 "{number}|{brand_name}" 格式的唯一标识，值为 ABC 分类字符（'A'/'B'/'C'）
               若输入为空列表，返回空字典
     """
-    # 提取每个产品的唯一标识、年销量和成本价，计算年消耗金额
+    # 提取每个产品的唯一标识和年销量
     # 使用 "|" 拼接 number 和 brand_name 作为唯一键，应对不同品牌下相同产品编号的情况
     products = []
     for r in rows:
         annual_sales = float(r.get('annual_sales_1y', 0) or 0)
-        cost_price = float(r.get('cost_price', 0) or 0)
         products.append({
             'key': f"{r['number']}|{r['brand_name']}",
-            # 年消耗金额 = 年销量 × 成本价，作为 ABC 排序依据
-            'consumption_value': annual_sales * cost_price,
+            # 年销量作为 ABC 排序依据
             'annual_sales': annual_sales,
-            'cost_price': cost_price,
         })
 
     # 空数据保护：若没有产品数据，直接返回空字典
     if not products:
         return {}
 
-    # 按年消耗金额降序排列，金额高的产品排在前面
-    sorted_prods = sorted(products, key=lambda x: x['consumption_value'], reverse=True)
+    # 按年销量降序排列，销量高的产品排在前面
+    sorted_prods = sorted(products, key=lambda x: x['annual_sales'], reverse=True)
 
     # 计算各类别的产品数量阈值
     total = len(sorted_prods)
@@ -144,8 +139,7 @@ def _calc_abc(rows: list) -> dict:
             # 剩余 → C 类
             abc[p['key']] = 'C'
 
-    # 注意：cost_price=0 或 annual_sales=0 的产品 consumption_value=0，
-    # 排序自然垫底落入 C 类区域，无需额外强制处理
+    # 注意：annual_sales=0 的产品销量为 0，排序自然垫底落入 C 类区域，无需额外强制处理
     return abc
 
 
@@ -331,6 +325,8 @@ def _build_record(row: dict, abc_class: str) -> dict:
     annual = int(row.get('annual_sales_1y', 0) or 0)
     # 当前可用库存（来自 crmapp_beihuo 的实际库存）
     avail = int(row.get('available_stock', 0) or 0)
+    # 当前在途数量（来自 crmapp_beihuo 的在途数量）
+    in_transit = int(row.get('transit_quantity', 0) or 0)
 
     # ── 安全库存计算 ──
     # 计算季节系数
@@ -386,6 +382,7 @@ def _build_record(row: dict, abc_class: str) -> dict:
 
         # 库存状态
         'available_stock': avail,                 # 当前可用库存
+        'transit_quantity': in_transit,           # 在途数量
         'sellable_days': round(avail / avg_daily, 2) if avg_daily > 0 else 0.0,  # 可销售天数
         'stock_status': status,                   # 库存状态
     }
@@ -401,14 +398,9 @@ def run_compute() -> dict:
 
     执行流程：
       第 1 步：从 oe_parts_sales 和 crmapp_beihuo 读取并集销量及库存数据
-      第 2 步：对所有产品进行 ABC 分类（基于年消耗金额 = annual_sales_1y × cost_price）
+      第 2 步：对所有产品进行 ABC 分类（基于年销量 annual_sales_1y）
       第 3 步：逐行计算安全库存、上下限、库存状态等字段
       第 4 步：TRUNCATE 清空 stock_safe 表后批量写入新计算结果
-
-    成本价补充策略：
-      - 优先使用 crmapp_beihuo.成本价
-      - Part 1 产品（有销量记录）若 crmapp_beihuo 中无成本价，则为 0，ABC 分类中 consumption_value=0 自然排入 C 类
-      - Part 2 产品（有库存无销量）annual_sales=0，consumption_value=0 自然排入 C 类
 
     全量刷新策略说明：
       - 采用 TRUNCATE + 批量 INSERT 的方式，确保数据完全一致
@@ -442,9 +434,8 @@ def run_compute() -> dict:
                     "timestamp": int(time.time())}
 
         # ====== 阶段 2：ABC 分类 ======
-        # 按年消耗金额（annual_sales_1y × cost_price）对所有产品进行 ABC 分类
-        # 注意：分类结果依赖于全局年消耗金额排序，必须全部加载后才能计算
-        # 成本价已在 SQL 层通过 LEFT JOIN crmapp_compare_summary 完成 fallback，无需循环补充
+        # 按年销量（annual_sales_1y）对所有产品进行 ABC 分类
+        # 注意：分类结果依赖于全局年销量排序，必须全部加载后才能计算
         abc = _calc_abc(rows)
         logger.info("[阶段2] ABC分类: A=%d B=%d C=%d",
                     sum(1 for v in abc.values() if v == 'A'),

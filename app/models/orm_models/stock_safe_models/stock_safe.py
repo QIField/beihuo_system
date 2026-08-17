@@ -43,6 +43,7 @@ class StockSafe(BaseModels):
     stock_upper_limit = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="库存上限：平均日销量 × (补货周期 + 覆盖天数) + 安全库存")
 
     available_stock = Column(Integer, nullable=True, default=0, comment="可用库存：每日快照从crmapp_beihuo表获取，使用number+brand_name+frey_no匹配")
+    transit_quantity = Column(Integer, nullable=True, default=0, comment="在途数量：从crmapp_beihuo表同步")
     sellable_days = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="可卖天数：可用库存 / 平均日销量")
 
     stock_status = Column(String(20), nullable=True, default='正常', comment="库存状态：呆滞清库/慢动销去库/紧急补货/需补货/库存积压/正常")
@@ -69,6 +70,7 @@ class StockSafe(BaseModels):
             "stock_lower_limit": float(self.stock_lower_limit) if self.stock_lower_limit is not None else None,
             "stock_upper_limit": float(self.stock_upper_limit) if self.stock_upper_limit is not None else None,
             "available_stock": self.available_stock,
+            "transit_quantity": self.transit_quantity,
             "sellable_days": float(self.sellable_days) if self.sellable_days is not None else None,
             "stock_status": self.stock_status,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
