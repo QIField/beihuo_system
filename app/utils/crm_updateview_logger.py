@@ -23,6 +23,15 @@ ALL_VIEW_FIELDS = [
     "qpl_price", "cost_price", "manufacturer_price",
 ]
 
+# 需要单独记录原始值的字段（product_id 已有独立字段，不再重复）
+ORIGINAL_FIELDS = [f for f in ALL_VIEW_FIELDS if f != "product_id"]
+
+# 从 view 接口额外爬取、仅用于数据库记录的字段（不加入 updateView payload）
+EXTRA_LOG_FIELDS = [
+    ("brand_name", "更新品牌"),
+    ("number", "更新oe"),
+]
+
 
 def _extract_product_id(payload):
     """从 payload 中提取 product_id，用于日志记录"""
@@ -32,7 +41,27 @@ def _extract_product_id(payload):
     return ""
 
 
-def log_update_view_request(source, store_code, payload, response_status, response_msg=None):
+def _extract_original_values(view_data):
+    """从 /view 返回的数据中提取需要记录的原始字段值"""
+    if not isinstance(view_data, dict):
+        return {}
+    return {
+        field: (str(view_data[field]) if view_data.get(field) is not None else None)
+        for field in ORIGINAL_FIELDS
+    }
+
+
+def _extract_extra_values(view_data):
+    """从 /view 返回的数据中提取额外记录字段（不加入 updateView payload）"""
+    if not isinstance(view_data, dict):
+        return {}
+    return {
+        field: (str(view_data[field]) if view_data.get(field) is not None else None)
+        for field, _ in EXTRA_LOG_FIELDS
+    }
+
+
+def log_update_view_request(source, store_code, payload, response_status, response_msg=None, original_values=None, extra_original_values=None):
     """
     记录一次 updateView 请求日志到数据库。
 
@@ -43,26 +72,40 @@ def log_update_view_request(source, store_code, payload, response_status, respon
     :param payload: dict 请求参数
     :param response_status: str 响应状态：success / failed / error
     :param response_msg: str 接口返回消息或异常信息
+    :param original_values: dict 调用前从 /view 接口获取的原始字段值
+    :param extra_original_values: dict 调用前从 /view 接口获取的额外记录字段值
     """
     try:
+        original_values = original_values or {}
+        extra_original_values = extra_original_values or {}
         sql = """
             INSERT INTO crm_updateview_log
-            (source, store_code, product_id, request_payload, response_status, response_msg)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            (source, store_code, product_id, request_payload,
+             original_cass_desc, original_brand_code, original_l_name_zh_store,
+             original_brand_barcode, original_store_cass_price, original_store_peer_price,
+             original_qpl_price, original_cost_price, original_manufacturer_price,
+             更新品牌, 更新oe,
+             response_status, response_msg)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
-        db_execute(sql, (
+        params = [
             source,
             store_code,
             _extract_product_id(payload),
             json.dumps(payload, ensure_ascii=False, default=str),
-            response_status,
-            response_msg,
-        ))
+        ]
+        for field in ORIGINAL_FIELDS:
+            params.append(original_values.get(field))
+        for field, _ in EXTRA_LOG_FIELDS:
+            params.append(extra_original_values.get(field))
+        params.extend([response_status, response_msg])
+
+        db_execute(sql, tuple(params))
     except Exception as e:
         print(f"[updateView日志] 记录失败: {e}")
 
 
-def execute_update_view_with_log(session, payload, source, store_code, headers=None, timeout=30):
+def execute_update_view_with_log(session, payload, source, store_code, headers=None, timeout=30, original_values=None, extra_original_values=None):
     """
     执行 updateView 请求并记录日志。
 
@@ -72,6 +115,8 @@ def execute_update_view_with_log(session, payload, source, store_code, headers=N
     :param store_code: str 门店/组织代码
     :param headers: dict 可选的自定义请求头
     :param timeout: int 请求超时时间（秒）
+    :param original_values: dict 可选的 /view 原始字段值
+    :param extra_original_values: dict 可选的 /view 额外记录字段值
     :return: (success: bool, msg: str)
     """
     try:
@@ -81,16 +126,16 @@ def execute_update_view_with_log(session, payload, source, store_code, headers=N
 
         if data.get("status") == 200:
             msg = data.get("msg", "更新成功")
-            log_update_view_request(source, store_code, payload, "success", msg)
+            log_update_view_request(source, store_code, payload, "success", msg, original_values, extra_original_values)
             return True, msg
 
         msg = data.get("msg", "更新失败")
-        log_update_view_request(source, store_code, payload, "failed", msg)
+        log_update_view_request(source, store_code, payload, "failed", msg, original_values, extra_original_values)
         return False, msg
 
     except Exception as e:
         error_msg = f"API调用失败: {e}"
-        log_update_view_request(source, store_code, payload, "error", f"{error_msg}\n{traceback.format_exc()}")
+        log_update_view_request(source, store_code, payload, "error", f"{error_msg}\n{traceback.format_exc()}", original_values, extra_original_values)
         return False, error_msg
 
 
@@ -142,7 +187,9 @@ def fetch_view_then_update(session, product_id, new_values, source, store_code, 
     # 确保 product_id 正确
     payload["product_id"] = str(product_id)
 
-    # 3. 调用 updateView
+    # 3. 提取原始字段值并调用 updateView
+    original_values = _extract_original_values(view_data)
+    extra_original_values = _extract_extra_values(view_data)
     return execute_update_view_with_log(
         session=session,
         payload=payload,
@@ -150,4 +197,6 @@ def fetch_view_then_update(session, product_id, new_values, source, store_code, 
         store_code=store_code,
         headers=headers,
         timeout=timeout,
+        original_values=original_values,
+        extra_original_values=extra_original_values,
     )
