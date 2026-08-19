@@ -1317,14 +1317,8 @@ def api_beihuo():
     inquiry_3m_val = request.args.get('inquiry_3m_val', '').strip() or None
     stock_op = request.args.get('stock_op', '')
     stock_val = request.args.get('stock_val', '').strip() or None
-    sales_yesterday_op = request.args.get('sales_yesterday_op', '')
-    sales_yesterday_val = request.args.get('sales_yesterday_val', '').strip() or None
     sales_month_op = request.args.get('sales_month_op', '')
     sales_month_val = request.args.get('sales_month_val', '').strip() or None
-    today_sales_op = request.args.get('today_sales_op', '')
-    today_sales_val = request.args.get('today_sales_val', '').strip() or None
-    sales_today_op = request.args.get('sales_today_op', '')
-    sales_today_val = request.args.get('sales_today_val', '').strip() or None
     national_inquiry_1m_op = request.args.get('national_inquiry_1m_op', '')
     national_inquiry_1m_val = request.args.get('national_inquiry_1m_val', '').strip() or None
     national_inquiry_3m_op = request.args.get('national_inquiry_3m_op', '')
@@ -1433,18 +1427,9 @@ def api_beihuo():
     if stock_val is not None and stock_op:
         where_parts.append(f"`库存数量` {stock_op} %s")
         params.append(stock_val)
-    if sales_yesterday_val is not None and sales_yesterday_op:
-        where_parts.append(f"`昨日销量` {sales_yesterday_op} %s")
-        params.append(sales_yesterday_val)
     if sales_month_val is not None and sales_month_op:
         where_parts.append(f"`本月销量` {sales_month_op} %s")
         params.append(sales_month_val)
-    if today_sales_val is not None and today_sales_op:
-        where_parts.append(f"`今日销量` {today_sales_op} %s")
-        params.append(today_sales_val)
-    if sales_today_val is not None and sales_today_op:
-        where_parts.append(f"`今日销量` {sales_today_op} %s")
-        params.append(sales_today_val)
     if national_inquiry_1m_val is not None and national_inquiry_1m_op:
         where_parts.append(f"`全国近1个月询价量` {national_inquiry_1m_op} %s")
         params.append(national_inquiry_1m_val)
