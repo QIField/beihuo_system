@@ -13,6 +13,7 @@
     <!-- LayUI -->
     <link rel="stylesheet" href="/static/layui/css/layui.css">
     <script src="/static/layui/layui.js"></script>
+    <script src="/static/js/frequency-module.js"></script>
 
     <!-- Filter Panel Component -->
     <link rel="stylesheet" href="/static/js/components/filter_panel/filter-panel.css">
@@ -596,7 +597,28 @@
                 comparator: (valueA, valueB) => valueA - valueB
             },
             { field: '内部备注', headerName: '内部备注', width: 150, filter: true },
-            { field: 'waiting_time', headerName: '待仓时间', width: 120, filter: true }
+            { field: 'waiting_time', headerName: '待仓时间', width: 120, filter: true },
+            {
+                field: 'frequency',
+                headerName: '频次',
+                width: 100,
+                filter: 'agNumberColumnFilter',
+                valueGetter: function(params) {
+                    var value = params.data ? params.data['frequency'] : '';
+                    if (value === '' || value === null || value === undefined) {
+                        return '';
+                    }
+                    var num = parseFloat(value);
+                    return isNaN(num) ? '' : num;
+                },
+                comparator: function(valueA, valueB) {
+                    var a = parseFloat(valueA);
+                    var b = parseFloat(valueB);
+                    a = isNaN(a) ? -Infinity : a;
+                    b = isNaN(b) ? -Infinity : b;
+                    return a - b;
+                }
+            }
         ];
         
         // Grid 配置
@@ -1405,15 +1427,19 @@
         async function loadData() {
             const dateRange = document.getElementById('dateRange').value;
             let startDate = '', endDate = '';
-            
-            if (dateRange) {
+
+            if (FrequencyModule) {
+                const parsed = FrequencyModule.parseDateRange(dateRange);
+                startDate = parsed.start;
+                endDate = parsed.end;
+            } else {
                 const dates = dateRange.split(' - ');
                 if (dates.length === 2) {
                     startDate = dates[0];
                     endDate = dates[1];
                 }
             }
-            
+
             if (!startDate || !endDate) {
                 layui.layer.msg('请选择日期范围', {icon: 0});
                 return;
@@ -1515,7 +1541,18 @@
         async function searchData() {
             // 获取日期范围
             const dateRangeValue = document.getElementById('dateRange').value;
-            const { start: startDate, end: endDate } = parseDateRange(dateRangeValue);
+            let startDate = '', endDate = '';
+            if (FrequencyModule) {
+                const parsed = FrequencyModule.parseDateRange(dateRangeValue);
+                startDate = parsed.start;
+                endDate = parsed.end;
+            } else {
+                const dates = dateRangeValue.split(' - ');
+                if (dates.length === 2) {
+                    startDate = dates[0].trim();
+                    endDate = dates[1].trim();
+                }
+            }
 
             if (!startDate || !endDate) {
                 layui.layer.msg('请选择日期范围', {icon: 0});

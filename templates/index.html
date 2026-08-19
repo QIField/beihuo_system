@@ -271,126 +271,191 @@
             .layui-input-label { width: 60px; font-size: 12px; }
         }
 
-        .search-panel .layui-row:first-child {
-            display: flex;
-            margin-left: -6px;
-            margin-right: -6px;
-        }
-        .search-panel .layui-row:first-child > [class*="layui-col-"] {
-            padding-left: 6px;
-            padding-right: 6px;
-            flex: 1;
-        }
-        .search-panel .layui-row:nth-child(2) .layui-col-md2:nth-child(1) {
-            /* 今日销量对齐第一行的oe */
-            width: calc(100% / 6 - 12px * 5 / 6);
-            display: inline-block;
-        }
-        .search-panel .layui-row:nth-child(2) .layui-col-md2:nth-child(2) {
-            /* 昨日销量对齐第一行的品牌 */
-            width: calc(100% / 6 - 12px * 5 / 6);
-            display: inline-block;
-        }
-        .search-panel .layui-row:nth-child(2) .layui-col-md2 {
-            flex: 1;
-            min-width: 0;
-            margin-right: 12px;
-        }
-        .search-panel .layui-row:nth-child(2) .layui-col-md2:nth-last-child(2) {
-            margin-right: 0;
-        }
-        .search-panel .layui-row:nth-child(2) .layui-col-md2:last-child {
-            margin-right: 0;
+        /* 搜索面板 - 紧凑布局 */
+        .search-panel {
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: #fff;
+            border: 1px solid #e6e6e6;
+            border-radius: 4px;
         }
 
-        /* 搜索面板分组样式 */
-        .search-group {
+        .search-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 12px;
-            padding: 12px 0;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border-bottom: 1px solid #f0f0f0;
         }
-        .search-group:last-child {
-            border-bottom: none;
-        }
-        .group-label {
-            font-size: 14px;
-            font-weight: bold;
+
+        .update-time {
+            font-size: 13px;
             color: #333;
-            white-space: nowrap;
-            min-width: 70px;
+            font-weight: 600;
         }
-        .search-fields {
+
+        .search-header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .search-filters {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            flex: 1;
+            gap: 8px 14px;
             align-items: center;
+            margin-bottom: 8px;
         }
-        .search-fields input,
-        .search-fields select,
-        .group-actions select {
-            height: 34px;
-            padding: 0 12px;
+
+        .search-quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            background: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+
+        .filter-group input,
+        .filter-group select,
+        .compare-box input,
+        .compare-box select,
+        .data-action-group select {
+            height: 30px;
+            padding: 0 8px;
             border: 1px solid #d9d9d9;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 13px;
             color: #333;
             background: #fff;
-            transition: all 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .search-fields input {
-            width: 140px;
-        }
-        .search-fields input:focus,
-        .search-fields select:focus,
-        .group-actions select:focus {
-            border-color: #40a9ff;
+
+        .filter-group input:focus,
+        .filter-group select:focus,
+        .compare-box input:focus,
+        .compare-box select:focus {
+            border-color: #2f7ed8;
             outline: none;
+            box-shadow: 0 0 0 2px rgba(47, 126, 216, 0.15);
         }
-        .search-fields input::placeholder {
-            color: #999;
-            font-size: 14px;
+
+        .filter-input {
+            width: 120px;
         }
-        .search-fields select,
-        .group-actions select {
-            width: 130px;
+
+        .filter-input-sm {
+            width: 100px;
+        }
+
+        .filter-input-date {
+            width: 190px;
+        }
+
+        .filter-select {
+            width: 120px;
             cursor: pointer;
         }
-        /* 销量筛选区域 */
-        .compare-fields {
-            gap: 20px;
+
+        .filter-select-sm {
+            width: 100px;
         }
+
+        /* 兼容 Layui 渲染后的下拉框 */
+        .filter-group .layui-form-select {
+            width: auto;
+        }
+        .filter-group .layui-form-select .layui-input {
+            height: 30px;
+            line-height: 30px;
+        }
+
+        /* 销量筛选区域 */
         .compare-box {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 4px;
         }
-        .field-label {
-            font-size: 14px;
-            color: #333;
-            font-weight: 500;
+
+        .compare-box .field-label {
+            font-size: 12px;
+            color: #666;
+            white-space: nowrap;
         }
+
         .compare-box select {
-            width: 60px;
-            padding: 0 8px;
+            width: 48px;
+            padding: 0 4px;
         }
+
         .compare-box input {
-            width: 80px !important;
+            width: 60px;
         }
-        /* 按钮组 */
-        .group-actions {
+
+        .sales-filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .sales-filter-group .filter-group-label {
+            align-self: center;
+        }
+
+        .frequency-filter-group {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .filter-hint-inline {
+            font-size: 12px;
+            color: #999;
+            white-space: nowrap;
+        }
+
+        .filter-divider {
+            width: 1px;
+            height: 20px;
+            background-color: #e0e0e0;
+            margin: 0 4px;
+        }
+
+        /* 数据操作按钮组 */
+        .data-action-group {
             display: flex;
             gap: 8px;
             align-items: center;
+            margin-left: auto;
         }
-        /* 按钮分隔线 */
-        .action-separator {
-            width: 1px;
-            height: 20px;
-            background-color: #d9d9d9;
-            margin: 0 4px;
+
+        /* 搜索面板响应式 */
+        @media (max-width: 1200px) {
+            .search-filters {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .search-quick-actions {
+                flex-direction: column;
+                align-items: flex-start;
+            }
         }
 
         /* 确保表格容器有足够的底部间距 */
@@ -911,6 +976,8 @@
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script src="{{ url_for('static', filename='js/supplier-render.js') }}"></script>
     <script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/frequency-module.js') }}"></script>
 
     <!-- Filter Panel Component -->
     <link rel="stylesheet" href="{{ url_for('static', filename='js/components/filter_panel/filter-panel.css') }}">
@@ -2589,75 +2656,82 @@ window.loadContent = function(type) {
     // 动态加载内容
     document.getElementById('content').innerHTML = `
         <!-- 搜索表单 -->
-        <div class="layui-form search-panel" lay-filter="searchForm" style="margin-bottom: 10px; padding: 16px; background: #fff; border: 1px solid #e6e6e6;">
-        
-        <!-- 更新时间 -->
-        <div style="margin-bottom: 16px;">
-            <span id="updateTimeDisplay" style="font-size: 15px; color: #000; font-weight: bold;">更新时间：-</span>
-        </div>
-
-        <!-- 搜索条件组：基础筛选 + 销量筛选 + 搜索按钮 -->
-        <div class="search-group">
-            <span class="group-label">搜索条件</span>
-            <div class="search-fields">
-                <!-- 基础筛选 -->
-                <input type="text" name="oe" autocomplete="off" placeholder="OE">
-                <select name="brand" id="searchBrand">
-                    <option value="">品牌</option>
-                </select>
-                <input type="text" name="material_name" autocomplete="off" placeholder="物料名称">
-                <input type="text" name="barcode" autocomplete="off" placeholder="品牌号">
-                <select name="tag" id="searchTag">
-                    <option value="">标签</option>
-                </select>
-                <!-- 销量筛选 -->
-                <div class="compare-box">
-                    <span class="field-label">今日销量</span>
-                    <select name="today_sales_op">
-                        <option value=">">></option>
-                        <option value="<"><</option>
-                        <option value="=">=</option>
-                        <option value=">=">≥</option>
-                        <option value="<=">≤</option>
-                    </select>
-                    <input type="number" name="today_sales_val" placeholder="数值">
-                </div>
-                <div class="compare-box">
-                    <span class="field-label">昨日销量</span>
-                    <select name="sales_yesterday_op">
-                        <option value=">">></option>
-                        <option value="<"><</option>
-                        <option value="=">=</option>
-                        <option value=">=">≥</option>
-                        <option value="<=">≤</option>
-                    </select>
-                    <input type="number" name="sales_yesterday_val" placeholder="数值">
+        <div class="layui-form search-panel" lay-filter="searchForm">
+            <!-- 顶部：更新时间 + 主操作 -->
+            <div class="search-header">
+                <span id="updateTimeDisplay" class="update-time">更新时间：-</span>
+                <div class="search-header-actions">
+                    <button class="layui-btn layui-btn-sm" id="searchBtn"><i class="layui-icon layui-icon-search"></i> 搜索</button>
+                    <button class="layui-btn layui-btn-sm layui-btn-primary" id="resetBtn"><i class="layui-icon layui-icon-refresh"></i> 重置</button>
                 </div>
             </div>
-            <div class="group-actions">
-                <button class="layui-btn layui-btn-sm" id="searchBtn">搜索</button>
-                <button class="layui-btn layui-btn-sm layui-btn-primary" id="resetBtn">重置</button>
-            </div>
-        </div>
 
-        <!-- 数据操作组 -->
-        <div class="search-group">
-            <span class="group-label">数据操作</span>
-            <div class="group-actions">
-                <select name="inquiry_field" id="inquiryField">
-                    <option value="inquiry_1m">近1个月询价</option>
-                    <option value="inquiry_3m">近3个月月均询价</option>
-                    <option value="national_inquiry_1m">全国近1个月询价</option>
-                    <option value="national_inquiry_3m">全国近3个月月均询价</option>
-                </select>
-                <button class="layui-btn layui-btn-sm layui-btn-primary" id="inquiryStockBtn">询价>9且库存为0</button>
-                <div class="action-separator"></div>
-                <button class="layui-btn layui-btn-sm layui-btn-primary" id="loadDataBtn">更新数据</button>
-                <div class="action-separator"></div>
-                <button class="layui-btn layui-btn-sm layui-btn-primary" id="fetchDataBtn">拉取数据</button>
+            <!-- 筛选区：基础筛选 + 销量筛选 -->
+            <div class="search-filters">
+                <div class="filter-group">
+                    <span class="filter-group-label" title="按 OE、品牌、物料名称、品牌号、标签等基础字段筛选备货数据">基础筛选</span>
+                    <input type="text" name="oe" autocomplete="off" placeholder="OE" class="filter-input filter-input-sm">
+                    <select name="brand" id="searchBrand" class="filter-select filter-select-sm">
+                        <option value="">品牌</option>
+                    </select>
+                    <input type="text" name="material_name" autocomplete="off" placeholder="物料名称" class="filter-input">
+                    <input type="text" name="barcode" autocomplete="off" placeholder="品牌号" class="filter-input filter-input-sm">
+                    <select name="tag" id="searchTag" class="filter-select filter-select-sm">
+                        <option value="">标签</option>
+                    </select>
+                </div>
+
+                <div class="filter-group sales-filter-group">
+                    <span class="filter-group-label" title="按今日或昨日销量范围筛选数据">销量筛选</span>
+                    <div class="sales-filters">
+                        <div class="compare-box">
+                            <span class="field-label">今日</span>
+                            <select name="today_sales_op">
+                                <option value=">">></option>
+                                <option value="<"><</option>
+                                <option value="=">=</option>
+                                <option value=">=">≥</option>
+                                <option value="<=">≤</option>
+                            </select>
+                            <input type="number" name="today_sales_val" placeholder="值">
+                        </div>
+                        <div class="compare-box">
+                            <span class="field-label">昨日</span>
+                            <select name="sales_yesterday_op">
+                                <option value=">">></option>
+                                <option value="<"><</option>
+                                <option value="=">=</option>
+                                <option value=">=">≥</option>
+                                <option value="<=">≤</option>
+                            </select>
+                            <input type="number" name="sales_yesterday_val" placeholder="值">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 频次查询与数据维护 -->
+            <div class="search-quick-actions">
+                <div class="filter-group frequency-filter-group">
+                    <span class="filter-group-label" title="选择日期区间后显示频次列，并结合询价量与库存进行快捷查询">频次查询</span>
+                    <input type="text" name="date_range" id="dateRangeInput" autocomplete="off" placeholder="请选择日期范围" readonly class="filter-input filter-input-date">
+                    <span class="filter-hint-inline">选择日期区间后显示频次列</span>
+                    <div class="filter-divider"></div>
+                    <select name="inquiry_field" id="inquiryField" class="filter-select">
+                        <option value="inquiry_1m">近1个月询价</option>
+                        <option value="inquiry_3m">近3个月月均询价</option>
+                        <option value="national_inquiry_1m">全国近1个月询价</option>
+                        <option value="national_inquiry_3m">全国近3个月月均询价</option>
+                    </select>
+                    <button class="layui-btn layui-btn-sm layui-btn-primary" id="inquiryStockBtn">询价>9且库存为0</button>
+                </div>
+                <div class="filter-group data-action-group">
+                    <span class="filter-group-label" title="手动更新或拉取最新备货数据">数据维护</span>
+                    <button class="layui-btn layui-btn-sm layui-btn-primary" id="loadDataBtn">更新数据</button>
+                    <button class="layui-btn layui-btn-sm layui-btn-primary" id="fetchDataBtn">拉取数据</button>
+                </div>
             </div>
         </div>
-    </div>
 
                 <!-- 工具栏 -->
                 <div class="toolbar-container">
@@ -2759,6 +2833,9 @@ window.loadContent = function(type) {
                                 <div class="layui-form-item" style="margin-bottom:5px;">
                                     <input type="checkbox" name="warning_status" title="预警状态" lay-skin="primary" checked>
                                 </div>
+                                <div class="layui-form-item" style="margin-bottom:5px;">
+                                    <input type="checkbox" name="frequency" title="频次" lay-skin="primary">
+                                </div>
                                 <div class="layui-form-item">
                                     <button class="layui-btn layui-btn-primary layui-btn-xs" id="applyColumnFilter" style="width:100%;">应用</button>
                                 </div>
@@ -2814,6 +2891,24 @@ window.loadContent = function(type) {
         // 渲染表格
         var myTable = renderBeihuoTable(table);
         // window.beihuoTableIns = myTable; // 保存表格实例到全局变量 - 现在在done回调中设置
+
+        // 初始化日期范围选择器
+        if (typeof initDateRangePicker !== 'undefined') {
+            initDateRangePicker('dateRangeInput', {
+                done: function(value, date, endDate) {
+                    if (value) {
+                        // 日期选择完成后自动触发搜索，并显示频次列
+                        updateFrequencyColumnVisibility();
+                        document.getElementById('searchBtn').click();
+                    } else {
+                        setFrequencyColumnVisible(false);
+                    }
+                }
+            });
+        }
+
+        // 默认隐藏频次列（与初始空日期状态保持一致）
+        setFrequencyColumnVisible(false);
 
         // 重新渲染表单以确保事件绑定生效
         layui.use('form', function() {
@@ -3009,7 +3104,18 @@ function renderBeihuoTable(table) {
             {field: '近3个月月均询价量', title: '近3个月月均询价量', width: 130, sort: true, align: 'right', fieldAlias: 'inquiry_3m'},
             {field: '全国近1个月询价量', title: '全国近1个月询价量', width: 130, sort: true, align: 'right', fieldAlias: 'national_inquiry_1m'},
             {field: '全国近3个月月均询价量', title: '全国近3个月月均询价量', width: 140, sort: true, align: 'right', fieldAlias: 'national_inquiry_3m'},
-            {field: '内部备注', title: '内部备注', width: 150, sort: true, unresize: false, fieldAlias: 'internal_remarks'}
+            {field: '内部备注', title: '内部备注', width: 150, sort: true, unresize: false, fieldAlias: 'internal_remarks'},
+            {
+                field: 'frequency',
+                title: '频次',
+                width: 90,
+                sort: true,
+                align: 'right',
+                hide: true,
+                templet: function(d) {
+                    return FrequencyModule ? FrequencyModule.formatFrequencyValue(d.frequency) : (d.frequency || '');
+                }
+            }
         ]
     ];
     
@@ -3023,7 +3129,7 @@ function renderBeihuoTable(table) {
         page: true,
         limits: [50,75,100,200],
         limit: 50,
-        height: 'full-315', // 添加固定高度以实现冻结表头
+        height: 'full-235', // 搜索栏压缩后，增大表格可视区域
         toolbar: false,
         autoSort: false,
         even: false,
@@ -3425,6 +3531,80 @@ function bindSupplierTooltipEvents() {
 
 
 /**
+ * 根据表单数据构建表格查询参数
+ * - 将 date_range 解析为 start_date 和 end_date
+ * - 返回的新对象中不再包含 date_range 原始值
+ *
+ * @param {object} formData 表单数据
+ * @returns {object} 查询参数
+ */
+function buildTableWhere(formData) {
+    var params = {};
+    for (var key in formData) {
+        if (formData[key] !== '' && formData[key] !== null && formData[key] !== undefined) {
+            params[key] = formData[key];
+        }
+    }
+
+    var dateRange = params.date_range || '';
+    delete params.date_range;
+
+    if (FrequencyModule && dateRange) {
+        var parsed = FrequencyModule.parseDateRange(dateRange);
+        if (parsed.start && parsed.end) {
+            params.start_date = parsed.start;
+            params.end_date = parsed.end;
+        }
+    } else if (dateRange) {
+        var dates = dateRange.split(' - ');
+        if (dates.length === 2) {
+            params.start_date = dates[0].trim();
+            params.end_date = dates[1].trim();
+        }
+    }
+
+    return params;
+}
+
+/**
+ * 显示或隐藏“频次”列
+ * @param {boolean} visible 是否显示
+ */
+function setFrequencyColumnVisible(visible) {
+    if (typeof layui !== 'undefined' && layui.table && layui.table.hideCol) {
+        layui.table.hideCol('beihuoTable', {
+            field: 'frequency',
+            hide: !visible
+        });
+    }
+
+    // 同步列筛选下拉框中的勾选状态
+    var checkbox = document.querySelector('#columnFilterDropdown input[name="frequency"]');
+    if (checkbox) {
+        checkbox.checked = visible;
+        if (typeof layui !== 'undefined' && layui.form) {
+            layui.form.render('checkbox');
+        }
+    }
+}
+
+/**
+ * 根据当前日期范围输入框的值更新频次列显示状态
+ */
+function updateFrequencyColumnVisibility() {
+    var dateRange = document.getElementById('dateRangeInput').value || '';
+    var hasRange = false;
+    if (FrequencyModule) {
+        var parsed = FrequencyModule.parseDateRange(dateRange);
+        hasRange = !!(parsed.start && parsed.end);
+    } else {
+        var dates = dateRange.split(' - ');
+        hasRange = dates.length === 2 && dates[0].trim() && dates[1].trim();
+    }
+    setFrequencyColumnVisible(hasRange);
+}
+
+/**
  * 绑定事件处理器
  * @param {object} myTable 表格实例
  * @param {object} form 表单对象
@@ -3456,14 +3636,9 @@ function bindEventHandlers(myTable, form, table) {
             }
         }
         
-        // 构建当前搜索参数
-        var currentParams = {};
-        for (var key in currentFormData) {
-            if (currentFormData[key] !== '' && currentFormData[key] !== null) {
-                currentParams[key] = currentFormData[key];
-            }
-        }
-        
+        // 构建当前搜索参数（解析日期范围）
+        var currentParams = buildTableWhere(currentFormData);
+
         // 清空购物车缓存
         clearCartCache();
         
@@ -3615,8 +3790,13 @@ function bindEventHandlers(myTable, form, table) {
             }
         }
         var data = layui.form.val('searchForm');
+        var params = buildTableWhere(data);
+
+        // 根据日期范围控制频次列显示/隐藏
+        updateFrequencyColumnVisibility();
+
         myTable.reload({
-            where: data,
+            where: params,
             page: {curr: 1} // 重置分页
         });
         return false; // 阻止表单默认提交行为
@@ -3628,12 +3808,18 @@ function bindEventHandlers(myTable, form, table) {
         document.querySelectorAll('#content input[type="text"]').forEach(function(input) {
             input.value = '';
         });
-        
+
+        // 清空日期范围选择器
+        var dateRangeInput = document.getElementById('dateRangeInput');
+        if (dateRangeInput) {
+            dateRangeInput.value = '';
+        }
+
         // 重置所有下拉框
         document.querySelectorAll('#content select').forEach(function(select) {
             select.selectedIndex = 0;
         });
-        
+
         // 重置数值比较框
         document.querySelectorAll('input[name$="_op"], input[name$="_val"]').forEach(function(input) {
             if(input.type === 'number') {
@@ -3642,7 +3828,10 @@ function bindEventHandlers(myTable, form, table) {
                 input.selectedIndex = 0;
             }
         });
-        
+
+        // 隐藏频次列
+        setFrequencyColumnVisible(false);
+
         // 重新渲染layui表单元素
         layui.use('form', function() {
             var form = layui.form;
@@ -4839,7 +5028,8 @@ function applyColumnFilter(myTable) {
     if (checkedColumns.sales_6m) newCols[0].push({field: '近6个月销量', title: '近6个月销量', width: 120, sort: true, align: 'right'});
     if (checkedColumns.sales_7d) newCols[0].push({field: '近7天销量', title: '近7天销量', width: 100, sort: true, align: 'right'});
     if (checkedColumns.warning_status) newCols[0].push({field: '预警状态', title: '预警状态', width: 100, sort: true});
-    
+    if (checkedColumns.frequency) newCols[0].push({field: 'frequency', title: '频次', width: 90, sort: true, align: 'right'});
+
     newCols[0].push({
         field: 'operate',
         title: '操作',

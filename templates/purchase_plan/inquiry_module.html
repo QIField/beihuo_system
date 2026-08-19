@@ -15,6 +15,7 @@
     <script src="{{ url_for('static', filename='js/components/custom-pagination/custom-pagination.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/handsontable-builder/handsontable-builder.js') }}"></script>
     <script src="{{ url_for('static', filename='js/purchase_plan/common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
     <style>
 
         .file-input {
@@ -270,6 +271,7 @@
             <div class="data-header">
                 <span>报价失效时间调整</span>
                 <div class="search-bar">
+                    <input type="text" class="search-input" id="gzbbrDateRange" placeholder="选择日期范围" style="width: 220px;" readonly>
                     <input type="text" class="search-input" id="gzbbrSearchOe" placeholder="OE号">
                     <input type="text" class="search-input" id="gzbbrSearchSupplier" placeholder="供应商">
                     <input type="text" class="search-input" id="gzbbrSearchBrand" placeholder="品牌（前端过滤）">
@@ -694,6 +696,7 @@
             document.getElementById('gzbbrSearchBtn').addEventListener('click', loadGzbbrQuotes);
             document.getElementById('gzbbrUpdateBtn').addEventListener('click', batchUpdateGzbbrLoseDate);
             document.getElementById('gzbbrSelectAll').addEventListener('change', toggleGzbbrSelectAll);
+            initDateRangePicker('gzbbrDateRange', { max: '2099-12-31' });
         }
 
         function formatTimestamp(value) {
@@ -709,8 +712,25 @@
             const oe = document.getElementById('gzbbrSearchOe').value.trim();
             const supplier = document.getElementById('gzbbrSearchSupplier').value.trim();
             const brand = document.getElementById('gzbbrSearchBrand').value.trim();
+            const dateRangeValue = document.getElementById('gzbbrDateRange').value;
 
-            const url = `/api/purchase_plan/inquiry/gzbbr_quote_search?oe=${encodeURIComponent(oe)}&supplier=${encodeURIComponent(supplier)}`;
+            let createDateStart = '';
+            let createDateEnd = '';
+            if (dateRangeValue) {
+                const dates = dateRangeValue.split(' - ');
+                if (dates.length === 2) {
+                    createDateStart = encodeURIComponent(dates[0].trim() + ' 00:00:00').replace(/%20/g, '+');
+                    createDateEnd = encodeURIComponent(dates[1].trim() + ' 23:59:59').replace(/%20/g, '+');
+                }
+            }
+
+            let url = `/api/purchase_plan/inquiry/gzbbr_quote_search?oe=${encodeURIComponent(oe)}&supplier=${encodeURIComponent(supplier)}`;
+            if (createDateStart) {
+                url += `&create_date_start=${createDateStart}`;
+            }
+            if (createDateEnd) {
+                url += `&create_date_end=${createDateEnd}`;
+            }
 
             fetch(url)
                 .then(r => r.json())
@@ -745,6 +765,7 @@
                 price: item.price,
                 stock: item.stock,
                 lose_date: formatTimestamp(item.lose_date),
+                create_date: formatTimestamp(item.create_date),
                 remark: item.remark,
                 _raw: item
             }));
@@ -755,7 +776,7 @@
 
             gzbbrHot = new Handsontable(container, {
                 data: data,
-                colHeaders: ['选择', 'OE号', '品牌', '供应商', '仓库', '价格', '库存', '原失效时间', '备注'],
+                colHeaders: ['选择', 'OE号', '品牌', '供应商', '仓库', '价格', '库存', '原失效时间', '创建时间', '备注'],
                 columns: [
                     { data: 'selected', type: 'checkbox', renderer: 'checkbox', width: 50 },
                     { data: 'number', readOnly: true },
@@ -765,6 +786,7 @@
                     { data: 'price', readOnly: true },
                     { data: 'stock', readOnly: true },
                     { data: 'lose_date', readOnly: true },
+                    { data: 'create_date', readOnly: true },
                     { data: 'remark', readOnly: true }
                 ],
                 rowHeights: DEFAULT_ROW_HEIGHT,

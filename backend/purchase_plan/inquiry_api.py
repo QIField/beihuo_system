@@ -1562,13 +1562,17 @@ def gzbbr_quote_search():
     oe = request.args.get('oe', '')
     supplier = request.args.get('supplier', '')
     limit = request.args.get('limit', 500, type=int)
+    create_date_start = request.args.get('create_date_start', '')
+    create_date_end = request.args.get('create_date_end', '')
 
     try:
         rows = GzbbrQuoteService.search_quote_prices(
             store_code=_get_current_store_code(),
             oe=oe,
             supplier=supplier,
-            limit=limit
+            limit=limit,
+            create_date_start=create_date_start,
+            create_date_end=create_date_end
         )
         return jsonify({'code': 0, 'msg': '查询成功', 'data': rows})
     except Exception as e:

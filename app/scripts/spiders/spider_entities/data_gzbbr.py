@@ -74,7 +74,8 @@ class DataGzbbrSpider:
     # https://data.gzbbr.com/admin/Product.Quoteprice/index
     def get_quote_price_index(self, order="desc", offset=0, limit=500,
                               supplier_name="", number="", pdname="",
-                              frey_no="", price="", create_date_start="", remark=""):
+                              frey_no="", price="", create_date_start="",
+                              create_date_end="", remark=""):
         """
         查询报价列表
         :param order: 排序方式，默认 desc
@@ -86,6 +87,7 @@ class DataGzbbrSpider:
         :param frey_no: Frey 编号
         :param price: 价格
         :param create_date_start: 创建开始日期
+        :param create_date_end: 创建结束日期
         :param remark: 备注
         :return: 响应对象
         """
@@ -101,6 +103,7 @@ class DataGzbbrSpider:
             "frey_no": frey_no,
             "price": price,
             "create_date_start": create_date_start,
+            "create_date_end": create_date_end,
             "remark": remark,
         }
 

@@ -35,6 +35,7 @@ from app.sockets import register_socket_events, notification_manager
 from app.utils.database_connection import get_db_connection
 from app.utils.search import parse_space, parse_comma
 from app.utils.export_tools import handle_export_request
+from app.services.sales_frequency_service import enrich_data_with_frequency
 
 
 # 导入轻量级任务管理器（延迟初始化）
@@ -1335,6 +1336,10 @@ def api_beihuo():
     sales_7d_op = request.args.get('sales_7d_op', '')
     sales_7d_val = request.args.get('sales_7d_val', '').strip() or None
 
+    # 日期范围参数（用于频次计算）
+    start_date = request.args.get('start_date', '').strip() or None
+    end_date = request.args.get('end_date', '').strip() or None
+
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
 
@@ -1595,6 +1600,22 @@ def api_beihuo():
         row['sales_data'] = sales_text
 
     result = map_vehicle_fields_from_compare(result)
+
+    # 如果指定了日期范围，计算并附加频次数据
+    if start_date and end_date and result:
+        result, freq_error = enrich_data_with_frequency(
+            data_list=result,
+            barcode_field='物料条码',
+            start_date=start_date,
+            end_date=end_date,
+            frequency_field='frequency'
+        )
+        if freq_error:
+            print(f"[频次计算] /api/beihuo 出现错误: {freq_error}")
+    elif result:
+        # 未选择日期范围时，频次字段保持为空
+        for row in result:
+            row['frequency'] = ''
 
     conn.close()
     return jsonify({
@@ -3730,6 +3751,21 @@ def date_ordercount():
 
         beihuo_data = map_vehicle_fields_from_compare(beihuo_data)
 
+        # 根据日期范围计算频次数据
+        if beihuo_data and start_date and end_date:
+            beihuo_data, freq_error = enrich_data_with_frequency(
+                data_list=beihuo_data,
+                barcode_field='物料条码',
+                start_date=start_date,
+                end_date=end_date,
+                frequency_field='frequency'
+            )
+            if freq_error:
+                print(f"[频次计算] /api/date_ordercount 出现错误: {freq_error}")
+        elif beihuo_data:
+            for item in beihuo_data:
+                item['frequency'] = 0
+
         # 将查询结果批量存储到数据库中
         if beihuo_data:
             # 先删除该用户和组织的旧数据（如果有）
@@ -3963,13 +3999,30 @@ def date_ordercount_search():
                 # 如果排序失败，保持原有顺序
         
         print(f"[高级搜索] 过滤完成: 原始数据 {len(cached_data)} 条, 过滤后 {len(filtered_data)} 条")
-        
+
+        # 为搜索结果补充频次数据（缓存表未持久化频次，按当前日期范围实时计算）
+        search_start_date = session.get('last_date_ordercount_start_date')
+        search_end_date = session.get('last_date_ordercount_end_date')
+        if filtered_data and search_start_date and search_end_date:
+            filtered_data, freq_error = enrich_data_with_frequency(
+                data_list=filtered_data,
+                barcode_field='物料条码',
+                start_date=search_start_date,
+                end_date=search_end_date,
+                frequency_field='frequency'
+            )
+            if freq_error:
+                print(f"[频次计算] /api/date_ordercount_search 出现错误: {freq_error}")
+        elif filtered_data:
+            for item in filtered_data:
+                item['frequency'] = 0
+
         return jsonify({
             'code': 0,
             'msg': '查询成功',
             'data': filtered_data
         })
-        
+
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'请点击排序图标'}), 500
 
@@ -4053,13 +4106,28 @@ def date_ordercount_get_cache():
         cached_data = cursor.fetchall()
         print(f"查询到的数据条数: {len(cached_data)}")
         conn.close()
-        
+
+        # 为缓存数据补充频次数据
+        if cached_data and start_date and end_date:
+            cached_data, freq_error = enrich_data_with_frequency(
+                data_list=cached_data,
+                barcode_field='物料条码',
+                start_date=start_date,
+                end_date=end_date,
+                frequency_field='frequency'
+            )
+            if freq_error:
+                print(f"[频次计算] /api/date_ordercount_get_cache 出现错误: {freq_error}")
+        elif cached_data:
+            for item in cached_data:
+                item['frequency'] = 0
+
         return jsonify({
             'code': 0,
             'msg': '获取缓存成功',
             'data': cached_data
         })
-        
+
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'获取缓存失败: {str(e)}'}), 500
 
