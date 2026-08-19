@@ -21,6 +21,7 @@ def set_mercedes_config(
     password: Optional[str] = None,
     customer_id: Optional[str] = None,
     sales_organization_id: Optional[str] = None,
+    cookie: Optional[str] = None,
     tax_rate: Optional[float] = None,
     discount_rate: Optional[float] = None
 ) -> Dict:
@@ -32,6 +33,7 @@ def set_mercedes_config(
     :param password: 登录密码（可选），默认保留原值
     :param customer_id: 客户ID（可选）
     :param sales_organization_id: 销售组织ID（可选）
+    :param cookie: Cookie（可选），默认保留原值
     :param tax_rate: 税率（可选），默认保留原值
     :param discount_rate: 折扣率（可选），默认保留原值
     :return: 设置结果
@@ -46,6 +48,8 @@ def set_mercedes_config(
         update_dict['customer_id'] = customer_id
     if sales_organization_id is not None:
         update_dict['sales_organization_id'] = sales_organization_id
+    if cookie is not None:
+        update_dict['cookie'] = cookie
     if tax_rate is not None:
         update_dict['tax_rate'] = tax_rate
     if discount_rate is not None:

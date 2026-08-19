@@ -15,6 +15,7 @@ from app.models.orm_models.car_parts_library_benz_stock import CarPartsLibraryBe
 from app.models.orm_models.crmapp_compare_summary import CrmappCompareSummary
 from app.services.car_parts_library_service.mercedes_dalfsc_service import fetch_mercedes_data
 from app.services.car_parts_library_service.excel_import_service import process_file_stream, generate_template
+from app.services.car_parts_library_service.zhaopeiyun_benz import zhaopeiyun_benz_fallback
 from app.utils.orm.session import orm_session
 from app.dao.car_parts_library_benz_dao import CarPartsLibraryBenzDao
 from app.services.system_setting_service.beihuo_system_config_service import set_config_by_key, update_json_config
@@ -218,6 +219,7 @@ def get_crmapp_beihuo_data(oe_list):
 #     result=get_crmapp_beihuo_data(oe_list)
 #     print(result)
     
+@zhaopeiyun_benz_fallback
 def data_refresh(part_numbers: List[str]) -> Dict:
     """
     根据配件编号列表刷新数据
@@ -505,5 +507,5 @@ def download_template():
 
 
 # if __name__ == '__main__':
-#     a=data_list_page_refresh(part_number='8201245')
+#     a=data_refresh(['A1698202140'])
 #     print(a)

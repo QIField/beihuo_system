@@ -57,6 +57,7 @@ def set_mercedes_config_api():
         password = data.get('password')
         customer_id = data.get('customer_id')
         sales_organization_id = data.get('sales_organization_id')
+        cookie = data.get('cookie')
 
         tax_rate = data.get('tax_rate', 1.13)
         discount_rate = data.get('discount_rate', 0.83)
@@ -73,6 +74,7 @@ def set_mercedes_config_api():
             password=password,
             customer_id=customer_id,
             sales_organization_id=sales_organization_id,
+            cookie=cookie,
             tax_rate=tax_rate,
             discount_rate=discount_rate
         )

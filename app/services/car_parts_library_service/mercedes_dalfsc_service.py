@@ -107,6 +107,8 @@ def fetch_mercedes_stock_information(spider, part_numbers):
         return {'status': False, 'msg': msg, 'stock_data': []}
 
 
+
+##对外接口
 def fetch_mercedes_data(part_numbers):
     """
     完整的奔驰数据爬取流程：先爬零件信息，从零件数据中提取载荷信息，再爬库存信息（暂不入库）
@@ -168,6 +170,8 @@ def fetch_mercedes_data(part_numbers):
 
 
 
+
+##对外接口
 def by_part_number_get_data(part_number):
     """
     根据零件编号获取零件信息和库存信息（不入库，返回JSON）
