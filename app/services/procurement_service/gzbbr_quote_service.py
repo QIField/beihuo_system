@@ -24,7 +24,8 @@ class GzbbrQuoteService:
     LOCAL_INQUIRY_TABLE = "crmapp_price_inquiry"
 
     @staticmethod
-    def search_quote_prices(store_code, oe='', supplier='', limit=500):
+    def search_quote_prices(store_code, oe='', supplier='', limit=500,
+                            create_date_start='', create_date_end=''):
         """搜索 data.gzbbr.com 报价列表"""
         spider = DataGzbbrSpider(store_code=store_code)
         try:
@@ -32,7 +33,9 @@ class GzbbrQuoteService:
                 number=oe,
                 supplier_name=supplier,
                 limit=limit,
-                offset=0
+                offset=0,
+                create_date_start=create_date_start,
+                create_date_end=create_date_end
             )
             resp.raise_for_status()
             logger.info(f"【搜索响应状态】{resp.status_code}")
