@@ -11,15 +11,23 @@
 每日全流程（每日凌晨 4:00 执行）：
   Step 1: 计算安全库存 (stock_safe)
 
+每日销售订单爬取（每天凌晨 5:00 执行）：
+  Step 1: 爬取销售订单历史数据 → 更新最近 3 天
+
 销售&退货+销量表刷新的独立流程（每月 1/10/20 号凌晨 3:00 执行，先于每日全流程）：
-  Step 1: 爬取销售订单历史数据 (sales_order_history)
+  Step 1: 爬取销售订单历史数据 (sales_order_history) —— 兜底更新最近 10 天
   Step 2: 退货订单匹配 (stock_safe_refund_ref)
   Step 3: 构建OE零件销量表 (oe_parts_sales) — 月维度计算，每月刷新一次即可
 
 注册方式：
-    from app.scripts.tasks.stock_safe_tasks import stock_safe_daily_register, stock_safe_sales_refund_register
+    from app.scripts.tasks.stock_safe_tasks import (
+        stock_safe_daily_register,
+        stock_safe_sales_refund_register,
+        stock_safe_daily_sales_crawl_register,
+    )
     stock_safe_daily_register(task_manager)
     stock_safe_sales_refund_register(task_manager)
+    stock_safe_daily_sales_crawl_register(task_manager)
 """
 
 import os
@@ -97,13 +105,69 @@ def stock_safe_daily_register(task_manager) -> None:
 
 
 
+def _crawl_and_store_sales_order_history() -> dict:
+    """
+    每日独立任务：爬取销售订单历史数据（每天凌晨 5:00 执行，只更新最近 3 天）
+
+    Returns:
+        执行结果摘要
+    """
+    total_start = time.time()
+    results = {}
+
+    logger.info("[每日销售订单爬取] ====== 开始执行 ======")
+
+    try:
+        from app.scripts.spiders.spiders_services.sales_order_history_crawler import (
+            crawl_and_store_sales_order_history,
+        )
+        pre_3day = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
+        r = crawl_and_store_sales_order_history(start_date=pre_3day)  # pyright: ignore[reportArgumentType]
+        logger.info("[每日销售订单爬取] 完成: 入库 %d 条", r)
+        results['crawl_sales_daily'] = {'status': 'completed', 'inserted': r, 'start_date': pre_3day}
+    except Exception as e:
+        logger.error("[每日销售订单爬取] 失败: %s", e, exc_info=True)
+        results['crawl_sales_daily'] = {'status': 'failed', 'error': str(e)}
+
+    total_elapsed = round(time.time() - total_start, 2)
+    completed = sum(1 for v in results.values() if v.get('status') == 'completed')
+    logger.info("[每日销售订单爬取] ====== 完成: %d/1 步成功, 耗时 %.2fs ======", completed, total_elapsed)
+
+    results['_meta'] = {
+        'total_elapsed_time': total_elapsed,
+        'completed_steps': completed,
+        'timestamp': int(time.time()),
+    }
+    return results
+
+
+def stock_safe_daily_sales_crawl_register(task_manager) -> None:
+    """
+    注册每日销售订单历史数据爬取定时任务（每天凌晨 5:00 执行，只更新最近 3 天）
+
+    Args:
+        task_manager: LightweightTaskManager 实例
+    """
+    try:
+        task_manager.schedule(
+            _crawl_and_store_sales_order_history,
+            'cron',
+            'stock_safe_daily_sales_crawl',
+            hour=5,
+            minute=0,
+            replace_existing=True,
+        )
+        print("[每日销售订单爬取] 定时任务已注册（每天凌晨 5:00 执行，更新最近 3 天）")
+    except Exception as e:
+        print(f"[每日销售订单爬取] 注册失败: {e}")
+
 
 def _stock_safe_sales_refund_pipeline() -> dict:
     """
     销售订单 & 退货匹配 & 销量表构建流程（每月 1/10/20 号执行）
 
     执行流程：
-      [Step 1] 爬取销售订单历史数据 → 写入 sales_order_history
+      [Step 1] 爬取销售订单历史数据 → 写入 sales_order_history（兜底更新最近 10 天）
       [Step 2] 退货订单匹配 → 全量刷新 stock_safe_refund_ref
       [Step 3] 构建OE零件销量表 → 全量刷新 oe_parts_sales（月维度计算）
 
@@ -115,13 +179,13 @@ def _stock_safe_sales_refund_pipeline() -> dict:
 
     logger.info("[销售退货流程] ====== 开始执行 ======")
 
-    # ── Step 1: 爬取销售订单历史数据 ──
+    # ── Step 1: 爬取销售订单历史数据（兜底更新最近 10 天） ──
     logger.info("[Step 1/3] 爬取销售订单历史数据")
     try:
         from app.scripts.spiders.spiders_services.sales_order_history_crawler import (
             crawl_and_store_sales_order_history,
         )
-        pre_10day = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
+        pre_10day = (datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d")
         r1 = crawl_and_store_sales_order_history(start_date=pre_10day)  # pyright: ignore[reportArgumentType]
         logger.info("[Step 1/3] 完成: 入库 %d 条", r1)
         results['step1_crawl_sales'] = {'status': 'completed', 'inserted': r1}
@@ -177,7 +241,7 @@ def stock_safe_sales_refund_register(task_manager) -> None:
             'stock_safe_sales_refund_pipeline',
             hour=3,
             minute=0,
-            day_of_month='1,10,20',
+            day='1,10,20',
             replace_existing=True,
         )
         print("[销售退货流程] 定时任务已注册（每月 1/10/20 号凌晨 3:00 执行）")

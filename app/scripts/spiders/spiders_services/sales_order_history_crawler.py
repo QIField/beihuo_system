@@ -261,5 +261,5 @@ def crawl_and_store_sales_order_history(
 # 主入口
 # ============================================================================
 
-# if __name__ == "__main__":
-#     crawl_and_store_sales_order_history(start_date="2024-01-01")
+if __name__ == "__main__":
+    crawl_and_store_sales_order_history(start_date="2026-07-01")
