@@ -9,6 +9,7 @@ import logging
 from bs4 import BeautifulSoup
 
 from app.utils.database_connection import db_cursor
+from app.utils.ks_auto_bill_model import COMPANIES, get_company_key
 from .api_client import VinVehicleInfoApiClient
 
 
@@ -51,7 +52,7 @@ def parse_catalog_html(html):
 
 
 def _build_update_sql(record_id, parsed):
-    """构建动态 UPDATE 语句"""
+    """构建动态 UPDATE 语句，补全到数据时更新 engine/chassis，并始终标记为已查询"""
     fields = []
     values = []
 
@@ -62,8 +63,8 @@ def _build_update_sql(record_id, parsed):
         fields.append('chassis = %s')
         values.append(parsed['chassis'])
 
-    if not fields:
-        return None, None
+    fields.append('status = %s')
+    values.append('已查询')
 
     sql = f"UPDATE vin_vehicle_info SET {', '.join(fields)} WHERE id = %s"
     values.append(record_id)
@@ -71,10 +72,12 @@ def _build_update_sql(record_id, parsed):
 
 
 def _fetch_pending_records(cursor, limit=50):
-    """查询待补全的记录"""
+    """查询待补全的记录，按创建时间倒序，跳过已查询过的记录"""
     sql = """
         SELECT id, vin_code FROM vin_vehicle_info
-        WHERE engine IS NULL OR engine = '' OR chassis IS NULL OR chassis = ''
+        WHERE (engine IS NULL OR engine = '' OR chassis IS NULL OR chassis = '')
+          AND (status IS NULL OR status != '已查询')
+        ORDER BY created_at DESC
         LIMIT %s
     """
     cursor.execute(sql, (limit,))
@@ -136,50 +139,57 @@ def run_vin_vehicle_info_sync(limit=50):
     流程：
       1. 从 crmapp_ks_inquiry_detail 和 qpl_quote_result_v2 提取近两天数据
       2. 整合写入 vin_vehicle_info（利用 uk_vin_code 去重）
-      3. 对 engine/chassis 为空的记录执行爬虫补全
+      3. 使用所有配置的公司 key 轮流爬虫补全
+      4. 每个 key 按 created_at 倒序处理 limit 条未查询记录
+      5. 无论是否补全到数据，都将记录标记为 status = '已查询'
 
-    :param limit: 爬虫最多处理条数，默认 50
+    :param limit: 每个 key 最多处理的条数，默认 50
     :return: dict 统计信息
     """
-    client = VinVehicleInfoApiClient()
     stats = {'total': 0, 'updated': 0, 'merged': 0}
 
-    try:
-        with db_cursor(dict_cursor=True) as cursor:
-            # Step 1: 数据提取与整合
-            logger.info("[VIN整合] 开始从数据源提取数据...")
-            crm_records = _fetch_crm_inquiry_records(cursor)
-            qpl_records = _fetch_qpl_quote_records(cursor)
+    with db_cursor(dict_cursor=True) as cursor:
+        # Step 1: 数据提取与整合
+        logger.info("[VIN整合] 开始从数据源提取数据...")
+        crm_records = _fetch_crm_inquiry_records(cursor)
+        qpl_records = _fetch_qpl_quote_records(cursor)
 
-            merged_count = _merge_into_vin_vehicle_info(cursor, crm_records, qpl_records)
-            stats['merged'] = merged_count
-            logger.info(
-                f"[VIN整合] CRM={len(crm_records)}条, QPL={len(qpl_records)}条, 新增={merged_count}条"
-            )
+        merged_count = _merge_into_vin_vehicle_info(cursor, crm_records, qpl_records)
+        stats['merged'] = merged_count
+        logger.info(
+            f"[VIN整合] CRM={len(crm_records)}条, QPL={len(qpl_records)}条, 新增={merged_count}条"
+        )
 
-            # Step 2: 爬虫更新
+        # Step 2: 使用所有配置 key 轮流爬虫补全
+        keys = [get_company_key(c) for c in COMPANIES]
+        for key in keys:
             records = _fetch_pending_records(cursor, limit)
+            if not records:
+                logger.info(f"[VIN补全][{key}] 没有待补全记录，跳过")
+                continue
 
-            for record in records:
-                stats['total'] += 1
-                record_id = record['id']
-                vin_code = record['vin_code']
+            client = VinVehicleInfoApiClient(key=key)
+            try:
+                logger.info(f"[VIN补全][{key}] 开始处理 {len(records)} 条")
+                for record in records:
+                    stats['total'] += 1
+                    record_id = record['id']
+                    vin_code = record['vin_code']
 
-                html = client.fetch_catalog_html(vin_code)
-                if html is None:
-                    logger.warning(f"[VIN补全] 获取HTML失败，跳过: {vin_code}")
-                    continue
-                parsed = parse_catalog_html(html)
+                    html = client.fetch_catalog_html(vin_code)
+                    if html is None:
+                        logger.warning(f"[VIN补全][{key}] 获取HTML失败，仅标记已查询: {vin_code}")
+                        parsed = {}
+                    else:
+                        parsed = parse_catalog_html(html)
 
-                sql, params = _build_update_sql(record_id, parsed)
-                if sql:
+                    sql, params = _build_update_sql(record_id, parsed)
                     cursor.execute(sql, params)
                     stats['updated'] += cursor.rowcount
 
-                logger.info(f"[VIN补全] {vin_code} engine={parsed.get('engine')} chassis={parsed.get('chassis')}")
-
-    finally:
-        client.close()
+                    logger.info(f"[VIN补全][{key}] {vin_code} engine={parsed.get('engine')} chassis={parsed.get('chassis')}")
+            finally:
+                client.close()
 
     logger.info(f"[VIN补全完成] 整合={stats['merged']} 处理={stats['total']} 更新={stats['updated']}")
     return stats

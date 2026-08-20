@@ -16,8 +16,8 @@ logger = logging.getLogger('vin_vehicle_info_sync')
 class VinVehicleInfoApiClient:
     """VIN 信息查询客户端"""
 
-    def __init__(self):
-        self.spider = CassmallSpider()
+    def __init__(self, key='fs'):
+        self.spider = CassmallSpider(key=key)
 
     def fetch_catalog_html(self, vin_code):
         """
