@@ -19,5 +19,6 @@ from .crm_pp_name import CrmPpName
 from .crm_pp_name_log import CrmPpNameLog
 from .crm_pp_alias_pool import CrmPpAliasPool
 from .crm_pp_alias_pool_log import CrmPpAliasPoolLog
+from .vin_vehicle_full_info import VinVehicleFullInfo
 
-__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog", "CrmPpAliasPool", "CrmPpAliasPoolLog"]
+__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog", "CrmPpAliasPool", "CrmPpAliasPoolLog", "VinVehicleFullInfo"]

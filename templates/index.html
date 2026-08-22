@@ -335,8 +335,6 @@
 
         .filter-group input,
         .filter-group select,
-        .compare-box input,
-        .compare-box select,
         .data-action-group select {
             height: 30px;
             padding: 0 8px;
@@ -350,8 +348,7 @@
 
         .filter-group input:focus,
         .filter-group select:focus,
-        .compare-box input:focus,
-        .compare-box select:focus {
+        .data-action-group select:focus {
             border-color: #2f7ed8;
             outline: none;
             box-shadow: 0 0 0 2px rgba(47, 126, 216, 0.15);
@@ -385,39 +382,6 @@
         .filter-group .layui-form-select .layui-input {
             height: 30px;
             line-height: 30px;
-        }
-
-        /* 销量筛选区域 */
-        .compare-box {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .compare-box .field-label {
-            font-size: 12px;
-            color: #666;
-            white-space: nowrap;
-        }
-
-        .compare-box select {
-            width: 48px;
-            padding: 0 4px;
-        }
-
-        .compare-box input {
-            width: 60px;
-        }
-
-        .sales-filters {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .sales-filter-group .filter-group-label {
-            align-self: center;
         }
 
         .frequency-filter-group {
@@ -2666,7 +2630,7 @@ window.loadContent = function(type) {
                 </div>
             </div>
 
-            <!-- 筛选区：基础筛选 + 销量筛选 -->
+            <!-- 筛选区：基础筛选 -->
             <div class="search-filters">
                 <div class="filter-group">
                     <span class="filter-group-label" title="按 OE、品牌、物料名称、品牌号、标签等基础字段筛选备货数据">基础筛选</span>
@@ -2679,34 +2643,6 @@ window.loadContent = function(type) {
                     <select name="tag" id="searchTag" class="filter-select filter-select-sm">
                         <option value="">标签</option>
                     </select>
-                </div>
-
-                <div class="filter-group sales-filter-group">
-                    <span class="filter-group-label" title="按今日或昨日销量范围筛选数据">销量筛选</span>
-                    <div class="sales-filters">
-                        <div class="compare-box">
-                            <span class="field-label">今日</span>
-                            <select name="today_sales_op">
-                                <option value=">">></option>
-                                <option value="<"><</option>
-                                <option value="=">=</option>
-                                <option value=">=">≥</option>
-                                <option value="<=">≤</option>
-                            </select>
-                            <input type="number" name="today_sales_val" placeholder="值">
-                        </div>
-                        <div class="compare-box">
-                            <span class="field-label">昨日</span>
-                            <select name="sales_yesterday_op">
-                                <option value=">">></option>
-                                <option value="<"><</option>
-                                <option value="=">=</option>
-                                <option value=">=">≥</option>
-                                <option value="<=">≤</option>
-                            </select>
-                            <input type="number" name="sales_yesterday_val" placeholder="值">
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -5055,6 +4991,12 @@ function exportBeihuoData() {
     var query = new URLSearchParams(formData).toString();
     var url = '/api/export/beihuo' + (query ? '?' + query : '');
 
+    // 显示遮罩加载动画，阻断用户操作
+    var loadingIndex = layui.layer.load(2, {
+        shade: [0.6, '#000'],
+        time: 0
+    });
+
     // 使用fetch获取Excel文件
     fetch(url)
         .then(response => {
@@ -5067,6 +5009,7 @@ function exportBeihuoData() {
             }
         })
         .then(blob => {
+            layui.layer.close(loadingIndex);
             var link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = '备货数据_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.xlsx';
@@ -5075,6 +5018,7 @@ function exportBeihuoData() {
             layui.layer.msg('数据导出成功', {icon: 1});
         })
         .catch(error => {
+            layui.layer.close(loadingIndex);
             console.error('导出失败:', error);
             layui.layer.msg('导出失败: ' + error.message, {icon: 2});
         });

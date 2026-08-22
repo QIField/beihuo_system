@@ -151,6 +151,12 @@ var CartActions = (function() {
         // 构建URL
         var url = '/api/export/cart?' + searchParams.toString();
 
+        // 显示遮罩加载动画，阻断用户操作
+        var loadingIndex = layui.layer.load(2, {
+            shade: [0.6, '#000'],
+            time: 0
+        });
+
         // 使用fetch获取Excel文件
         fetch(url)
             .then(function(response) {
@@ -163,6 +169,7 @@ var CartActions = (function() {
                 }
             })
             .then(function(blob) {
+                layui.layer.close(loadingIndex);
                 var link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
                 var timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
@@ -172,6 +179,7 @@ var CartActions = (function() {
                 layui.layer.msg('数据导出成功', { icon: 1 });
             })
             .catch(function(error) {
+                layui.layer.close(loadingIndex);
                 console.error('导出失败:', error);
                 layui.layer.msg('导出失败: ' + error.message, { icon: 2 });
             });

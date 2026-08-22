@@ -389,7 +389,10 @@
 
     <!-- 通用复制工具 -->
     <script src="/static/js/copy-utils.js"></script>
-    
+
+    <!-- 性能监控工具 -->
+    <script src="/static/js/performance-monitor.js"></script>
+
     <script>
         // 全局变量
         let gridApi = null;
@@ -701,10 +704,12 @@
         };
 
         // 数值列白名单：排序时强制按数值比较（NaN 视为最小）
+        // 频次列也按数值排序，确保 GridColumnMenu 下拉菜单中的升/降序逻辑正确
         const NUMERIC_COLUMNS = new Set([
             '库存数量', '在途数量', '销量', '库存金额', '成本价',
             '近1个月询价量', '近3个月月均询价量',
-            '全国近1个月询价量', '全国近3个月月均询价量'
+            '全国近1个月询价量', '全国近3个月月均询价量',
+            'frequency'
         ]);
 
         // 前端排序：对 filteredData 排序，数值列按数值比较，其他列按字符串比较
@@ -1425,6 +1430,8 @@
         
         // 加载数据 - 获取全部数据
         async function loadData() {
+            const perf = new PerformanceMonitor('日期查询');
+
             const dateRange = document.getElementById('dateRange').value;
             let startDate = '', endDate = '';
 
@@ -1439,72 +1446,52 @@
                     endDate = dates[1];
                 }
             }
+            perf.mark('请求参数验证');
 
             if (!startDate || !endDate) {
                 layui.layer.msg('请选择日期范围', {icon: 0});
                 return;
             }
-            
+
             try {
                 const loadingIndex = layui.layer.load(2);
-                
-                // 先请求第一页获取总数
-                const firstRequestBody = {
+
+                // 后端已忽略分页参数，直接返回全量数据
+                const requestBody = {
                     start: startDate,
                     end: endDate,
                     page: 1,
                     pageSize: 200
                 };
-                
-                const firstResponse = await fetch('/api/date_ordercount', {
+
+                perf.mark('API请求发送');
+                const response = await fetch('/api/date_ordercount', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(firstRequestBody)
+                    body: JSON.stringify(requestBody)
                 });
-                
-                const firstResult = await firstResponse.json();
-                
-                if (firstResult.code !== 0) {
+
+                const result = await response.json();
+
+                if (result.code !== 0) {
                     layui.layer.close(loadingIndex);
-                    layui.layer.msg(firstResult.msg || '加载失败', {icon: 2});
+                    layui.layer.msg(result.msg || '加载失败', {icon: 2});
                     return;
                 }
-                
-                let allData = [...firstResult.data];
-                const total = firstResult.total || firstResult.data.length;
-                
-                // 如果有多页数据，继续获取
-                const totalPages = Math.ceil(total / 200);
-                if (totalPages > 1) {
-                    for (let page = 2; page <= totalPages; page++) {
-                        const requestBody = {
-                            start: startDate,
-                            end: endDate,
-                            page: page,
-                            pageSize: 200
-                        };
-                        
-                        const response = await fetch('/api/date_ordercount', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(requestBody)
-                        });
-                        
-                        const result = await response.json();
-                        if (result.code === 0) {
-                            allData = allData.concat(result.data);
-                        }
-                    }
-                }
-                
+
                 layui.layer.close(loadingIndex);
-                
+                perf.mark('服务器响应接收');
+
+                const allData = result.data || [];
+                const total = result.total || allData.length;
+
                 currentData = allData.map((item, index) => ({
                     ...item,
                     selected: false,
                     id: index
                 }));
                 filteredData = [...currentData];
+                perf.mark('数据解析处理');
 
                 // 更新筛选面板数据
                 updateFilterPanelData();
@@ -1512,12 +1499,14 @@
                 // 更新表格数据
                 if (gridApi && gridApi.setRowData) {
                     renderCurrentPage(1, currentPageSize);
+                    perf.mark('页面渲染更新');
                 } else {
                     console.error('[AG Grid] API 未准备好');
                 }
-                
+
+                perf.finish();
                 layui.layer.msg(`加载了 ${filteredData.length} 条数据（共 ${total} 条）`);
-                
+
             } catch (error) {
                 layui.layer.closeAll('loading');
                 layui.layer.msg('加载数据失败: ' + error.message, {icon: 2});
@@ -1539,6 +1528,8 @@
         
         // 搜索数据 - 同时搜索日期、搜索面板和筛选参数
         async function searchData() {
+            const perf = new PerformanceMonitor('日期查询-搜索');
+
             // 获取日期范围
             const dateRangeValue = document.getElementById('dateRange').value;
             let startDate = '', endDate = '';
@@ -1578,6 +1569,7 @@
             if (brand) searchParams.brand = brand;
             if (carBrand) searchParams.car_brand = carBrand;
             if (tag) searchParams.tag = tag;
+            perf.mark('请求参数验证');
 
             // 显示加载中
             const loadingIndex = layui.layer.load(2, {
@@ -1586,6 +1578,7 @@
             });
 
             try {
+                perf.mark('API请求发送');
                 const response = await fetch('/api/date_ordercount_search', {
                     method: 'POST',
                     headers: {
@@ -1595,6 +1588,7 @@
                 });
 
                 const result = await response.json();
+                perf.mark('服务器响应接收');
 
                 layui.layer.close(loadingIndex);
 
@@ -1604,13 +1598,16 @@
                         selected: false,
                         id: index
                     }));
+                    perf.mark('数据解析处理');
 
                     // 更新筛选面板数据
                     updateFilterPanelData();
 
                     // 应用所有搜索和筛选条件到搜索结果
                     applyAllFiltersToData(FilterPanel.getActiveFilters());
+                    perf.mark('页面渲染更新');
 
+                    perf.finish();
                     layui.layer.msg(`搜索完成，找到 ${result.data.length} 条记录`, {icon: 1});
                 } else {
                     layui.layer.msg(result.msg || '搜索失败', {icon: 2});
@@ -1737,18 +1734,75 @@
         
         // 导出数据
         function exportData() {
-            const data = filteredData;
-            if (data.length === 0) {
-                layui.layer.msg('没有数据可导出', {icon: 0});
-                return;
+            // 收集搜索面板条件
+            const oe = document.getElementById('advSearchOe').value.trim();
+            const barcode = document.getElementById('advSearchBarcode').value.trim();
+            const materialName = document.getElementById('advSearchMaterialName').value.trim();
+            const brand = document.getElementById('advSearchBrand').value.trim();
+            const carBrand = document.getElementById('advSearchCarBrand').value.trim();
+            const tag = document.getElementById('advSearchTag').value.trim();
+
+            // 收集筛选面板条件
+            const activeFilters = FilterPanel.getActiveFilters();
+
+            // 收集当前排序状态
+            let sortField = '';
+            let sortOrder = '';
+            // gridApi 在初始化时被覆盖为 Grid 实例，需通过 gridOptions.api 获取真实 API
+            const gridApiInstance = gridOptions && gridOptions.api ? gridOptions.api : gridApi;
+            if (gridApiInstance && typeof gridApiInstance.getSortModel === 'function') {
+                const sortModel = gridApiInstance.getSortModel();
+                if (sortModel && sortModel.length > 0) {
+                    sortField = sortModel[0].colId;
+                    sortOrder = sortModel[0].sort;
+                }
             }
-            
-            // 使用 AG Grid 的 CSV 导出功能
-            gridApi.exportDataAsCsv({
-                fileName: `日期查询_${new Date().toISOString().slice(0, 10)}.csv`
+
+            const loadingIndex = layui.layer.load(2, {
+                shade: [0.6, '#000'],
+                time: 0
             });
-            
-            layui.layer.msg('导出成功', {icon: 1});
+
+            fetch('/api/date_ordercount/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    oe: oe,
+                    barcode: barcode,
+                    material_name: materialName,
+                    brand: brand,
+                    car_brand: carBrand,
+                    tag: tag,
+                    field: sortField,
+                    order: sortOrder,
+                    filter_品牌: activeFilters['品牌'] || [],
+                    filter_车型品牌: activeFilters['车型品牌'] || [],
+                    filter_标签: activeFilters['标签'] || []
+                })
+            })
+            .then(function(response) {
+                if (!response.ok) {
+                    return response.json().then(function(err) {
+                        throw new Error(err.msg || '导出失败');
+                    });
+                }
+                return response.blob();
+            })
+            .then(function(blob) {
+                layui.layer.close(loadingIndex);
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                link.download = `日期查询_${timestamp}.xlsx`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                layui.layer.msg('导出成功', { icon: 1 });
+            })
+            .catch(function(error) {
+                layui.layer.close(loadingIndex);
+                console.error('导出失败:', error);
+                layui.layer.msg('导出失败: ' + error.message, { icon: 2 });
+            });
         }
 
         // ==================== 搜索和筛选面板功能 ====================

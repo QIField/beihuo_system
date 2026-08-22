@@ -12,6 +12,7 @@ from datetime import datetime
 from openpyxl.comments import Comment
 from app.utils.database_connection import get_db_connection
 from app.services.compare_service.compare_data_service import CompareDataService
+from app.utils.export_tools.excel_styles import apply_uniform_style
 
 # 创建蓝图
 compare_bp = Blueprint('compare', __name__)
@@ -324,6 +325,9 @@ def export_compare_data():
                 }
                 for col, width in column_widths.items():
                     worksheet.column_dimensions[col].width = width
+
+                # 应用比价模块统一样式
+                apply_uniform_style(worksheet)
 
             output.seek(0)
 

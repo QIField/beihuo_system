@@ -1,26 +1,30 @@
 """
 采购历史比对Excel写入工具
-用于生成带有月份批注的比价结果Excel
-零模板依赖，所有列与样式通过代码声明式配置
+
+用于生成带有月份批注的比价结果Excel。
+零模板依赖，所有列与样式通过代码声明式配置。
+样式复用比价模块统一规范（app.utils.export_tools.excel_styles）。
 """
+
 from typing import List, Callable, Any
 from openpyxl import Workbook
 from openpyxl.comments import Comment
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
+
 from app.models.purchase_history_compare_models import OECompareResult
-
-
-# ── 样式常量 ──
-HEADER_FONT = Font(name="微软雅黑", size=11, bold=True, color="FFFFFF")
-HEADER_FILL = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-HEADER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
-HEADER_BORDER = Border(bottom=Side(style="thin"))
-HEADER_HEIGHT = 30
-
-DATA_FONT = Font(name="微软雅黑", size=10, color="333333")
-DATA_BORDER = Border(bottom=Side(style="thin"))
-DATA_HEIGHT = 20
-ALT_FILL = PatternFill(start_color="EBF1F8", end_color="EBF1F8", fill_type="solid")
+from .excel_styles import (
+    HEADER_FONT,
+    HEADER_FILL,
+    HEADER_ALIGN,
+    HEADER_BORDER,
+    HEADER_HEIGHT,
+    DATA_FONT,
+    DATA_BORDER,
+    DATA_HEIGHT,
+    ALT_FILL,
+    apply_freeze_panes,
+)
 
 
 def _format_sales_data(result: OECompareResult) -> str:
@@ -108,7 +112,7 @@ class PurchaseHistoryExcelWriter:
         self._build_header()
 
     def _build_header(self):
-        """创建表头并应用样式"""
+        """创建表头并应用统一表头样式"""
         for col_idx, spec in enumerate(_COLUMN_SPECS, 1):
             cell = self.ws.cell(row=1, column=col_idx, value=spec["title"])
             cell.font = HEADER_FONT
@@ -116,7 +120,7 @@ class PurchaseHistoryExcelWriter:
             cell.alignment = HEADER_ALIGN
             cell.border = HEADER_BORDER
         self.ws.row_dimensions[1].height = HEADER_HEIGHT
-        self.ws.freeze_panes = "A2"
+        apply_freeze_panes(self.ws, header_row=1)
 
     def write_compare_results(self, results: List[OECompareResult], start_row: int = 2):
         """
@@ -162,7 +166,6 @@ class PurchaseHistoryExcelWriter:
         self._apply_alternating_fill(start_row, current_row - 1)
 
         # 添加自动筛选（表头+数据范围）
-        from openpyxl.utils import get_column_letter
         last_col = get_column_letter(len(_COLUMN_SPECS))
         last_row = current_row - 1 if current_row > start_row else 1
         self.ws.auto_filter.ref = f"A1:{last_col}{last_row}"
@@ -241,7 +244,6 @@ class PurchaseHistoryExcelWriter:
 
     def set_column_widths(self):
         """根据列配置设置列宽"""
-        from openpyxl.utils import get_column_letter
         for col_idx, spec in enumerate(_COLUMN_SPECS, 1):
             letter = get_column_letter(col_idx)
             self.ws.column_dimensions[letter].width = spec["width"]

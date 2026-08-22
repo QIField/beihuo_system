@@ -4,10 +4,71 @@
 """
 
 import io
+import json
 from datetime import datetime
 from flask import Response, jsonify
 from app.utils.database_connection import get_db_connection
 import pymysql
+
+
+def parse_purchase_records(records_json):
+    """
+    解析 purchase_records JSON，提取日期、供应商名称和价格。
+
+    与购物车页面 supplier-render.js 解析逻辑保持一致：
+    数据格式：'[{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_date":"2026-01-12"}]'
+
+    Args:
+        records_json: purchase_records JSON 字符串
+
+    Returns:
+        list: [(日期, 供应商名称, 价格), ...]；解析失败或为空时返回空列表
+    """
+    if not records_json or not isinstance(records_json, str):
+        return []
+
+    try:
+        records = json.loads(records_json)
+        if isinstance(records, list):
+            suppliers = []
+            for r in records:
+                name = r.get('supplier_name', '').strip()
+                price = r.get('purchase_price', 0.0)
+                date = r.get('purchase_date', '').strip()
+                if name:
+                    suppliers.append((date, name, f"{price:.2f}"))
+            return suppliers
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    return []
+
+
+def build_supplier_field(original_supplier, purchase_records):
+    """
+    构建供应商字段值：优先使用 purchase_records JSON，没有则回退到原始供应商字符串。
+
+    输出格式与购物车页面 tooltip 一致：
+      - 有日期："日期 - 供应商 - 单价"
+      - 无日期："供应商 - 单价"
+
+    Args:
+        original_supplier: 原始供应商字段值
+        purchase_records: purchase_records JSON 字符串
+
+    Returns:
+        str: 格式化后的供应商字符串，多个供应商用换行分隔
+    """
+    records = parse_purchase_records(purchase_records)
+    if records:
+        parts = []
+        for date, name, price in records:
+            if date:
+                parts.append(f"{date} - {name} - {price}")
+            else:
+                parts.append(f"{name} - {price}")
+        return '\n'.join(parts)
+    return original_supplier or ''
 
 
 def parse_supplier_string(supplier_str):
