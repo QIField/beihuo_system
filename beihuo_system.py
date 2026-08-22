@@ -34,7 +34,15 @@ from flask_socketio import SocketIO
 from app.sockets import register_socket_events, notification_manager
 from app.utils.database_connection import get_db_connection
 from app.utils.search import parse_space, parse_comma
-from app.utils.export_tools import handle_export_request
+from app.utils.export_tools import handle_export_request, export_data
+from app.utils.export_tools.providers import (
+    BEIHUO_EXPORT_CONFIG,
+    fetch_beihuo_data,
+    CART_EXPORT_CONFIG,
+    fetch_cart_data,
+    DATE_QUERY_EXPORT_CONFIG,
+    fetch_date_query_data,
+)
 from app.services.sales_frequency_service import enrich_data_with_frequency
 
 
@@ -238,7 +246,6 @@ def reset_daily_status():
     if daily_execution_status['last_execution_date'] != today:
         daily_execution_status['last_execution_date'] = today
         daily_execution_status['combined_task_executed_today'] = False
-        print(f"[{datetime.now()}] DEBUG: 重置每日执行状态，今天是 {today}")
 
 def run_crm_create_products_task():
     """运行CRM新建产品任务的函数 - 优化版本"""
@@ -261,11 +268,9 @@ def run_virtual_inventory_task():
     import threading
     
     current_time = datetime.now()
-    print(f"[{current_time}] DEBUG: run_virtual_inventory_task 被调用, 进程ID: {os.getpid()}")
-    
+
     # 检查是否有任务正在运行
     if task_execution_tracker['task_running']:
-        print(f"[{current_time}] DEBUG: 任务已在运行中，跳过本次执行")
         return
     
     # 定义后台任务执行函数
@@ -306,8 +311,7 @@ def run_virtual_inventory_task():
             
             # 重置任务标记
             task_execution_tracker['task_running'] = False
-            print(f"[{datetime.now()}] DEBUG: 任务执行结束，重置task_running标志")
-    
+
     # 创建后台线程执行任务
     thread = threading.Thread(target=execute_task_in_background, daemon=True)
     thread.start()
@@ -341,30 +345,6 @@ def run_cart_cleanup_task():
 
     except Exception as e:
         print(f"[失败] 每小时购物车清理任务失败: {str(e)}")
-
-def print_task_debug_info():
-    """打印任务执行调试信息"""
-    print("="*50)
-    print("DEBUG INFO - 任务执行状态:")
-    print(f"- task_running: {task_execution_tracker['task_running']}")
-    print(f"- combined_task_executed_today: {daily_execution_status['combined_task_executed_today']}")
-    print(f"- last_execution_date: {daily_execution_status['last_execution_date']}")
-    print(f"- virtual_inventory_last_run: {task_execution_tracker['virtual_inventory_last_run']}")
-    print(f"- execution_log_count: {len(task_execution_tracker['execution_log'])}")
-    
-    # 显示task_manager统计
-    stats = task_manager.get_stats()
-    print(f"\nTask Manager 统计:")
-    print(f"- 提交任务: {stats['submitted']}")
-    print(f"- 运行中: {stats['running']}")
-    print(f"- 已完成: {stats['completed']}")
-    print(f"- 失败: {stats['failed']}")
-    print(f"- 活跃线程: {stats['active_threads']}")
-    
-    # 显示最近5次执行记录
-    recent_logs = task_execution_tracker['execution_log'][-5:] if task_execution_tracker['execution_log'] else []
-
-
 
 #定时更新========================================================================================================================================
 # [已重构] 以下代码已迁移到 app/services/beihuo_service/ 模块
@@ -1286,8 +1266,6 @@ def api_beihuo():
     field = request.args.get('field', '').strip() or None
     order = request.args.get('order', '').strip() or None
 
-    print(f"Debug - 接收到排序参数: field={field}, order={order}")  # 调试信息
-
     # 获取搜索条件并处理多行输入
     oe = request.args.get('oe', '').strip()
     supplier = request.args.get('supplier', '').strip()
@@ -1345,10 +1323,6 @@ def api_beihuo():
     current_store = get_user_store()  # 使用统一的函数获取当前用户门店
     where_parts.append("`company` = %s")
     params.append(current_store)
-
-    print(f"Debug - Field: {field}, Order: {order}")  # 调试信息
-    print(f"Debug - Where clause: {where_parts}")  # 调试信息
-    print(f"Debug - Params: {params}")  # 调试信息
 
     # 处理搜索参数
     if oe_list:
@@ -1448,10 +1422,6 @@ def api_beihuo():
 
     where_clause = "WHERE " + " AND ".join(where_parts) if where_parts else ""
 
-    print(f"Debug - Field: {field}, Order: {order}")  # 调试信息
-    print(f"Debug - Where clause: {where_clause}")  # 调试信息
-    print(f"Debug - Params: {params}")  # 调试信息
-
     # 处理排序
     order_clause = ""
     if field and order:
@@ -1518,8 +1488,7 @@ def api_beihuo():
 
     # 如果需要后端排序（排序字段在特殊字段中），则获取所有数据进行排序
     if field and field in ['近1个月询价量', '近3个月月均询价量', '近12个月月均销量', '近6个月月均销量', '近7天销量', '库存数量', '在途数量', '昨日销量', '本月销量', '今日销量', '全国近1个月询价量', '全国近3个月月均询价量', '成品可卖天数', '成本价']:
-        print(f"Debug - Starting backend sorting for field: {field}")  # 调试信息
-        
+
         # 获取所有符合条件的数据
         all_data_sql = f"""
             SELECT `物料名称`, `品牌`, `物料条码`, `oe`, `车型品牌`, `标签`, `库存金额`, `成本价`,
@@ -1531,12 +1500,9 @@ def api_beihuo():
             {where_clause}
             ORDER BY `oe`  -- 使用一个稳定排序避免结果顺序变化
         """
-        print(f"Debug - All data SQL: {all_data_sql}")  # 调试信息
         cursor.execute(all_data_sql, params)
         all_rows = cursor.fetchall()
-        
-        print(f"Debug - Total rows to sort: {len(all_rows)}")  # 调试信息
-        
+
         # 应用后端排序
         if field in all_rows[0] if all_rows else []:
             reverse = order.lower() == "desc"
@@ -1564,11 +1530,6 @@ def api_beihuo():
         params.extend([limit, offset])
         cursor.execute(sql, params)
         result = cursor.fetchall()
-
-    # 添加调试信息
-    print(f"Debug - SQL查询: {sql if 'sql' in locals() else 'Backend sorted'}")
-    print(f"Debug - 参数: {params[:-2] if len(params) >= 2 else params}")
-    print(f"Debug - 查询结果数量: {len(result)}")
 
     # 添加数据处理逻辑以合并销量字段
     for row in result:
@@ -2242,14 +2203,12 @@ def switch_org():
     """用户切换组织（门店）- 基于allowed_orgs权限控制"""
     data = request.get_json()
     new_org = data.get('org')
-    print(f"Debug - 接收到的组织切换请求: {new_org}")  # 调试信息
-    
+
     if not new_org:
         return jsonify({'code': 1, 'msg': '请选择要切换的组织'}), 400
-    
+
     # 检查组织是否在允许的门店列表中
     if new_org not in STORES:
-        print(f"Debug - 无效的组织代码: {new_org}")  # 调试信息
         return jsonify({'code': 1, 'msg': '无效的组织代码'}), 400
     
     # 获取当前用户的允许组织列表
@@ -2280,7 +2239,6 @@ def switch_org():
             return jsonify({'code': 1, 'msg': '权限不足，普通用户只能在自己所属门店操作'}), 403
 
     session['current_org'] = new_org
-    print(f"Debug - 用户组织切换成功，新的current_org: {new_org}")  # 调试信息
     return jsonify({
         'code': 0, 
         'msg': '组织切换成功',
@@ -2297,17 +2255,11 @@ def get_user_store():
     is_admin = session.get('is_admin', False)
     user_store = session.get('store', 'fsbbr')  # 用户的默认门店，使用默认值'fsbbr'
     
-    print(f"Debug - get_user_store: is_admin={is_admin}, user_store={user_store}")  # 调试信息
-    print(f"Debug - get_user_store: session keys: {list(session.keys())}")  # 调试信息
-    print(f"Debug - get_user_store: session.get('current_org')={session.get('current_org')}")  # 调试信息
-    
     # 无论是否为管理员，都应返回当前切换的组织（如果存在）
     current_org = session.get('current_org', user_store)
-    print(f"Debug - get_user_store: current_org={current_org}")  # 调试信息
-    
+
     # 如果current_org是'none'、'undefined'、'all'等无效值，返回用户默认门店
     if not current_org or current_org == 'all' or current_org == 'none' or current_org == 'undefined' or current_org == '':
-        print(f"Debug - get_user_store: using user_store instead of invalid current_org")  # 调试信息
         return user_store
     return current_org
 
@@ -2997,38 +2949,26 @@ def download_unmatched():
 def unified_export(export_type):
     """
     通用数据导出接口 - 根据搜索条件导出数据
-    
+
+    使用标准导出组件（app.utils.export_tools）统一处理备货表与购物车导出。
+
     Args:
         export_type: 导出类型（beihuo/cart）
-        
+
     Query参数（备货表）:
-        oe: OE号搜索
-        supplier: 供应商搜索
-        brand: 品牌搜索
-        material_name: 物料名称搜索
-        tag: 标签搜索
-        barcode: 物料条码搜索
-        car_brand: 车型品牌搜索
-        
+        oe, supplier, brand, material_name, tag, barcode, car_brand
+
     Query参数（购物车表）:
-        oe: OE号搜索
-        barcode: 物料条码/品牌号搜索
-        material_name: 物料名称搜索
-        brand: 品牌搜索
-        tag: 标签搜索
-        car_model: 车型搜索
-        dimension: 维度（product/supplier），默认product
+        oe, barcode, material_name, brand, tag, car_model, dimension
     """
     try:
-        # 获取当前门店
         current_store = get_user_store()
-        
-        # 获取搜索条件
-        search_params = {}
-        
+        if not current_store:
+            return jsonify({'code': 1, 'msg': '未获取到门店信息'}), 400
+
         if export_type == 'beihuo':
-            # 备货表搜索参数
             search_params = {
+                'store': current_store,
                 'oe': request.args.get('oe', '').strip(),
                 'supplier': request.args.get('supplier', '').strip(),
                 'brand': request.args.get('brand', '').strip(),
@@ -3037,9 +2977,11 @@ def unified_export(export_type):
                 'barcode': request.args.get('barcode', '').strip(),
                 'car_brand': request.args.get('car_brand', '').strip(),
             }
+            data = fetch_beihuo_data(**search_params)
+            return export_data(BEIHUO_EXPORT_CONFIG, data)
         elif export_type == 'cart':
-            # 购物车表搜索参数
             search_params = {
+                'store': current_store,
                 'oe': request.args.get('oe', '').strip(),
                 'barcode': request.args.get('barcode', '').strip(),
                 'material_name': request.args.get('material_name', '').strip(),
@@ -3048,16 +2990,15 @@ def unified_export(export_type):
                 'car_model': request.args.get('car_model', '').strip(),
                 'dimension': request.args.get('dimension', 'product'),
             }
-        
-        # 调用通用导出函数
-        return handle_export_request(
-            export_type=export_type,
-            store=current_store,
-            search_params=search_params
-        )
-        
+            data = fetch_cart_data(**search_params)
+            return export_data(CART_EXPORT_CONFIG, data)
+        else:
+            return jsonify({'code': 1, 'msg': f'不支持的导出类型: {export_type}'}), 400
+
     except Exception as e:
         print(f"导出失败: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         return jsonify({'code': 1, 'msg': f'导出失败: {str(e)}'}), 500
 
 
@@ -3630,9 +3571,6 @@ def date_query():
 @login_required
 def date_ordercount():
     """根据日期范围查询订单统计"""
-    from datetime import datetime
-    start_time = datetime.now()
-    
     try:
         data = request.get_json()
         start_date = data.get('start')
@@ -3642,27 +3580,22 @@ def date_ordercount():
         sort = data.get('sort', {})
         filter_params = data.get('filter', {})
         
-        print(f"[{start_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 收到日期查询请求: 用户={session.get('username', 'default_user')}, 开始日期={start_date}, 结束日期={end_date}, 页码={page}, 每页={page_size}")
-        
         if not start_date or not end_date:
             return jsonify({'code': 1, 'msg': '缺少日期参数'}), 400
-        
+
         # 获取当前用户公司（支持管理员切换组织）
         company = get_user_store()
         username = session.get('username', 'default_user')
-        
+
         # 保存查询参数到session，以便其他函数可以使用
         session['last_date_ordercount_start_date'] = start_date
         session['last_date_ordercount_end_date'] = end_date
         session['last_date_ordercount_company'] = company
-        
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}] 存储到session - 用户: {username}, 开始日期: {start_date}, 结束日期: {end_date}, 页码: {page}, 每页: {page_size}")
-        
+
         # 直接调用外部API获取最新数据
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
-        
-        api_start_time = datetime.now()
+
         url = "http://bi.gzbbr.com/crmapp_api.by_date_xl"
 
         api_data = {
@@ -3677,11 +3610,7 @@ def date_ordercount():
         }
 
         import requests
-        print(f"[{api_start_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 开始调用外部API...")
         response = requests.post(url, data=api_data, headers=headers)
-        api_end_time = datetime.now()
-        api_elapsed = (api_end_time - api_start_time).total_seconds()
-        print(f"[{api_end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 外部API调用完成，状态码: {response.status_code}, 耗时: {api_elapsed:.3f}s")
 
         if response.status_code != 200:
             conn.close()
@@ -3745,8 +3674,6 @@ def date_ordercount():
                 end_date=end_date,
                 frequency_field='frequency'
             )
-            if freq_error:
-                print(f"[频次计算] /api/date_ordercount 出现错误: {freq_error}")
         elif beihuo_data:
             for item in beihuo_data:
                 item['frequency'] = 0
@@ -3809,37 +3736,22 @@ def date_ordercount():
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.executemany(insert_sql, batch_data)
-            insert_end_time = datetime.now()
-            insert_elapsed = (insert_end_time - api_end_time).total_seconds()
-            print(f"[{insert_end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 批量插入了 {len(batch_data)} 条数据到数据库，耗时: {insert_elapsed:.3f}s")
-        else:
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}] 没有数据需要插入到数据库")
 
         conn.commit()
 
-        # 获取总数和分页数据
+        # 直接返回全量数据，不再按 page/pageSize 分页
         total = len(beihuo_data)
-        offset = (page - 1) * page_size
-        paginated_data = beihuo_data[offset:offset + page_size]
 
         conn.close()
-
-        end_time = datetime.now()
-        total_elapsed = (end_time - start_time).total_seconds()
-        print(f"[{end_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 请求处理完成，总耗时: {total_elapsed:.3f}s, 返回数据: {len(paginated_data)} 条")
 
         return jsonify({
             'code': 0,
             'msg': '查询成功',
-            'data': paginated_data,
+            'data': beihuo_data,
             'total': total
         })
 
     except Exception as e:
-        error_time = datetime.now()
-        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] date_ordercount函数发生错误: {str(e)}")  # 添加详细错误信息
-        import traceback
-        print(f"[{error_time.strftime('%Y-%m-%d %H:%M:%S.%f')}] 错误堆栈: {traceback.format_exc()}")  # 添加堆栈跟踪
         return jsonify({'code': 1, 'msg': f'查询失败: {str(e)}'}), 500
 
 # 新增API：日期查询结果面板的搜索功能
@@ -3860,14 +3772,10 @@ def date_ordercount_search():
         field = data.get('field', '').strip()  # 排序字段
         order = data.get('order', '').strip()  # 排序方向：asc/desc
 
-        print(f"[高级搜索] 收到请求: OE={oe}, 条码={barcode}, 名称={material_name}, 品牌={brand}, 车型品牌={car_brand}, 标签={tag}")
-        
         # 获取组织和用户信息（用于定位特定查询的数据）
         company = session.get('last_date_ordercount_company')
         username = session.get('username', 'default_user')
-        
-        print(f"[高级搜索] 组织: {company}, 用户: {username}")
-        
+
         # 如果没有组织信息，返回提示
         if not company:
             return jsonify({
@@ -3905,8 +3813,6 @@ def date_ordercount_search():
         car_brand_list = [item.strip() for item in car_brand.split('\n') if item.strip()] if '\n' in car_brand else ([car_brand] if car_brand else [])
         tag_list = [item.strip() for item in tag.split('\n') if item.strip()] if '\n' in tag else ([tag] if tag else [])
 
-        print(f"[高级搜索] 解析后: OE列表={oe_list}, 条码列表={barcode_list}, 名称列表={material_name_list}, 品牌列表={brand_list}, 车型品牌列表={car_brand_list}, 标签列表={tag_list}")
-        
         # 在缓存数据中进行搜索
         filtered_data = []
         for item in cached_data:
@@ -3980,10 +3886,8 @@ def date_ordercount_search():
                     # 字符串字段排序
                     filtered_data.sort(key=lambda x: str(x.get(field, '') or '').lower(), reverse=reverse_order)
             except Exception as e:
-                print(f"排序过程中出现错误: {str(e)}")
                 # 如果排序失败，保持原有顺序
-        
-        print(f"[高级搜索] 过滤完成: 原始数据 {len(cached_data)} 条, 过滤后 {len(filtered_data)} 条")
+                pass
 
         # 为搜索结果补充频次数据（缓存表未持久化频次，按当前日期范围实时计算）
         search_start_date = session.get('last_date_ordercount_start_date')
@@ -4010,6 +3914,48 @@ def date_ordercount_search():
 
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'请点击排序图标'}), 500
+
+
+# 新增API：日期查询结果导出
+@app.route('/api/date_ordercount/export', methods=['POST'])
+@login_required
+def date_ordercount_export():
+    """导出日期查询结果，支持搜索面板与筛选面板全部条件。"""
+    try:
+        data = request.get_json() or {}
+
+        company = session.get('last_date_ordercount_company')
+        if not company:
+            return jsonify({
+                'code': 1,
+                'msg': '请先执行日期范围查询以获取数据',
+                'data': []
+            }), 400
+
+        search_params = {
+            'company': company,
+            'username': session.get('username', 'default_user'),
+            'oe': data.get('oe', '').strip(),
+            'barcode': data.get('barcode', '').strip(),
+            'material_name': data.get('material_name', '').strip(),
+            'brand': data.get('brand', '').strip(),
+            'car_brand': data.get('car_brand', '').strip(),
+            'tag': data.get('tag', '').strip(),
+            'field': data.get('field', '').strip(),
+            'order': data.get('order', '').strip(),
+            'filter_品牌': data.get('filter_品牌', data.get('filterBrand', [])),
+            'filter_车型品牌': data.get('filter_车型品牌', data.get('filterCarBrand', [])),
+            'filter_标签': data.get('filter_标签', data.get('filterTag', [])),
+        }
+
+        rows = fetch_date_query_data(**search_params)
+        return export_data(DATE_QUERY_EXPORT_CONFIG, rows)
+
+    except Exception as e:
+        print(f"日期查询导出失败: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'code': 1, 'msg': f'导出失败: {str(e)}'}), 500
 
 
 # 新增API：清空日期查询缓存
@@ -4065,11 +4011,7 @@ def date_ordercount_get_cache():
         data = request.get_json()
         start_date = data.get('start') or session.get('last_date_ordercount_start_date')
         end_date = data.get('end') or session.get('last_date_ordercount_end_date')
-        
-        print(f"获取缓存 - 用户: {username}, 开始日期: {start_date}, 结束日期: {end_date}")
-        print(f"Session中的日期: {session.get('last_date_ordercount_start_date')}, {session.get('last_date_ordercount_end_date')}")
-        print(f"请求中的日期: {data.get('start') if data else None}, {data.get('end') if data else None}")
-        
+
         if not start_date or not end_date:
             return jsonify({
                 'code': 0,
@@ -4086,10 +4028,8 @@ def date_ordercount_get_cache():
         WHERE username = %s AND start_date = %s AND end_date = %s
         ORDER BY id
         """
-        print(f"执行查询: {get_sql % (username, start_date, end_date)}")
         cursor.execute(get_sql, (username, start_date, end_date))
         cached_data = cursor.fetchall()
-        print(f"查询到的数据条数: {len(cached_data)}")
         conn.close()
 
         # 为缓存数据补充频次数据
@@ -4101,8 +4041,6 @@ def date_ordercount_get_cache():
                 end_date=end_date,
                 frequency_field='frequency'
             )
-            if freq_error:
-                print(f"[频次计算] /api/date_ordercount_get_cache 出现错误: {freq_error}")
         elif cached_data:
             for item in cached_data:
                 item['frequency'] = 0
@@ -4232,8 +4170,7 @@ def process_bill():
 
         if process_type == 'order':
             # 对于订单处理，不管是一个还是多个文件，都打包成ZIP，且文件放在子文件夹中
-            print(f"DEBUG: 开始处理订单文件，共 {len(processed_files)} 个文件")
-            
+
             # 根据订单类型确定要添加的图片文件夹
             img_folder_path = None
             if order_type == '广州龙星景丰':
@@ -4255,7 +4192,6 @@ def process_bill():
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
                 # 添加处理后的文件
                 for file_path in processed_files:
-                    print(f"DEBUG: 正在处理文件: {file_path}")
                     if os.path.exists(file_path):  # 检查文件是否存在
                         # 将文件放入"处理结果/"子文件夹中再添加到ZIP
                         folder_name = "处理结果"
@@ -4263,7 +4199,6 @@ def process_bill():
                             content = f.read()
                             # 创建ZipInfo对象以更好地控制文件信息
                             archive_path = f"{folder_name}/{os.path.basename(file_path)}"
-                            print(f"DEBUG: 将文件存入归档路径: {archive_path}")
                             info = zipfile.ZipInfo(archive_path)
                             info.compress_type = zipfile.ZIP_DEFLATED
                             # 设置外部文件属性（文件权限）为标准的文件权限
@@ -4271,7 +4206,6 @@ def process_bill():
                             info.external_attr = 0o644 << 16  # 设置为标准文件权限
                             # 写入内容，指定UTF-8编码
                             zf.writestr(info, content.encode('utf-8'))
-                            print(f"DEBUG: 已写入文件到ZIP: {archive_path}")
                     else:
                         # 清理临时目录
                         if temp_dir:
@@ -4284,18 +4218,13 @@ def process_bill():
                 
                 # 如果是广州龙星景丰或厦门华禹订单，添加对应的图片文件夹到处理结果目录
                 if img_folder_path and os.path.exists(img_folder_path):
-                    print(f"DEBUG: 添加图片文件夹到处理结果目录: {img_folder_path}")
                     for img_file in os.listdir(img_folder_path):
                         img_file_path = os.path.join(img_folder_path, img_file)
                         if os.path.isfile(img_file_path):
                             # 将图片文件添加到ZIP的"处理结果/img/"子文件夹中
                             archive_img_path = f"处理结果/img/{img_file}"  # 放在处理结果目录下的img子目录
-                            print(f"DEBUG: 将图片存入归档路径: {archive_img_path}")
                             with open(img_file_path, 'rb') as img:
                                 zf.writestr(archive_img_path, img.read())
-                                print(f"DEBUG: 已写入图片到ZIP: {archive_img_path}")
-
-            print(f"DEBUG: ZIP构建完成，准备发送")
             # 现在可以安全地删除原始临时目录了
             if temp_dir:
                 try:
@@ -4308,7 +4237,6 @@ def process_bill():
             zip_buffer.seek(0)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             safe_filename = f"Processed_Orders_{timestamp}.zip"
-            print(f"DEBUG: 发送ZIP文件，文件名: {safe_filename}")
             return Response(
                 zip_buffer.getvalue(),
                 mimetype='application/zip',

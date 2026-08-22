@@ -19,6 +19,18 @@ class VinVehicleInfoApiClient:
     def __init__(self, key='fs'):
         self.spider = CassmallSpider(key=key)
 
+    def fetch_catalog_response(self, vin_code):
+        """
+        根据 VIN 码抓取 catalog 页面原始响应
+
+        :param vin_code: VIN 码
+        :return: requests.Response 对象，失败返回 None
+        """
+        response = self.spider.get_maindata_catalog(vin_code)
+        if response is None:
+            logger.warning(f"[VIN API] 请求无响应，跳过: {vin_code}")
+        return response
+
     def fetch_catalog_html(self, vin_code):
         """
         根据 VIN 码抓取 catalog 页面 HTML
@@ -26,9 +38,8 @@ class VinVehicleInfoApiClient:
         :param vin_code: VIN 码
         :return: HTML 字符串，失败返回 None
         """
-        response = self.spider.get_maindata_catalog(vin_code)
+        response = self.fetch_catalog_response(vin_code)
         if response is None:
-            logger.warning(f"[VIN API] 请求无响应，跳过: {vin_code}")
             return None
         response.raise_for_status()
         return response.text

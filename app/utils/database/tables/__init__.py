@@ -28,6 +28,7 @@ from .inquiry_tables import (
     init_price_inquiry_direct_table,
     init_ks_part_mapping_table,
     init_vin_vehicle_info_table,
+    init_vin_vehicle_full_info_table,
 )
 
 from .virtual_inventory_stats_tables import (
@@ -74,6 +75,7 @@ __all__ = [
     'init_shop_business_indicator_table',
     'init_price_inquiry_direct_table',
     'init_vin_vehicle_info_table',
+    'init_vin_vehicle_full_info_table',
     'init_ks_engine_mapping_table',
     'init_safety_stock_calculation_table',
     'init_all_virtual_inventory_tables',

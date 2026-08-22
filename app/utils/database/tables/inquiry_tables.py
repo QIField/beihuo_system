@@ -353,3 +353,64 @@ def init_vin_vehicle_info_table():
         print(f"  [失败] VIN车辆信息映射表: {e}")
     finally:
         conn.close()
+
+
+def init_vin_vehicle_full_info_table():
+    """
+    初始化 VIN 车辆完整信息表
+    存储 VIN、发动机、底盘信息均齐全的去重数据
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS vin_vehicle_full_info (
+                id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
+                vin_code VARCHAR(100) NOT NULL COMMENT 'VIN码',
+                engine VARCHAR(100) NOT NULL COMMENT '发动机号',
+                chassis VARCHAR(100) NOT NULL COMMENT '底盘号',
+                source VARCHAR(50) DEFAULT NULL COMMENT '数据来源：ks_inquiry / vin_vehicle_info / merge',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                UNIQUE KEY uk_vin_code (vin_code),
+                INDEX idx_engine (engine),
+                INDEX idx_chassis (chassis),
+                INDEX idx_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='VIN车辆完整信息表';
+            """
+            cursor.execute(create_table_sql)
+
+            # 检查并添加列（兼容旧表）
+            alter_columns = [
+                ("source", "VARCHAR(50) DEFAULT NULL COMMENT '数据来源：ks_inquiry / vin_vehicle_info / merge'"),
+                ("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'"),
+                ("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'"),
+            ]
+            for col_name, col_def in alter_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE vin_vehicle_full_info ADD COLUMN {col_name} {col_def}")
+                    print(f"  [成功] 已添加列 {col_name}")
+                except Exception as e:
+                    if "Duplicate column name" not in str(e):
+                        print(f"  ! 添加列 {col_name} 时出错: {str(e)}")
+
+            # 检查并添加索引（兼容旧表）
+            index_list = [
+                ("uk_vin_code", "UNIQUE INDEX uk_vin_code (vin_code)"),
+                ("idx_engine", "INDEX idx_engine (engine)"),
+                ("idx_chassis", "INDEX idx_chassis (chassis)"),
+                ("idx_created_at", "INDEX idx_created_at (created_at)"),
+            ]
+            for idx_name, idx_def in index_list:
+                try:
+                    cursor.execute(f"ALTER TABLE vin_vehicle_full_info ADD {idx_def}")
+                    print(f"  [成功] 已添加索引 {idx_name}")
+                except Exception as e:
+                    if "Duplicate key name" not in str(e):
+                        print(f"  ! 添加索引 {idx_name} 时出错: {str(e)}")
+
+            print("  [成功] VIN车辆完整信息表")
+    except Exception as e:
+        print(f"  [失败] VIN车辆完整信息表: {e}")
+    finally:
+        conn.close()
