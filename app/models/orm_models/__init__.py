@@ -6,6 +6,7 @@ from .account_receivable_list import AccountReceivableList
 from .customer_quota_model import CustomerQuota
 from .ks_suyuanma import KsSuyuanma
 from .wechat_daily_quote_detail import WechatDailyQuoteDetail
+from .weixin_decoding_vin import WeixinDecodingVin
 from .crmapp_sales_history_detail import CrmappSalesHistoryDetail
 from .car_parts_library_benz import CarPartsLibraryBenz
 from .car_parts_library_benz_stock import CarPartsLibraryBenzStock
@@ -21,4 +22,4 @@ from .crm_pp_alias_pool import CrmPpAliasPool
 from .crm_pp_alias_pool_log import CrmPpAliasPoolLog
 from .vin_vehicle_full_info import VinVehicleFullInfo
 
-__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog", "CrmPpAliasPool", "CrmPpAliasPoolLog", "VinVehicleFullInfo"]
+__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "WeixinDecodingVin", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog", "CrmPpAliasPool", "CrmPpAliasPoolLog", "VinVehicleFullInfo"]

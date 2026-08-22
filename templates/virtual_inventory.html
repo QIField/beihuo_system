@@ -199,10 +199,28 @@
         return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
     }
 
+    // 定义格式化时间戳函数（精确到毫秒）
+    function formatTimestamp() {
+        var now = new Date();
+        var year = now.getFullYear();
+        var month = String(now.getMonth() + 1).padStart(2, '0');
+        var day = String(now.getDate()).padStart(2, '0');
+        var hours = String(now.getHours()).padStart(2, '0');
+        var minutes = String(now.getMinutes()).padStart(2, '0');
+        var seconds = String(now.getSeconds()).padStart(2, '0');
+        var milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+        return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds + '.' + milliseconds;
+    }
+
+    // 打印搜索步骤日志（带绝对时间戳与距搜索发起耗时）
+    function logSearchStep(stepName) {
+        var now = performance.now();
+        var elapsed = app && app._searchStartTime ? (now - app._searchStartTime).toFixed(2) : '0.00';
+        console.log('[' + stepName + '] 时间戳: ' + formatTimestamp() + ' (距搜索发起: ' + elapsed + ' ms)');
+    }
+
     // 定义页面功能
     var app = {
-        // 表格加载开始时间（用于计时）
-        _tableLoadStartTime: null,
 
         // 初始化表格
         initTable: function(searchParams = {}) {
@@ -210,12 +228,34 @@
                 var table = layui.table;
                 var $ = layui.jquery;
 
-                // 记录开始时间
-                app._tableLoadStartTime = performance.now();
-                console.log('[⏱️ 计时] 开始加载表格数据...');
-
                 // 确定API端点 - 保持使用统一的API接口
                 var apiUrl = '/api/virtual_inventory_by_msg_pattern';
+
+                // 步骤1: 搜索请求发起前
+                app._searchStartTime = performance.now();
+                logSearchStep('搜索请求发起前');
+
+                // 临时包装 $.ajax，在 layui 内部处理之前精确捕获请求发送与数据接收
+                var originalAjax = $.ajax;
+                $.ajax = function(options) {
+                    var isTarget = options.url && options.url.indexOf(apiUrl) === 0;
+                    if (isTarget) {
+                        $.ajax = originalAjax;
+
+                        var originalBeforeSend = options.beforeSend;
+                        options.beforeSend = function(jqXHR, settings) {
+                            logSearchStep('请求发送完成后');
+                            if (originalBeforeSend) return originalBeforeSend.apply(this, arguments);
+                        };
+
+                        var originalSuccess = options.success;
+                        options.success = function(data, textStatus, jqXHR) {
+                            logSearchStep('数据接收开始时');
+                            if (originalSuccess) return originalSuccess.apply(this, arguments);
+                        };
+                    }
+                    return originalAjax.apply(this, arguments);
+                };
 
                 // 创建实际传递给API的参数，保留业务日期类型参数
                 var apiParams = {...searchParams};
@@ -251,12 +291,19 @@
                         field: 'fetch_time',
                         type: 'desc'
                     },
+                    // 步骤4: 数据处理开始时
+                    parseData: function(res) {
+                        logSearchStep('数据处理开始时');
+                        return res;
+                    },
                     // 监听排序事件，通过后端排序
                     done: function(res, curr, count) {
+                        // 步骤5: 数据渲染完成时
+                        logSearchStep('数据渲染完成时');
+
                         var endTime = performance.now();
-                        var duration = (endTime - app._tableLoadStartTime).toFixed(2);
-                        console.log(`[⏱️ 计时] 表格数据加载完成，耗时: ${duration}ms`, res);
-                        console.log('当前搜索参数:', apiParams);
+                        var totalDuration = (endTime - app._searchStartTime).toFixed(2);
+                        console.log('总耗时: ' + totalDuration + ' ms');
 
                         // 重新设置表格高度
                         setTimeout(function() {
@@ -266,8 +313,6 @@
                                 tableBox.css('height', 'calc(100% - 41px)'); // 减去头部高度
                             }
                         }, 100);
-
-
                     },
                     error: function(res, msg) {
                         console.error('表格加载失败: ' + msg);
