@@ -290,16 +290,16 @@ def run_vin_vehicle_info_sync(limit=100):
             finally:
                 client.close()
 
-    logger.info(f"[VIN补全完成] 整合={stats['merged']} 处理={stats['total']} 更新={stats['updated']}")
+        # Step 3: 合并完整 VIN 信息到 vin_vehicle_full_info
+        try:
+            logger.info("[VIN完整信息] 开始合并 CRM 与 vin_vehicle_info 完整数据...")
+            full_info_count = _merge_vin_full_info(cursor)
+            stats['full_info_merged'] = full_info_count
+            logger.info(f"[VIN完整信息] 合并完成，新增={full_info_count}条")
+        except Exception as e:
+            logger.error(f"[VIN完整信息] 合并失败: {e}")
+            raise
 
-    # Step 3: 合并完整 VIN 信息到 vin_vehicle_full_info
-    try:
-        logger.info("[VIN完整信息] 开始合并 CRM 与 vin_vehicle_info 完整数据...")
-        full_info_count = _merge_vin_full_info(cursor)
-        stats['full_info_merged'] = full_info_count
-        logger.info(f"[VIN完整信息] 合并完成，新增={full_info_count}条")
-    except Exception as e:
-        logger.error(f"[VIN完整信息] 合并失败: {e}")
-        raise
+    logger.info(f"[VIN补全完成] 整合={stats['merged']} 处理={stats['total']} 更新={stats['updated']} 完整信息合并={stats.get('full_info_merged', 0)}")
 
     return stats
