@@ -275,6 +275,14 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
             skipped_items.append(item)
             valid_items.remove(item)
 
+    # 直接入库流程允许仓库为空：把因warehouse为空被跳过的记录恢复为有效
+    if skip_b2b:
+        for item in skipped_items[:]:
+            if item.get('skip_reason') and 'warehouse为空' in item.get('skip_reason'):
+                item.pop('skip_reason', None)
+                valid_items.append(item)
+                skipped_items.remove(item)
+
     if not valid_items:
         raise ValueError('没有有效的数据可导入')
     
@@ -288,6 +296,14 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
             file_path, creator, company, markup_rate, progress_callback
         )
     
+    # B2B上传前过滤空库存记录（B2B接口不接受null/0库存）
+    b2b_items = [item for item in valid_items if item.get('stock_quantity') is not None]
+    b2b_skip_items = [item for item in valid_items if item.get('stock_quantity') is None]
+    for item in b2b_skip_items:
+        item['处理结果'] = '其他'
+        item['详情'] = '跳过: 库存数量为空'
+        item['二次上传'] = ''
+    
     # 步骤1：B2B上传（带进度回调）
     def item_callback(result):
         nonlocal processed
@@ -295,7 +311,7 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
         if progress_callback:
             progress_callback(processed, total, f"B2B上传: {result.get('oe', '')}")
     
-    b2b_results = batch_upload_with_callback(valid_items, callback=item_callback, brand_mapping={})
+    b2b_results = batch_upload_with_callback(b2b_items, callback=item_callback, brand_mapping={})
     
     # 合并结果到valid_items（询价模块保持原始品牌）
     for item in valid_items:
@@ -361,6 +377,11 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     }
     
     for item in valid_items:
+        # 空库存记录已在B2B上传前标记处理结果，不再参与九分类
+        if item.get('stock_quantity') is None:
+            category_count['其他'] = category_count.get('其他', 0) + 1
+            continue
+        
         oe = item['oe']
         brand = item['brand']
         update_msg = item.get('update_msg', '')
@@ -420,6 +441,9 @@ def process_inquiry_import_async(file_path: str, markup_rate: str, creator: str,
     # 步骤7：导入数据库
     upload_success_items = []
     for item in valid_items:
+        # 空库存记录保持现状：跳过B2B上传且不入库
+        if item.get('stock_quantity') is None:
+            continue
         if item.get('处理结果') == '上传成功':
             upload_success_items.append(item)
         elif item.get('二次上传'):
@@ -593,7 +617,7 @@ def _process_direct_import(valid_items, skipped_items, df, original_columns, col
     # 直接入库，所有数据都标记为成功（询价模块保持原始品牌，不做别名映射）
     for item in valid_items:
         item['处理结果'] = '直接入库'
-        item['详情'] = '跳过B2B推送，直接入库'
+        item['详情'] = '跳过B2B推送，直接入库成功'
         item['二次上传'] = ''
         
         if progress_callback:
@@ -1280,6 +1304,7 @@ def precheck_inquiry_file():
         
         # 获取CRM品牌列表（全量）
         from app.utils.crm_product.crm_productAdd.crm_brand_id import get_brand_dict
+        from app.services.pp_alias_service.pp_alias_pool_service import get_match_brands
         from config import create_crm_session
         session = create_crm_session()
         try:
@@ -1297,8 +1322,11 @@ def precheck_inquiry_file():
         else:
             b2b_supplier_names = set(supplier_df['name'].dropna().astype(str).tolist())
         
-        # 精确匹配
-        unmatched_brands = sorted([b for b in brands if b not in crm_brand_names])
+        # 精确匹配（品牌或其别名池成员在CRM品牌列表中均视为匹配）
+        unmatched_brands = sorted([
+            b for b in brands
+            if not any(c in crm_brand_names for c in get_match_brands(b))
+        ])
         unmatched_suppliers = sorted([s for s in suppliers if s not in b2b_supplier_names])
         
         return jsonify({
@@ -1402,6 +1430,7 @@ def parse_preview():
             # 匹配数据
             # 上传场景下不过滤 CRM 库存，只看 OE+品牌 是否匹配
             from app.utils.crm_product.crm_product_matcher import fetch_matched_products, pick_product_fields
+            from app.services.pp_alias_service.pp_alias_pool_service import get_match_brands
 
             result_rows = []
             for _, row in df.iterrows():
@@ -1420,10 +1449,18 @@ def parse_preview():
                 # 供应商精确匹配
                 matched_supplier = supplier if supplier in supplier_names else ''
 
-                # CRM 匹配：按 OE + 品牌匹配，不过滤 CRM 库存
+                # CRM 匹配：按 OE + 品牌（含别名池）匹配，不过滤 CRM 库存
                 matched_products = []
                 if brand:
-                    matched_products = fetch_matched_products(company, oe, brand, ignore_stock=True)
+                    seen_product_ids = set()
+                    for cand_brand in get_match_brands(brand):
+                        for p in fetch_matched_products(company, oe, cand_brand, ignore_stock=True):
+                            product_id = p.get('product_id')
+                            if product_id:
+                                if product_id in seen_product_ids:
+                                    continue
+                                seen_product_ids.add(product_id)
+                            matched_products.append(p)
 
                 base_row = {
                     'oe': oe,

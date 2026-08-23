@@ -588,7 +588,7 @@ def init_price_inquiry_table():
                 warehouse VARCHAR(255) COMMENT '仓库',
                 expire_time DATETIME COMMENT '失效时间',
                 remark TEXT COMMENT '备注',
-                stock_quantity INT DEFAULT 0 COMMENT '库存数量',
+                stock_quantity INT DEFAULT NULL COMMENT '库存数量',
                 common_number VARCHAR(255) COMMENT '通用号',
                 ks_sync TINYINT(1) DEFAULT 0 COMMENT '开思是否同步，0=未同步，1=已同步',
                 company VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码',
@@ -611,7 +611,7 @@ def init_price_inquiry_table():
                 ("warehouse", "VARCHAR(255) COMMENT '仓库'"),
                 ("expire_time", "DATETIME COMMENT '失效时间'"),
                 ("remark", "TEXT COMMENT '备注'"),
-                ("stock_quantity", "INT DEFAULT 0 COMMENT '库存数量'"),
+                ("stock_quantity", "INT DEFAULT NULL COMMENT '库存数量'"),
                 ("common_number", "VARCHAR(255) COMMENT '通用号'"),
                 ("ks_sync", "TINYINT(1) DEFAULT 0 COMMENT '开思是否同步，0=未同步，1=已同步'"),
                 ("company", "VARCHAR(100) DEFAULT 'fsbbr' COMMENT '公司/门店代码'"),
@@ -644,6 +644,7 @@ def init_price_inquiry_table():
                 cursor.execute("ALTER TABLE crmapp_price_inquiry MODIFY oe VARCHAR(100) NOT NULL COMMENT 'OE号'")
                 cursor.execute("ALTER TABLE crmapp_price_inquiry MODIFY brand VARCHAR(50) COMMENT '品牌'")
                 cursor.execute("ALTER TABLE crmapp_price_inquiry MODIFY supplier VARCHAR(50) COMMENT '供应商'")
+                cursor.execute("ALTER TABLE crmapp_price_inquiry MODIFY stock_quantity INT DEFAULT NULL COMMENT '库存数量'")
                 print("已更新字段长度")
             except Exception as e:
                 print(f"更新字段长度时出错: {str(e)}")

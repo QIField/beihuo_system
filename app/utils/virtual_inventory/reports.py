@@ -175,13 +175,12 @@ def generate_virtual_inventory_compare_excel(business_date):
 
 
 def _build_supplier_summary_lines():
-    """统计佛山总部表 18 个固定供应商最近七天累计量，返回消息行列表"""
+    """统计佛山总部表 18 个固定供应商今天与昨天的爬取量，返回消息行列表"""
     placeholders = ','.join(['%s'] * len(FSBBR_SUPPLIER_NAMES))
     today = datetime.now().date()
+    yesterday = today - timedelta(days=1)
 
-    # 需覆盖「昨日 7 天窗口」与「今日 7 天窗口」，共 8 天
-    start_dt = today - timedelta(days=7)
-    start_time = datetime.combine(start_dt, datetime.min.time())
+    start_time = datetime.combine(yesterday, datetime.min.time())
     end_time = datetime.combine(today, datetime.max.time().replace(microsecond=0))
 
     daily_sql = f"""
@@ -204,19 +203,16 @@ def _build_supplier_summary_lines():
     for row in rows:
         daily_map[(row['supplier_name'], str(row['dt']))] = row['cnt']
 
-    lines = ['', '===【各供应商最近七天爬取量】===']
+    today_str = today.strftime('%Y-%m-%d')
+    yesterday_str = yesterday.strftime('%Y-%m-%d')
+
+    lines = ['', '===【各供应商昨天→今天爬取量】===']
     for name in FSBBR_SUPPLIER_NAMES:
-        today_7d = sum(
-            daily_map.get((name, (today - timedelta(days=i)).strftime('%Y-%m-%d')), 0)
-            for i in range(7)
-        )
-        yesterday_7d = sum(
-            daily_map.get((name, (today - timedelta(days=i + 1)).strftime('%Y-%m-%d')), 0)
-            for i in range(7)
-        )
-        change = today_7d - yesterday_7d
+        today_count = daily_map.get((name, today_str), 0)
+        yesterday_count = daily_map.get((name, yesterday_str), 0)
+        change = today_count - yesterday_count
         change_str = signed_number(change)
-        lines.append(f'{name}：{yesterday_7d} → {today_7d} ({change_str})')
+        lines.append(f'{name}：{yesterday_count} → {today_count} ({change_str})')
     return lines
 
 

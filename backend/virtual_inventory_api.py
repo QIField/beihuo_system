@@ -14,6 +14,7 @@ def log_time_cost(operation_name, start_time):
     print(f"[[耗时] 后端计时] {operation_name} 耗时: {cost:.2f}ms")
     return cost
 
+
 # 创建蓝图
 virtual_inventory_bp = Blueprint('virtual_inventory', __name__)
 
@@ -639,8 +640,6 @@ def get_virtual_inventory_statistics():
 @login_required
 def get_virtual_inventory_by_msg_pattern():
     """根据更新信息模式获取虚拟库存数据 - 遵循用户选择的日期范围"""
-    api_start_time = time.time()
-    print(f"\n[[耗时] 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 开始 ==========")
     try:
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 10))
@@ -664,10 +663,8 @@ def get_virtual_inventory_by_msg_pattern():
 
         company, table_name, supplier_column = get_current_virtual_inventory_context()
 
-        db_connect_start = time.time()
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
-        log_time_cost("数据库连接", db_connect_start)
 
         # 构建查询条件
         where_conditions = ["1=1"]
@@ -741,6 +738,7 @@ def get_virtual_inventory_by_msg_pattern():
         cursor.execute(count_sql, params)
         total = cursor.fetchone()['total']
 
+        # 查询数据
         # 构建排序子句
         order_clause = ""
         if field and order:
@@ -770,7 +768,6 @@ def get_virtual_inventory_by_msg_pattern():
         else:
             order_clause = "ORDER BY `fetch_time` DESC"  # 使用fetch_time作为默认排序
 
-        # 查询数据
         sql = f"""
             SELECT `{supplier_column}` AS supplier_name, `oe_code`, `brand`, `price`, `expiry_date`, `warehouse`, `stock`, `remark`, 
                    `fetch_time`, `update_msg`
@@ -794,9 +791,6 @@ def get_virtual_inventory_by_msg_pattern():
                 if hasattr(row['expiry_date'], 'strftime'):
                     row['expiry_date'] = row['expiry_date'].strftime('%Y-%m-%d %H:%M:%S')
 
-        # 使用 update_status 字段进行统计，避免 LIKE 查询
-        stats_start = time.time()
-
         # 使用索引字段统计成功数量
         simple_success_sql = f"""
             SELECT COUNT(*) as count FROM {table_name}
@@ -810,12 +804,7 @@ def get_virtual_inventory_by_msg_pattern():
         no_record_count = failed_count
         new_archive_count = 0
 
-        log_time_cost("统计查询(使用update_status索引)", stats_start)
-
         conn.close()
-
-        total_cost = log_time_cost("API 总耗时", api_start_time)
-        print(f"[[耗时] 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 完成，总耗时: {total_cost:.2f}ms ==========\n")
 
         return jsonify({
             'code': 0,
@@ -829,8 +818,6 @@ def get_virtual_inventory_by_msg_pattern():
         })
 
     except Exception as e:
-        total_cost = log_time_cost("API 总耗时(异常)", api_start_time)
-        print(f"[[耗时] 后端计时] ========== API /api/virtual_inventory_by_msg_pattern 异常结束，总耗时: {total_cost:.2f}ms ==========\n")
         return jsonify({'code': 1, 'msg': f'获取数据失败: {str(e)}'}), 500
 
 @virtual_inventory_bp.route('/api/virtual_inventory_statistics_by_pattern', methods=['GET'])
