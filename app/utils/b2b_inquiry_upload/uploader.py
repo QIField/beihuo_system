@@ -121,6 +121,13 @@ def prepare_data(df):
     skipped_items = []
     
     for idx, row in df.iterrows():
+        # 库存数量：空值保持为 None，不强制转 0
+        stock_raw = row.get('stock_quantity', '')
+        if pd.notna(stock_raw) and str(stock_raw).strip() != '':
+            stock_quantity = int(stock_raw)
+        else:
+            stock_quantity = None
+
         item = {
             'index': idx,
             'oe': str(row.get('oe', '')).strip(),
@@ -128,7 +135,7 @@ def prepare_data(df):
             'supplier': str(row.get('supplier', '')).strip(),
             'warehouse': str(row.get('warehouse', '')).strip(),
             'price': float(row.get('price', 0)) if pd.notna(row.get('price')) else 0,
-            'stock_quantity': int(row.get('stock_quantity', 0)) if pd.notna(row.get('stock_quantity')) else 0,
+            'stock_quantity': stock_quantity,
             'expire_time': row.get('expire_time', ''),
             'remark': str(row.get('remark', '')).strip(),
         }
@@ -145,7 +152,7 @@ def prepare_data(df):
             skip_reasons.append('supplier为空')
         if not item['warehouse']:
             skip_reasons.append('warehouse为空')
-        
+
         if skip_reasons:
             item['skip_reason'] = '、'.join(skip_reasons)
             skipped_items.append(item)

@@ -225,8 +225,7 @@
             <!-- 操作按钮区 -->
             <div class="upload-actions">
                 <button type="button" class="btn btn-primary" id="btnDownloadTemplate">下载询价模板</button>
-                <button type="button" class="btn btn-primary" id="btnImportUpload">导入文件（上传系统）</button>
-                <button type="button" class="btn btn-primary" id="btnImportRecord">导入文件（仅记录入库不上传）</button>
+                <button type="button" class="btn btn-primary" id="btnImport">导入文件</button>
             </div>
 
             <!-- 隐藏的文件输入框 -->
@@ -242,7 +241,8 @@
                         <button class="markup-btn" id="markupIncrease">+</button>
                     </div>
                     <span class="upload-markup-hint">最终价格 = 原价 × 倍数</span>
-                    <button type="button" class="btn btn-primary" id="btnConfirmUpload">确认上传</button>
+                    <button type="button" class="btn btn-primary" id="btnUploadSystem">上传系统</button>
+                    <button type="button" class="btn btn-primary" id="btnUploadRecordOnly">仅录入数据库</button>
                 </div>
             </div>
 
@@ -329,76 +329,24 @@
         // 记录哪些行被展开（用数据索引）
         let expandedRows = new Set();
 
-        // 格式化数据并计算合并单元格
-        function formatDataAndMergeCells(data) {
-            const formattedData = [];
-            const mergeCells = [];
-            let currentRow = 0;
-
-            // 按OE分组（保持原始顺序）
-            const oeGroups = {};
-            const oeOrder = [];
-            data.forEach(item => {
-                if (!oeGroups[item.oe]) {
-                    oeGroups[item.oe] = [];
-                    oeOrder.push(item.oe);
-                }
-                oeGroups[item.oe].push(item);
-            });
-
-            for (const oe of oeOrder) {
-                const oeItems = oeGroups[oe];
-                const oeStartRow = currentRow;
-                const oeRowCount = oeItems.length;
-
-                // 按品牌分组
-                const brandGroups = {};
-                const brandOrder = [];
-                oeItems.forEach(item => {
-                    const brand = item.brand || '未知品牌';
-                    if (!brandGroups[brand]) {
-                        brandGroups[brand] = [];
-                        brandOrder.push(brand);
-                    }
-                    brandGroups[brand].push(item);
-                });
-
-                for (const brand of brandOrder) {
-                    const brandItems = brandGroups[brand];
-                    const brandStartRow = currentRow;
-                    const brandRowCount = brandItems.length;
-
-                    brandItems.forEach((item, index) => {
-                        formattedData.push({
-                            rowNumber: currentRow + 1,
-                            oe: index === 0 ? formatEmptyValue(item.oe) : '',
-                            brand: index === 0 ? formatEmptyValue(item.brand) : '',
-                            supplier: formatEmptyValue(item.supplier),
-                            original_price: item.original_price ? '¥' + parseFloat(item.original_price).toFixed(2) : '',
-                            price: item.price ? '¥' + parseFloat(item.price).toFixed(2) : '',
-                            markup_rate: item.markup_rate ? ((parseFloat(item.markup_rate) - 1) * 100).toFixed(2) + '%' : '',
-                            markup_amount: item.markup_amount ? '¥' + parseFloat(item.markup_amount).toFixed(2) : '',
-                            warehouse: formatEmptyValue(item.warehouse),
-                            expire_time: formatEmptyValue(item.expire_time),
-                            remark: formatEmptyValue(item.remark),
-                            stock_quantity: formatEmptyValue(item.stock_quantity),
-                            common_number: formatEmptyValue(item.common_number),
-                            import_time: formatEmptyValue(item.import_time)
-                        });
-                        currentRow++;
-                    });
-
-                    if (brandRowCount > 1) {
-                        mergeCells.push({ row: brandStartRow, col: 2, rowspan: brandRowCount, colspan: 1 });
-                    }
-                }
-
-                if (oeRowCount > 1) {
-                    mergeCells.push({ row: oeStartRow, col: 1, rowspan: oeRowCount, colspan: 1 });
-                }
-            }
-
-            return { formattedData, mergeCells };
+        // 格式化数据
+        function formatData(data) {
+            return data.map((item, index) => ({
+                rowNumber: index + 1,
+                oe: formatEmptyValue(item.oe),
+                brand: formatEmptyValue(item.brand),
+                supplier: formatEmptyValue(item.supplier),
+                original_price: item.original_price ? '¥' + parseFloat(item.original_price).toFixed(2) : '',
+                price: item.price ? '¥' + parseFloat(item.price).toFixed(2) : '',
+                markup_rate: item.markup_rate ? ((parseFloat(item.markup_rate) - 1) * 100).toFixed(2) + '%' : '',
+                markup_amount: item.markup_amount ? '¥' + parseFloat(item.markup_amount).toFixed(2) : '',
+                warehouse: formatEmptyValue(item.warehouse),
+                expire_time: formatEmptyValue(item.expire_time),
+                remark: formatEmptyValue(item.remark),
+                stock_quantity: formatEmptyValue(item.stock_quantity),
+                common_number: formatEmptyValue(item.common_number),
+                import_time: formatEmptyValue(item.import_time)
+            }));
         }
 
         // 创建带展开按钮的列renderer（适配Builder）
@@ -502,7 +450,7 @@
             };
         }
 
-        function initTableBuilder(data, mergeCells) {
+        function initTableBuilder(data) {
             const container = document.getElementById('handsontable-container');
             container.innerHTML = '';
 
@@ -543,7 +491,6 @@
                     toolbar: true
                 },
                 handsontableOptions: {
-                    mergeCells: mergeCells,
                     rowHeaders: false,
                     height: '100%',
                     rowHeights: function(row) {
@@ -585,9 +532,9 @@
                     // 更新标签页上的数量
                     updateTabBadge(currentDataType, allData.length);
 
-                    // 格式化数据并计算合并单元格，然后用Builder创建表格
-                    const { formattedData, mergeCells } = formatDataAndMergeCells(allData);
-                    initTableBuilder(formattedData, mergeCells);
+                    // 格式化数据，然后用Builder创建表格
+                    const formattedData = formatData(allData);
+                    initTableBuilder(formattedData);
                 } else {
                     container.innerHTML = '<div class="loading-overlay">加载失败: ' + result.msg + '</div>';
                 }
@@ -867,20 +814,14 @@
 
         function initUpload() {
             const fileInput = document.getElementById('fileInput');
-            const btnImportUpload = document.getElementById('btnImportUpload');
-            const btnImportRecord = document.getElementById('btnImportRecord');
+            const btnImport = document.getElementById('btnImport');
             const btnDownloadTemplate = document.getElementById('btnDownloadTemplate');
-            const btnConfirmUpload = document.getElementById('btnConfirmUpload');
+            const btnUploadSystem = document.getElementById('btnUploadSystem');
+            const btnUploadRecordOnly = document.getElementById('btnUploadRecordOnly');
 
-            // 导入文件（上传系统）
-            btnImportUpload.addEventListener('click', () => {
-                currentUploadMode = 'upload';
-                fileInput.click();
-            });
-
-            // 导入文件（仅记录入库不上传）
-            btnImportRecord.addEventListener('click', () => {
-                currentUploadMode = 'record';
+            // 导入文件
+            btnImport.addEventListener('click', () => {
+                currentUploadMode = null;
                 fileInput.click();
             });
 
@@ -894,8 +835,17 @@
             // 下载模板
             btnDownloadTemplate.addEventListener('click', downloadTemplate);
 
-            // 确认上传
-            btnConfirmUpload.addEventListener('click', handleConfirmUpload);
+            // 上传系统
+            btnUploadSystem.addEventListener('click', () => {
+                currentUploadMode = 'upload';
+                handleConfirmUpload();
+            });
+
+            // 仅录入数据库
+            btnUploadRecordOnly.addEventListener('click', () => {
+                currentUploadMode = 'record';
+                handleConfirmUpload();
+            });
 
             // 加价率事件
             initPreviewMarkupEvents();
@@ -1026,14 +976,6 @@
                                 }
                             });
                         }
-                    },
-                    afterOnCellMouseDown: function(event, coords, TD) {
-                        const actionColIndex = columns.findIndex(c => c.data === '_action');
-                        if (coords.col === actionColIndex) {
-                            previewData.splice(coords.row, 1);
-                            previewBuilder.config.localData = previewData;
-                            previewBuilder.refresh();
-                        }
                     }
                 }
             });
@@ -1041,8 +983,27 @@
 
         // 操作列渲染器
         function actionRenderer(instance, td, row, col, prop, value, cellProperties) {
-            td.innerHTML = '<button class="btn btn-danger btn-sm">删除</button>';
+            td.innerHTML = '<button class="btn btn-danger btn-sm" type="button">删除</button>';
             td.style.textAlign = 'center';
+
+            const btn = td.querySelector('button');
+            if (btn) {
+                btn.onclick = function(e) {
+                    e.stopPropagation();
+                    if (!previewBuilder || !previewData.length) return;
+
+                    // 考虑分页计算真实数据索引
+                    const page = previewBuilder.currentPage || 1;
+                    const pageSize = previewBuilder.pageSize || previewData.length;
+                    const dataIndex = (page - 1) * pageSize + row;
+
+                    if (dataIndex >= 0 && dataIndex < previewData.length) {
+                        previewData.splice(dataIndex, 1);
+                        previewBuilder.config.localData = previewData;
+                        previewBuilder.refresh();
+                    }
+                };
+            }
             return td;
         }
 
@@ -1108,14 +1069,25 @@
                 return;
             }
 
+            const skipB2b = currentUploadMode === 'record';
+
             // 校验有 product_id 的行的失效时间格式（YYYY-MM-DD HH:MM:SS）
+            // 录入数据库模式允许为空，上传系统模式保持必填
             const expireTimeRegex = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
             const invalidRows = [];
             previewData.forEach((row, idx) => {
                 if (row.product_id) {
                     const et = String(row.expire_time || '').trim();
-                    if (!et || !expireTimeRegex.test(et)) {
-                        invalidRows.push(idx + 1);
+                    if (skipB2b) {
+                        // 录入数据库模式：为空不校验，有值必须格式正确
+                        if (et && !expireTimeRegex.test(et)) {
+                            invalidRows.push(idx + 1);
+                        }
+                    } else {
+                        // 上传系统模式：保持原样，必填
+                        if (!et || !expireTimeRegex.test(et)) {
+                            invalidRows.push(idx + 1);
+                        }
                     }
                 }
             });
@@ -1124,7 +1096,6 @@
                 return;
             }
 
-            const skipB2b = currentUploadMode === 'record';
             const markupRate = parseFloat(document.getElementById('markupInput').value) || 1;
 
             // 将预览数据（已删除的行已过滤）生成 CSV 文件上传

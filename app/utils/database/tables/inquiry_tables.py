@@ -161,7 +161,7 @@ def init_price_inquiry_direct_table():
                 warehouse VARCHAR(200) DEFAULT NULL COMMENT '仓库',
                 expire_time DATETIME DEFAULT NULL COMMENT '失效时间',
                 remark TEXT COMMENT '备注',
-                stock_quantity INT DEFAULT 0 COMMENT '库存数量',
+                stock_quantity INT DEFAULT NULL COMMENT '库存数量',
                 common_number VARCHAR(500) DEFAULT NULL COMMENT '通用号',
                 ks_sync TINYINT DEFAULT 0 COMMENT '是否同步开思 0-否 1-是',
                 company VARCHAR(50) DEFAULT NULL COMMENT '公司',
@@ -213,6 +213,13 @@ def init_price_inquiry_direct_table():
                 except Exception as e:
                     if "Duplicate column name" not in str(e):
                         print(f"  ! 添加列 {col_name} 时出错: {str(e)}")
+
+            # 检查并修改库存数量字段为允许 NULL（兼容旧表）
+            try:
+                cursor.execute("ALTER TABLE crmapp_price_inquiry_direct MODIFY stock_quantity INT DEFAULT NULL COMMENT '库存数量'")
+                print("  [成功] 已修改 stock_quantity 允许 NULL")
+            except Exception as e:
+                print(f"  ! 修改 stock_quantity 时出错: {str(e)}")
 
             # 检查并添加唯一索引（兼容旧表）
             try:
