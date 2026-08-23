@@ -142,12 +142,12 @@ def _derive_fields(rows: list, stat_date: date, months: list,
     annual = df["annual_sales_1y"].to_numpy(dtype=float)
 
     # 日均/月均销量
-    df["avg_daily_sales_1y"] = np.round(annual / actual_days, 2)
-    df["avg_monthly_sales_1y"] = np.round(annual / 12, 2)
+    df["avg_daily_sales_1y"] = np.round(annual / actual_days, 3)
+    df["avg_monthly_sales_1y"] = np.round(annual / 12, 3)
 
     # 周标准差 σ_w（方案一：真实周标准差，用于 SS = Z × σ_w × √(L/7)）
     week_matrix = df[WEEK_COLUMNS].to_numpy(dtype=float)
-    df["sales_std_dev_1y"] = np.round(np.std(week_matrix, axis=1, ddof=0), 2)
+    df["sales_std_dev_1y"] = np.round(np.std(week_matrix, axis=1, ddof=0), 3)
 
     # 周度 JSON
     df["weekly_sales_json"] = [

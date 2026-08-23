@@ -54,6 +54,7 @@ def api_stock_safe_list():
     try:
         keyword = request.args.get('keyword', '').strip()
         stock_status = request.args.get('stock_status', '').strip()
+        sales_status = request.args.get('sales_status', '').strip()
         abc_classification = request.args.get('abc_classification', '').strip()
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 50))
@@ -67,6 +68,7 @@ def api_stock_safe_list():
         result = get_stock_safe_list(
             keyword=keyword,
             stock_status=stock_status,
+            sales_status=sales_status,
             abc_classification=abc_classification,
             page=page,
             limit=limit,

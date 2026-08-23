@@ -108,7 +108,7 @@ def batch_insert(rows: list, batch_size: int = 2000) -> int:
             base_safety_stock, season_coefficient, safety_stock,
             stock_lower_limit, stock_upper_limit,
             available_stock, sellable_days,
-            stock_status
+            sales_status, stock_status
         batch_size: 每批插入行数，默认 2000
 
     Returns:
@@ -133,6 +133,7 @@ def batch_insert(rows: list, batch_size: int = 2000) -> int:
             available_stock,
             transit_quantity,
             sellable_days,
+            sales_status,
             stock_status
         )
         VALUES (
@@ -150,6 +151,7 @@ def batch_insert(rows: list, batch_size: int = 2000) -> int:
             :available_stock,
             :transit_quantity,
             :sellable_days,
+            :sales_status,
             :stock_status
         )
     """)

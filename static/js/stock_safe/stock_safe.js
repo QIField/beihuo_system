@@ -9,7 +9,7 @@
  *  功能：
  *   1) 排序：AG Grid 原生 sortable + onSortChanged（同步前端排序箭头显示 + 调用后端 sort_field/sort_order）
  *   2) 分页：模块私有 StockSafePagination（onPageChange 回调走后端 LIMIT/OFFSET）
- *   3) 搜索筛选：工具栏关键词 / 库存状态 / ABC 分类（查询/重置按钮），走后端过滤
+ *   3) 搜索筛选：工具栏关键词 / 销售状态（下拉框）/ 库存状态（下拉框）/ ABC 分类（查询/重置按钮），走后端过滤
  *   4) 列显示：独立的工具栏按钮弹窗（批量勾选显隐），通过 gridColumnApi.applyColumnStat#e 应用
  */
 
@@ -32,6 +32,7 @@
     // 搜索筛选状态
     var currentFilter = {
         keyword: '',
+        sales_status: '',
         stock_status: '',
         abc_classification: ''
     };
@@ -84,7 +85,7 @@
         { headerName: '基础安全库存',     field: 'base_safety_stock',   width: 130, cellClass: 'cell-number', valueFormatter: decFormatter },
         {
             headerName: '季节系数', field: 'season_coefficient', width: 100, cellClass: 'cell-number',
-            valueFormatter: function (p) { return (p.value == null || isNaN(p.value)) ? '-' : parseFloat(p.value).toFixed(2); }
+            valueFormatter: function (p) { return (p.value == null || isNaN(p.value)) ? '-' : parseFloat(p.value).toFixed(3); }
         },
         { headerName: '调整后安全库存',   field: 'safety_stock',        width: 140, cellClass: 'cell-number', valueFormatter: decFormatter },
         { headerName: '库存下限',         field: 'stock_lower_limit',   width: 110, cellClass: 'cell-number', valueFormatter: decFormatter },
@@ -105,24 +106,47 @@
             }
         },
         {
-            headerName: '库存状态', field: 'stock_status', width: 130,
-            cellRenderer: renderStatusCell
+            headerName: '销售状态', field: 'sales_status', width: 110,
+            cellRenderer: renderSalesStatusCell
+        },
+        {
+            headerName: '库存状态', field: 'stock_status', width: 180,
+            cellRenderer: renderStockStatusCell
         }
     ];
 
     // ---- 单元格渲染 & 格式化 ----
-    function renderStatusCell(p) {
-        if (!p.value) return '<span style="color:#bbb;">-</span>';
-        var M = {
-            '紧急补货':   { cls: 'status-danger', ic: '🚨' },
-            '需补货':     { cls: 'status-warning', ic: '⚠️' },
-            '慢动销去库': { cls: 'status-slow',   ic: '🐢' },
-            '呆滞清库':   { cls: 'status-dead',   ic: '💀' },
-            '库存积压':   { cls: 'status-info',   ic: '📦' },
-            '正常':       { cls: 'status-success', ic: '✅' }
+    // 销售状态：单独一列展示，按销量水平着色
+    function renderSalesStatusCell(p) {
+        var label = (p.data ? p.data.sales_status : '') || '';
+        if (!label) return '<span style="color:#bbb;">-</span>';
+
+        var styleMap = {
+            '无销售': 'status-dead',
+            '销量极低': 'status-slow',
+            '销量低': 'status-warning',
+            '销量正常': 'status-success',
         };
-        var s = M[p.value] || { cls: '', ic: '' };
-        return '<span class="cell-status ' + s.cls + '">' + s.ic + ' ' + p.value + '</span>';
+        var cls = styleMap[label] || '';
+        return '<span class="cell-status ' + cls + '">' + label + '</span>';
+    }
+
+    // 库存状态：单独一列展示，按补货紧迫程度着色
+    function renderStockStatusCell(p) {
+        var label = (p.data ? p.data.stock_status : '') || '';
+        if (!label) return '<span style="color:#bbb;">-</span>';
+
+        var styleMap = {
+            '呆滞清库': 'status-dead',
+            '慢动销去库': 'status-slow',
+            '库存积压': 'status-danger',
+            '需补货': 'status-warning',
+            '需补货|可卖天数较少': 'status-danger',
+            '紧急补货': 'status-danger',
+            '库存正常': 'status-success',
+        };
+        var cls = styleMap[label] || '';
+        return '<span class="cell-status ' + cls + '">' + label + '</span>';
     }
     function intFormatter(p) {
         if (p.value == null || isNaN(p.value)) return '-';
@@ -130,7 +154,8 @@
     }
     function decFormatter(p) {
         if (p.value == null || isNaN(p.value)) return '-';
-        return parseFloat(p.value).toFixed(2).replace(/\.?0+$/, '');
+        // 保留 3 位小数展示
+        return parseFloat(p.value).toFixed(3);
     }
 
     // ============================================================
@@ -225,9 +250,10 @@
         // 重置
         document.getElementById('btnReset').addEventListener('click', function () {
             document.getElementById('filterKeyword').value = '';
-            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterSalesStatus').value = '';
+            document.getElementById('filterStockStatus').value = '';
             document.getElementById('filterABC').value = '';
-            currentFilter = { keyword: '', stock_status: '', abc_classification: '' };
+            currentFilter = { keyword: '', sales_status: '', stock_status: '', abc_classification: '' };
             if (pagination) pagination.currentPage = 1;
             fetchData();
         });
@@ -240,7 +266,8 @@
 
     function applyFiltersFromDOM() {
         currentFilter.keyword = (document.getElementById('filterKeyword').value || '').trim();
-        currentFilter.stock_status = (document.getElementById('filterStatus').value || '').trim();
+        currentFilter.sales_status = (document.getElementById('filterSalesStatus').value || '').trim();
+        currentFilter.stock_status = (document.getElementById('filterStockStatus').value || '').trim();
         currentFilter.abc_classification = (document.getElementById('filterABC').value || '').trim();
     }
 
@@ -333,7 +360,9 @@
             .then(function (res) {
                 if (res.code !== 0) return;
                 var data = res.data || {};
-                var keys = ['紧急补货', '需补货', '慢动销去库', '呆滞清库', '库存积压', '正常'];
+                // 统计库存维度标签（后端按关键字匹配统计，一个产品可能同时计入多个维度）
+                var keys = ['紧急补货', '需补货', '需补货|可卖天数较少', '慢动销去库', '呆滞清库',
+                           '库存正常', '无销售', '销量极低', '销量低', '销量正常'];
                 var total = 0;
                 keys.forEach(function (k) {
                     var cnt = data[k] || 0;
@@ -369,7 +398,8 @@
                     + '&sort_order=' + encodeURIComponent(currentSortOrder);
             }
             if (currentFilter.keyword)           url += '&keyword=' + encodeURIComponent(currentFilter.keyword);
-            if (currentFilter.stock_status)      url += '&stock_status=' + encodeURIComponent(currentFilter.stock_status);
+            if (currentFilter.sales_status)    url += '&sales_status=' + encodeURIComponent(currentFilter.sales_status);
+            if (currentFilter.stock_status)    url += '&stock_status=' + encodeURIComponent(currentFilter.stock_status);
             if (currentFilter.abc_classification) url += '&abc_classification=' + encodeURIComponent(currentFilter.abc_classification);
 
             fetch(url, { credentials: 'same-origin' })
@@ -419,7 +449,8 @@
                     + '&sort_order=' + encodeURIComponent(currentSortOrder);
             }
             if (currentFilter.keyword)           url += '&keyword=' + encodeURIComponent(currentFilter.keyword);
-            if (currentFilter.stock_status)      url += '&stock_status=' + encodeURIComponent(currentFilter.stock_status);
+            if (currentFilter.sales_status)    url += '&sales_status=' + encodeURIComponent(currentFilter.sales_status);
+            if (currentFilter.stock_status)    url += '&stock_status=' + encodeURIComponent(currentFilter.stock_status);
             if (currentFilter.abc_classification) url += '&abc_classification=' + encodeURIComponent(currentFilter.abc_classification);
 
             fetch(url, { credentials: 'same-origin' })
@@ -445,10 +476,10 @@
         }
         var headers = ['OE号', '品牌', '条码', '产品名称', 'ABC分类',
             '可用库存', '在途数量', '日均销量', '基础安全库存', '季节系数',
-            '调整后安全库存', '库存下限', '库存上限', '可卖天数', '库存状态'];
+            '调整后安全库存', '库存下限', '库存上限', '可卖天数', '销售状态', '库存状态'];
         var keys = ['number', 'brand_name', 'frey_no', 'pdname', 'abc_classification',
             'available_stock', 'transit_quantity', 'avg_daily_sales', 'base_safety_stock', 'season_coefficient',
-            'safety_stock', 'stock_lower_limit', 'stock_upper_limit', 'sellable_days', 'stock_status'];
+            'safety_stock', 'stock_lower_limit', 'stock_upper_limit', 'sellable_days', 'sales_status', 'stock_status'];
 
         function esc(v) {
             var s = v == null ? '' : String(v);

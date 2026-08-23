@@ -60,11 +60,11 @@ logger = get_stock_safe_logger()
 # 值：
 #   pct   - 该分类占总产品数的比例（A:20%, B:60%, C:20%）
 #   z     - 安全库存 Z 值（标准正态分布分位数，决定服务水平）
-#   cover - 覆盖天数，用于计算库存上限中的备货天数
+#   cover - 订货周期（天），用于计算库存上限中的备货天数
 ABC_CFG = {
-    'A': {'pct': 0.2, 'z': 1.5, 'cover': 20},   # 高价值/高销量，高服务水平，短覆盖
-    'B': {'pct': 0.6, 'z': 1.2, 'cover': 15},   # 中价值/中销量，中等服务水平，中覆盖
-    'C': {'pct': 0.2, 'z': 0.8, 'cover': 5},   # 低价值/低销量，低服务水平，长覆盖
+    'A': {'pct': 0.2, 'z': 1.5, 'cover': 20},   # A类：高价值，高服务水平，订货周期20天
+    'B': {'pct': 0.6, 'z': 1.2, 'cover': 15},   # B类：中价值，中等服务水平，订货周期15天
+    'C': {'pct': 0.2, 'z': 0.8, 'cover': 5},    # C类：低价值，低服务水平，订货周期5天
 }
 
 # 采购提前期（天）：从下单到到货的周期
@@ -200,7 +200,7 @@ def _calc_season(monthly_json: str, annual: float) -> float:
 
     # 计算季节系数并钳制到 [SEASON_MIN, SEASON_MAX] 范围
     # cur / avg_monthly 可能小于 0.7 或大于 1.3，通过 max/min 组合钳制
-    return round(max(SEASON_MIN, min(SEASON_MAX, cur / avg_monthly)), 2)
+    return round(max(SEASON_MIN, min(SEASON_MAX, cur / avg_monthly)), 3)
 
 
 # =============================================================================
@@ -208,17 +208,14 @@ def _calc_season(monthly_json: str, annual: float) -> float:
 # =============================================================================
 
 def _determine_status(avail: int, avg_daily: float, lower: float,
-                      upper: float, safety: float, annual: int) -> tuple:
+                      upper: float, safety: float, annual: int,
+                      cover: int, sellable_days: float) -> tuple:
     """
-    判定产品的库存状态及原因。
+    中文标签双标签判定产品的库存状态，返回 (销售状态, 库存状态) 元组。
 
-    判定优先级（从高到低）：
-      1. 呆滞清库 → 年销量为 0，一年无销售记录
-      2. 慢动销去库 → 年销量 <= 12，月均销量 <= 1
-      3. 紧急补货 → 可用库存为 0 或 ≤ 安全库存
-      4. 需补货 → 可用库存 ≤ 库存下限（再订货点）
-      5. 库存积压 → 可用库存 ≥ 上限 × 积压阈值
-      6. 正常 → 以上条件均不满足
+    标签：
+      销售状态：无销售 / 销量极低 / 销量低 / 销量正常
+      库存状态：呆滞清库 / 慢动销去库 / 库存积压 / 需补货 / 需补货|可卖天数较少 / 紧急补货 / 库存正常
 
     Args:
         avail:    可用库存数量
@@ -226,69 +223,47 @@ def _determine_status(avail: int, avg_daily: float, lower: float,
         lower:    库存下限
         upper:    库存上限
         safety:   调整后安全库存
-        annual:   年销量
+        annual:   年销量（过去 12 个月的总销量）
+        sellable_days: 可销售天数（可用库存 / 日均销量）
+        cover:    订货周期（天），来自 ABC_CFG[class]['cover']
 
     Returns:
-        tuple: (库存状态中文描述, 原因代码)
-               - 正常状态时，reason 为 None
-               - 特殊状态（呆滞清库/慢动销去库）时，reason 为原因代码
+        tuple: (sales_code, stock_code)，均为中文标签字符串
     """
-    # 优先级 1：年销量为 0 → 呆滞清库
+    # ── 销售状态码 ──
     if annual == 0:
-        return '呆滞清库', 'no_sale_1y'
+        sales_code = '无销售'
+    elif annual <= 20:
+        sales_code = '销量极低'  # 年销量 ≤20（约≤1件/月）
+    elif annual <= 104:
+        sales_code = '销量低'    # 年销量 21~104（约≤1件/周）
+    else:
+        sales_code = '销量正常'
 
-    # 优先级 2：年销量 <= 12 → 慢动销去库
-    if annual <= 12:
-        return '慢动销去库', 'low_sale'
+    # ── 库存状态码 ──
+    cycle_days = LEAD_TIME + cover
+  
 
-    # 优先级 3：可用库存为 0 或 ≤ 安全库存 → 紧急补货
-    if avail == 0 or avail <= safety:
-        return '紧急补货', None
+    if avg_daily > 0 and sellable_days >= cycle_days + 30:
+        stock_code = '呆滞清库'  # 可销售天数远超补货周期+订货周期+30天
+    elif avg_daily > 0 and sellable_days >= cycle_days + 10:
+        stock_code = '慢动销去库'  # 可销售天数超过补货周期+订货周期+10天
+    elif avail >= upper * OVERSTOCK_RATIO:
+        stock_code = '库存积压'  # 可用库存超过库存上限的1.3倍
+    elif sellable_days <= 3 and avail <= lower:
+        stock_code = '需补货|可卖天数较少'  # 库存低于下限且可销售天数≤3天
+    elif avail <= lower:
+        stock_code = '需补货'  # 库存降至再订货点以下
+    elif avail <= safety:
+        stock_code = '紧急补货'  # 安全库存已耗尽，需立即补货
+    else:
+        stock_code = '库存正常'
 
-    # 优先级 4：可用库存 ≤ 库存下限（再订货点）→ 需补货
-    if avail <= lower:
-        return '需补货', None
-
-    # 优先级 5：可用库存 ≥ 上限 × 积压倍数 → 库存积压
-    if avail >= upper * OVERSTOCK_RATIO:
-        return '库存积压', None
-
-    # 默认状态：正常
-    return '正常', None
+    if annual == 0:
+        stock_code = '库存正常'
 
 
-# =============================================================================
-# 库存上下限调整函数
-# =============================================================================
-
-def _adjust_limits(status: str, avail: int, lower: float, upper: float) -> tuple:
-    """
-    根据库存状态调整上下限值。
-
-    调整规则：
-      - 慢动销去库：下限设为 0（不强制补货），上限设为可用库存的 50%（逐步去库存）
-      - 呆滞清库：上下限均设为 0（不再补货，清库处理）
-      - 其他状态：保持原有计算值不变
-
-    Args:
-        status:  库存状态中文描述
-        avail:   可用库存数量
-        lower:   原始计算的下限值
-        upper:   原始计算的上限值
-
-    Returns:
-        tuple: (调整后的下限, 调整后的上限)
-    """
-    # 慢动销去库：只出不进，上限设为现有库存的一半，逐步消耗
-    if status == '慢动销去库':
-        return 0.0, round(avail * 0.5, 2)
-
-    # 呆滞清库：彻底停止补货，上下限归零
-    if status == '呆滞清库':
-        return 0.0, 0.0
-
-    # 其他状态：保持原始计算值不变
-    return lower, upper
+    return (sales_code, stock_code)
 
 
 # =============================================================================
@@ -334,10 +309,10 @@ def _build_record(row: dict, abc_class: str) -> dict:
 
     # 基础安全库存 = Z值 × 周销量标准差 × 根号(提前期 ÷ 7)
     # 使用 ABC_CFG.get 防御性读取，若 abc_class 不在配置中则默认用 C 类参数
-    base = round(ABC_CFG.get(abc_class, ABC_CFG['C'])['z'] * std_dev * (LEAD_TIME / 7) ** 0.5, 2)
+    base = round(ABC_CFG.get(abc_class, ABC_CFG['C'])['z'] * std_dev * (LEAD_TIME / 7) ** 0.5, 3)
 
     # 调整后安全库存 = 基础安全库存 × 季节系数
-    safety = round(base * season, 2)
+    safety = round(base * season, 3)
 
     # ── 库存上下限计算 ──
     # 获取 ABC 分类对应的覆盖天数
@@ -345,18 +320,16 @@ def _build_record(row: dict, abc_class: str) -> dict:
 
     # 下限 = 日平均销量 × 提前期 + 安全库存
     # 含义：在补货到货前的最低需求 + 安全缓冲
-    lower = round(avg_daily * LEAD_TIME + safety, 2)
+    lower = round(avg_daily * LEAD_TIME + safety, 3)
 
     # 上限 = 日平均销量 × (提前期 + 覆盖天数) + 安全库存
     # 含义：从下单到下次补货前的最长周期需求 + 安全缓冲
-    upper = round(avg_daily * (LEAD_TIME + cover) + safety, 2)
-
-    # ── 库存状态判定与上下限调整 ──
+    upper = round(avg_daily * (LEAD_TIME + cover) + safety, 3)
+    sellable_days = round(avail / avg_daily, 3) if avg_daily > 0 else 0.0
+    # ── 库存状态判定 ──
     # 根据可用库存、日均销量、上下限、安全库存和年销量判定库存状态
-    status, reason = _determine_status(avail, avg_daily, lower, upper, safety, annual)
-
-    # 根据状态调整上下限（慢动销/呆滞产品需要特殊处理）
-    adj_lower, adj_upper = _adjust_limits(status, avail, lower, upper)
+    # 返回值为 (销售状态码, 库存状态码) 元组，拆分存储到两个字段
+    sales_code, stock_code = _determine_status(avail, avg_daily, lower, upper, safety, annual, cover,sellable_days)
 
     # ── 构建返回字典 ──
     # 注意：字段名需与数据库表 stock_safe 的列名严格对应
@@ -376,15 +349,16 @@ def _build_record(row: dict, abc_class: str) -> dict:
         'season_coefficient': season,             # 季节系数
         'safety_stock': safety,                   # 最终安全库存（含季节调整）
 
-        # 库存上下限
-        'stock_lower_limit': adj_lower,           # 调整后的库存下限
-        'stock_upper_limit': adj_upper,           # 调整后的库存上限
+        # 库存上下限（使用原始计算值，不做调整）
+        'stock_lower_limit': lower,               # 库存下限
+        'stock_upper_limit': upper,               # 库存上限
 
-        # 库存状态
+        # 库存状态（拆分存储：销售状态 + 库存状态）
         'available_stock': avail,                 # 当前可用库存
         'transit_quantity': in_transit,           # 在途数量
-        'sellable_days': round(avail / avg_daily, 2) if avg_daily > 0 else 0.0,  # 可销售天数
-        'stock_status': status,                   # 库存状态
+        'sellable_days': sellable_days,  # 可销售天数（可用库存 / 日均销量）
+        'sales_status': sales_code,               # 销售状态：无销售/销量极低/销量低/销量正常
+        'stock_status': stock_code,               # 库存状态：呆滞清库/慢动销去库/库存积压/需补货/紧急补货/库存正常
     }
 
 

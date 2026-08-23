@@ -39,13 +39,13 @@
         .header-actions { display: flex; gap: 12px; }
 
         /* ===== 统计卡片 ===== */
-        .stat-cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 20px; }
+        .stat-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
         .stat-card {
             background: #fff;
-            border-radius: 10px;
-            padding: 18px 20px;
+            border-radius: 8px;
+            padding: 12px 14px;
             transition: all 0.25s ease;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
             border: 1px solid #f5f5f5;
             position: relative;
             overflow: hidden;
@@ -67,22 +67,7 @@
         .stat-card.dead::before { background: #8c8c8c; }
         .stat-card.slow::before { background: #fa8c16; }
 
-        .stat-card-icon {
-            width: 42px; height: 42px;
-            border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 22px;
-            background: #fafafa;
-            margin-bottom: 12px;
-        }
-        .stat-card.danger .stat-card-icon { background: #fff1f0; }
-        .stat-card.warning .stat-card-icon { background: #fffbe6; }
-        .stat-card.info .stat-card-icon { background: #e6f7ff; }
-        .stat-card.success .stat-card-icon { background: #f6ffed; }
-        .stat-card.dead .stat-card-icon { background: #fafafa; }
-        .stat-card.slow .stat-card-icon { background: #fff7e6; }
-
-        .stat-card-value { font-size: 30px; font-weight: 700; line-height: 1.1; margin-bottom: 6px; color: #262626; font-family: 'Roboto Mono', 'Consolas', monospace; }
+        .stat-card-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-bottom: 2px; color: #262626; font-family: 'Roboto Mono', 'Consolas', monospace; }
         .stat-card-label { font-size: 13px; color: #8c8c8c; font-weight: 500; }
 
         /* ===== 工具栏 ===== */
@@ -291,8 +276,11 @@
         }
 
         /* ===== 响应式 ===== */
+        @media (max-width: 1200px) {
+            .stat-cards { grid-template-columns: repeat(5, 1fr); }
+        }
         @media (max-width: 900px) {
-            .stat-cards { grid-template-columns: repeat(2, 1fr); }
+            .stat-cards { grid-template-columns: repeat(3, 1fr); }
             .toolbar { flex-direction: column; gap: 14px; align-items: stretch; }
             .toolbar-right { margin-left: 0; justify-content: space-between; }
             .header { flex-direction: column; gap: 14px; align-items: flex-start; }
@@ -314,37 +302,47 @@
             </div>
         </div>
 
-        <!-- 统计卡片 -->
+        <!-- 统计卡片：紧凑排版 -->
         <div class="stat-cards">
             <div class="stat-card danger">
-                <div class="stat-card-icon">🚨</div>
-                <div class="stat-card-value" id="count_紧急补货">0</div>
                 <div class="stat-card-label">紧急补货</div>
+                <div class="stat-card-value" id="count_紧急补货">0</div>
             </div>
             <div class="stat-card warning">
-                <div class="stat-card-icon">⚠️</div>
-                <div class="stat-card-value" id="count_需补货">0</div>
                 <div class="stat-card-label">需补货</div>
+                <div class="stat-card-value" id="count_需补货">0</div>
+            </div>
+            <div class="stat-card danger">
+                <div class="stat-card-label">需补货|可卖天数较少</div>
+                <div class="stat-card-value" id="count_需补货|可卖天数较少">0</div>
             </div>
             <div class="stat-card slow">
-                <div class="stat-card-icon">🐢</div>
-                <div class="stat-card-value" id="count_慢动销去库">0</div>
                 <div class="stat-card-label">慢动销去库</div>
+                <div class="stat-card-value" id="count_慢动销去库">0</div>
             </div>
             <div class="stat-card dead">
-                <div class="stat-card-icon">💀</div>
-                <div class="stat-card-value" id="count_呆滞清库">0</div>
                 <div class="stat-card-label">呆滞清库</div>
-            </div>
-            <div class="stat-card info">
-                <div class="stat-card-icon">📦</div>
-                <div class="stat-card-value" id="count_库存积压">0</div>
-                <div class="stat-card-label">库存积压</div>
+                <div class="stat-card-value" id="count_呆滞清库">0</div>
             </div>
             <div class="stat-card success">
-                <div class="stat-card-icon">✅</div>
-                <div class="stat-card-value" id="count_正常">0</div>
                 <div class="stat-card-label">库存正常</div>
+                <div class="stat-card-value" id="count_库存正常">0</div>
+            </div>
+            <div class="stat-card dead">
+                <div class="stat-card-label">无销售</div>
+                <div class="stat-card-value" id="count_无销售">0</div>
+            </div>
+            <div class="stat-card slow">
+                <div class="stat-card-label">销量极低</div>
+                <div class="stat-card-value" id="count_销量极低">0</div>
+            </div>
+            <div class="stat-card slow">
+                <div class="stat-card-label">销量低</div>
+                <div class="stat-card-value" id="count_销量低">0</div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-card-label">销量正常</div>
+                <div class="stat-card-value" id="count_销量正常">0</div>
             </div>
         </div>
 
@@ -356,15 +354,26 @@
                     <input type="text" id="filterKeyword" placeholder="OE号/品牌/名称/条码">
                 </div>
                 <div class="filter-item">
-                    <label>库存状态：</label>
-                    <select id="filterStatus">
+                    <label>销售状态：</label>
+                    <select id="filterSalesStatus">
                         <option value="">全部</option>
-                        <option value="紧急补货">紧急补货</option>
-                        <option value="需补货">需补货</option>
-                        <option value="库存积压">库存积压</option>
-                        <option value="慢动销去库">慢动销去库</option>
+                        <option value="无销售">无销售</option>
+                        <option value="销量极低">销量极低</option>
+                        <option value="销量低">销量低</option>
+                        <option value="销量正常">销量正常</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>库存状态：</label>
+                    <select id="filterStockStatus">
+                        <option value="">全部</option>
                         <option value="呆滞清库">呆滞清库</option>
-                        <option value="正常">正常</option>
+                        <option value="慢动销去库">慢动销去库</option>
+                        <option value="库存积压">库存积压</option>
+                        <option value="需补货">需补货</option>
+                        <option value="需补货|可卖天数较少">需补货|可卖天数较少</option>
+                        <option value="紧急补货">紧急补货</option>
+                        <option value="库存正常">库存正常</option>
                     </select>
                 </div>
                 <div class="filter-item">

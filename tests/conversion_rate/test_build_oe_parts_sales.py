@@ -212,8 +212,8 @@ def test_derive_fields_normal():
     rec = records[0]
     assert rec["number"] == "E" and rec["brand_name"] == "B"
     assert rec["annual_sales_1y"] == 18, "近一年总净销量应为 3+5+10"
-    assert rec["avg_daily_sales_1y"] == round(18 / 365, 2)
-    assert rec["avg_monthly_sales_1y"] == round(18 / 12, 2)
+    assert rec["avg_daily_sales_1y"] == round(18 / 365, 3)
+    assert rec["avg_monthly_sales_1y"] == round(18 / 12, 3)
     assert rec["sales_this_year"] == 15, "今年销量应为 5+10"
     assert rec["sales_last_year"] == 3, "去年销量应为 3"
 
@@ -227,7 +227,7 @@ def test_derive_fields_normal():
 
     # 周标准差：基于52周周销量计算（方案一：真实周标准差）
     import statistics
-    expected_std = round(statistics.pstdev(week_values), 2)
+    expected_std = round(statistics.pstdev(week_values), 3)
     assert rec["sales_std_dev_1y"] == expected_std, \
         f"周标准差应为{expected_std}，实际{rec['sales_std_dev_1y']}"
 
@@ -363,7 +363,7 @@ def test_derive_fields_weekly_std_dev():
 
     # 构造递增周数据：1, 2, 3, ..., 52
     week_values = list(range(1, 53))
-    expected_std = round(statistics.pstdev(week_values), 2)
+    expected_std = round(statistics.pstdev(week_values), 3)
 
     rows = [_build_row("W", "B", annual=sum(week_values), this_year=sum(week_values),
                        last_year=0, month_values=[0] * 12,

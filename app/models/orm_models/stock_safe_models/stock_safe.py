@@ -35,18 +35,18 @@ class StockSafe(BaseModels):
     pdname = Column(String(255), nullable=True, comment="产品名称（冗余）")
 
     abc_classification = Column(String(1), nullable=True, comment="ABC分类（A/B/C），决定Z系数与覆盖天数")
-    avg_daily_sales = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="平均日销量（从销量表同步）")
-    base_safety_stock = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="基础安全库存：Z系数 × 销量标准差 × 补货周期")
-    season_coefficient = Column(DECIMAL(4, 2), nullable=True, default=1.00, comment="季节系数（范围0.7~1.3）")
-    safety_stock = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="调整后安全库存：基础安全库存 × 季节系数")
-    stock_lower_limit = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="库存下限：平均日销量 × 补货周期 + 安全库存")
-    stock_upper_limit = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="库存上限：平均日销量 × (补货周期 + 覆盖天数) + 安全库存")
-
+    avg_daily_sales = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="平均日销量（从销量表同步）")
+    base_safety_stock = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="基础安全库存：Z系数 × 销量标准差 × 补货周期")
+    season_coefficient = Column(DECIMAL(4, 3), nullable=True, default=1.000, comment="季节系数（范围0.7~1.3）")
+    safety_stock = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="调整后安全库存：基础安全库存 × 季节系数")
+    stock_lower_limit = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="库存下限：平均日销量 × 补货周期 + 安全库存")
+    stock_upper_limit = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="库存上限：平均日销量 × (补货周期 + 覆盖天数) + 安全库存")
     available_stock = Column(Integer, nullable=True, default=0, comment="可用库存：每日快照从crmapp_beihuo表获取，使用number+brand_name+frey_no匹配")
     transit_quantity = Column(Integer, nullable=True, default=0, comment="在途数量：从crmapp_beihuo表同步")
-    sellable_days = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="可卖天数：可用库存 / 平均日销量")
+    sellable_days = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="可卖天数：可用库存 / 平均日销量")
 
-    stock_status = Column(String(20), nullable=True, default='正常', comment="库存状态：呆滞清库/慢动销去库/紧急补货/需补货/库存积压/正常")
+    stock_status = Column(String(20), nullable=True, default='正常', comment="库存状态：呆滞清库/慢动销去库/库存积压/需补货/需补货|可卖天数较少/紧急补货/库存正常")
+    sales_status = Column(String(20), nullable=True, default='正常', comment="销售状态：无销售/销量极低/销量低/销量正常")
 
     created_at = Column(DateTime, nullable=True, default=datetime.now, comment="数据创建时间")
     updated_at = Column(DateTime, nullable=True, default=datetime.now, onupdate=datetime.now, comment="数据更新时间")
@@ -73,6 +73,7 @@ class StockSafe(BaseModels):
             "transit_quantity": self.transit_quantity,
             "sellable_days": float(self.sellable_days) if self.sellable_days is not None else None,
             "stock_status": self.stock_status,
+            "sales_status": self.sales_status,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,
         }

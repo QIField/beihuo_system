@@ -39,13 +39,13 @@ class OePartsSales(BaseModels):
     pdname = Column(String(255), nullable=True, comment="产品名称（即sales_order_history表pdname字段）")
     frey_no = Column(String(255), nullable=False, comment="条码（即sales_order_history表frey_no字段），与number、brand_name共同唯一标识")
 
-    avg_daily_sales_1y = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="日销量（近一年数据）：近一年平均日销量 = 近一年总销量 / 365，单位：个")
-    avg_monthly_sales_1y = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="月销量（近一年数据）：近一年平均月销量 = 近一年总销量 / 12，单位：个")
+    avg_daily_sales_1y = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="日销量（近一年数据）：近一年平均日销量 = 近一年总销量 / 365，单位：个")
+    avg_monthly_sales_1y = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="月销量（近一年数据）：近一年平均月销量 = 近一年总销量 / 12，单位：个")
     annual_sales_1y = Column(Integer, nullable=True, default=0, comment="年销量（近一年数据）：近一年（过去365天）总销量，单位：个")
     sales_this_year = Column(Integer, nullable=True, default=0, comment="今年销量：当前自然年（1月1日至统计日）总销量，单位：个")
     sales_last_year = Column(Integer, nullable=True, default=0, comment="上一年销量：上一个完整自然年总销量，单位：个")
 
-    sales_std_dev_1y = Column(DECIMAL(12, 2), nullable=True, default=0.00, comment="近一年销量标准差（周标准差 σ_w）：基于近52周各周净销量计算，用于基础安全库存公式 SS = Z × σ_w × √(L/7)，其中 σ_w 为周销量总体标准差（ddof=0）")
+    sales_std_dev_1y = Column(DECIMAL(12, 3), nullable=True, default=0.000, comment="近一年销量标准差（周标准差 σ_w）：基于近52周各周净销量计算，用于基础安全库存公式 SS = Z × σ_w × √(L/7)，其中 σ_w 为周销量总体标准差（ddof=0）")
 
     monthly_sales_json = Column(JSON, nullable=True, comment="近12个月各月销量JSON：格式{\"YYYY-MM\": 数量, ...}，用于计算季节系数（当月销量/全年平均月销量），范围限制0.7~1.3")
 
