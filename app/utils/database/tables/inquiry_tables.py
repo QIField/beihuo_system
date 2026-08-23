@@ -421,3 +421,60 @@ def init_vin_vehicle_full_info_table():
         print(f"  [失败] VIN车辆完整信息表: {e}")
     finally:
         conn.close()
+
+
+def init_weixin_decoding_vin_table():
+    """
+    初始化微信解码 VIN 表
+    存储从微信群/好友消息中解析出的 VIN 信息
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS weixin_decoding_vin (
+                id INT(11) NOT NULL AUTO_INCREMENT,
+                creation_date DATETIME DEFAULT NULL COMMENT '创建时间',
+                groupname VARCHAR(255) DEFAULT NULL COMMENT '群名称',
+                nickname VARCHAR(255) DEFAULT NULL COMMENT '好友备注',
+                vin VARCHAR(255) DEFAULT NULL COMMENT '车架号',
+                content VARCHAR(500) DEFAULT NULL COMMENT '车架号信息',
+                PRIMARY KEY (id) USING BTREE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='微信解码VIN表';
+            """
+            cursor.execute(create_table_sql)
+
+            # 检查并添加列（兼容旧表）
+            alter_columns = [
+                ("creation_date", "DATETIME DEFAULT NULL COMMENT '创建时间'"),
+                ("groupname", "VARCHAR(255) DEFAULT NULL COMMENT '群名称'"),
+                ("nickname", "VARCHAR(255) DEFAULT NULL COMMENT '好友备注'"),
+                ("vin", "VARCHAR(255) DEFAULT NULL COMMENT '车架号'"),
+                ("content", "VARCHAR(500) DEFAULT NULL COMMENT '车架号信息'"),
+            ]
+            for col_name, col_def in alter_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE weixin_decoding_vin ADD COLUMN {col_name} {col_def}")
+                    print(f"  [成功] 已添加列 {col_name}")
+                except Exception as e:
+                    if "Duplicate column name" not in str(e):
+                        print(f"  ! 添加列 {col_name} 时出错: {str(e)}")
+
+            # 检查并添加索引（兼容旧表）
+            index_list = [
+                ("idx_creation_date", "INDEX idx_creation_date (creation_date)"),
+                ("idx_vin", "INDEX idx_vin (vin)"),
+            ]
+            for idx_name, idx_def in index_list:
+                try:
+                    cursor.execute(f"ALTER TABLE weixin_decoding_vin ADD {idx_def}")
+                    print(f"  [成功] 已添加索引 {idx_name}")
+                except Exception as e:
+                    if "Duplicate key name" not in str(e):
+                        print(f"  ! 添加索引 {idx_name} 时出错: {str(e)}")
+
+            print("  [成功] 微信解码VIN表")
+    except Exception as e:
+        print(f"  [失败] 微信解码VIN表: {e}")
+    finally:
+        conn.close()
