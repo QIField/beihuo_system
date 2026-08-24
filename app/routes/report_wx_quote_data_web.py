@@ -37,6 +37,13 @@ def monthly_summary():
     return render_template("report_wx_quote_data_web/monthly_summary_web.html")
 
 
+@report_wx_quote_data_web_bp.route("/engine_chassis_stats")
+@require_page_login()
+def engine_chassis_stats():
+    """发动机底盘统计"""
+    return render_template("report_wx_quote_data_web/engine_chassis_stats_web.html")
+
+
 @report_wx_quote_data_web_bp.route("/report_wx_quote_data_main_web")
 @require_page_login()
 def report_wx_quote_data_main_web():

@@ -13,6 +13,7 @@ from app.core.permission.decorators_plus import require_param_permission
 from . import report_wx_quote_data_bp
 from app.services.report_wx_quote_data_services import wechat_daily_quote_detail_service
 from app.services.report_wx_quote_data_services import wechat_daily_quote_detail_subsidiary
+from app.services.report_wx_quote_data_services import engine_chassis_stats_service
 from app.services.report_wx_quote_data_services.create_link import crawl_products_by_oe_brand
 from app.exceptions.data_exceptions import DataNotFoundError
 
@@ -288,5 +289,46 @@ def search_oe_product_api():
         return jsonify({
             'code': 500,
             'msg': f'搜索OE产品失败: {str(e)}',
+            'data': None
+        })
+
+
+@report_wx_quote_data_bp.route('/engine_chassis_stats_api', methods=['GET'])
+@require_authentication()
+def engine_chassis_stats_api():
+    """
+    发动机/底盘型号频次统计 API
+
+    根据日期范围过滤 weixin_decoding_vin 记录，
+    关联 vin_vehicle_full_info 统计 engine 和 chassis 出现次数。
+    """
+    try:
+        start_date = request.args.get('start_date', '')
+        end_date = request.args.get('end_date', '')
+
+        if start_date == '':
+            start_date = None
+        if end_date == '':
+            end_date = None
+
+        # 如果仅有开始日期，默认结束日期与开始日期相同
+        if start_date and not end_date:
+            end_date = start_date
+
+        result = engine_chassis_stats_service.get_engine_chassis_stats(
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        return jsonify({
+            'code': 0,
+            'msg': '获取发动机/底盘统计成功',
+            'data': result
+        })
+
+    except Exception as e:
+        return jsonify({
+            'code': 500,
+            'msg': f'获取发动机/底盘统计失败: {str(e)}',
             'data': None
         })
