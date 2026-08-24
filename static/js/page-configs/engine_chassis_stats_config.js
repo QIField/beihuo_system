@@ -20,11 +20,21 @@ window.EngineChassisStatsConfig = (function() {
     }
 
     /**
+     * 公共 Handsontable 行为配置
+     */
+    function buildHandsontableOptions() {
+        return {
+            // 列宽按比例拉伸，避免表格右侧出现大片空白
+            stretchH: 'all'
+        };
+    }
+
+    /**
      * 发动统计表格列定义
      */
     function buildEngineColumns() {
         return [
-            { data: 'engine', title: '发动机型号', width: 300, readOnly: true },
+            { data: 'engine', title: '发动机型号', width: 350, readOnly: true },
             {
                 data: 'count',
                 title: '出现次数',
@@ -41,7 +51,7 @@ window.EngineChassisStatsConfig = (function() {
      */
     function buildChassisColumns() {
         return [
-            { data: 'chassis', title: '底盘型号', width: 300, readOnly: true },
+            { data: 'chassis', title: '底盘型号', width: 350, readOnly: true },
             {
                 data: 'count',
                 title: '出现次数',
@@ -64,6 +74,7 @@ window.EngineChassisStatsConfig = (function() {
             gridKey: 'engine_stats_grid',
             columns: buildEngineColumns(),
             localData: localData || [],
+            handsontableOptions: buildHandsontableOptions(),
             components: {
                 pagination: {
                     pageSizeOptions: [20, 50, 100, 200],
@@ -90,6 +101,7 @@ window.EngineChassisStatsConfig = (function() {
             gridKey: 'chassis_stats_grid',
             columns: buildChassisColumns(),
             localData: localData || [],
+            handsontableOptions: buildHandsontableOptions(),
             components: {
                 pagination: {
                     pageSizeOptions: [20, 50, 100, 200],

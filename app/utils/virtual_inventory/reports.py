@@ -61,7 +61,7 @@ def generate_virtual_inventory_compare_excel(business_date):
     }
 
     key_cols = ['supplier_name', 'oe_code', 'brand', 'warehouse']
-    select_cols = key_cols + ['price', 'stock', 'remark']
+    select_cols = key_cols + ['original_price', 'stock', 'remark']
 
     sql = f"""
         SELECT {', '.join(select_cols)}
@@ -80,7 +80,7 @@ def generate_virtual_inventory_compare_excel(business_date):
     df_yesterday = pd.DataFrame(yesterday_rows)[select_cols].drop_duplicates(subset=key_cols)
 
     for df in (df_today, df_yesterday):
-        df['price'] = pd.to_numeric(df['price'], errors='coerce')
+        df['original_price'] = pd.to_numeric(df['original_price'], errors='coerce')
         df['stock'] = pd.to_numeric(df['stock'], errors='coerce').fillna(0).astype(int)
 
     # 新增OE
@@ -88,17 +88,17 @@ def generate_virtual_inventory_compare_excel(business_date):
     df_new = merged_new[merged_new['_merge'] == 'left_only'][select_cols].copy()
     df_new.rename(columns={
         'supplier_name': '供应商名称', 'oe_code': 'OE码', 'brand': '品牌',
-        'price': '价格', 'stock': '库存', 'warehouse': '仓库', 'remark': '备注'
+        'original_price': '价格', 'stock': '库存', 'warehouse': '仓库', 'remark': '备注'
     }, inplace=True)
 
     # 价格变化
     df_price = df_today.merge(df_yesterday, on=key_cols, how='inner', suffixes=('_今天', '_昨天'))
-    df_price = df_price[df_price['price_今天'] != df_price['price_昨天']].copy()
-    df_price['变化量'] = (df_price['price_今天'] - df_price['price_昨天']).apply(signed_number)
-    df_price = df_price[key_cols + ['price_昨天', 'price_今天', '变化量', 'remark_今天']]
+    df_price = df_price[df_price['original_price_今天'] != df_price['original_price_昨天']].copy()
+    df_price['变化量'] = (df_price['original_price_今天'] - df_price['original_price_昨天']).apply(signed_number)
+    df_price = df_price[key_cols + ['original_price_昨天', 'original_price_今天', '变化量', 'remark_今天']]
     df_price.rename(columns={
         'supplier_name': '供应商名称', 'oe_code': 'OE码', 'brand': '品牌', 'warehouse': '仓库',
-        'price_昨天': '昨天价格', 'price_今天': '今天价格', 'remark_今天': '备注'
+        'original_price_昨天': '昨天价格', 'original_price_今天': '今天价格', 'remark_今天': '备注'
     }, inplace=True)
 
     # 库存变化

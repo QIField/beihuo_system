@@ -306,6 +306,19 @@ def _process_single_record(cursor, client, key, record, stats, newly_completed):
             _mark_record_queried(cursor, record_id)
         else:
             parsed = parse_catalog_html(response.text)
+            if not parsed:
+                body_preview = (response.text or '')[:1000].replace('\n', ' ')
+                logger.warning(
+                    f"[VIN补全][{key}] {vin_code} 解析为空，"
+                    f"status={response.status_code} body_len={len(response.text or '')} "
+                    f"body_preview={body_preview!r}"
+                )
+            else:
+                logger.info(
+                    f"[VIN补全][{key}] {vin_code} 解析成功，"
+                    f"status={response.status_code} body_len={len(response.text or '')} "
+                    f"parsed={parsed}"
+                )
             _mark_record_queried(cursor, record_id, parsed)
 
         stats['updated'] += cursor.rowcount
@@ -315,7 +328,10 @@ def _process_single_record(cursor, client, key, record, stats, newly_completed):
         if _validate_vin_full_info(vin_code, engine, chassis):
             newly_completed.add((vin_code, engine, chassis))
         else:
-            logger.info(f"[VIN补全][{key}] {vin_code} 信息不完整，不加入完整信息表")
+            logger.info(
+                f"[VIN补全][{key}] {vin_code} 信息不完整，不加入完整信息表，"
+                f"parsed={parsed}"
+            )
 
         logger.info(f"[VIN补全][{key}] {vin_code} engine={engine} chassis={chassis}")
         return 'ok'
