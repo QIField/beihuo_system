@@ -1,0 +1,196 @@
+<div class="layui-card">
+    <div class="layui-card-header">发动机底盘统计</div>
+    <div class="layui-card-body" style="display: flex; flex-direction: column; gap: 15px;">
+        <!-- 搜索区域 -->
+        <div class="layui-form-item" style="margin-bottom: 0;">
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">日期范围</label>
+                <div class="layui-input-inline" style="width: 220px;">
+                    <input type="text" name="dateRange" id="dateRange" placeholder="请选择日期范围" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-inline">
+                <button class="layui-btn" id="searchBtn">
+                    <i class="layui-icon layui-icon-search"></i> 查询
+                </button>
+                <button class="layui-btn layui-btn-primary" id="resetBtn">
+                    <i class="layui-icon layui-icon-refresh"></i> 重置
+                </button>
+            </div>
+        </div>
+
+        <!-- 发动机统计 -->
+        <div>
+            <div style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 10px;">发动机型号统计</div>
+            <div id="engineStatsGrid" style="width: 100%; height: 400px; border: 1px solid #e8e8e8;"></div>
+        </div>
+
+        <!-- 底盘统计 -->
+        <div>
+            <div style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 10px;">底盘型号统计</div>
+            <div id="chassisStatsGrid" style="width: 100%; height: 400px; border: 1px solid #e8e8e8;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Handsontable -->
+<link rel="stylesheet" href="/static/js/handsontable/handsontable.full.min.css">
+<script src="/static/js/handsontable/handsontable.full.min.js"></script>
+
+<!-- 自定义分页组件 -->
+<script src="/static/js/components/custom-pagination/custom-pagination.js"></script>
+
+<!-- Grid Column Menu 组件 -->
+<link rel="stylesheet" href="/static/js/components/grid-column-menu/grid-column-menu.css">
+<script src="/static/js/components/grid-column-menu/grid-column-menu.js"></script>
+
+<!-- Handsontable Builder -->
+<script src="/static/js/components/handsontable-builder/handsontable-builder.js"></script>
+
+<!-- 日期范围选择器 -->
+<script src="/static/js/date-range-picker.js"></script>
+
+<!-- 表格配置 -->
+<script src="/static/js/page-configs/engine_chassis_stats_config.js"></script>
+
+<style>
+    #engineStatsGrid .handsontable .htCore td,
+    #chassisStatsGrid .handsontable .htCore td {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        vertical-align: middle !important;
+    }
+</style>
+
+<script>
+    (function() {
+        var engineBuilder = null;
+        var chassisBuilder = null;
+
+        // 获取今天日期范围字符串
+        function getTodayDateRange() {
+            var today = new Date();
+            var year = today.getFullYear();
+            var month = String(today.getMonth() + 1).padStart(2, '0');
+            var day = String(today.getDate()).padStart(2, '0');
+            return year + '-' + month + '-' + day + ' - ' + year + '-' + month + '-' + day;
+        }
+
+        // 显示加载提示
+        function showLoading() {
+            return layer.load(1, { shade: [0.1, '#fff'] });
+        }
+
+        // 关闭加载提示
+        function hideLoading(index) {
+            layer.close(index);
+        }
+
+        // 获取当前搜索的日期范围参数
+        function getSearchParams() {
+            return EngineChassisStatsConfig.getDateRange();
+        }
+
+        // 创建或重建表格构建器
+        function renderBuilders(engineData, chassisData) {
+            // 销毁旧实例
+            if (engineBuilder) {
+                engineBuilder.destroy();
+                engineBuilder = null;
+            }
+            if (chassisBuilder) {
+                chassisBuilder.destroy();
+                chassisBuilder = null;
+            }
+
+            var engineConfig = EngineChassisStatsConfig.createEngineConfig(engineData);
+            engineBuilder = HandsontableBuilder.create(
+                engineConfig.containerSelector,
+                engineConfig
+            );
+
+            var chassisConfig = EngineChassisStatsConfig.createChassisConfig(chassisData);
+            chassisBuilder = HandsontableBuilder.create(
+                chassisConfig.containerSelector,
+                chassisConfig
+            );
+        }
+
+        // 加载统计数据
+        function loadStats() {
+            var params = getSearchParams();
+
+            // 校验日期范围
+            if (!params.start_date || !params.end_date) {
+                layer.msg('请选择日期范围', { icon: 2 });
+                return;
+            }
+
+            var loadIndex = showLoading();
+
+            var queryParts = [];
+            queryParts.push('start_date=' + encodeURIComponent(params.start_date));
+            queryParts.push('end_date=' + encodeURIComponent(params.end_date));
+
+            fetch('/new/api/report_wx_quote_data/engine_chassis_stats_api?' + queryParts.join('&'), {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                hideLoading(loadIndex);
+
+                if (result.code !== 0) {
+                    layer.msg(result.msg || '查询失败', { icon: 2 });
+                    renderBuilders([], []);
+                    return;
+                }
+
+                var engineData = (result.data && result.data.engine_stats) || [];
+                var chassisData = (result.data && result.data.chassis_stats) || [];
+
+                renderBuilders(engineData, chassisData);
+            })
+            .catch(function(error) {
+                hideLoading(loadIndex);
+                console.error('[发动机底盘统计] 加载数据失败:', error);
+                layer.msg('加载失败，请稍后重试', { icon: 2 });
+                renderBuilders([], []);
+            });
+        }
+
+        // 初始化日期范围选择器
+        function initDatePicker() {
+            initDateRangePicker('dateRange', {
+                format: 'yyyy-MM-dd',
+                range: true,
+                max: 0
+            });
+
+            // 默认选中今天
+            var todayRange = getTodayDateRange();
+            document.getElementById('dateRange').value = todayRange;
+        }
+
+        // 绑定搜索和重置事件
+        function bindEvents() {
+            document.getElementById('searchBtn').addEventListener('click', function() {
+                loadStats();
+            });
+
+            document.getElementById('resetBtn').addEventListener('click', function() {
+                document.getElementById('dateRange').value = getTodayDateRange();
+                layer.msg('已重置', { time: 1000 });
+                loadStats();
+            });
+        }
+
+        // 页面加载完成后初始化
+        layui.use(['layer'], function() {
+            initDatePicker();
+            bindEvents();
+            loadStats();
+        });
+    })();
+</script>
