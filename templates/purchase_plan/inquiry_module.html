@@ -195,7 +195,12 @@
         }
 
         #handsontable-container {
-            height: calc(100vh - 220px);
+            flex: 1;
+            min-height: 0;
+        }
+
+        #mainPaginationBar {
+            flex-shrink: 0;
         }
 
     </style>
@@ -213,7 +218,7 @@
                 正常询价数据<span class="tab-badge" id="normalBadge">0</span>
             </button>
             <button class="data-tab" id="tabDirect" data-type="direct">
-                直接入库数据<span class="tab-badge" id="directBadge">0</span>
+                友商价格记录<span class="tab-badge" id="directBadge">0</span>
             </button>
             <button class="data-tab" id="tabGzbbr" data-type="gzbbr">
                 失效时间调整<span class="tab-badge" id="gzbbrBadge">0</span>
@@ -242,7 +247,7 @@
                     </div>
                     <span class="upload-markup-hint">最终价格 = 原价 × 倍数</span>
                     <button type="button" class="btn btn-primary" id="btnUploadSystem">上传系统</button>
-                    <button type="button" class="btn btn-primary" id="btnUploadRecordOnly">仅录入数据库</button>
+                    <button type="button" class="btn btn-primary" id="btnUploadRecordOnly">记录友商价格</button>
                 </div>
             </div>
 
@@ -264,6 +269,7 @@
                 </div>
             </div>
             <div id="handsontable-container"></div>
+            <div id="mainPaginationBar"></div>
         </div>
 
         <!-- data.gzbbr 失效时间调整 -->
@@ -320,7 +326,7 @@
         let tableBuilder = null;
         let allData = [];
 
-        // 当前数据类型：upload-上传文件, normal-正常询价数据, direct-直接入库数据
+        // 当前数据类型：upload-上传文件, normal-正常询价数据, direct-友商价格记录
         let currentDataType = 'upload';
 
         // 行高固定为40px
@@ -345,8 +351,32 @@
                 remark: formatEmptyValue(item.remark),
                 stock_quantity: formatEmptyValue(item.stock_quantity),
                 common_number: formatEmptyValue(item.common_number),
-                import_time: formatEmptyValue(item.import_time)
+                import_time: normalizeDateTime(item.import_time)
             }));
+        }
+
+        // 标准化日期时间为 ISO 8601 格式，便于排序和跨浏览器兼容
+        function normalizeDateTime(value) {
+            if (value === null || value === undefined || value === '') return '';
+            const s = String(value).trim();
+            const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+            if (!m) return s;
+            return m[1] + '-' + m[2] + '-' + m[3] + 'T' + m[4] + ':' + m[5] + ':' + m[6];
+        }
+
+        // 将 ISO 格式日期时间渲染为友好的显示格式
+        function formatDateTimeDisplay(value) {
+            if (!value) return '';
+            const s = String(value);
+            const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+            if (!m) return s;
+            return m[1] + '-' + m[2] + '-' + m[3] + ' ' + m[4] + ':' + m[5] + ':' + m[6];
+        }
+
+        function importTimeRenderer(instance, td, row, col, prop, value, cellProperties) {
+            Handsontable.renderers.TextRenderer.apply(this, arguments);
+            td.textContent = formatDateTimeDisplay(value);
+            return td;
         }
 
         // 创建带展开按钮的列renderer（适配Builder）
@@ -459,25 +489,53 @@
                 tableBuilder = null;
             }
 
-            const gridKey = currentDataType === 'direct' ? 'direct_list' : 'normal_list';
+            const isDirect = currentDataType === 'direct';
+            const gridKey = isDirect ? 'direct_list' : 'normal_list';
+
+            const normalColumns = [
+                { data: 'rowNumber', title: '行号', width: 70, readOnly: true },
+                { data: 'oe', title: 'OE号', width: 150, readOnly: true },
+                { data: 'brand', title: '品牌', width: 120, readOnly: true },
+                { data: 'supplier', title: '供应商', width: 150, readOnly: true, renderer: createExpandableRenderer(10) },
+                { data: 'original_price', title: '原价', width: 100, readOnly: true },
+                { data: 'price', title: '售价', width: 100, readOnly: true },
+                { data: 'markup_rate', title: '加价率', width: 100, readOnly: true },
+                { data: 'markup_amount', title: '加价金额', width: 100, readOnly: true },
+                { data: 'warehouse', title: '仓库', width: 120, readOnly: true, renderer: createExpandableRenderer(8) },
+                { data: 'expire_time', title: '失效时间', width: 160, readOnly: true },
+                { data: 'remark', title: '备注', width: 150, readOnly: true, renderer: createExpandableRenderer(8) },
+                { data: 'stock_quantity', title: '库存数量', width: 100, readOnly: true },
+                { data: 'common_number', title: '通用号', width: 150, readOnly: true, renderer: createCommonNumberRenderer(10) },
+                { data: 'import_time', title: '上传时间', width: 160, readOnly: true, renderer: importTimeRenderer }
+            ];
+
+            const directColumns = [
+                { data: 'rowNumber', title: '行号', readOnly: true },
+                { data: 'oe', title: 'OE号', readOnly: true },
+                { data: 'brand', title: '品牌', readOnly: true },
+                { data: 'supplier', title: '供应商', readOnly: true, renderer: createExpandableRenderer(10) },
+                { data: 'original_price', title: '原价', readOnly: true },
+                { data: 'common_number', title: '通用号', readOnly: true, renderer: createCommonNumberRenderer(10) },
+                { data: 'import_time', title: '上传时间', readOnly: true, renderer: importTimeRenderer }
+            ];
+
+            const baseHotOptions = {
+                rowHeaders: false,
+                height: '100%',
+                rowHeights: function(row) {
+                    return expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
+                },
+                autoRowSize: false,
+                manualColumnResize: true,
+                manualRowResize: false,
+                columnSorting: true,
+                sortIndicator: true,
+                filters: false,
+                dropdownMenu: false
+            };
 
             tableBuilder = HandsontableBuilder.create('#handsontable-container', {
-                columns: [
-                    { data: 'rowNumber', title: '行号', width: 70, readOnly: true },
-                    { data: 'oe', title: 'OE号', width: 150, readOnly: true },
-                    { data: 'brand', title: '品牌', width: 120, readOnly: true },
-                    { data: 'supplier', title: '供应商', width: 150, readOnly: true, renderer: createExpandableRenderer(10) },
-                    { data: 'original_price', title: '原价', width: 100, readOnly: true },
-                    { data: 'price', title: '售价', width: 100, readOnly: true },
-                    { data: 'markup_rate', title: '加价率', width: 100, readOnly: true },
-                    { data: 'markup_amount', title: '加价金额', width: 100, readOnly: true },
-                    { data: 'warehouse', title: '仓库', width: 120, readOnly: true, renderer: createExpandableRenderer(8) },
-                    { data: 'expire_time', title: '失效时间', width: 160, readOnly: true },
-                    { data: 'remark', title: '备注', width: 150, readOnly: true, renderer: createExpandableRenderer(8) },
-                    { data: 'stock_quantity', title: '库存数量', width: 100, readOnly: true },
-                    { data: 'common_number', title: '通用号', width: 150, readOnly: true, renderer: createCommonNumberRenderer(10) },
-                    { data: 'import_time', title: '上传时间', width: 160, readOnly: true }
-                ],
+                columns: isDirect ? directColumns : normalColumns,
                 localData: data,
                 readOnly: true,
                 pageKey: 'inquiry_module',
@@ -487,23 +545,10 @@
                     doubleClickCopy: true,
                     copyToast: true,
                     columnMenu: { persist: true },
-                    pagination: { pageSizeOptions: [50, 100, 200], defaultPageSize: 100 },
+                    pagination: { container: '#mainPaginationBar', pageSizeOptions: [50, 100, 200], defaultPageSize: 100 },
                     toolbar: true
                 },
-                handsontableOptions: {
-                    rowHeaders: false,
-                    height: '100%',
-                    rowHeights: function(row) {
-                        return expandedRows.has(row) ? undefined : DEFAULT_ROW_HEIGHT;
-                    },
-                    autoRowSize: false,
-                    manualColumnResize: true,
-                    manualRowResize: false,
-                    columnSorting: true,
-                    sortIndicator: true,
-                    filters: false,
-                    dropdownMenu: false
-                }
+                handsontableOptions: isDirect ? Object.assign({}, baseHotOptions, { stretchH: 'all' }) : baseHotOptions
             });
         }
 
@@ -585,9 +630,9 @@
                     }
                 } else {
                     uploadContainer.style.display = 'none';
-                    mainContainer.style.display = 'block';
+                    mainContainer.style.display = 'flex';
                     gzbbrContainer.style.display = 'none';
-                    dataTitle.textContent = activeType === 'normal' ? '询价比价数据' : '直接入库数据';
+                    dataTitle.textContent = activeType === 'normal' ? '询价比价数据' : '友商价格记录';
                     expandedRows.clear();
                     // 切换标签时销毁旧表格，避免gridKey冲突
                     if (tableBuilder) {
@@ -841,7 +886,7 @@
                 handleConfirmUpload();
             });
 
-            // 仅录入数据库
+            // 记录友商价格
             btnUploadRecordOnly.addEventListener('click', () => {
                 currentUploadMode = 'record';
                 handleConfirmUpload();

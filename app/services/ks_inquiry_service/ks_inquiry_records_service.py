@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
 import time
-from app.utils.database_connection import db_cursor, db_query_one
+from app.utils.database_connection import db_cursor, db_query_one, db_query_all
 from app.utils.common_util_module.sql_builder import build_order_by
 from app.services.ks_inquiry_service.ks_inquiry_stats_service import _build_code_display_exprs
 
@@ -68,6 +68,33 @@ class KsInquiryRecordsService:
             params.extend(values)
 
     @staticmethod
+    def _get_engine_mappings(company: str) -> Dict[tuple, str]:
+        """获取指定公司的发动机展示名称映射"""
+        sql = """
+            SELECT car_brand_name, original_code, display_code
+            FROM ks_part_mapping
+            WHERE company = %s AND mapping_type = 'engine'
+        """
+        rows = db_query_all(sql, (company,), dict_cursor=True)
+        mappings = {}
+        for row in rows or []:
+            key = (row.get('car_brand_name') or '', row.get('original_code') or '')
+            mappings[key] = row.get('display_code') or ''
+        return mappings
+
+    @staticmethod
+    def _map_engine_value(car_brand_name: str, engine: str, mappings: Dict[tuple, str]) -> str:
+        """根据映射规则计算发动机展示值（先截取后映射）"""
+        if not engine:
+            return engine
+        if car_brand_name == '奔驰' and len(engine) > 6:
+            base = engine[:6]
+        else:
+            base = engine
+        display = mappings.get((car_brand_name, base))
+        return display if display else base
+
+    @staticmethod
     def get_records(
         inquiry_id: str = '',
         parts_num: str = '',
@@ -110,8 +137,6 @@ class KsInquiryRecordsService:
         Returns:
             Dict: {list: 数据列表, total: 总条数, page: 当前页, page_size: 每页条数}
         """
-        start_time = time.time()
-
         conditions, params = [], []
 
         # 基础查询条件（明细表已加别名 d，列名必须带前缀避免歧义）
@@ -168,41 +193,10 @@ class KsInquiryRecordsService:
             default='d.inquiryId ASC, d.content_item_index ASC'
         )
 
-        # 查询数据（带分页）
-        # 发动机展示逻辑：先截取后映射
-        _, engine_display_expr, engine_join_expr = _build_code_display_exprs(
-            'engine', 'car_brand_name', 'engine'
-        )
-
-        data_sql = f"""
-            SELECT
-                d.inquiryId,
-                d.garage_company_name AS customerName,
-                d.partsNum,
-                d.resolve_parts_num,
-                d.resolve_parts_name,
-                d.partsName,
-                d.brandName,
-                d.brandNormalized,
-                d.brandId,
-                d.sellerBtPrice,
-                d.sellerPrice,
-                d.display_seller_status AS displaySellerStatus,
-                d.remark,
-                d.vin,
-                {engine_display_expr} AS engine,
-                d.production_date AS productionDate,
-                d.chassis,
-                d.car_brand_name AS carBrandName,
-                d.location_name AS locationName,
-                d.arrival_time AS arrivalTime,
-                d.content_item_index
+        # 查询数据（带分页，延迟关联：先查 id 再查完整字段）
+        id_sql = f"""
+            SELECT d.id
             FROM crmapp_ks_inquiry_detail d
-            LEFT JOIN ks_part_mapping m
-                ON m.company = %s
-                AND m.mapping_type = 'engine'
-                AND m.car_brand_name = d.car_brand_name
-                AND m.original_code = {engine_join_expr}
             WHERE {where_clause}
             ORDER BY {order_by}
             LIMIT %s OFFSET %s
@@ -219,15 +213,49 @@ class KsInquiryRecordsService:
 
         # 查询分页数据
         offset = (page - 1) * page_size
-        data_params = params.copy()
-        # JOIN 条件中的 company 放在参数最前面
-        data_params.insert(0, company)
-        data_params.append(page_size)
-        data_params.append(offset)
+        id_params = params.copy()
+        id_params.append(page_size)
+        id_params.append(offset)
 
         with db_cursor() as cursor:
-            cursor.execute(data_sql, tuple(data_params))
-            rows = cursor.fetchall()
+            # 第一步：查 id 列表（走覆盖索引，不回表）
+            cursor.execute(id_sql, tuple(id_params))
+            id_rows = cursor.fetchall()
+            ids = [row[0] for row in id_rows]
+
+            # 第二步：用 id IN 查完整字段（只回表 200 行）
+            if ids:
+                detail_sql = f"""
+                    SELECT
+                        d.inquiryId,
+                        d.garage_company_name AS customerName,
+                        d.partsNum,
+                        d.resolve_parts_num,
+                        d.resolve_parts_name,
+                        d.partsName,
+                        d.brandName,
+                        d.brandNormalized,
+                        d.brandId,
+                        d.sellerBtPrice,
+                        d.sellerPrice,
+                        d.display_seller_status AS displaySellerStatus,
+                        d.remark,
+                        d.vin,
+                        d.engine,
+                        d.production_date AS productionDate,
+                        d.chassis,
+                        d.car_brand_name AS carBrandName,
+                        d.location_name AS locationName,
+                        d.arrival_time AS arrivalTime,
+                        d.content_item_index
+                    FROM crmapp_ks_inquiry_detail d
+                    WHERE d.id IN ({', '.join(['%s'] * len(ids))})
+                    ORDER BY d.inquiryId ASC, d.content_item_index ASC
+                """
+                cursor.execute(detail_sql, tuple(ids))
+                rows = cursor.fetchall()
+            else:
+                rows = []
 
             # 硬编码列名（确保与 SQL 一致）- 已删除：quote_date, partType, partsBrandQuality, company, created_at, updated_at
             columns = [
@@ -245,9 +273,15 @@ class KsInquiryRecordsService:
                     record = dict(zip(columns, row))
                 result.append(record)
 
-            end_time = time.time()
-            elapsed_time = (end_time - start_time) * 1000  # 毫秒
-            print(f"[KsInquiryRecordsService] 查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
+            # 发动机展示映射：SQL 去掉 JOIN 后，在 Python 层处理
+            if company:
+                engine_mappings = KsInquiryRecordsService._get_engine_mappings(company)
+                for record in result:
+                    record['engine'] = KsInquiryRecordsService._map_engine_value(
+                        record.get('carBrandName') or '',
+                        record.get('engine') or '',
+                        engine_mappings
+                    )
 
             return {
                 'list': result,
