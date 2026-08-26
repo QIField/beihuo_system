@@ -51,8 +51,8 @@ def parse_catalog_html(html):
     return result
 
 
-def _build_update_sql(record_id, parsed):
-    """构建动态 UPDATE 语句，补全到数据时更新 engine/chassis，并始终标记为已查询"""
+def _build_update_sql(record_id, parsed, status='已查询'):
+    """构建动态 UPDATE 语句，补全到数据时更新 engine/chassis，并标记指定状态"""
     fields = []
     values = []
 
@@ -64,16 +64,16 @@ def _build_update_sql(record_id, parsed):
         values.append(parsed['chassis'])
 
     fields.append('status = %s')
-    values.append('已查询')
+    values.append(status)
 
     sql = f"UPDATE vin_vehicle_info SET {', '.join(fields)} WHERE id = %s"
     values.append(record_id)
     return sql, tuple(values)
 
 
-def _mark_record_queried(cursor, record_id, parsed=None):
-    """将记录标记为已查询，用于异常或空结果场景"""
-    sql, params = _build_update_sql(record_id, parsed or {})
+def _mark_record_queried(cursor, record_id, parsed=None, status='已查询'):
+    """将记录标记为指定状态，用于异常或空结果场景"""
+    sql, params = _build_update_sql(record_id, parsed or {}, status=status)
     cursor.execute(sql, params)
     return cursor.rowcount
 
@@ -84,6 +84,13 @@ def _is_daily_limit_reached(response):
         return False
     text = response.text or ''
     return '当天查询EPC次数已达上限' in text or 'var status = "415"' in text
+
+
+def _is_data_defect(response):
+    """判断响应是否表示开思数据缺陷"""
+    if response is None or response.status_code != 200:
+        return False
+    return '由于数据缺陷，该VIN码配置信息不全' in (response.text or '')
 
 
 def _validate_vin_full_info(vin_code, engine, chassis):
@@ -304,6 +311,9 @@ def _process_single_record(cursor, client, key, record, stats, newly_completed):
         elif response.status_code != 200:
             logger.warning(f"[VIN补全][{key}] 响应异常 status={response.status_code}，仅标记已查询: {vin_code}")
             _mark_record_queried(cursor, record_id)
+        elif _is_data_defect(response):
+            logger.warning(f"[VIN补全][{key}] {vin_code} 开思数据缺陷，标记状态为'开思数据缺陷'")
+            _mark_record_queried(cursor, record_id, status='开思数据缺陷')
         else:
             parsed = parse_catalog_html(response.text)
             if not parsed:
