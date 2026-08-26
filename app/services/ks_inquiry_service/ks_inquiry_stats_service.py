@@ -4,7 +4,7 @@
 处理 crmapp_ks_inquiry_detail 表的聚合统计业务逻辑
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import json
 import time
 from app.utils.database_connection import db_cursor, db_query_one
@@ -62,6 +62,131 @@ class KsInquiryStatsService:
     """
 
     @staticmethod
+    def _build_oe_where_having_clause(
+        inquiry_id: str = '',
+        resolve_parts_num: str = '',
+        parts_name: str = '',
+        brand_name: str = '',
+        brand: str = '',
+        seller_status: str = '',
+        begin_date: str = '',
+        end_date: str = '',
+        company: str = '',
+        sort_column: str = '',
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None,
+    ) -> Tuple[str, str, List[Any], List[Any], str]:
+        """构建 OE 统计查询的 WHERE、HAVING 和 ORDER BY 子句。"""
+        conditions, params = [], []
+
+        if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
+        if resolve_parts_num: conditions.append("resolve_parts_num LIKE %s"); params.append(f"%{resolve_parts_num}%")
+        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
+        if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
+        if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
+        if seller_status:
+            conditions.append("display_seller_status = %s")
+            params.append(seller_status)
+        if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
+        if end_date:      conditions.append("quote_date <= %s");            params.append(end_date)
+        if company:       conditions.append("company = %s");                params.append(company)
+
+        where_conditions = list(conditions)
+        where_params = list(params)
+        having_conditions = []
+        having_params = []
+        if column_filters:
+            for col_id, values in column_filters.items():
+                placeholders = ', '.join(['%s'] * len(values))
+                if col_id == 'resolve_parts_num':
+                    where_conditions.append(f"resolve_parts_num IN ({placeholders})")
+                    where_params.extend(values)
+                elif col_id == 'partsName':
+                    where_conditions.append(f"resolve_parts_name IN ({placeholders})")
+                    where_params.extend(values)
+                elif col_id in ('count', 'unquotedProducts'):
+                    having_conditions.append(f"{col_id} IN ({placeholders})")
+                    having_params.extend(values)
+
+        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+        having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
+
+        oe_column_map = {
+            'resolve_parts_num': 'resolve_parts_num',
+            'count': 'count',
+            'partsName': 'partsName',
+            'unquotedProducts': 'unquotedProducts'
+        }
+        order_by = build_order_by(
+            sort_column, sort_dir, oe_column_map,
+            numeric_columns={'count', 'unquotedProducts'},
+            default='count DESC'
+        )
+
+        return where_clause, having_clause, where_params, having_params, order_by
+
+    @staticmethod
+    def _fetch_oe_rows(
+        where_clause: str,
+        having_clause: str,
+        params: List[Any],
+        having_params: List[Any],
+        order_by: str,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """根据 WHERE/HAVING 查询 OE 聚合数据；limit 为 None 时不分页。"""
+        if limit is not None:
+            data_sql = f"""
+                SELECT * FROM (
+                    SELECT
+                        resolve_parts_num,
+                        COUNT(DISTINCT inquiryId) as count,
+                        MAX(resolve_parts_name) as partsName,
+                        MAX(unquoted_products) as unquotedProducts
+                    FROM crmapp_ks_inquiry_detail
+                    WHERE {where_clause}
+                    GROUP BY resolve_parts_num
+                    {having_clause}
+                ) t
+                ORDER BY {order_by}
+                LIMIT %s OFFSET %s
+            """
+            data_params = list(params)
+            data_params.extend(having_params)
+            data_params.append(limit)
+            data_params.append(offset or 0)
+        else:
+            data_sql = f"""
+                SELECT
+                    resolve_parts_num,
+                    COUNT(DISTINCT inquiryId) as count,
+                    MAX(resolve_parts_name) as partsName,
+                    MAX(unquoted_products) as unquotedProducts
+                FROM crmapp_ks_inquiry_detail
+                WHERE {where_clause}
+                GROUP BY resolve_parts_num
+                {having_clause}
+                ORDER BY {order_by}
+            """
+            data_params = list(params)
+            data_params.extend(having_params)
+
+        with db_cursor() as cursor:
+            cursor.execute(data_sql, data_params)
+            rows = cursor.fetchall()
+
+            columns = ['resolve_parts_num', 'count', 'partsName', 'unquotedProducts']
+            result = []
+            for row in rows:
+                if isinstance(row, dict):
+                    record = row
+                else:
+                    record = dict(zip(columns, row))
+                result.append(record)
+            return result
+
+    @staticmethod
     def get_oe_stats(
         inquiry_id: str = '',
         resolve_parts_num: str = '',
@@ -91,43 +216,11 @@ class KsInquiryStatsService:
         """
         start_time = time.time()
 
-        conditions, params = [], []
+        where_clause, having_clause, params, having_params, order_by = KsInquiryStatsService._build_oe_where_having_clause(
+            inquiry_id, resolve_parts_num, parts_name, brand_name, brand, seller_status,
+            begin_date, end_date, company, sort_column, sort_dir, column_filters
+        )
 
-        # 基础查询条件
-        if inquiry_id:    conditions.append("inquiryId LIKE %s");           params.append(f"%{inquiry_id}%")
-        if resolve_parts_num: conditions.append("resolve_parts_num LIKE %s"); params.append(f"%{resolve_parts_num}%")
-        if parts_name:    conditions.append("resolve_parts_name LIKE %s");  params.append(f"%{parts_name}%")
-        if brand_name:    conditions.append("brandName LIKE %s");           params.append(f"%{brand_name}%")
-        if brand:         conditions.append("brandNormalized = %s");        params.append(brand)
-        if seller_status:
-            conditions.append("display_seller_status = %s")
-            params.append(seller_status)
-        if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
-        if end_date:      conditions.append("quote_date <= %s");            params.append(end_date)
-        if company:       conditions.append("company = %s");                params.append(company)
-
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-
-        # 列头下拉全量筛选（非聚合列进 WHERE，聚合列进 HAVING）
-        having_conditions = []
-        having_params = []
-        if column_filters:
-            for col_id, values in column_filters.items():
-                placeholders = ', '.join(['%s'] * len(values))
-                if col_id == 'resolve_parts_num':
-                    conditions.append(f"resolve_parts_num IN ({placeholders})")
-                    params.extend(values)
-                elif col_id == 'partsName':
-                    conditions.append(f"resolve_parts_name IN ({placeholders})")
-                    params.extend(values)
-                elif col_id in ('count', 'unquotedProducts'):
-                    having_conditions.append(f"{col_id} IN ({placeholders})")
-                    having_params.extend(values)
-
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
-
-        # 查询不同OE号的总数量
         count_sql = f"""
             SELECT COUNT(*) FROM (
                 SELECT
@@ -140,38 +233,6 @@ class KsInquiryStatsService:
                 {having_clause}
             ) t
         """
-
-        # OE统计排序：白名单映射（前端列名 -> SQL列名）
-        oe_column_map = {
-            'resolve_parts_num': 'resolve_parts_num',
-            'count': 'count',
-            'partsName': 'partsName',
-            'unquotedProducts': 'unquotedProducts'
-        }
-        order_by = build_order_by(
-            sort_column, sort_dir, oe_column_map,
-            numeric_columns={'count', 'unquotedProducts'},
-            default='count DESC'
-        )
-
-        # 查询分组聚合数据
-        data_sql = f"""
-            SELECT * FROM (
-                SELECT
-                    resolve_parts_num,
-                    COUNT(DISTINCT inquiryId) as count,
-                    MAX(resolve_parts_name) as partsName,
-                    MAX(unquoted_products) as unquotedProducts
-                FROM crmapp_ks_inquiry_detail
-                WHERE {where_clause}
-                GROUP BY resolve_parts_num
-                {having_clause}
-            ) t
-            ORDER BY {order_by}
-            LIMIT %s OFFSET %s
-        """
-
-        # 查询总条数
         count_params = params.copy()
         count_params.extend(having_params)
         count_result = db_query_one(count_sql, tuple(count_params), dict_cursor=False)
@@ -182,36 +243,48 @@ class KsInquiryStatsService:
         else:
             total = count_result[0] if count_result else 0
 
-        # 查询分页数据
         offset = (page - 1) * page_size
-        data_params = params.copy()
-        data_params.extend(having_params)
-        data_params.append(page_size)
-        data_params.append(offset)
+        result = KsInquiryStatsService._fetch_oe_rows(
+            where_clause, having_clause, params, having_params, order_by,
+            limit=page_size, offset=offset
+        )
 
-        with db_cursor() as cursor:
-            cursor.execute(data_sql, data_params)
-            rows = cursor.fetchall()
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) * 1000
+        print(f"[KsInquiryStatsService] OE统计查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
 
-            columns = ['resolve_parts_num', 'count', 'partsName', 'unquotedProducts']
-            result = []
-            for row in rows:
-                if isinstance(row, dict):
-                    record = row
-                else:
-                    record = dict(zip(columns, row))
-                result.append(record)
+        return {
+            'list': result,
+            'total': total,
+            'page': page,
+            'page_size': page_size
+        }
 
-            end_time = time.time()
-            elapsed_time = (end_time - start_time) * 1000
-            print(f"[KsInquiryStatsService] OE统计查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
-
-            return {
-                'list': result,
-                'total': total,
-                'page': page,
-                'page_size': page_size
-            }
+    @staticmethod
+    def get_all_oe_stats(
+        inquiry_id: str = '',
+        resolve_parts_num: str = '',
+        parts_name: str = '',
+        brand_name: str = '',
+        brand: str = '',
+        seller_status: str = '',
+        begin_date: str = '',
+        end_date: str = '',
+        company: str = '',
+        sort_column: str = '',
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        获取OE号统计完整数据（不分页，用于导出）
+        """
+        where_clause, having_clause, params, having_params, order_by = KsInquiryStatsService._build_oe_where_having_clause(
+            inquiry_id, resolve_parts_num, parts_name, brand_name, brand, seller_status,
+            begin_date, end_date, company, sort_column, sort_dir, column_filters
+        )
+        return KsInquiryStatsService._fetch_oe_rows(
+            where_clause, having_clause, params, having_params, order_by
+        )
 
     @staticmethod
     def get_part_mapping(company: str = '', mapping_type: str = 'engine') -> List[Dict[str, Any]]:
@@ -432,6 +505,125 @@ class KsInquiryStatsService:
             }
 
     @staticmethod
+    def _build_customer_where_clause(
+        garage_name: str = '',
+        begin_date: str = '',
+        end_date: str = '',
+        company: str = '',
+        sort_column: str = '',
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None,
+    ) -> Tuple[str, List[Any], str, str, str, str, str]:
+        """构建客户统计查询的 WHERE、ORDER BY 及去重统计表达式。"""
+        conditions, params = [], []
+
+        if garage_name:
+            conditions.append("garage_company_name LIKE %s")
+            params.append(f"%{garage_name}%")
+        if begin_date:
+            conditions.append("quote_date >= %s")
+            params.append(begin_date)
+        if end_date:
+            conditions.append("quote_date <= %s")
+            params.append(end_date)
+        if company:
+            conditions.append("company = %s")
+            params.append(company)
+        conditions.append("COALESCE(TRIM(garage_company_name), '') != ''")
+
+        customer_filter_column_map = {'customerName': 'garage_company_name'}
+        if column_filters:
+            if isinstance(column_filters, str):
+                try:
+                    column_filters = json.loads(column_filters)
+                except Exception:
+                    column_filters = {}
+            for col_id, values in column_filters.items():
+                if not values:
+                    continue
+                if col_id in customer_filter_column_map:
+                    db_col = customer_filter_column_map[col_id]
+                    placeholders = ', '.join(['%s'] * len(values))
+                    conditions.append(f"{db_col} IN ({placeholders})")
+                    params.extend(values)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        dedup_key_expr = "CONCAT(COALESCE(garage_company_name, ''), '_', COALESCE(inquiryId, ''), '_', COALESCE(resolve_parts_num, ''))"
+        count_expr = "COUNT(DISTINCT dedup_key)"
+        ordered_expr = "COUNT(DISTINCT CASE WHEN has_ordered = 1 THEN dedup_key END)"
+        unordered_expr = "COUNT(DISTINCT CASE WHEN has_unordered = 1 AND has_ordered = 0 THEN dedup_key END)"
+
+        customer_column_map = {
+            'customerName': 'customerName',
+            'count': count_expr,
+            'orderedCount': ordered_expr,
+            'unorderedCount': unordered_expr,
+            'conversionRate': f"{ordered_expr} * 100.0 / NULLIF({count_expr}, 0)"
+        }
+        order_by = build_order_by(
+            sort_column, sort_dir, customer_column_map,
+            numeric_columns={'count', 'orderedCount', 'unorderedCount', 'conversionRate'},
+            default=f'{count_expr} DESC, customerName ASC'
+        )
+
+        return where_clause, params, order_by, dedup_key_expr, count_expr, ordered_expr, unordered_expr
+
+    @staticmethod
+    def _fetch_customer_rows(
+        where_clause: str,
+        params: List[Any],
+        order_by: str,
+        dedup_key_expr: str,
+        count_expr: str,
+        ordered_expr: str,
+        unordered_expr: str,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """根据 WHERE 查询客户聚合数据；limit 为 None 时不分页。"""
+        data_sql = f"""
+            SELECT
+                t.garage_company_name AS customerName,
+                {count_expr} AS count,
+                {ordered_expr} AS orderedCount,
+                {unordered_expr} AS unorderedCount
+            FROM (
+                SELECT
+                    garage_company_name,
+                    {dedup_key_expr} AS dedup_key,
+                    MAX(CASE WHEN display_seller_status = '本店下单' THEN 1 ELSE 0 END) AS has_ordered,
+                    MAX(CASE WHEN display_seller_status IN ('未下单', '非本店下单') THEN 1 ELSE 0 END) AS has_unordered
+                FROM crmapp_ks_inquiry_detail
+                WHERE {where_clause}
+                GROUP BY garage_company_name, inquiryId, resolve_parts_num
+            ) t
+            GROUP BY t.garage_company_name
+            ORDER BY {order_by}
+        """
+        data_params = list(params)
+        if limit is not None:
+            data_sql += " LIMIT %s OFFSET %s"
+            data_params.append(limit)
+            data_params.append(offset or 0)
+
+        with db_cursor() as cursor:
+            cursor.execute(data_sql, data_params)
+            rows = cursor.fetchall()
+
+            result = []
+            for row in rows:
+                if isinstance(row, dict):
+                    item = dict(row)
+                else:
+                    item = dict(zip(['customerName', 'count', 'orderedCount', 'unorderedCount'], row))
+                count_val = item.get('count', 0) or 0
+                ordered_val = item.get('orderedCount', 0) or 0
+                item['conversionRate'] = round(ordered_val * 100.0 / count_val, 2) if count_val else 0
+                result.append(item)
+            return result
+
+    @staticmethod
     def get_customer_stats(
         garage_name: str = '',
         begin_date: str = '',
@@ -453,56 +645,9 @@ class KsInquiryStatsService:
         """
         start_time = time.time()
 
-        # 去重键：客户 + 询价单号 + resolve_parts_num
-        dedup_key_expr = "CONCAT(COALESCE(garage_company_name, ''), '_', COALESCE(inquiryId, ''), '_', COALESCE(resolve_parts_num, ''))"
-
-        # 外层统计表达式（引用子查询结果列）
-        count_expr = "COUNT(DISTINCT dedup_key)"
-        ordered_expr = "COUNT(DISTINCT CASE WHEN has_ordered = 1 THEN dedup_key END)"
-        unordered_expr = "COUNT(DISTINCT CASE WHEN has_unordered = 1 AND has_ordered = 0 THEN dedup_key END)"
-
-        conditions, params = [], []
-
-        # 基础查询条件
-        if garage_name:
-            conditions.append("garage_company_name LIKE %s")
-            params.append(f"%{garage_name}%")
-
-        if begin_date:
-            conditions.append("quote_date >= %s")
-            params.append(begin_date)
-
-        if end_date:
-            conditions.append("quote_date <= %s")
-            params.append(end_date)
-
-        if company:
-            conditions.append("company = %s")
-            params.append(company)
-
-        # 客户名称不能为空
-        conditions.append("COALESCE(TRIM(garage_company_name), '') != ''")
-
-        # 列头下拉筛选（非聚合列）
-        customer_filter_column_map = {
-            'customerName': 'garage_company_name'
-        }
-        if column_filters:
-            if isinstance(column_filters, str):
-                try:
-                    column_filters = json.loads(column_filters)
-                except Exception:
-                    column_filters = {}
-            for col_id, values in column_filters.items():
-                if not values:
-                    continue
-                if col_id in customer_filter_column_map:
-                    db_col = customer_filter_column_map[col_id]
-                    placeholders = ', '.join(['%s'] * len(values))
-                    conditions.append(f"{db_col} IN ({placeholders})")
-                    params.extend(values)
-
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        where_clause, params, order_by, dedup_key_expr, count_expr, ordered_expr, unordered_expr = KsInquiryStatsService._build_customer_where_clause(
+            garage_name, begin_date, end_date, company, sort_column, sort_dir, column_filters
+        )
 
         count_sql = f"""
             SELECT COUNT(*) FROM (
@@ -512,42 +657,6 @@ class KsInquiryStatsService:
                 GROUP BY garage_company_name
             ) t
         """
-
-        # 排序列映射
-        customer_column_map = {
-            'customerName': 'customerName',
-            'count': count_expr,
-            'orderedCount': ordered_expr,
-            'unorderedCount': unordered_expr,
-            'conversionRate': f"{ordered_expr} * 100.0 / NULLIF({count_expr}, 0)"
-        }
-        order_by = build_order_by(
-            sort_column, sort_dir, customer_column_map,
-            numeric_columns={'count', 'orderedCount', 'unorderedCount', 'conversionRate'},
-            default=f'{count_expr} DESC, customerName ASC'
-        )
-
-        data_sql = f"""
-            SELECT
-                t.garage_company_name AS customerName,
-                {count_expr} AS count,
-                {ordered_expr} AS orderedCount,
-                {unordered_expr} AS unorderedCount
-            FROM (
-                SELECT
-                    garage_company_name,
-                    {dedup_key_expr} AS dedup_key,
-                    MAX(CASE WHEN display_seller_status = '本店下单' THEN 1 ELSE 0 END) AS has_ordered,
-                    MAX(CASE WHEN display_seller_status IN ('未下单', '非本店下单') THEN 1 ELSE 0 END) AS has_unordered
-                FROM crmapp_ks_inquiry_detail
-                WHERE {where_clause}
-                GROUP BY garage_company_name, inquiryId, resolve_parts_num
-            ) t
-            GROUP BY t.garage_company_name
-            ORDER BY {order_by}
-            LIMIT %s OFFSET %s
-        """
-
         count_result = db_query_one(count_sql, tuple(params), dict_cursor=False)
         if count_result is None:
             total = 0
@@ -557,35 +666,41 @@ class KsInquiryStatsService:
             total = count_result[0] if count_result else 0
 
         offset = (page - 1) * page_size
-        data_params = params.copy()
-        data_params.append(page_size)
-        data_params.append(offset)
+        result = KsInquiryStatsService._fetch_customer_rows(
+            where_clause, params, order_by, dedup_key_expr, count_expr, ordered_expr, unordered_expr,
+            limit=page_size, offset=offset
+        )
 
-        with db_cursor() as cursor:
-            cursor.execute(data_sql, data_params)
-            rows = cursor.fetchall()
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) * 1000
+        print(f"[KsInquiryStatsService] 客户统计查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
 
-            result = []
-            for row in rows:
-                if isinstance(row, dict):
-                    item = dict(row)
-                else:
-                    item = dict(zip(['customerName', 'count', 'orderedCount', 'unorderedCount'], row))
-                count_val = item.get('count', 0) or 0
-                ordered_val = item.get('orderedCount', 0) or 0
-                item['conversionRate'] = round(ordered_val * 100.0 / count_val, 2) if count_val else 0
-                result.append(item)
+        return {
+            'list': result,
+            'total': total,
+            'page': page,
+            'page_size': page_size
+        }
 
-            end_time = time.time()
-            elapsed_time = (end_time - start_time) * 1000
-            print(f"[KsInquiryStatsService] 客户统计查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
-
-            return {
-                'list': result,
-                'total': total,
-                'page': page,
-                'page_size': page_size
-            }
+    @staticmethod
+    def get_all_customer_stats(
+        garage_name: str = '',
+        begin_date: str = '',
+        end_date: str = '',
+        company: str = '',
+        sort_column: str = '',
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        获取客户维度完整数据（不分页，用于导出）
+        """
+        where_clause, params, order_by, dedup_key_expr, count_expr, ordered_expr, unordered_expr = KsInquiryStatsService._build_customer_where_clause(
+            garage_name, begin_date, end_date, company, sort_column, sort_dir, column_filters
+        )
+        return KsInquiryStatsService._fetch_customer_rows(
+            where_clause, params, order_by, dedup_key_expr, count_expr, ordered_expr, unordered_expr
+        )
 
     @staticmethod
     def get_engine_chassis_list(

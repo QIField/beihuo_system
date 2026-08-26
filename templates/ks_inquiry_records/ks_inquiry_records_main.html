@@ -399,6 +399,9 @@
             <!-- 重置按钮 -->
             <button class="filter-btn" onclick="resetAll()">重置</button>
 
+            <!-- 导出按钮 -->
+            <button class="filter-btn" onclick="exportCurrentTab()">导出</button>
+
             <input type="hidden" id="searchInquiryId">
             <input type="hidden" id="searchResolvePartsNum">
             <input type="hidden" id="searchPartsName">
@@ -711,6 +714,183 @@
                     refreshCustomerStats();
                 }
             }
+        }
+
+        // 导出当前标签页完整数据
+        function exportCurrentTab() {
+            const tabId = currentTab;
+            let params = getSearchParams(tabId);
+
+            // 明细页使用 HandsontableBuilder，需单独提取排序/筛选
+            if (tabId === 'detail') {
+                appendDetailExportParams(params);
+            } else {
+                // AG Grid 页使用 GridColumnMenu 统一获取主表排序/筛选
+                appendGridExportParams(params, getMainGridSelector(tabId), '');
+            }
+
+            // 多表格标签页需额外收集各子表排序/筛选
+            if (tabId === 'engine') {
+                appendGridExportParams(params, '#chassisGrid', 'chassis_');
+                appendGridExportParams(params, '#engineGrid', 'engine_');
+                appendGridExportParams(params, '#oeNumGrid', 'oenum_');
+            } else if (tabId === 'customer') {
+                appendGridExportParams(params, '#customerEngineGrid', 'engine_');
+                appendGridExportParams(params, '#customerChassisGrid', 'chassis_');
+                appendGridExportParams(params, '#customerOeGrid', 'oenum_');
+            }
+
+            const exportUrlMap = {
+                'detail': '/new/api/ks_inquiry/records/export/detail',
+                'oe': '/new/api/ks_inquiry/records/export/oe',
+                'engine': '/new/api/ks_inquiry/records/export/engine',
+                'customer': '/new/api/ks_inquiry/records/export/customer'
+            };
+
+            const url = exportUrlMap[tabId];
+            if (!url) {
+                layui.layer.msg('当前标签页暂不支持导出', {icon: 0});
+                return;
+            }
+
+            fetch(url + '?' + new URLSearchParams(params).toString(), {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                if (result.code === 0 || result.code === '0') {
+                    const taskId = result.data && result.data.task_id;
+                    if (taskId) {
+                        layui.layer.msg('导出任务已提交，请稍候...', {icon: 1, time: 2000});
+                        pollExportTask(taskId);
+                    } else {
+                        layui.layer.msg('导出任务提交失败', {icon: 2});
+                    }
+                } else {
+                    layui.layer.msg(result.msg || '导出任务提交失败', {icon: 2});
+                }
+            })
+            .catch(function(error) {
+                console.error('[export] 提交导出任务失败:', error);
+                layui.layer.msg('导出任务提交失败', {icon: 2});
+            });
+        }
+
+        // 获取当前标签页主表选择器
+        function getMainGridSelector(tabId) {
+            if (tabId === 'oe') return '#oeStatsGrid';
+            if (tabId === 'engine') return '#chassisGrid';
+            if (tabId === 'customer') return '#customerStatsGrid';
+            return null;
+        }
+
+        // 从 HandsontableBuilder 提取明细排序/筛选参数
+        function appendDetailExportParams(params) {
+            const builder = window.ksInquiryDetailBuilder;
+            if (!builder) return;
+
+            if (builder.sortColumn) {
+                params.sort_column = builder.sortColumn;
+                params.sort_dir = builder.sortDir || 'asc';
+            }
+
+            const filters = {};
+            if (builder.filterColumn && builder.filterValues && builder.filterValues.length > 0) {
+                filters[builder.filterColumn] = builder.filterValues;
+            }
+            if (Object.keys(filters).length > 0) {
+                params.column_filters = JSON.stringify(filters);
+            }
+        }
+
+        // 从 GridColumnMenu 提取 AG Grid 排序/筛选参数
+        function appendGridExportParams(params, gridSelector, prefix) {
+            if (!gridSelector || typeof GridColumnMenu === 'undefined') return;
+
+            if (GridColumnMenu.getSortState) {
+                const sortState = GridColumnMenu.getSortState(gridSelector);
+                if (sortState && sortState.sortColumn) {
+                    params[prefix + 'sort_column'] = sortState.sortColumn;
+                    params[prefix + 'sort_dir'] = sortState.sortDir || 'asc';
+                }
+            }
+
+            if (GridColumnMenu.getFilterState) {
+                const filterState = GridColumnMenu.getFilterState(gridSelector);
+                if (filterState && filterState.active && filterState.filters) {
+                    params[prefix + 'column_filters'] = JSON.stringify(filterState.filters);
+                }
+            }
+        }
+
+        // 轮询异步导出任务状态并显示进度
+        function pollExportTask(taskId) {
+            const maxAttempts = 120;
+            let attempts = 0;
+            const progressHtml = '<div id="export-progress-box" style="padding: 20px; text-align: center;">' +
+                '<i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop" style="font-size: 30px;"></i>' +
+                '<p id="export-progress-text" style="margin-top: 12px; font-size: 14px; color: #333;">正在准备导出...</p>' +
+                '</div>';
+            let openIndex = layui.layer.open({
+                type: 1,
+                title: '数据导出中',
+                closeBtn: 0,
+                shade: 0.3,
+                area: ['320px', '180px'],
+                content: progressHtml
+            });
+
+            const timer = setInterval(function() {
+                attempts++;
+                if (attempts > maxAttempts) {
+                    clearInterval(timer);
+                    layui.layer.close(openIndex);
+                    layui.layer.msg('导出任务超时，请稍后重试', {icon: 2});
+                    return;
+                }
+
+                fetch('/new/api/ks_inquiry/records/export/status/' + taskId, {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(result) {
+                    if (result.code === 1 || result.code === '1') {
+                        clearInterval(timer);
+                        layui.layer.close(openIndex);
+                        layui.layer.msg(result.msg || '没有数据可导出', {icon: 0});
+                        return;
+                    }
+                    if (result.code !== 0 && result.code !== '0') {
+                        clearInterval(timer);
+                        layui.layer.close(openIndex);
+                        layui.layer.msg(result.msg || '查询任务状态失败', {icon: 2});
+                        return;
+                    }
+
+                    const task = result.data || {};
+                    if (task.status === 'completed') {
+                        clearInterval(timer);
+                        layui.layer.close(openIndex);
+                        window.location.href = '/new/api/ks_inquiry/records/export/download/' + taskId;
+                    } else if (task.status === 'failed') {
+                        clearInterval(timer);
+                        layui.layer.close(openIndex);
+                        layui.layer.msg('导出失败：' + (task.message || task.error || '未知错误'), {icon: 2});
+                    } else {
+                        const progress = task.progress || 0;
+                        const message = task.message || ('导出中 ' + progress + '%...');
+                        const $text = document.getElementById('export-progress-text');
+                        if ($text) {
+                            $text.textContent = message;
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    console.error('[export] 查询任务状态失败:', error);
+                });
+            }, 1000);
         }
 
         // 根据当前标签更新搜索栏显示
