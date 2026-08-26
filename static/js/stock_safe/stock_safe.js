@@ -34,11 +34,15 @@
         keyword: '',
         sales_status: '',
         stock_status: '',
-        abc_classification: ''
+        abc_classification: '',
+        data_type: 'useful'   // 默认显示有用数据
     };
 
     // 防止重复请求
     var isLoading = false;
+
+    // 废弃操作防重复提交
+    var isAbandoning = false;
 
     // 列定义（升序/降序通过 onSortChanged 走后端）
     var COLUMN_DEFS = [
@@ -53,6 +57,18 @@
                 return '<span style="color:#8c8c8c;font-family:Roboto Mono,Consolas,monospace;font-weight:500;">' + idx + '</span>';
             },
             sortable: false
+        },
+        // 批量选择复选框列（供批量废弃/恢复使用）
+        {
+            headerCheckboxSelection: true,
+            checkboxSelection: true,
+            width: 50,
+            pinned: 'left',
+            sortable: false,
+            resizable: false,
+            suppressSizeToFit: true,
+            suppressMenu: true,
+            cellStyle: function () { return { cursor: 'pointer' }; }
         },
         { headerName: 'OE号', field: 'number', flex: 1.5, minWidth: 120 },
         { headerName: '品牌', field: 'brand_name', width: 120 },
@@ -112,6 +128,20 @@
         {
             headerName: '库存状态', field: 'stock_status', width: 180,
             cellRenderer: renderStockStatusCell
+        },
+        {
+            headerName: '操作', width: 110, pinned: 'right', sortable: false,
+            // 整列浅蓝底纹，与其他数据列区分；按钮保持实心彩色(橙=废弃/绿=恢复)
+            cellStyle: function () { return { background: '#e6f7ff' }; },
+            cellRenderer: function (p) {
+                var id = (p.data && p.data.id != null) ? p.data.id : '';
+                var frey = (p.data && p.data.frey_no != null) ? p.data.frey_no : '';
+                // 废弃数据视图下显示"恢复数据"（绿色），否则显示"废弃数据"（橙色）
+                if (currentFilter.data_type === 'useless') {
+                    return '<button class="btn-restore" data-frey="' + frey + '" title="将该条数据恢复为有用">恢复数据</button>';
+                }
+                return '<button class="btn-abandon" data-id="' + id + '" title="将本行数据移入废弃表">废弃数据</button>';
+            }
         }
     ];
 
@@ -253,7 +283,8 @@
             document.getElementById('filterSalesStatus').value = '';
             document.getElementById('filterStockStatus').value = '';
             document.getElementById('filterABC').value = '';
-            currentFilter = { keyword: '', sales_status: '', stock_status: '', abc_classification: '' };
+            document.getElementById('filterDataType').value = 'useful';
+            currentFilter = { keyword: '', sales_status: '', stock_status: '', abc_classification: '', data_type: 'useful' };
             if (pagination) pagination.currentPage = 1;
             fetchData();
         });
@@ -262,6 +293,271 @@
         // 刷新 / 导出
         document.getElementById('btnRefresh').addEventListener('click', function () { fetchData(); });
         document.getElementById('btnExport').addEventListener('click', exportData);
+
+        // 批量废弃 / 批量恢复（基于复选框勾选的行）
+        document.getElementById('btnBatchAbandon').addEventListener('click', batchAbandon);
+        document.getElementById('btnBatchRestore').addEventListener('click', batchRestore);
+
+        // 数据范围切换：同步批量按钮显示，并直接刷新当前视图数据
+        document.getElementById('filterDataType').addEventListener('change', function () {
+            applyFiltersFromDOM();
+            updateBatchButtons();
+            if (pagination) pagination.currentPage = 1;
+            fetchData();
+        });
+
+        // 初始加载：按默认"有用数据"视图设置批量按钮显示
+        updateBatchButtons();
+
+        // 废弃数据 / 恢复数据：监听 grid 容器内的按钮点击（由单元格渲染器生成）
+        var gridDiv = document.getElementById('stockSafeGrid');
+        if (gridDiv) {
+            gridDiv.addEventListener('click', function (e) {
+                var abBtn = e.target.closest('.btn-abandon');
+                if (abBtn) {
+                    var id = abBtn.getAttribute('data-id');
+                    if (id) abandonRow(parseInt(id, 10));
+                    return;
+                }
+                var reBtn = e.target.closest('.btn-restore');
+                if (reBtn) {
+                    var frey = reBtn.getAttribute('data-frey');
+                    if (frey) restoreRow(frey);
+                }
+            });
+        }
+    }
+
+    // ============================================================
+    // 废弃数据操作
+    // ============================================================
+    function abandonRow(id) {
+        if (!id || isNaN(id)) {
+            layui.use(['layer'], function (l) { l.msg('无效的记录ID', { icon: 2 }); });
+            return;
+        }
+        if (isAbandoning) return;   // 防止重复提交
+        isAbandoning = true;
+
+        layui.use(['layer'], function (layer) {
+            layer.confirm('确定将该条数据标记为废弃并移入废弃表吗？', {
+                title: '废弃数据',
+                btn: ['确定', '取消']
+            }, function (index) {
+                layer.close(index);
+                submitAbandon(id);
+            }, function () {
+                isAbandoning = false;
+            });
+        });
+    }
+
+    function submitAbandon(id) {
+        layui.use(['layer'], function (layer) {
+            layer.load(2);
+
+            fetch('/new/api/stock_safe/abandon', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: [id] })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    layer.closeAll('loading');
+                    isAbandoning = false;
+                    if (res.code !== 0) {
+                        layer.msg(res.msg || '废弃失败', { icon: 2 });
+                        return;
+                    }
+                    layer.msg('已废弃', { icon: 1 });
+                    // 废弃成功后刷新列表及统计卡片
+                    fetchData();
+                    loadStatusCount();
+                })
+                .catch(function (err) {
+                    layer.closeAll('loading');
+                    isAbandoning = false;
+                    layer.msg('网络错误，请稍后重试', { icon: 2 });
+                    console.error('[stock_safe] abandon 失败:', err);
+                });
+        });
+    }
+
+    // ============================================================
+    // 批量废弃 / 批理恢复操作
+    // ============================================================
+
+    // 从 AG Grid 获取当前勾选的行
+    function getSelectedRows() {
+        if (!gridApi) return [];
+        return gridApi.getSelectedRows() || [];
+    }
+
+    // 根据当前数据范围视图，切换批量操作按钮的显示
+    // useful（有用数据）→ 显示批量废弃；useless（废弃数据）→ 显示批量恢复
+    function updateBatchButtons() {
+        var abn = document.getElementById('btnBatchAbandon');
+        var rst = document.getElementById('btnBatchRestore');
+        if (!abn || !rst) return;
+        var type = (document.getElementById('filterDataType').value || 'useful');
+        if (type === 'useless') {
+            abn.style.display = 'none';
+            rst.style.display = '';
+        } else {
+            abn.style.display = '';
+            rst.style.display = 'none';
+        }
+    }
+
+    // 批量废弃：收集选中行的 id，调用已有的批量废弃接口
+    function batchAbandon() {
+        var rows = getSelectedRows();
+        var ids = [];
+        rows.forEach(function (r) { if (r.id != null && r.id !== '') ids.push(r.id); });
+        if (ids.length === 0) {
+            layui.use(['layer'], function (l) { l.msg('请先勾选要废弃的数据（勾选行首复选框）', { icon: 0 }); });
+            return;
+        }
+        layui.use(['layer'], function (layer) {
+            layer.confirm('确定批量废弃所选 ' + ids.length + ' 条数据吗？', {
+                title: '批量废弃',
+                btn: ['确定', '取消']
+            }, function (index) {
+                layer.close(index);
+                submitBatchAbandon(ids);
+            });
+        });
+    }
+
+    function submitBatchAbandon(ids) {
+        layui.use(['layer'], function (layer) {
+            layer.load(2);
+            fetch('/new/api/stock_safe/abandon', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: ids })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    layer.closeAll('loading');
+                    if (res.code !== 0) { layer.msg(res.msg || '批量废弃失败', { icon: 2 }); return; }
+                    var n = res.data && res.data.moved ? res.data.moved : 0;
+                    layer.msg('批量废弃成功，共 ' + n + ' 条', { icon: 1 });
+                    fetchData();
+                    loadStatusCount();
+                })
+                .catch(function (err) {
+                    layer.closeAll('loading');
+                    layer.msg('网络错误，请稍后重试', { icon: 2 });
+                    console.error('[stock_safe] batch abandon 失败:', err);
+                });
+        });
+    }
+
+    // 批量恢复：收集选中行的 frey_no，调用已有的批量恢复（按条码删除废弃记录）
+    function batchRestore() {
+        var rows = getSelectedRows();
+        var freys = [];
+        rows.forEach(function (r) { if (r.frey_no) freys.push(r.frey_no); });
+        if (freys.length === 0) {
+            layui.use(['layer'], function (l) { l.msg('请先勾选要恢复的数据（勾选行首复选框）', { icon: 0 }); });
+            return;
+        }
+        layui.use(['layer'], function (layer) {
+            layer.confirm('确定批量恢复所选 ' + freys.length + ' 条数据吗？', {
+                title: '批量恢复',
+                btn: ['确定', '取消']
+            }, function (index) {
+                layer.close(index);
+                submitBatchRestore(freys);
+            });
+        });
+    }
+
+    function submitBatchRestore(freys) {
+        layui.use(['layer'], function (layer) {
+            layer.load(2);
+            fetch('/new/api/stock_safe/restore', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ freys: freys })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    layer.closeAll('loading');
+                    if (res.code !== 0) { layer.msg(res.msg || '批量恢复失败', { icon: 2 }); return; }
+                    var n = res.data && res.data.restored ? res.data.restored : 0;
+                    layer.msg('批量恢复成功，共 ' + n + ' 条', { icon: 1 });
+                    fetchData();
+                    loadStatusCount();
+                })
+                .catch(function (err) {
+                    layer.closeAll('loading');
+                    layer.msg('网络错误，请稍后重试', { icon: 2 });
+                    console.error('[stock_safe] batch restore 失败:', err);
+                });
+        });
+    }
+
+    // ============================================================
+    // 恢复数据操作
+    // ============================================================
+    var isRestoring = false;   // 恢复操作防重复提交
+
+    function restoreRow(frey) {
+        if (!frey) {
+            layui.use(['layer'], function (l) { l.msg('无效的数据', { icon: 2 }); });
+            return;
+        }
+        if (isRestoring) return;
+        isRestoring = true;
+
+        layui.use(['layer'], function (layer) {
+            layer.confirm('确定将该条数据恢复为有用数据吗？', {
+                title: '恢复数据',
+                btn: ['确定', '取消']
+            }, function (index) {
+                layer.close(index);
+                submitRestore(frey);
+            }, function () {
+                isRestoring = false;
+            });
+        });
+    }
+
+    function submitRestore(frey) {
+        layui.use(['layer'], function (layer) {
+            layer.load(2);
+
+            fetch('/new/api/stock_safe/restore', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ frey_no: frey })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    layer.closeAll('loading');
+                    isRestoring = false;
+                    if (res.code !== 0) {
+                        layer.msg(res.msg || '恢复失败', { icon: 2 });
+                        return;
+                    }
+                    layer.msg('已恢复', { icon: 1 });
+                    // 恢复成功后刷新列表及统计卡片
+                    fetchData();
+                    loadStatusCount();
+                })
+                .catch(function (err) {
+                    layer.closeAll('loading');
+                    isRestoring = false;
+                    layer.msg('网络错误，请稍后重试', { icon: 2 });
+                    console.error('[stock_safe] restore 失败:', err);
+                });
+        });
     }
 
     function applyFiltersFromDOM() {
@@ -269,6 +565,7 @@
         currentFilter.sales_status = (document.getElementById('filterSalesStatus').value || '').trim();
         currentFilter.stock_status = (document.getElementById('filterStockStatus').value || '').trim();
         currentFilter.abc_classification = (document.getElementById('filterABC').value || '').trim();
+        currentFilter.data_type = (document.getElementById('filterDataType').value || 'useful').trim();
     }
 
     // ============================================================
@@ -401,6 +698,7 @@
             if (currentFilter.sales_status)    url += '&sales_status=' + encodeURIComponent(currentFilter.sales_status);
             if (currentFilter.stock_status)    url += '&stock_status=' + encodeURIComponent(currentFilter.stock_status);
             if (currentFilter.abc_classification) url += '&abc_classification=' + encodeURIComponent(currentFilter.abc_classification);
+            url += '&data_type=' + encodeURIComponent(currentFilter.data_type);
 
             fetch(url, { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
@@ -452,6 +750,7 @@
             if (currentFilter.sales_status)    url += '&sales_status=' + encodeURIComponent(currentFilter.sales_status);
             if (currentFilter.stock_status)    url += '&stock_status=' + encodeURIComponent(currentFilter.stock_status);
             if (currentFilter.abc_classification) url += '&abc_classification=' + encodeURIComponent(currentFilter.abc_classification);
+            url += '&data_type=' + encodeURIComponent(currentFilter.data_type);
 
             fetch(url, { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })

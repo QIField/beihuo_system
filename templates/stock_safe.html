@@ -144,6 +144,80 @@
         .btn-default { background: #fff; color: #595959; border: 1px solid #d9d9d9; }
         .btn-default:hover { color: #1890ff; border-color: #1890ff; }
 
+        /* 废弃数据操作按钮（AG Grid 单元格内，橙色警示风格） */
+        .btn-abandon {
+            background: #fa8c16;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .btn-abandon:hover {
+            background: #ffa940;
+            box-shadow: 0 2px 8px rgba(250, 140, 22, 0.35);
+        }
+        .btn-abandon:active {
+            background: #d46b08;
+        }
+
+        /* 恢复数据操作按钮（AG Grid 单元格内，绿色成功风格，废弃数据视图下使用） */
+        .btn-restore {
+            background: #52c41a;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .btn-restore:hover {
+            background: #73d13d;
+            box-shadow: 0 2px 8px rgba(82, 196, 26, 0.35);
+        }
+        .btn-restore:active {
+            background: #389e0d;
+        }
+
+        /* 工具栏：批量废弃按钮（橙色警示） */
+        .btn-batch-abandon {
+            background: #fa8c16;
+            color: #fff;
+            border-color: #fa8c16;
+        }
+        .btn-batch-abandon:hover {
+            background: #ffa940;
+            border-color: #ffa940;
+            color: #fff;
+        }
+
+        /* 工具栏：批量恢复按钮（绿色成功） */
+        .btn-batch-restore {
+            background: #52c41a;
+            color: #fff;
+            border-color: #52c41a;
+        }
+        .btn-batch-restore:hover {
+            background: #73d13d;
+            border-color: #73d13d;
+            color: #fff;
+        }
+
         /* ===== AG Grid ===== */
         .grid-wrapper {
             background: #fff;
@@ -385,11 +459,24 @@
                         <option value="C">C类</option>
                     </select>
                 </div>
+                <div class="filter-item">
+                    <label>数据范围：</label>
+                    <select id="filterDataType">
+                        <option value="useless">废弃数据</option>
+                        <option value="useful" selected>有用数据</option>
+                    </select>
+                </div>
                 <button class="btn btn-primary" id="btnSearch">
                     <i class="layui-icon">&#xe615;</i> 查询
                 </button>
                 <button class="btn btn-default" id="btnReset">
                     <i class="layui-icon">&#x1006;</i> 重置
+                </button>
+                <button class="btn btn-batch-restore" id="btnBatchRestore">
+                    <i class="layui-icon">&#xe605;</i> 批量恢复
+                </button>
+                <button class="btn btn-batch-abandon" id="btnBatchAbandon">
+                    <i class="layui-icon">&#xe610;</i> 批量废弃
                 </button>
             </div>
             <div class="toolbar-right">

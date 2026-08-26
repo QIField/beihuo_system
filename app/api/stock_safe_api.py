@@ -19,6 +19,10 @@ from app.services.stock_safe_service.stock_safe_query_service import (
     get_status_count,
     get_abc_count,
 )
+from app.services.stock_safe_service.stock_safe_useless_data_service import (
+    abandon_stock_safe_rows,
+    restore_stock_safe_rows,
+)
 
 
 # 创建子蓝图，url_prefix 将在主蓝图注册时拼接
@@ -34,6 +38,7 @@ def api_stock_safe_list():
         keyword:             搜索关键词（OE号/品牌/产品名称/条码）
         stock_status:        库存状态筛选
         abc_classification:  ABC 分类筛选（A/B/C）
+        data_type:           数据范围：all 全部 / useful 有用（默认）/ useless 废弃
         page:                页码，默认 1
         limit:               每页条数，默认 50，最大 500
         sort_field:          排序字段名（如 available_stock、avg_daily_sales 等）
@@ -56,6 +61,7 @@ def api_stock_safe_list():
         stock_status = request.args.get('stock_status', '').strip()
         sales_status = request.args.get('sales_status', '').strip()
         abc_classification = request.args.get('abc_classification', '').strip()
+        data_type = request.args.get('data_type', 'useful').strip()
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 50))
         sort_field = request.args.get('sort_field', '').strip()
@@ -70,6 +76,7 @@ def api_stock_safe_list():
             stock_status=stock_status,
             sales_status=sales_status,
             abc_classification=abc_classification,
+            data_type=data_type,
             page=page,
             limit=limit,
             sort_field=sort_field,
@@ -125,5 +132,90 @@ def api_abc_count():
         return jsonify({'code': 0, 'msg': 'success', 'data': data})
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'查询失败: {str(e)}', 'data': {}}), 500
+
+
+@stock_safe_bp.route('/abandon', methods=['POST'])
+def api_abandon_stock_safe():
+    """
+    废弃指定的安全库存记录（写入 stock_safe_useless_data 表，不删除 stock_safe 原记录）
+
+    请求体（JSON）：
+        {
+            "ids": [1, 2, 3]   # 待废弃的 stock_safe 记录主键 id 列表
+        }
+
+    返回：
+        {
+            "code": 0,
+            "msg": "success",
+            "data": { "total": 3, "moved": 3 }
+        }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        ids = payload.get('ids') or []
+
+        result = abandon_stock_safe_rows(ids)
+
+        if result.get('code') != 0:
+            return jsonify({
+                'code': 1,
+                'msg': result.get('msg', '废弃失败'),
+                'data': result,
+            }), 400
+
+        return jsonify({'code': 0, 'msg': 'success', 'data': result})
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'废弃失败: {str(e)}',
+            'data': {'total': 0, 'moved': 0},
+        }), 500
+
+
+@stock_safe_bp.route('/restore', methods=['POST'])
+def api_restore_stock_safe():
+    """
+    恢复指定的废弃记录（从 stock_safe_useless_data 表删除）
+
+    请求体（JSON）：
+        { "frey_no": "xxx" }            # 恢复单条
+        或 { "freys": ["xxx", "yyy"] }  # 批量恢复多条
+
+    返回：
+        {
+            "code": 0,
+            "msg": "success",
+            "data": { "restored": 1 }
+        }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        frey = payload.get('frey_no')
+        freys = payload.get('freys')
+
+        if freys:
+            # 批量恢复
+            frey_list = list(freys)
+        else:
+            # 单个恢复（兼容单值传参）
+            frey_list = [frey] if frey else []
+
+        result = restore_stock_safe_rows(frey_list)
+
+        if result.get('code') != 0:
+            return jsonify({
+                'code': 1,
+                'msg': result.get('msg', '恢复失败'),
+                'data': result,
+            }), 400
+
+        return jsonify({'code': 0, 'msg': 'success', 'data': result})
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'恢复失败: {str(e)}',
+            'data': {'restored': 0},
+        }), 500
 
 
