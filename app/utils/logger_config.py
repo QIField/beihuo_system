@@ -86,6 +86,7 @@ TASK_LOGGERS = [
     'purchase_history_compare',     # 采购历史比对功能
     'crm_full_crawl',               # CRM 全量数据爬取
     'ks_inquiry_export',            # 开思询价导出
+    'wx_chat_image_parse',          # 微信群聊图片解析
 ]
 
 
