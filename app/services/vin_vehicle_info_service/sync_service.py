@@ -93,6 +93,19 @@ def _is_data_defect(response):
     return '由于数据缺陷，该VIN码配置信息不全' in (response.text or '')
 
 
+def _is_login_page(response, vin_code):
+    """判断响应是否为登录页（cookie 失效）"""
+    if response is None or response.status_code != 200:
+        return False
+    url = response.url or ''
+    text = response.text or ''
+    expected_path = f'/maindata/catalog/{vin_code}'
+    if expected_path not in url:
+        return True
+    login_markers = ['账号登录', 'passport/login', '请登录', '登录开思']
+    return any(marker in text for marker in login_markers)
+
+
 def _validate_vin_full_info(vin_code, engine, chassis):
     """验证 VIN 完整信息字段是否均非空"""
     return bool(vin_code and str(vin_code).strip() and
@@ -288,6 +301,7 @@ def _process_single_record(cursor, client, key, record, stats, newly_completed):
     返回值：
       - 'ok'：正常处理并标记为已查询
       - 'limit_reached'：触发 EPC 日查询上限，需要停止当前 key
+      - 'login_failed'：当前 key cookie 失效被踢到登录页，需要停止当前 key
       - 函数内部已处理异常，不会向外抛错
 
     若本次成功补全了 VIN、发动机、底盘三者，才会将记录加入 newly_completed。
@@ -308,6 +322,12 @@ def _process_single_record(cursor, client, key, record, stats, newly_completed):
                 f"当前记录 {vin_code} 不标记为已查询，留给下一个key重试"
             )
             return 'limit_reached'
+        elif _is_login_page(response, vin_code):
+            logger.warning(
+                f"[VIN补全][{key}] cookie失效，跳转登录页，停止使用该key，"
+                f"当前记录 {vin_code} 不标记为已查询，留给下一个key重试"
+            )
+            return 'login_failed'
         elif response.status_code != 200:
             logger.warning(f"[VIN补全][{key}] 响应异常 status={response.status_code}，仅标记已查询: {vin_code}")
             _mark_record_queried(cursor, record_id)
@@ -374,7 +394,7 @@ def _process_key_records(key, records, stats):
             logger.info(f"[VIN补全][{key}] 开始处理 {len(records)} 条")
             for record in records:
                 result = _process_single_record(cursor, client, key, record, stats, newly_completed)
-                if result == 'limit_reached':
+                if result in ('limit_reached', 'login_failed'):
                     break
         finally:
             client.close()

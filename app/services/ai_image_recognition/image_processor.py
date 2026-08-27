@@ -205,7 +205,8 @@ def image_processor(data):
         print("图片名称为空")
         return None
     url = f"http://113.45.176.129:8001/static/wxImage/{image_name}"
-    ai_look(url, thinking="enabled")
+    records = ai_look(url, thinking="enabled")
+    return records
 
 
 # if __name__ == "__main__":
