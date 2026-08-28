@@ -87,25 +87,26 @@ class ExcelExporter(BaseExporter):
         self.alt_fill = alt_fill or ALT_FILL
         self.apply_alt_fill = apply_alt_fill
 
-    def export(
+    def _write_sheet(
         self,
+        wb,
+        sheet_name: str,
+        fields: List[str],
+        headers: Dict[str, str],
         data: List[Dict[str, Any]],
-        filename: str,
-        sheet_name: str = '数据',
-        **kwargs,
-    ) -> Response:
-        try:
-            from openpyxl import Workbook
-            from openpyxl.utils import get_column_letter
-        except ImportError as e:
-            raise RuntimeError('缺少 openpyxl 库，无法导出 Excel') from e
+        is_first: bool = False,
+    ) -> None:
+        """向工作簿写入一个工作表，并应用统一样式。"""
+        from openpyxl.utils import get_column_letter
 
-        wb = Workbook()
-        ws = wb.active
-        ws.title = sheet_name
+        if is_first:
+            ws = wb.active
+            ws.title = sheet_name
+        else:
+            ws = wb.create_sheet(title=sheet_name)
 
         # 写入表头
-        header_row = self._build_header_row()
+        header_row = [headers.get(field, field) for field in fields]
         header_font_kwargs = {'bold': True}
         if self.header_style.get('font_color'):
             header_font_kwargs['color'] = self.header_style['font_color']
@@ -128,7 +129,7 @@ class ExcelExporter(BaseExporter):
 
         # 写入数据并应用统一样式
         for row_num, row_data in enumerate(data, 2):
-            for col_num, field in enumerate(self.fields, 1):
+            for col_num, field in enumerate(fields, 1):
                 value = row_data.get(field)
                 if value is None:
                     value = ''
@@ -148,14 +149,18 @@ class ExcelExporter(BaseExporter):
             ws.freeze_panes = 'A2'
 
         # 自动调整列宽
-        for column in ws.columns:
-            column_letter = get_column_letter(column[0].column)
+        for col_idx, field in enumerate(fields, 1):
+            column_letter = get_column_letter(col_idx)
             if column_letter in self.column_widths:
                 ws.column_dimensions[column_letter].width = self.column_widths[column_letter]
                 continue
 
             max_length = 0
-            for cell in column:
+            header_text = headers.get(field, field)
+            if header_text:
+                max_length = len(str(header_text))
+            for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx):
+                cell = row[0]
                 try:
                     if cell.value and len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
@@ -164,6 +169,59 @@ class ExcelExporter(BaseExporter):
             adjusted_width = min(max_length + 2, 50)
             if adjusted_width > 0:
                 ws.column_dimensions[column_letter].width = adjusted_width
+
+    def export(
+        self,
+        data: List[Dict[str, Any]],
+        filename: str,
+        sheet_name: str = '数据',
+        **kwargs,
+    ) -> Response:
+        try:
+            from openpyxl import Workbook
+        except ImportError as e:
+            raise RuntimeError('缺少 openpyxl 库，无法导出 Excel') from e
+
+        wb = Workbook()
+        self._write_sheet(wb, sheet_name, self.fields, self.headers, data, is_first=True)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return self._make_response(output.getvalue(), filename)
+
+    def export_multi_sheets(
+        self,
+        sheets: List[Dict[str, Any]],
+        filename: str,
+        **kwargs,
+    ) -> Response:
+        """
+        导出多 Sheet Excel。
+
+        Args:
+            sheets: 每个 sheet 的配置，格式：
+                {
+                    'sheet_name': str,
+                    'fields': List[str],
+                    'headers': Dict[str, str],
+                    'data': List[Dict[str, Any]]
+                }
+            filename: 文件名
+        """
+        try:
+            from openpyxl import Workbook
+        except ImportError as e:
+            raise RuntimeError('缺少 openpyxl 库，无法导出 Excel') from e
+
+        wb = Workbook()
+        for idx, sheet_config in enumerate(sheets):
+            sheet_name = sheet_config.get('sheet_name', f'Sheet{idx + 1}')
+            fields = sheet_config.get('fields', self.fields)
+            headers = sheet_config.get('headers', self.headers)
+            data = sheet_config.get('data', [])
+            self._write_sheet(wb, sheet_name, fields, headers, data, is_first=(idx == 0))
 
         output = io.BytesIO()
         wb.save(output)

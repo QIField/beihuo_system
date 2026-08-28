@@ -1,5 +1,4 @@
 import json
-import os
 
 from typing import Any, Dict, List, Union
 
@@ -7,6 +6,7 @@ from typing import Any, Dict, List, Union
 import requests
 
 from app.dao.external_system_dao.wx_chat_image import get_image_list
+from config.config_list_manager.config_cache import get_config_value
 
 
 
@@ -22,9 +22,7 @@ load_dotenv(dotenv_path=ENV_PATH)
 
 
 ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
-ARK_ENDPOINT_ID = os.getenv("ARK_ENDPOINT_ID", "")
-ARK_API_KEY = os.getenv("ARK_API_KEY", "")
-ARK_MODEL = ARK_ENDPOINT_ID
+ARK_MODEL = "doubao-seed-2-0-mini-260428"
 
 
 
@@ -178,8 +176,9 @@ def ai_call(
         # 深度思考模式开关（doubao-seed-2.0 系列支持）
         "thinking_type": thinking,
     }
+    api_key = get_config_value("API_key_Doubao-Seed-2.0-mini") or ""
     headers = {
-        "Authorization": f"Bearer {ARK_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
     response = requests.post(ARK_BASE_URL, json=payload, headers=headers, timeout=120)
@@ -205,7 +204,8 @@ def image_processor(data):
         print("图片名称为空")
         return None
     url = f"http://113.45.176.129:8001/static/wxImage/{image_name}"
-    ai_look(url, thinking="enabled")
+    records = ai_look(url, thinking="enabled")
+    return records
 
 
 # if __name__ == "__main__":

@@ -215,11 +215,11 @@ class CassmallSpider:
 
     def get_maindata_catalog(self, catalog_id):
         """
-        获取 maindata 目录详情
-        :param catalog_id: 目录 ID，如 WBAWX5104CL775449
+        获取 maindata 目录详情（使用 JSON 接口）
+        :param catalog_id: 目录 ID / VIN 码，如 LBVTZ0103KSU03671
         :return: 响应对象
         """
-        url = f"{self.BASE_URL}/maindata/catalog/{catalog_id}"
+        url = f"{self.BASE_URL}/maindata/api/getEpcModelInterfaceV2/{catalog_id}"
 
         print("【请求API地址】", url)
         print("【请求方法】", "GET")

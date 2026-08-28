@@ -15,6 +15,65 @@ from .exporters import BaseExporter, ExcelExporter, get_exporter
 from .formatters import FormatterRegistry
 
 
+def export_multi_sheets(
+    filename: str,
+    sheets: List[Dict[str, Any]],
+    exporter_options: Optional[Dict[str, Any]] = None,
+) -> Response:
+    """
+    多 Sheet Excel 导出入口。
+
+    Args:
+        filename: 文件名（建议包含 .xlsx 后缀）
+        sheets: 每个 sheet 的配置，格式：
+            {
+                'sheet_name': str,
+                'config': ExportConfig,  # 与 data 二选一，优先级高于 fields/headers
+                'data': List[Dict[str, Any]],
+                'fields': List[str],     # 未提供 config 时使用
+                'headers': Dict[str, str] # 未提供 config 时使用
+            }
+        exporter_options: 透传给 ExcelExporter 的选项
+
+    Returns:
+        Flask Response 对象
+    """
+    if not sheets:
+        return jsonify({'code': 1, 'msg': '没有数据可导出'}), 400
+
+    exporter_options = exporter_options or {}
+    first_config = sheets[0].get('config')
+    if first_config:
+        exporter = first_config.build_exporter()
+    else:
+        exporter = ExcelExporter(
+            fields=sheets[0].get('fields', []),
+            headers=sheets[0].get('headers', {}),
+            **exporter_options
+        )
+
+    prepared_sheets = []
+    for sheet in sheets:
+        config = sheet.get('config')
+        data = sheet.get('data', [])
+        if config:
+            prepared_data = config.prepare_data(data)
+            fields = config.fields
+            headers = config.headers
+        else:
+            prepared_data = data
+            fields = sheet.get('fields', [])
+            headers = sheet.get('headers', {})
+        prepared_sheets.append({
+            'sheet_name': sheet.get('sheet_name', '数据'),
+            'fields': fields,
+            'headers': headers,
+            'data': prepared_data,
+        })
+
+    return exporter.export_multi_sheets(prepared_sheets, filename)
+
+
 DataFetcher = Callable[..., List[Dict[str, Any]]]
 
 

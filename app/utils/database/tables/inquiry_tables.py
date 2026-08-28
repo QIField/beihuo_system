@@ -173,9 +173,7 @@ def init_price_inquiry_direct_table():
                 INDEX idx_oe (oe),
                 INDEX idx_brand (brand),
                 INDEX idx_company (company),
-                INDEX idx_import_time (import_time),
-                -- 唯一索引：同一产品同一品牌同一供应商同一价格只能有一条记录
-                UNIQUE INDEX uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)
+                INDEX idx_import_time (import_time)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='询价直接入库数据表';
             """
             cursor.execute(create_table_sql)
@@ -221,16 +219,16 @@ def init_price_inquiry_direct_table():
             except Exception as e:
                 print(f"  ! 修改 stock_quantity 时出错: {str(e)}")
 
-            # 检查并添加唯一索引（兼容旧表）
+            # 检查并删除唯一索引（业务要求允许重复数据）
             try:
                 cursor.execute("""
                     ALTER TABLE crmapp_price_inquiry_direct
-                    ADD UNIQUE INDEX uk_oe_brand_supplier_price_company (oe, brand, supplier, price, company)
+                    DROP INDEX uk_oe_brand_supplier_price_company
                 """)
-                print("  [成功] 已添加唯一索引 uk_oe_brand_supplier_price_company")
+                print("  [成功] 已删除唯一索引 uk_oe_brand_supplier_price_company")
             except Exception as e:
-                if "Duplicate key name" not in str(e):
-                    print(f"  ! 添加唯一索引时出错: {str(e)}")
+                if "Can't DROP" not in str(e) and "doesn't exist" not in str(e):
+                    print(f"  ! 删除唯一索引时出错: {str(e)}")
 
             print("  [成功] 询价直接入库数据表")
     except Exception as e:

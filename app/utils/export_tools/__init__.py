@@ -54,6 +54,7 @@ from .core import (
     DataProvider,
     SearchParamNormalizer,
     export_data,
+    export_multi_sheets,
     export_with_provider,
     export_from_request,
 )
@@ -94,6 +95,7 @@ from .excel_styles import (
 # 异步导出
 from .async_export import (
     submit_export_task,
+    submit_multi_sheet_export_task,
     submit_provider_export_task,
 )
 
@@ -109,6 +111,7 @@ __all__ = [
     'DataProvider',
     'SearchParamNormalizer',
     'export_data',
+    'export_multi_sheets',
     'export_with_provider',
     'export_from_request',
 
@@ -141,5 +144,6 @@ __all__ = [
 
     # 异步导出
     'submit_export_task',
+    'submit_multi_sheet_export_task',
     'submit_provider_export_task',
 ]
