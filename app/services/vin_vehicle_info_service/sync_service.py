@@ -6,7 +6,6 @@ VIN 车辆信息补全服务
 """
 
 import logging
-from bs4 import BeautifulSoup
 
 from app.utils.database_connection import db_cursor
 from app.utils.ks_auto_bill_model import COMPANIES, get_company_key
@@ -26,29 +25,71 @@ _LABEL_HANDLERS = {
 }
 
 
-def parse_catalog_html(html):
-    """
-    解析 catalog HTML，提取发动机和底盘信息
-    优先级：发动机 > 发动机编码；底盘 > 车型编码
-    """
-    soup = BeautifulSoup(html, 'html.parser')
+_EPC_DATA_DEFECT_MESSAGE = '此vin码有品牌信息没有epc信息'
+
+
+def _is_json_response(response):
+    """判断响应是否为 JSON 类型"""
+    if response is None:
+        return False
+    content_type = response.headers.get('Content-Type', '')
+    return 'application/json' in content_type
+
+
+def _extract_from_configs(configs):
+    """从 configs 数组中提取发动机和底盘"""
     result = {}
-
-    for row in soup.find_all('tr'):
-        tds = row.find_all('td')
-        if len(tds) < 2:
-            continue
-
-        label = tds[0].get_text(strip=True)
-        value = tds[1].get_text(strip=True)
-
+    for item in configs:
+        label = item.get('name', '').strip()
+        value = (item.get('value') or '').strip()
         handler = _LABEL_HANDLERS.get(label)
-        if handler:
+        if handler and value:
             key, fallback = handler
             if not fallback or key not in result:
                 result[key] = value
-
     return result
+
+
+def _parse_catalog_json(response):
+    """
+    解析 catalog JSON 响应，提取发动机和底盘信息
+
+    严格校验关键字段：
+      - success 必须为 true
+      - data 不能为空
+      - 车型（carModelName）不能为空
+      - configs 不能为空
+    """
+    try:
+        payload = response.json()
+        if not payload.get('success'):
+            return {}
+        data_list = payload.get('data') or []
+        if not data_list:
+            return {}
+        item = data_list[0]
+        # 严格校验关键字段：车型必须存在
+        if not item.get('carModelName'):
+            return {}
+        configs = item.get('configs') or []
+        if not configs:
+            return {}
+        return _extract_from_configs(configs)
+    except Exception:
+        logger.exception("[VIN解析] JSON 响应解析失败")
+        return {}
+
+
+def parse_catalog_response(response):
+    """
+    解析 catalog JSON 响应
+
+    :param response: requests.Response 对象
+    :return: dict，包含 engine/chassis（可能为空）
+    """
+    if response is None or not _is_json_response(response):
+        return {}
+    return _parse_catalog_json(response)
 
 
 def _build_update_sql(record_id, parsed, status='已查询'):
@@ -79,18 +120,60 @@ def _mark_record_queried(cursor, record_id, parsed=None, status='已查询'):
 
 
 def _is_daily_limit_reached(response):
-    """判断响应是否表示当日 EPC 查询次数已达上限"""
-    if response is None or response.status_code != 200:
+    """判断响应是否表示当日 EPC/VIN 查询次数已达上限"""
+    if response is None:
         return False
-    text = response.text or ''
-    return '当天查询EPC次数已达上限' in text or 'var status = "415"' in text
+    if not _is_json_response(response):
+        return False
+    try:
+        payload = response.json()
+        message = payload.get('message') or ''
+        status = payload.get('status') or ''
+        status_code = payload.get('statusCode')
+        if '上限' not in message:
+            return False
+        # 新接口返回 404，message 为：当天VIN码查询次数已达上限！
+        if 'EPC' in message or 'VIN' in message or '查询次数' in message:
+            return True
+        if status_code == -10000 and status == 'ERROR':
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def _is_data_defect(response):
-    """判断响应是否表示开思数据缺陷"""
+    """
+    判断响应是否表示开思数据缺陷
+
+    严格判定条件（需同时满足）：
+      1. JSON 响应中 message 为 "此vin码有品牌信息没有epc信息"
+      2. 关键字段全部为 null/空：
+         - 车型（carModelName）为 null
+         - configs 中无法提取到发动机或底盘
+    """
     if response is None or response.status_code != 200:
         return False
-    return '由于数据缺陷，该VIN码配置信息不全' in (response.text or '')
+    if not _is_json_response(response):
+        return False
+    try:
+        payload = response.json()
+        message = payload.get('message') or ''
+        if message != _EPC_DATA_DEFECT_MESSAGE:
+            return False
+        data_list = payload.get('data') or []
+        if not data_list:
+            return True
+        item = data_list[0]
+        # 条件 2a：车型必须为 null/空
+        if item.get('carModelName'):
+            return False
+        # 条件 2b：configs 中不能解析出发动机或底盘
+        configs = item.get('configs') or []
+        extracted = _extract_from_configs(configs)
+        return not extracted.get('engine') and not extracted.get('chassis')
+    except Exception:
+        return False
 
 
 def _is_login_page(response, vin_code):
@@ -99,10 +182,23 @@ def _is_login_page(response, vin_code):
         return False
     url = response.url or ''
     text = response.text or ''
-    expected_path = f'/maindata/catalog/{vin_code}'
-    if expected_path not in url:
+    expected_path = f'/maindata/api/getEpcModelInterfaceV2/{vin_code}'
+
+    # 1. URL 直接被重定向到登录页
+    if '/passport/login' in url:
         return True
+
+    # 2. 登录接口特有的响应头
+    app_context = response.headers.get('X-Application-Context', '')
+    if 'cass-passport' in app_context:
+        return True
+
+    # 3. 非目标 URL 且包含登录页文本特征
     login_markers = ['账号登录', 'passport/login', '请登录', '登录开思']
+    if expected_path not in url and any(marker in text for marker in login_markers):
+        return True
+
+    # 4. 目标 URL 包含登录页文本特征（兜底）
     return any(marker in text for marker in login_markers)
 
 
@@ -335,7 +431,7 @@ def _process_single_record(cursor, client, key, record, stats, newly_completed):
             logger.warning(f"[VIN补全][{key}] {vin_code} 开思数据缺陷，标记状态为'开思数据缺陷'")
             _mark_record_queried(cursor, record_id, status='开思数据缺陷')
         else:
-            parsed = parse_catalog_html(response.text)
+            parsed = parse_catalog_response(response)
             if not parsed:
                 body_preview = (response.text or '')[:1000].replace('\n', ' ')
                 logger.warning(
