@@ -17,6 +17,7 @@ from .wms_return_items_detail_task import register_wms_return_items_detail_tasks
 from .crm_price_sync_task import register_crm_price_sync_tasks
 from .mercedes_replace_number_sync_task import register_mercedes_replace_number_sync_tasks
 from .wx_chat_image_parse_task import register_wx_chat_image_parse_tasks
+from .data_gzbbr_login_task import register_data_gzbbr_login_tasks
 from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
 
 
@@ -68,6 +69,9 @@ def register_all_tasks(task_manager):
 
     # 14. 注册微信群聊图片解析定时任务（每天03:00）
     register_wx_chat_image_parse_tasks(task_manager)
+
+    # 15. 注册 data.gzbbr.com 每日登录更新 Cookie 定时任务（每天07:00）
+    register_data_gzbbr_login_tasks(task_manager)
 
 
 __all__ = ['execute_daily_pipeline', 'register_all_tasks']

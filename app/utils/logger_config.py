@@ -87,6 +87,7 @@ TASK_LOGGERS = [
     'crm_full_crawl',               # CRM 全量数据爬取
     'ks_inquiry_export',            # 开思询价导出
     'wx_chat_image_parse',          # 微信群聊图片解析
+    'data_gzbbr_login',             # data.gzbbr.com 自动登录更新 Cookie
 ]
 
 
