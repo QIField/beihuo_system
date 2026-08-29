@@ -40,13 +40,19 @@ def _clean_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return valid_items
 
 
-def _save_direct_inquiries(session, items: List[Dict[str, Any]], supplier: str) -> None:
+def _save_direct_inquiries(
+    session,
+    items: List[Dict[str, Any]],
+    supplier: str,
+    source_file: str,
+) -> None:
     """
     将清洗后的报价数据写入 crmapp_price_inquiry_direct
 
     :param session: 数据库会话
     :param items: 清洗后的报价条目列表
     :param supplier: 群名称，写入 supplier 字段
+    :param source_file: 来源图片名称，写入 source_file 字段
     """
     now = datetime.now()
     for item in items:
@@ -56,7 +62,7 @@ def _save_direct_inquiries(session, items: List[Dict[str, Any]], supplier: str) 
             supplier=supplier,
             original_price=item["original_price"],
             company="fsbbr",
-            source_file="询价群识别",
+            source_file=source_file,
             import_time=now,
         )
         session.add(record)
@@ -86,10 +92,11 @@ def parse_wx_chat_images(days: Optional[int] = 3) -> None:
     for image in pending_images:
         image_id = image["序号"]
         image_name = image["图片名称"]
+        image_url = f"http://113.45.176.129:8001/static/wxImage/{image_name}"
         supplier = image.get("群名称", "")
 
         try:
-            records = image_processor({"图片名称": image_name})
+            records = image_processor({"图片url": image_url})
         except Exception as e:
             logger.error(f"[wx_chat_image_parse] 图片识别异常 id={image_id}, name={image_name}: {e}")
             with orm_session() as session:
@@ -100,7 +107,7 @@ def parse_wx_chat_images(days: Optional[int] = 3) -> None:
             valid_items = _clean_records(records)
             if valid_items:
                 with orm_session() as session:
-                    _save_direct_inquiries(session, valid_items, supplier)
+                    _save_direct_inquiries(session, valid_items, supplier, image_url)
 
             with orm_session() as session:
                 update_image_status(session, image_id, "已解析")

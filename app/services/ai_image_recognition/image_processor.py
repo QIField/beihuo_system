@@ -199,11 +199,10 @@ def ai_look(url: str, thinking: str = "disabled") -> List[Dict[str, Any]]:
 
 
 def image_processor(data):
-    image_name = data.get("图片名称")
-    if not image_name:
-        print("图片名称为空")
+    url = data.get("图片url")
+    if not url:
+        print("图片url为空")
         return None
-    url = f"http://113.45.176.129:8001/static/wxImage/{image_name}"
     records = ai_look(url, thinking="enabled")
     return records
 
