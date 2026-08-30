@@ -17,7 +17,7 @@ data.gzbbr.com 登录业务服务层
 from typing import Optional, Tuple
 
 from app.scripts.spiders.spider_entities.data_gzbbr_login import DataGzbbrLoginSpider
-from app.services.system_setting_service.beihuo_system_config_service import update_json_config
+from app.services.system_setting_service.beihuo_system_config_service import set_config_by_key
 from app.utils.logger_config import get_task_logger
 
 logger = get_task_logger("data_gzbbr_login")
@@ -39,18 +39,19 @@ class DataGzbbrLoginService:
         self.config_key = config_key
 
     def save_cookie_to_config(self, cookie_str: str) -> bool:
-        """将 Cookie 保存到指定配置键（带缓存刷新）"""
+        """将 Cookie 字符串直接保存到指定配置键（带缓存刷新）"""
         try:
-            result = update_json_config(
+            result = set_config_by_key(
                 config_key=self.config_key,
-                update_dict={"cookie": cookie_str},
+                config_value=cookie_str,
                 env="prod",
+                config_type="string",
             )
-            if result.get("code") == 200:
+            if result and result.get("config_key") == self.config_key:
                 logger.info(f"[配置] Cookie 已保存到配置键 '{self.config_key}'")
                 return True
             else:
-                logger.error(f"[配置] 保存 Cookie 失败: {result.get('message')}")
+                logger.error(f"[配置] 保存 Cookie 失败: {result}")
                 return False
         except Exception as e:
             logger.error(f"[配置] 保存 Cookie 异常: {e}")

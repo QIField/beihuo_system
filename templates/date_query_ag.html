@@ -458,7 +458,9 @@
                 width: 120, 
                 pinned: 'left',
                 filter: 'agNumberColumnFilter',
-                cellClass: 'stock-cell',
+                cellClass: function(params) {
+                    return params.value === 0 ? 'stock-cell stock-zero' : 'stock-cell';
+                },
                 valueGetter: params => parseFloat(params.data['在途数量']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
             },
