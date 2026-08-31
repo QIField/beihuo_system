@@ -178,7 +178,6 @@ class KsInquiryRecordsService:
         id_params = list(params)
 
         with db_cursor() as cursor:
-            _id_t0 = time.time()
             if limit is not None:
                 # 分页场景：只查询当前页 id
                 base_id_sql = f"""
@@ -221,18 +220,6 @@ class KsInquiryRecordsService:
                     if len(rows) < batch_size:
                         break
                     last_id = ids[-1]
-            _id_ms = (time.time() - _id_t0) * 1000
-            _total_ids = sum(len(b) for b in id_batches)
-
-            # #region debug-point B:fetch-id-query
-            _dbg_log('B', 'ks_inquiry_records_service.py:_fetch_detail_rows', '[DEBUG] fetch id query done', {
-                'limit': limit,
-                'offset': offset,
-                'id_batches': len(id_batches),
-                'total_ids': _total_ids,
-                'id_query_elapsed_ms': round(_id_ms, 2)
-            })
-            # #endregion
 
             columns = [
                 'inquiryId', 'customerName', 'partsNum', 'resolve_parts_num', 'resolve_parts_name', 'partsName', 'brandName', 'brandNormalized',
@@ -500,7 +487,7 @@ class KsInquiryRecordsService:
         grid_configs = {
             'detail':       {'columns': KsInquiryRecordsService._DETAIL_FILTER_MAP, 'aggregated': set()},
             'master':       {'columns': KsInquiryRecordsService._MASTER_FILTER_MAP, 'aggregated': set()},
-            'oe_stats':     {'columns': {'resolve_parts_num': 'resolve_parts_num', 'partsName': 'resolve_parts_name', 'count': 'count', 'unquotedProducts': 'unquotedProducts'}, 'aggregated': {'count', 'unquotedProducts'}, 'group_by': 'resolve_parts_num'},
+            'oe_stats':     {'columns': {'resolve_parts_num': 'resolve_parts_num', 'partsName': 'resolve_parts_name', 'count': 'count', 'unquotedProducts': 'unquotedProducts', 'carBrandName': 'car_brand_name'}, 'aggregated': {'count', 'unquotedProducts'}, 'group_by': 'resolve_parts_num'},
             'garage_chassis': {'columns': {'carBrandName': 'car_brand_name', 'chassis': 'chassis', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, chassis'},
             'garage_engine':  {'columns': {'carBrandName': 'car_brand_name', 'engine': 'engine', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, engine'},
             'garage_oenum':   {'columns': {'carBrandName': 'car_brand_name', 'partsNum': 'partsNum', 'count': 'count'}, 'aggregated': {'count'}, 'group_by': 'car_brand_name, partsNum'},

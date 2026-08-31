@@ -104,10 +104,11 @@ def _build_detail_export_config() -> ExportConfig:
 def _build_oe_export_config() -> ExportConfig:
     """OE军备统计导出配置。"""
     return ExportConfig(
-        fields=['resolve_parts_num', 'count', 'partsName', 'unquotedProducts'],
+        fields=['resolve_parts_num', 'count', 'carBrandName', 'partsName', 'unquotedProducts'],
         headers={
             'resolve_parts_num': 'OE号',
             'count': '出现次数',
+            'carBrandName': '车辆品牌',
             'partsName': '配件名称',
             'unquotedProducts': '未报价商品数',
         },
@@ -227,6 +228,7 @@ def export_oe():
             'brand_name': _parse_str_param('brand_name'),
             'brand': _parse_str_param('brand'),
             'seller_status': _parse_str_param('seller_status'),
+            'car_brand_name': _parse_str_param('car_brand_name'),
             **_build_common_search_params()
         }
         _add_sort_params(search_params)

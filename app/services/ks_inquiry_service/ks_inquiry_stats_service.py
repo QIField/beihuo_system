@@ -72,6 +72,7 @@ class KsInquiryStatsService:
         begin_date: str = '',
         end_date: str = '',
         company: str = '',
+        car_brand_name: str = '',
         sort_column: str = '',
         sort_dir: str = '',
         column_filters: Optional[Dict[str, List[str]]] = None,
@@ -90,6 +91,7 @@ class KsInquiryStatsService:
         if begin_date:    conditions.append("quote_date >= %s");            params.append(begin_date)
         if end_date:      conditions.append("quote_date <= %s");            params.append(end_date)
         if company:       conditions.append("company = %s");                params.append(company)
+        if car_brand_name: conditions.append("car_brand_name LIKE %s");     params.append(f"%{car_brand_name}%")
 
         where_conditions = list(conditions)
         where_params = list(params)
@@ -104,6 +106,9 @@ class KsInquiryStatsService:
                 elif col_id == 'partsName':
                     where_conditions.append(f"resolve_parts_name IN ({placeholders})")
                     where_params.extend(values)
+                elif col_id == 'carBrandName':
+                    where_conditions.append(f"car_brand_name IN ({placeholders})")
+                    where_params.extend(values)
                 elif col_id in ('count', 'unquotedProducts'):
                     having_conditions.append(f"{col_id} IN ({placeholders})")
                     having_params.extend(values)
@@ -114,6 +119,7 @@ class KsInquiryStatsService:
         oe_column_map = {
             'resolve_parts_num': 'resolve_parts_num',
             'count': 'count',
+            'carBrandName': 'carBrandName',
             'partsName': 'partsName',
             'unquotedProducts': 'unquotedProducts'
         }
@@ -142,6 +148,7 @@ class KsInquiryStatsService:
                     SELECT
                         resolve_parts_num,
                         COUNT(DISTINCT inquiryId) as count,
+                        GROUP_CONCAT(DISTINCT car_brand_name ORDER BY car_brand_name ASC SEPARATOR ', ') as carBrandName,
                         MAX(resolve_parts_name) as partsName,
                         MAX(unquoted_products) as unquotedProducts
                     FROM crmapp_ks_inquiry_detail
@@ -161,6 +168,7 @@ class KsInquiryStatsService:
                 SELECT
                     resolve_parts_num,
                     COUNT(DISTINCT inquiryId) as count,
+                    GROUP_CONCAT(DISTINCT car_brand_name ORDER BY car_brand_name ASC SEPARATOR ', ') as carBrandName,
                     MAX(resolve_parts_name) as partsName,
                     MAX(unquoted_products) as unquotedProducts
                 FROM crmapp_ks_inquiry_detail
@@ -176,7 +184,7 @@ class KsInquiryStatsService:
             cursor.execute(data_sql, data_params)
             rows = cursor.fetchall()
 
-            columns = ['resolve_parts_num', 'count', 'partsName', 'unquotedProducts']
+            columns = ['resolve_parts_num', 'count', 'carBrandName', 'partsName', 'unquotedProducts']
             result = []
             for row in rows:
                 if isinstance(row, dict):
@@ -197,6 +205,7 @@ class KsInquiryStatsService:
         begin_date: str = '',
         end_date: str = '',
         company: str = '',
+        car_brand_name: str = '',
         page: int = 1,
         page_size: int = 200,
         sort_column: str = '',
@@ -218,7 +227,7 @@ class KsInquiryStatsService:
 
         where_clause, having_clause, params, having_params, order_by = KsInquiryStatsService._build_oe_where_having_clause(
             inquiry_id, resolve_parts_num, parts_name, brand_name, brand, seller_status,
-            begin_date, end_date, company, sort_column, sort_dir, column_filters
+            begin_date, end_date, company, car_brand_name, sort_column, sort_dir, column_filters
         )
 
         count_sql = f"""
@@ -271,6 +280,7 @@ class KsInquiryStatsService:
         begin_date: str = '',
         end_date: str = '',
         company: str = '',
+        car_brand_name: str = '',
         sort_column: str = '',
         sort_dir: str = '',
         column_filters: Optional[Dict[str, List[str]]] = None
@@ -280,7 +290,7 @@ class KsInquiryStatsService:
         """
         where_clause, having_clause, params, having_params, order_by = KsInquiryStatsService._build_oe_where_having_clause(
             inquiry_id, resolve_parts_num, parts_name, brand_name, brand, seller_status,
-            begin_date, end_date, company, sort_column, sort_dir, column_filters
+            begin_date, end_date, company, car_brand_name, sort_column, sort_dir, column_filters
         )
         return KsInquiryStatsService._fetch_oe_rows(
             where_clause, having_clause, params, having_params, order_by

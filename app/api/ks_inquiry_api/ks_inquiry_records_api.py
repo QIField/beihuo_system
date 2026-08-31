@@ -243,6 +243,7 @@ def get_oe_stats():
         begin_date = request.args.get('begin_date', '').strip()
         end_date = request.args.get('end_date', '').strip()
         company = request.args.get('company', '').strip()
+        car_brand_name = request.args.get('car_brand_name', '').strip()
         sort_column = request.args.get('sort_column', '').strip()
         sort_dir = request.args.get('sort_dir', '').strip()
 
@@ -280,6 +281,7 @@ def get_oe_stats():
             begin_date=begin_date,
             end_date=end_date,
             company=company,
+            car_brand_name=car_brand_name,
             sort_column=sort_column,
             sort_dir=sort_dir,
             page=page,
