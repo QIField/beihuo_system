@@ -337,8 +337,7 @@
 
         // 格式化数据
         function formatData(data) {
-            return data.map((item, index) => ({
-                rowNumber: index + 1,
+            return data.map((item) => ({
                 oe: formatEmptyValue(item.oe),
                 brand: formatEmptyValue(item.brand),
                 supplier: formatEmptyValue(item.supplier),
@@ -376,6 +375,13 @@
         function importTimeRenderer(instance, td, row, col, prop, value, cellProperties) {
             Handsontable.renderers.TextRenderer.apply(this, arguments);
             td.textContent = formatDateTimeDisplay(value);
+            return td;
+        }
+
+        // 行号渲染器：基于视觉行号计算，不绑定数据字段，排序后仍保持递增
+        function rowNumberRenderer(instance, td, row) {
+            td.textContent = row + 1;
+            td.style.textAlign = 'center';
             return td;
         }
 
@@ -493,7 +499,7 @@
             const gridKey = isDirect ? 'direct_list' : 'normal_list';
 
             const normalColumns = [
-                { data: 'rowNumber', title: '行号', width: 70, readOnly: true },
+                { data: null, title: '行号', width: 70, readOnly: true, renderer: rowNumberRenderer },
                 { data: 'oe', title: 'OE号', width: 150, readOnly: true },
                 { data: 'brand', title: '品牌', width: 120, readOnly: true },
                 { data: 'supplier', title: '供应商', width: 150, readOnly: true, renderer: createExpandableRenderer(10) },
@@ -510,7 +516,7 @@
             ];
 
             const directColumns = [
-                { data: 'rowNumber', title: '行号', readOnly: true },
+                { data: null, title: '行号', readOnly: true, renderer: rowNumberRenderer },
                 { data: 'oe', title: 'OE号', readOnly: true },
                 { data: 'brand', title: '品牌', readOnly: true },
                 { data: 'supplier', title: '供应商', readOnly: true, renderer: createExpandableRenderer(10) },
@@ -768,9 +774,10 @@
 
             gzbbrHot = new Handsontable(container, {
                 data: data,
-                colHeaders: ['选择', 'OE号', '品牌', '供应商', '仓库', '价格', '库存', '原失效时间', '创建时间', '备注'],
+                colHeaders: ['选择', '行号', 'OE号', '品牌', '供应商', '仓库', '价格', '库存', '原失效时间', '创建时间', '备注'],
                 columns: [
                     { data: 'selected', type: 'checkbox', renderer: 'checkbox', width: 50 },
+                    { data: null, readOnly: true, renderer: rowNumberRenderer, width: 60 },
                     { data: 'number', readOnly: true },
                     { data: 'brand_name', readOnly: true },
                     { data: 'supplier_name', readOnly: true },
@@ -973,11 +980,7 @@
             }
 
             const columns = [
-                { data: null, title: '序号', width: 60, readOnly: true, renderer: function(instance, td, row, col, prop, value, cellProperties) {
-                    td.innerText = row + 1;
-                    td.style.textAlign = 'center';
-                    return td;
-                }},
+                { data: null, title: '序号', width: 60, readOnly: true, renderer: rowNumberRenderer },
                 { data: 'oe', title: 'OE号', type: 'text', width: 150, readOnly: true },
                 { data: 'brand', title: '品牌', type: 'text', width: 100, readOnly: true },
                 { data: 'supplier', title: '供应商', type: 'text', width: 150, readOnly: true },
