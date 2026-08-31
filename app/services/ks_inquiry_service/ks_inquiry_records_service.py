@@ -175,32 +175,64 @@ class KsInquiryRecordsService:
         根据 WHERE 条件查询明细数据；limit/offset 为 None 时不分页。
         全量导出时按 batch_size 分批查询 id，避免超长 IN 子句。
         """
-        base_id_sql = f"""
-            SELECT d.id
-            FROM crmapp_ks_inquiry_detail d
-            WHERE {where_clause}
-            ORDER BY {order_by}
-        """
         id_params = list(params)
 
         with db_cursor() as cursor:
+            _id_t0 = time.time()
             if limit is not None:
                 # 分页场景：只查询当前页 id
+                base_id_sql = f"""
+                    SELECT d.id
+                    FROM crmapp_ks_inquiry_detail d
+                    WHERE {where_clause}
+                    ORDER BY {order_by}
+                """
                 cursor.execute(base_id_sql + " LIMIT %s OFFSET %s", tuple(id_params + [limit, offset or 0]))
                 id_batches = [[row[0] for row in cursor.fetchall()]]
             else:
-                # 全量导出：分批查询 id
+                # 全量导出：使用游标分页按 id 分批查询，避免 OFFSET 深翻页
                 id_batches = []
-                current_offset = 0
+                last_id = None
                 while True:
-                    cursor.execute(base_id_sql + " LIMIT %s OFFSET %s", tuple(id_params + [batch_size, current_offset]))
+                    if last_id is None:
+                        sql = f"""
+                            SELECT d.id
+                            FROM crmapp_ks_inquiry_detail d
+                            WHERE {where_clause}
+                            ORDER BY d.id ASC
+                            LIMIT %s
+                        """
+                        q_params = tuple(id_params + [batch_size])
+                    else:
+                        sql = f"""
+                            SELECT d.id
+                            FROM crmapp_ks_inquiry_detail d
+                            WHERE {where_clause} AND d.id > %s
+                            ORDER BY d.id ASC
+                            LIMIT %s
+                        """
+                        q_params = tuple(id_params + [last_id, batch_size])
+                    cursor.execute(sql, q_params)
                     rows = cursor.fetchall()
                     if not rows:
                         break
-                    id_batches.append([row[0] for row in rows])
+                    ids = [row[0] for row in rows]
+                    id_batches.append(ids)
                     if len(rows) < batch_size:
                         break
-                    current_offset += batch_size
+                    last_id = ids[-1]
+            _id_ms = (time.time() - _id_t0) * 1000
+            _total_ids = sum(len(b) for b in id_batches)
+
+            # #region debug-point B:fetch-id-query
+            _dbg_log('B', 'ks_inquiry_records_service.py:_fetch_detail_rows', '[DEBUG] fetch id query done', {
+                'limit': limit,
+                'offset': offset,
+                'id_batches': len(id_batches),
+                'total_ids': _total_ids,
+                'id_query_elapsed_ms': round(_id_ms, 2)
+            })
+            # #endregion
 
             columns = [
                 'inquiryId', 'customerName', 'partsNum', 'resolve_parts_num', 'resolve_parts_name', 'partsName', 'brandName', 'brandNormalized',
