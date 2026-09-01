@@ -53,8 +53,16 @@ PICK_WORK_EXTRA_FIELDS = ["handler_name", "real_name"]
 
 # type 显示映射
 TYPE_NAME_MAP = {
-    3: "收货",
-    5: "拣货",
+    3: "拣货",
+    5: "收货",
+}
+
+# (type, status) 组合状态映射
+COMBO_STATUS_NAME_MAP = {
+    (3, 0): "拣货未开始",
+    (3, 1): "正在拣货",
+    (5, 0): "收货未开始",
+    (5, 1): "正在入库",
 }
 
 # Excel 列顺序
@@ -99,6 +107,7 @@ def _fetch_orders(company: str, logger: logging.Logger) -> List[Dict[str, Any]]:
                 continue
             seen_order_nos.add(orders_no)
             record["status"] = status
+            record["type"] = int(record.get("type")) if record.get("type") is not None else None
             orders.append(record)
 
         logger.info("[wms_order_push] type=%s, status=%s 获取 %s 条", order_type, status, len(records))
@@ -220,8 +229,8 @@ def _calculate_shortage(needqty: Any, qty: Any) -> int:
 def _get_purchaser_or_salesperson(order: Dict[str, Any], order_type: int) -> Optional[str]:
     """
     根据订单类型从订单列表接口获取采购员/业务员
-    - type=5（拣货）：取 handler_name
-    - type=3（收货）：取 real_name
+    - type=5：取 handler_name
+    - type=3：取 real_name
     """
     if order_type == 5:
         return order.get("handler_name")
@@ -245,9 +254,10 @@ def _build_excel_row(
     pono = order.get("pono")
     needqty = item.get("needqty")
     qty = item.get("qty")
+    combo_key = (order_type, status)
 
     return {
-        "状态": TYPE_NAME_MAP.get(order_type, order_type),
+        "状态": COMBO_STATUS_NAME_MAP.get(combo_key, str(combo_key)),
         "订单": pono,
         "客户名称": order.get("fullname"),
         "采购员/业务员": _get_purchaser_or_salesperson(order, order_type) if status == 1 else "",
@@ -259,6 +269,7 @@ def _build_excel_row(
         "需要": needqty,
         "已拣货/已收货": qty,
         "缺货数/待出库数": _calculate_shortage(needqty, qty),
+        "_order_type": order_type,
     }
 
 
@@ -267,11 +278,10 @@ def _build_sheet_data(rows: List[Dict[str, Any]], order_type: int) -> Tuple[pd.D
     按订单类型筛选数据，组间插入空行，并返回需要合并的单元格行范围
 
     :param rows: 所有 Excel 行数据
-    :param order_type: 3（收货）或 5（拣货）
+    :param order_type: 3（拣货）或 5（收货）
     :return: (DataFrame, 合并范围列表[(start_excel_row, end_excel_row)])
     """
-    type_name = TYPE_NAME_MAP.get(order_type)
-    sheet_rows = [row for row in rows if row.get("状态") == type_name]
+    sheet_rows = [row for row in rows if row.get("_order_type") == order_type]
 
     if not sheet_rows:
         return pd.DataFrame(columns=EXCEL_COLUMNS), []
@@ -344,8 +354,8 @@ def _auto_fit_columns(ws) -> None:
 
 def _export_to_excel(rows: List[Dict[str, Any]], company: str, date_str: str) -> str:
     """
-    将记录按状态分工作表导出：
-    - 收货、拣货分别存放
+    将记录按订单类型分工作表导出：
+    - 拣货、收货分别存放
     - 不同订单之间插入空行
     - 同一订单的状态、订单、客户名称、采购员/业务员、操作人单元格合并
     """
@@ -377,14 +387,28 @@ def _build_download_url(company: str, date_str: str) -> str:
     )
 
 
-def _build_message(now_str: str, company: str, count: int, download_url: str) -> str:
-    return (
-        "===【WMS订单推送】===\n"
-        f"统计时间：{now_str}\n"
-        f"门店：{company}\n"
-        f"数据条数：{count}\n"
-        f"文件下载链接：{download_url}"
-    )
+def _build_message(
+    now_str: str,
+    company: str,
+    order_count: int,
+    row_count: int,
+    combo_order_counts: Dict[Tuple[int, int], int],
+    download_url: str,
+) -> str:
+    lines = [
+        "===【WMS订单推送】===",
+        f"统计时间：{now_str}",
+        f"门店：{company}",
+    ]
+    for combo_key, label in COMBO_STATUS_NAME_MAP.items():
+        count = combo_order_counts.get(combo_key, 0)
+        lines.append(f"{label}：{count} 单")
+    lines.extend([
+        f"合计订单：{order_count} 单",
+        f"数据条数：{row_count} 条",
+        f"文件下载链接：{download_url}",
+    ])
+    return "\n".join(lines)
 
 
 def run_wms_order_push(
@@ -492,7 +516,8 @@ def run_wms_order_push(
     result["file_path"] = file_path
 
     download_url = _build_download_url(company, date_str)
-    message = _build_message(now_str, company, count, download_url)
+    order_count = len(orders)
+    message = _build_message(now_str, company, order_count, count, combo_order_counts, download_url)
 
     if push:
         push_resp = message_push("WMS", message)
