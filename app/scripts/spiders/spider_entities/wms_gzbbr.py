@@ -54,12 +54,14 @@ class WmsGzbbrSpider:
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
 
     # https://wms.gzbbr.com/api/Wms.Orders/get_return_items
-    def get_return_items(self, orders_no=None):
+    def get_return_items(self, orders_no=None, is_self=None):
         """获取采购入库单列表"""
         url = f"{self.BASE_URL}/api/Wms.Orders/get_return_items"
         params = {
             "orders_no": orders_no,
         }
+        if is_self is not None:
+            params["is_self"] = is_self
         # ========== 打印请求信息 ==========
         self.logger.info("【请求API地址】%s", url)
         self.logger.info("【请求参数】%s", params)
@@ -78,6 +80,57 @@ class WmsGzbbrSpider:
         self.logger.info("【请求参数】%s", params)
         # ==================================
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
+    # https://wms.gzbbr.com/api/Wms.Orders/addPurchaseToInventory
+    def add_purchase_to_inventory(self, orders_id=None):
+        """采购入库确认"""
+        url = f"{self.BASE_URL}/api/Wms.Orders/addPurchaseToInventory"
+        payload = {"orders_id": orders_id}
+        # ========== 打印请求信息 ==========
+        self.logger.info("【请求API地址】%s", url)
+        self.logger.info("【请求参数】%s", payload)
+        # ==================================
+        return self.spider_tool.fetch(
+            url,
+            method="POST",
+            json=payload,
+            headers=self._get_auth_header(),
+        )
+
+    # https://wms.gzbbr.com/api/Wms.Orders/removePurchaseFromInventory
+    def remove_purchase_from_inventory(self, orders_id=None):
+        """采购移除确认"""
+        url = f"{self.BASE_URL}/api/Wms.Orders/removePurchaseFromInventory"
+        payload = {"orders_id": orders_id}
+        # ========== 打印请求信息 ==========
+        self.logger.info("【请求API地址】%s", url)
+        self.logger.info("【请求参数】%s", payload)
+        # ==================================
+        return self.spider_tool.fetch(
+            url,
+            method="POST",
+            json=payload,
+            headers=self._get_auth_header(),
+        )
+
+    # https://wms.gzbbr.com/api/Wms.Orders/orders_workok
+    def orders_workok(self, type=None, orders_id=None):
+        """订单工作完成确认"""
+        url = f"{self.BASE_URL}/api/Wms.Orders/orders_workok"
+        payload = {
+            "type": str(type) if type is not None else None,
+            "orders_id": str(orders_id) if orders_id is not None else None,
+        }
+        # ========== 打印请求信息 ==========
+        self.logger.info("【请求API地址】%s", url)
+        self.logger.info("【请求参数】%s", payload)
+        # ==================================
+        return self.spider_tool.fetch(
+            url,
+            method="POST",
+            json=payload,
+            headers=self._get_auth_header(),
+        )
 
     def close(self):
         """关闭会话连接"""

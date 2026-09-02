@@ -114,11 +114,7 @@ def _async_export_wrapper(
     logger.info('[async_export] 开始单 Sheet 导出，参数: %s', search_params)
 
     _notify_progress(progress_callback, 10, '正在查询数据...')
-    try:
-        data = fetcher(progress_callback=progress_callback, **search_params)
-    except Exception as e:
-        logger.exception('[async_export] 查询导出数据失败: %s', e)
-        raise
+    data = fetcher(progress_callback=progress_callback, **search_params)
 
     if not data:
         logger.warning('[async_export] 查询结果为空，无数据可导出')
@@ -211,6 +207,7 @@ def _async_multi_sheet_export_wrapper(
     for idx, sheet in enumerate(sheets_config):
         base_progress = int((idx / sheet_count) * 60)
         prepared, count = _prepare_sheet_data(sheet, progress_callback, base_progress)
+
         if prepared:
             prepared_sheets.append(prepared)
             total_records += count

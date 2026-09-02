@@ -826,30 +826,53 @@
 
         // 轮询异步导出任务状态并显示进度
         function pollExportTask(taskId) {
-            const maxAttempts = 120;
+            const MAX_DURATION_MS = 30 * 60 * 1000; // 最长等 30 分钟
+            const FAST_POLL_MS = 1000;
+            const SLOW_POLL_MS = 5000;
+            const FAST_PERIOD_MS = 30 * 1000; // 前 30 秒 1 秒/次，之后 5 秒/次
             let attempts = 0;
+            const startTime = Date.now();
+
             const progressHtml = '<div id="export-progress-box" style="padding: 20px; text-align: center;">' +
                 '<i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop" style="font-size: 30px;"></i>' +
                 '<p id="export-progress-text" style="margin-top: 12px; font-size: 14px; color: #333;">正在准备导出...</p>' +
+                '<p id="export-progress-elapsed" style="margin-top: 8px; font-size: 12px; color: #999;">已等待 0 秒</p>' +
                 '</div>';
-            let openIndex = layui.layer.open({
+            const openIndex = layui.layer.open({
                 type: 1,
                 title: '数据导出中',
                 closeBtn: 0,
                 shade: 0.3,
-                area: ['320px', '180px'],
+                shadeClose: false,
+                area: ['340px', '200px'],
                 content: progressHtml
             });
 
-            const timer = setInterval(function() {
-                attempts++;
-                if (attempts > maxAttempts) {
-                    clearInterval(timer);
+            const elapsedTimer = setInterval(function() {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const el = document.getElementById('export-progress-elapsed');
+                if (el) el.textContent = '已等待 ' + elapsed + ' 秒';
+            }, 1000);
+
+            let timer = null;
+
+            function scheduleNext() {
+                const elapsed = Date.now() - startTime;
+                if (elapsed > MAX_DURATION_MS) {
+                    clearInterval(elapsedTimer);
                     layui.layer.close(openIndex);
-                    layui.layer.msg('导出任务超时，请稍后重试', {icon: 2});
+                    layui.layer.msg('导出任务处理时间较长，请稍后到下载中心查看或重试', {icon: 0, time: 5000});
                     return;
                 }
+                const interval = elapsed < FAST_PERIOD_MS ? FAST_POLL_MS : SLOW_POLL_MS;
+                timer = setTimeout(function() {
+                    doPoll();
+                    scheduleNext();
+                }, interval);
+            }
 
+            function doPoll() {
+                attempts++;
                 fetch('/new/api/ks_inquiry/records/export/status/' + taskId, {
                     method: 'GET',
                     credentials: 'same-origin'
@@ -857,13 +880,15 @@
                 .then(function(response) { return response.json(); })
                 .then(function(result) {
                     if (result.code === 1 || result.code === '1') {
-                        clearInterval(timer);
+                        clearTimeout(timer);
+                        clearInterval(elapsedTimer);
                         layui.layer.close(openIndex);
                         layui.layer.msg(result.msg || '没有数据可导出', {icon: 0});
                         return;
                     }
                     if (result.code !== 0 && result.code !== '0') {
-                        clearInterval(timer);
+                        clearTimeout(timer);
+                        clearInterval(elapsedTimer);
                         layui.layer.close(openIndex);
                         layui.layer.msg(result.msg || '查询任务状态失败', {icon: 2});
                         return;
@@ -871,11 +896,13 @@
 
                     const task = result.data || {};
                     if (task.status === 'completed') {
-                        clearInterval(timer);
+                        clearTimeout(timer);
+                        clearInterval(elapsedTimer);
                         layui.layer.close(openIndex);
                         window.location.href = '/new/api/ks_inquiry/records/export/download/' + taskId;
                     } else if (task.status === 'failed') {
-                        clearInterval(timer);
+                        clearTimeout(timer);
+                        clearInterval(elapsedTimer);
                         layui.layer.close(openIndex);
                         layui.layer.msg('导出失败：' + (task.message || task.error || '未知错误'), {icon: 2});
                     } else {
@@ -890,7 +917,10 @@
                 .catch(function(error) {
                     console.error('[export] 查询任务状态失败:', error);
                 });
-            }, 1000);
+            }
+
+            doPoll();
+            scheduleNext();
         }
 
         // 根据当前标签更新搜索栏显示

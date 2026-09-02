@@ -58,7 +58,7 @@ docker/logs/
 
 # Custom
 1.txt
-
+/.dbg
 /scripts
 /demo
 /excel

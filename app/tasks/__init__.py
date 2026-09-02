@@ -14,6 +14,7 @@ from .crm_warehouse_inventory_sync_task import register_crm_warehouse_inventory_
 from .vin_vehicle_info_sync_task import register_vin_vehicle_info_sync_tasks
 from .wms_order_push_task import register_wms_order_push_tasks
 from .wms_return_items_detail_task import register_wms_return_items_detail_tasks
+from .wms_inventory_operation_task import register_wms_inventory_operation_tasks
 from .crm_price_sync_task import register_crm_price_sync_tasks
 from .mercedes_replace_number_sync_task import register_mercedes_replace_number_sync_tasks
 from .wx_chat_image_parse_task import register_wx_chat_image_parse_tasks
@@ -72,6 +73,9 @@ def register_all_tasks(task_manager):
 
     # 15. 注册 data.gzbbr.com 每日登录更新 Cookie 定时任务（每天07:00）
     register_data_gzbbr_login_tasks(task_manager)
+
+    # 16. 注册WMS库存操作自动推送定时任务（每天10:00、20:00）
+    register_wms_inventory_operation_tasks(task_manager)
 
 
 __all__ = ['execute_daily_pipeline', 'register_all_tasks']
