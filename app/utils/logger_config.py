@@ -77,6 +77,7 @@ TASK_LOGGERS = [
     'data_gzbbr',                   # data.gzbbr 报价接口日志
     'wms_order_push',               # WMS 订单推送
     'wms_return_items_detail',      # WMS 采购入库单明细同步（按指定字段）
+    'wms_inventory_operation',      # WMS 采购入库/移除自动推送
     'wms_gzbbr',                    # WMS 爬虫公共模块日志
     'crm_price_sync',               # CRM 产品价格同步
     'replace_number',               # 更新替换号

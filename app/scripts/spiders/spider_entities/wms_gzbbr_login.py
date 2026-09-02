@@ -399,8 +399,8 @@ class WmsGzbbrLoginService:
                 if body_status == 200:
                     # 业务状态为 200 → token 有效
                     return True, ""
-                elif body_status in (401, 403):
-                    # 明确的认证失败
+                elif body_status in (101, 401, 403):
+                    # 101: token过期；401/403: 认证失败
                     msg = data.get("msg", f"业务状态码：{body_status}")
                     return False, f"Token已过期或无效（{msg}）"
                 else:
