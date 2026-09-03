@@ -1,7 +1,9 @@
 # -*- coding:utf-8 -*-
 """
 WMS 库存操作自动推送定时任务
-每天 10:00、20:00 各执行一次
+
+运行时间从 beihuo_system_config 表读取（key: wms_inventory_operation_schedule_times），
+页面 /web/wms_inventory_operation/ 可配置，默认每天 10:00、20:00 各执行一次。
 
 流程：
 1. 采购入库自动推送（type=5, status=0/1）-> addPurchaseToInventory
@@ -17,11 +19,8 @@ from app.utils.logger_config import get_task_logger
 
 logger = get_task_logger('wms_inventory_operation')
 
-# 定时任务执行时间点（小时，分钟）
-SCHEDULE_TIMES = [
-    (10, 0),
-    (20, 0),
-]
+# job_id 前缀
+JOB_ID_PREFIX = 'wms_inventory_operation_task_'
 
 
 def run_wms_inventory_operation_task():
@@ -44,13 +43,31 @@ def run_wms_inventory_operation_task():
     logger.info(f"{'=' * 80}\n")
 
 
+def register_wms_inventory_operation_jobs(task_manager):
+    """
+    按当前配置的运行时间注册 job（不做启用开关检查，可被外部复用）
+    """
+    from app.services.wms_inventory_operation_service.task_control_service import get_schedule_times
+
+    for time_text in get_schedule_times():
+        hour, minute = time_text.split(":")
+        job_id = f'{JOB_ID_PREFIX}{int(hour):02d}{int(minute):02d}'
+        task_manager.schedule(
+            run_wms_inventory_operation_task,
+            'cron',
+            job_id,
+            hour=int(hour),
+            minute=int(minute),
+            replace_existing=True,
+        )
+        logger.info(f"[WMS库存操作自动推送] 定时任务已注册（每天{int(hour):02d}:{int(minute):02d}）")
+
+
 def register_wms_inventory_operation_tasks(task_manager):
     """
     注册 WMS 库存操作自动推送定时任务
 
-    每天 10:00、20:00 各执行一次
-
-    :param task_manager: 任务管理器实例（来自 app.core.task_manager）
+    运行时间从配置表读取，页面可动态修改
     """
     auto_start = os.environ.get('AUTO_START_WMS_INVENTORY_OPERATION', 'true').lower() != 'false'
     if not auto_start:
@@ -58,16 +75,6 @@ def register_wms_inventory_operation_tasks(task_manager):
         return
 
     try:
-        for hour, minute in SCHEDULE_TIMES:
-            job_id = f'wms_inventory_operation_task_{hour:02d}{minute:02d}'
-            task_manager.schedule(
-                run_wms_inventory_operation_task,
-                'cron',
-                job_id,
-                hour=hour,
-                minute=minute,
-                replace_existing=True,
-            )
-            logger.info(f"[WMS库存操作自动推送] 定时任务已注册（每天{hour:02d}:{minute:02d}）")
+        register_wms_inventory_operation_jobs(task_manager)
     except Exception as e:
         logger.error(f"[WMS库存操作自动推送] 注册失败: {e}")
