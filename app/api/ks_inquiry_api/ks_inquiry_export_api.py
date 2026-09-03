@@ -104,13 +104,12 @@ def _build_detail_export_config() -> ExportConfig:
 def _build_oe_export_config() -> ExportConfig:
     """OE军备统计导出配置。"""
     return ExportConfig(
-        fields=['resolve_parts_num', 'count', 'carBrandName', 'partsName', 'unquotedProducts'],
+        fields=['resolve_parts_num', 'count', 'carBrandName', 'partsName'],
         headers={
             'resolve_parts_num': 'OE号',
             'count': '出现次数',
             'carBrandName': '车辆品牌',
             'partsName': '配件名称',
-            'unquotedProducts': '未报价商品数',
         },
         filename_template='指挥总看板_OE军备统计_{timestamp}.xlsx',
         sheet_name='OE军备统计',
@@ -233,6 +232,9 @@ def export_oe():
         }
         _add_sort_params(search_params)
         _add_column_filters(search_params)
+
+        # OE统计服务不支持客户名称筛选，移除通用参数中的 garage_name
+        search_params.pop('garage_name', None)
 
         config = _build_oe_export_config()
         task_id = submit_export_task(config, _fetch_oe_export, search_params)

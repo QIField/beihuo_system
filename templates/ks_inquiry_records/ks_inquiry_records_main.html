@@ -371,8 +371,12 @@
         <!-- 搜索筛选区域 - 保持原样 -->
         <div class="search-panel">
             <!-- 日期选择器 -->
-            <span style="font-size: 14px; color: #666;">日期范围：</span>
+            <span id="dateRangeLabel" style="font-size: 14px; color: #666;">日期范围：</span>
             <input type="text" id="dateRange" placeholder="请选择日期范围" class="layui-input" style="width: 220px;" readonly>
+
+            <!-- 月份选择器（仅OE军备统计标签显示） -->
+            <span id="oeMonthLabel" style="font-size: 14px; color: #666; display: none;">查询月份：</span>
+            <input type="text" id="oeMonth" placeholder="请选择月份" class="layui-input" style="width: 140px; display: none;" readonly>
 
             <!-- 分隔符 -->
             <span style="color: #999;">|</span>
@@ -464,11 +468,20 @@
         // 获取查询参数
         function getSearchParams(tabId) {
             let beginDate = '', endDate = '';
-            const dateRangeValue = document.getElementById('dateRange').value;
-            if (dateRangeValue) {
-                const dates = dateRangeValue.split(' - ');
-                beginDate = dates[0] || '';
-                endDate = dates[1] || '';
+            if (tabId === 'oe') {
+                // OE军备统计：月份选择器，转换为当月首日~末日
+                const month = document.getElementById('oeMonth').value;
+                if (month) {
+                    beginDate = month + '-01';
+                    endDate = getMonthLastDay(month);
+                }
+            } else {
+                const dateRangeValue = document.getElementById('dateRange').value;
+                if (dateRangeValue) {
+                    const dates = dateRangeValue.split(' - ');
+                    beginDate = dates[0] || '';
+                    endDate = dates[1] || '';
+                }
             }
 
             let state = {};
@@ -674,6 +687,8 @@
         function resetAll() {
             // 重置日期范围为近三天
             document.getElementById('dateRange').value = getDefaultDateRange();
+            // 重置OE统计月份为当前月
+            document.getElementById('oeMonth').value = getDefaultMonth();
 
             // 只重置当前 tab 对应的 state
             const state = getCurrentSearchState(currentTab);
@@ -930,6 +945,24 @@
 
             currentTab = tabId;
 
+            // OE军备统计用月份选择器，其他标签用日期范围
+            const oeMonthInput = document.getElementById('oeMonth');
+            const oeMonthLabel = document.getElementById('oeMonthLabel');
+            const dateRangeInput = document.getElementById('dateRange');
+            const dateRangeLabel = document.getElementById('dateRangeLabel');
+            const isOeTab = (tabId === 'oe');
+            if (oeMonthInput && oeMonthLabel && dateRangeInput) {
+                oeMonthInput.style.display = isOeTab ? 'inline-block' : 'none';
+                oeMonthLabel.style.display = isOeTab ? 'inline' : 'none';
+                dateRangeInput.style.display = isOeTab ? 'none' : 'inline-block';
+                if (dateRangeLabel) {
+                    dateRangeLabel.style.display = isOeTab ? 'none' : 'inline';
+                }
+                if (isOeTab && !oeMonthInput.value) {
+                    oeMonthInput.value = getDefaultMonth();
+                }
+            }
+
             // 控制订单状态筛选只在明细列表标签显示
             const orderStatusWrapper = document.getElementById('orderStatusWrapper');
             const orderStatusSelect = document.getElementById('orderStatusSelect');
@@ -1026,6 +1059,19 @@
             return threeDaysAgoStr + ' - ' + todayStr;
         }
 
+        // 获取默认月份（当前月，格式 yyyy-MM）
+        function getDefaultMonth() {
+            const today = new Date();
+            return today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+        }
+
+        // 获取月份末日（monthStr 格式 yyyy-MM，返回 yyyy-MM-dd）
+        function getMonthLastDay(monthStr) {
+            const parts = monthStr.split('-');
+            const lastDay = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10), 0).getDate();
+            return monthStr + '-' + String(lastDay).padStart(2, '0');
+        }
+
         // 初始化 Grid
         document.addEventListener('DOMContentLoaded', function() {
             // 初始化标签导航组件
@@ -1082,6 +1128,21 @@
                     },
                     change: function(value, date, endDate) {
                         console.log('日期变化:', value);
+                    }
+                });
+
+                // OE军备统计：月份选择器
+                laydate.render({
+                    elem: '#oeMonth',
+                    trigger: 'focus',
+                    type: 'month',
+                    format: 'yyyy-MM',
+                    max: 0,
+                    done: function(value) {
+                        console.log('月份选择完成:', value);
+                        if (currentTab === 'oe') {
+                            refreshOeStats();
+                        }
                     }
                 });
             });

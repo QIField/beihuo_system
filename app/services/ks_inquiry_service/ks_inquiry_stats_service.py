@@ -62,6 +62,299 @@ class KsInquiryStatsService:
     """
 
     @staticmethod
+    def _can_use_summary(begin_date: str = '', end_date: str = '',
+                          inquiry_id: str = '', parts_name: str = '',
+                          brand_name: str = '', brand: str = '',
+                          seller_status: str = '') -> bool:
+        """判断能否命中月度汇总表：日期为同一自然月且无明细级筛选"""
+        if not begin_date or not end_date:
+            return False
+        if begin_date[:7] != end_date[:7]:
+            return False
+        return not (inquiry_id or parts_name or brand_name or brand or seller_status)
+
+    @staticmethod
+    def _get_summary_month(begin_date: str) -> str:
+        """由 begin_date 得到自然月首日，如 2024-03-15 → 2024-03-01"""
+        return begin_date[:7] + '-01'
+
+    @staticmethod
+    def _build_oe_summary_conditions(
+        summary_month: str,
+        resolve_parts_num: str = '',
+        car_brand_name: str = '',
+        company: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None,
+    ) -> Tuple[str, List[Any], str, List[Any]]:
+        """构建 OE 汇总表查询的 WHERE 和 HAVING 子句"""
+        conditions = ["summary_month = %s"]
+        params: List[Any] = [summary_month]
+        if company:       conditions.append("company = %s");           params.append(company)
+        if resolve_parts_num: conditions.append("resolve_parts_num LIKE %s"); params.append(f"%{resolve_parts_num}%")
+        if car_brand_name: conditions.append("car_brand_name LIKE %s"); params.append(f"%{car_brand_name}%")
+
+        having_conditions = []
+        having_params: List[Any] = []
+        if column_filters:
+            for col_id, values in column_filters.items():
+                if not values:
+                    continue
+                placeholders = ', '.join(['%s'] * len(values))
+                if col_id == 'resolve_parts_num':
+                    conditions.append(f"resolve_parts_num IN ({placeholders})")
+                    params.extend(values)
+                elif col_id == 'carBrandName':
+                    conditions.append(f"car_brand_name IN ({placeholders})")
+                    params.extend(values)
+                elif col_id == 'partsName':
+                    having_conditions.append(f"partsName IN ({placeholders})")
+                    having_params.extend(values)
+                elif col_id == 'count':
+                    having_conditions.append(f"count IN ({placeholders})")
+                    having_params.extend(values)
+
+        where_clause = " AND ".join(conditions)
+        having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
+        return where_clause, params, having_clause, having_params
+
+    @staticmethod
+    def _build_oe_summary_order_by(sort_column: str = '', sort_dir: str = '') -> str:
+        """构建 OE 汇总表查询的 ORDER BY 子句"""
+        oe_column_map = {
+            'resolve_parts_num': 'resolve_parts_num',
+            'count': 'count',
+            'carBrandName': 'carBrandName',
+            'partsName': 'partsName'
+        }
+        return build_order_by(
+            sort_column, sort_dir, oe_column_map,
+            numeric_columns={'count'},
+            default='count DESC'
+        )
+
+    @staticmethod
+    def _fetch_oe_summary_rows(
+        where_clause: str,
+        params: List[Any],
+        having_clause: str,
+        having_params: List[Any],
+        order_by: str,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """根据 WHERE/HAVING 查询 OE 汇总表数据；limit 为 None 时不分页。"""
+        data_sql = f"""
+            SELECT * FROM (
+                SELECT
+                    resolve_parts_num,
+                    SUM(inquiry_count) AS count,
+                    GROUP_CONCAT(DISTINCT car_brand_name ORDER BY car_brand_name ASC SEPARATOR ', ') AS carBrandName,
+                    MAX(parts_name) AS partsName
+                FROM ks_inquiry_oe_monthly_summary
+                WHERE {where_clause}
+                GROUP BY resolve_parts_num
+                {having_clause}
+            ) t
+            ORDER BY {order_by}
+        """
+        data_params = list(params) + list(having_params)
+        if limit is not None:
+            data_sql += " LIMIT %s OFFSET %s"
+            data_params.append(limit)
+            data_params.append(offset or 0)
+
+        with db_cursor() as cursor:
+            cursor.execute(data_sql, data_params)
+            rows = cursor.fetchall()
+
+            columns = ['resolve_parts_num', 'count', 'carBrandName', 'partsName']
+            result = []
+            for row in rows:
+                if isinstance(row, dict):
+                    record = dict(row)
+                else:
+                    record = dict(zip(columns, row))
+                # 汇总表未预计算未报价商品数，前端不展示该列，导出时为空
+                record.setdefault('unquotedProducts', None)
+                result.append(record)
+            return result
+
+    @staticmethod
+    def _get_oe_stats_from_summary(
+        summary_month: str,
+        resolve_parts_num: str = '',
+        car_brand_name: str = '',
+        company: str = '',
+        page: int = 1,
+        page_size: int = 200,
+        sort_column: str = '',
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
+    ) -> Dict[str, Any]:
+        """从月度汇总表查询 OE 统计（快速路径，含分页）"""
+        start_time = time.time()
+
+        where_clause, params, having_clause, having_params = KsInquiryStatsService._build_oe_summary_conditions(
+            summary_month, resolve_parts_num, car_brand_name, company, column_filters
+        )
+        order_by = KsInquiryStatsService._build_oe_summary_order_by(sort_column, sort_dir)
+
+        count_sql = f"""
+            SELECT COUNT(*) FROM (
+                SELECT resolve_parts_num
+                FROM ks_inquiry_oe_monthly_summary
+                WHERE {where_clause}
+                GROUP BY resolve_parts_num
+                {having_clause}
+            ) t
+        """
+        count_params = list(params) + list(having_params)
+        count_result = db_query_one(count_sql, tuple(count_params), dict_cursor=False)
+        if count_result is None:
+            total = 0
+        elif isinstance(count_result, dict):
+            total = count_result.get('COUNT(*)', 0) or count_result.get('count', 0)
+        else:
+            total = count_result[0] if count_result else 0
+
+        offset = (page - 1) * page_size
+        result = KsInquiryStatsService._fetch_oe_summary_rows(
+            where_clause, params, having_clause, having_params, order_by,
+            limit=page_size, offset=offset
+        )
+
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) * 1000
+        print(f"[KsInquiryStatsService] OE统计汇总表查询完成: 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
+
+        return {
+            'list': result,
+            'total': total,
+            'page': page,
+            'page_size': page_size
+        }
+
+    @staticmethod
+    def _get_all_oe_stats_from_summary(
+        summary_month: str,
+        resolve_parts_num: str = '',
+        car_brand_name: str = '',
+        company: str = '',
+        sort_column: str = '',
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
+    ) -> List[Dict[str, Any]]:
+        """从月度汇总表查询 OE 统计完整数据（不分页，用于导出）"""
+        where_clause, params, having_clause, having_params = KsInquiryStatsService._build_oe_summary_conditions(
+            summary_month, resolve_parts_num, car_brand_name, company, column_filters
+        )
+        order_by = KsInquiryStatsService._build_oe_summary_order_by(sort_column, sort_dir)
+        return KsInquiryStatsService._fetch_oe_summary_rows(
+            where_clause, params, having_clause, having_params, order_by
+        )
+
+    @staticmethod
+    def _get_customer_stats_by_oe_from_summary(
+        summary_month: str,
+        resolve_parts_num: str,
+        company: str = '',
+        page: int = 1,
+        page_size: int = 200,
+        sort_column: str = '',
+        sort_dir: str = '',
+        column_filters: Optional[Dict[str, List[str]]] = None
+    ) -> Dict[str, Any]:
+        """从月度客户汇总表查询指定 OE 的客户统计（快速路径）"""
+        start_time = time.time()
+
+        conditions = ["summary_month = %s", "resolve_parts_num = %s"]
+        params: List[Any] = [summary_month, resolve_parts_num]
+        if company:
+            conditions.append("company = %s")
+            params.append(company)
+
+        having_conditions = []
+        having_params: List[Any] = []
+        if column_filters:
+            for col_id, values in column_filters.items():
+                if not values:
+                    continue
+                placeholders = ', '.join(['%s'] * len(values))
+                if col_id == 'customerName':
+                    conditions.append(f"garage_company_name IN ({placeholders})")
+                    params.extend(values)
+                elif col_id == 'count':
+                    having_conditions.append(f"count IN ({placeholders})")
+                    having_params.extend(values)
+
+        where_clause = " AND ".join(conditions)
+        having_clause = "HAVING " + " AND ".join(having_conditions) if having_conditions else ""
+
+        customer_column_map = {
+            'customerName': 'customerName',
+            'count': 'count'
+        }
+        order_by = build_order_by(
+            sort_column, sort_dir, customer_column_map,
+            numeric_columns={'count'},
+            default='count DESC, customerName ASC'
+        )
+
+        count_sql = f"""
+            SELECT COUNT(*) FROM (
+                SELECT garage_company_name
+                FROM ks_inquiry_customer_by_oe_monthly_summary
+                WHERE {where_clause}
+                GROUP BY garage_company_name
+                {having_clause}
+            ) t
+        """
+        count_params = list(params) + list(having_params)
+        count_result = db_query_one(count_sql, tuple(count_params), dict_cursor=False)
+        if count_result is None:
+            total = 0
+        elif isinstance(count_result, dict):
+            total = count_result.get('COUNT(*)', 0) or count_result.get('count', 0)
+        else:
+            total = count_result[0] if count_result else 0
+
+        offset = (page - 1) * page_size
+        data_sql = f"""
+            SELECT
+                garage_company_name AS customerName,
+                SUM(inquiry_count) AS count
+            FROM ks_inquiry_customer_by_oe_monthly_summary
+            WHERE {where_clause}
+            GROUP BY garage_company_name
+            {having_clause}
+            ORDER BY {order_by}
+            LIMIT %s OFFSET %s
+        """
+        data_params = count_params + [page_size, offset]
+
+        with db_cursor() as cursor:
+            cursor.execute(data_sql, data_params)
+            rows = cursor.fetchall()
+
+            result = []
+            for row in rows:
+                if isinstance(row, dict):
+                    result.append(row)
+                else:
+                    result.append(dict(zip(['customerName', 'count'], row)))
+
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) * 1000
+        print(f"[KsInquiryStatsService] OE客户统计汇总表查询完成: OE={resolve_parts_num}, 耗时 {elapsed_time:.2f} ms, 总条数: {total}, 返回 {len(result)} 条记录")
+
+        return {
+            'list': result,
+            'total': total,
+            'page': page,
+            'page_size': page_size
+        }
+
+    @staticmethod
     def _build_oe_where_having_clause(
         inquiry_id: str = '',
         resolve_parts_num: str = '',
@@ -225,6 +518,16 @@ class KsInquiryStatsService:
         """
         start_time = time.time()
 
+        # 快速路径：单月查询且无明细级筛选时命中月度汇总表
+        if KsInquiryStatsService._can_use_summary(
+            begin_date, end_date, inquiry_id, parts_name, brand_name, brand, seller_status
+        ):
+            summary_month = KsInquiryStatsService._get_summary_month(begin_date)
+            return KsInquiryStatsService._get_oe_stats_from_summary(
+                summary_month, resolve_parts_num, car_brand_name, company,
+                page, page_size, sort_column, sort_dir, column_filters
+            )
+
         where_clause, having_clause, params, having_params, order_by = KsInquiryStatsService._build_oe_where_having_clause(
             inquiry_id, resolve_parts_num, parts_name, brand_name, brand, seller_status,
             begin_date, end_date, company, car_brand_name, sort_column, sort_dir, column_filters
@@ -288,6 +591,16 @@ class KsInquiryStatsService:
         """
         获取OE号统计完整数据（不分页，用于导出）
         """
+        # 快速路径：单月查询且无明细级筛选时命中月度汇总表
+        if KsInquiryStatsService._can_use_summary(
+            begin_date, end_date, inquiry_id, parts_name, brand_name, brand, seller_status
+        ):
+            summary_month = KsInquiryStatsService._get_summary_month(begin_date)
+            return KsInquiryStatsService._get_all_oe_stats_from_summary(
+                summary_month, resolve_parts_num, car_brand_name, company,
+                sort_column, sort_dir, column_filters
+            )
+
         where_clause, having_clause, params, having_params, order_by = KsInquiryStatsService._build_oe_where_having_clause(
             inquiry_id, resolve_parts_num, parts_name, brand_name, brand, seller_status,
             begin_date, end_date, company, car_brand_name, sort_column, sort_dir, column_filters
@@ -406,6 +719,16 @@ class KsInquiryStatsService:
         Returns:
             Dict: {list: [{customerName, count}], total, page, page_size}
         """
+        # 快速路径：指定OE+单月查询且无明细级筛选时命中月度客户汇总表
+        if resolve_parts_num and KsInquiryStatsService._can_use_summary(
+            begin_date, end_date, inquiry_id, parts_name, brand_name, brand, seller_status
+        ):
+            summary_month = KsInquiryStatsService._get_summary_month(begin_date)
+            return KsInquiryStatsService._get_customer_stats_by_oe_from_summary(
+                summary_month, resolve_parts_num, company,
+                page, page_size, sort_column, sort_dir, column_filters
+            )
+
         start_time = time.time()
 
         conditions, params = [], []
