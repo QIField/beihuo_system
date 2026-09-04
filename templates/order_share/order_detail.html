@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>订单信息</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #f5f6f8;
+            color: #333;
+            min-height: 100vh;
+        }
+        .page { max-width: 480px; margin: 0 auto; padding: 16px; }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .05);
+        }
+        .card-title { font-size: 14px; color: #999; margin-bottom: 14px; }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 15px;
+            border-bottom: 1px solid #f2f2f2;
+        }
+        .row:last-child { border-bottom: none; }
+        .row .label { color: #999; flex-shrink: 0; margin-right: 16px; }
+        .row .value { color: #222; text-align: right; word-break: break-all; }
+        .amount { font-size: 20px; font-weight: 600; color: #1677ff; }
+        .empty { text-align: center; padding: 80px 24px; }
+        .empty .icon { font-size: 48px; margin-bottom: 16px; }
+        .empty .title { font-size: 16px; color: #555; margin-bottom: 8px; }
+        .empty p { color: #999; font-size: 13px; }
+        footer { text-align: center; color: #bbb; font-size: 12px; padding: 24px 0; }
+    </style>
+</head>
+<body>
+<div class="page">
+    {% if order %}
+    <div class="card">
+        <div class="card-title">订单信息</div>
+        <div class="row"><span class="label">订单号</span><span class="value">{{ order.order_no }}</span></div>
+        {% if order.kingdee_no %}
+        <div class="row"><span class="label">金蝶单号</span><span class="value">{{ order.kingdee_no }}</span></div>
+        {% endif %}
+        <div class="row"><span class="label">客户</span><span class="value">{{ order.customer_name or '-' }}</span></div>
+        <div class="row"><span class="label">件数</span><span class="value">{{ order.quantity if order.quantity is not none else '-' }}</span></div>
+        <div class="row"><span class="label">金额</span><span class="value amount">{{ '%.2f'|format(order.amount or 0) }}</span></div>
+        <div class="row"><span class="label">状态</span><span class="value">{{ order.status if order.status is not none else '-' }}</span></div>
+        {% if order.handler %}
+        <div class="row"><span class="label">经手人</span><span class="value">{{ order.handler }}</span></div>
+        {% endif %}
+        <div class="row"><span class="label">创建时间</span><span class="value">{{ order.created_at or '-' }}</span></div>
+    </div>
+
+    {# 商品明细区块：数据源与页面内容确定后在此扩展 #}
+    {% else %}
+    <div class="card empty">
+        <div class="icon">&#128269;</div>
+        <div class="title">未找到订单信息</div>
+        <p>链接可能无效或订单不存在，请重新扫码获取</p>
+    </div>
+    {% endif %}
+    <footer>FSBBR · 订单查询</footer>
+</div>
+</body>
+</html>

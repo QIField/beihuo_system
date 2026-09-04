@@ -36,6 +36,10 @@ def expansion_app(app):
     from app.routes import common_web_bp
     app.register_blueprint(common_web_bp)
 
+    # 注册订单分享公开页面蓝图（扫码/直接输入网址访问，无需登录）
+    from app.routes.order_share_web import order_share_web_bp
+    app.register_blueprint(order_share_web_bp)
+
     # 初始化权限检查器：将 PermissionService 的方法注册到 PermissionCheckerRegistry
     # 注册完成后，接口上就可以使用 @require_permission、@require_role 等装饰器
     from app.services.permission_service import init_permission_checkers
