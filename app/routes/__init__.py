@@ -46,5 +46,8 @@ common_web_bp.register_blueprint(pp_alias_manager_web_bp)
 from .stock_safe_web import stock_safe_web_bp
 common_web_bp.register_blueprint(stock_safe_web_bp)
 
+from .wms_inventory_operation_web import wms_inventory_operation_web_bp
+common_web_bp.register_blueprint(wms_inventory_operation_web_bp)
+
 __all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp','warehouse_manager_web_bp','common_web_bp','excel_download_bp','pp_alias_manager_web_bp']
 

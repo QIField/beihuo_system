@@ -19,6 +19,7 @@ from .crm_price_sync_task import register_crm_price_sync_tasks
 from .mercedes_replace_number_sync_task import register_mercedes_replace_number_sync_tasks
 from .wx_chat_image_parse_task import register_wx_chat_image_parse_tasks
 from .data_gzbbr_login_task import register_data_gzbbr_login_tasks
+from .ks_inquiry_summary_tasks import register_ks_inquiry_summary_tasks
 from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
 
 
@@ -76,6 +77,9 @@ def register_all_tasks(task_manager):
 
     # 16. 注册WMS库存操作自动推送定时任务（每天10:00、20:00）
     register_wms_inventory_operation_tasks(task_manager)
+
+    # 17. 注册OE军备统计月度汇总定时任务（每天02:30）
+    register_ks_inquiry_summary_tasks(task_manager)
 
 
 __all__ = ['execute_daily_pipeline', 'register_all_tasks']

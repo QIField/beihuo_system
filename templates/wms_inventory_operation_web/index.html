@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS 采购入库/移除推送管理</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            padding: 24px;
+            background: #f2f2f2;
+        }
+        .panel {
+            background: #fff;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+        }
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+        .time-tags {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+        .time-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid #d2d2d2;
+            border-radius: 3px;
+            padding: 5px 10px;
+            background: #fafafa;
+        }
+        .time-tag .remove {
+            cursor: pointer;
+            color: #999;
+            font-weight: bold;
+        }
+        .time-tag .remove:hover {
+            color: #ff5722;
+        }
+        .time-input {
+            width: 90px;
+            height: 32px;
+            border: 1px solid #d2d2d2;
+            border-radius: 3px;
+            padding: 0 8px;
+        }
+        .status-line {
+            margin-top: 14px;
+            color: #666;
+            min-height: 20px;
+        }
+        .status-running {
+            color: #01AAED;
+        }
+        .status-error {
+            color: #FF5722;
+        }
+    </style>
+</head>
+<body>
+
+<div class="panel">
+    <div class="panel-title">定时运行时间</div>
+    <div class="time-tags" id="timeTags"></div>
+    <div style="margin-top: 16px; display: flex; gap: 10px;">
+        <button class="layui-btn layui-btn-primary" onclick="addTimeInput()">+ 添加</button>
+        <button class="layui-btn" onclick="saveTimes()">保存设置</button>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-title">手动运行</div>
+    <button class="layui-btn layui-btn-normal" id="runBtn" onclick="startRun()">立即运行</button>
+    <div class="status-line" id="runStatus"></div>
+</div>
+
+<script src="/static/layui/layui.js"></script>
+<script>
+var times = [];
+var pollTimer = null;
+
+layui.use(['layer'], function () {
+    var layer = layui.layer;
+    window.layer = layer;
+    loadTimes();
+});
+
+/* ========== 定时运行时间 ========== */
+
+function loadTimes() {
+    fetch('/new/api/wms_inventory_operation/schedule_times')
+        .then(function (res) { return res.json(); })
+        .then(function (res) {
+            if (res.code === 200) {
+                times = res.data.times || [];
+                renderTimes();
+            } else {
+                layer.msg(res.msg || '加载失败');
+            }
+        });
+}
+
+function renderTimes() {
+    var html = '';
+    times.forEach(function (t, i) {
+        html += '<span class="time-tag">' + t +
+            ' <span class="remove" onclick="removeTime(' + i + ')">x</span></span>';
+    });
+    html += '<input type="text" class="time-input" id="newTimeInput" placeholder="HH:MM">';
+    document.getElementById('timeTags').innerHTML = html;
+}
+
+function addTimeInput() {
+    var input = document.getElementById('newTimeInput');
+    var val = (input.value || '').trim();
+    if (!/^\d{1,2}:\d{1,2}$/.test(val)) {
+        layer.msg('请输入正确的时间格式 HH:MM，如 10:00');
+        return;
+    }
+    var parts = val.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10);
+    if (h > 23 || m > 59) {
+        layer.msg('时间超出范围（小时 0-23，分钟 0-59）');
+        return;
+    }
+    var formatted = ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2);
+    if (times.indexOf(formatted) !== -1) {
+        layer.msg('该时间已存在');
+        return;
+    }
+    times.push(formatted);
+    times.sort();
+    renderTimes();
+}
+
+function removeTime(index) {
+    times.splice(index, 1);
+    renderTimes();
+}
+
+function saveTimes() {
+    fetch('/new/api/wms_inventory_operation/schedule_times', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ times: times })
+    })
+        .then(function (res) { return res.json(); })
+        .then(function (res) {
+            if (res.code === 200) {
+                times = res.data.times;
+                renderTimes();
+                layer.msg('保存成功');
+            } else {
+                layer.msg(res.msg || '保存失败');
+            }
+        });
+}
+
+/* ========== 手动运行 ========== */
+
+function startRun() {
+    fetch('/new/api/wms_inventory_operation/run', { method: 'POST' })
+        .then(function (res) { return res.json(); })
+        .then(function (res) {
+            if (res.code === 200) {
+                layer.msg('任务已开始运行');
+                startPolling();
+            } else {
+                layer.msg(res.msg || '启动失败');
+            }
+        });
+}
+
+function startPolling() {
+    if (pollTimer) {
+        clearInterval(pollTimer);
+    }
+    pollTimer = setInterval(pollStatus, 3000);
+    pollStatus();
+}
+
+function pollStatus() {
+    fetch('/new/api/wms_inventory_operation/run_status')
+        .then(function (res) { return res.json(); })
+        .then(function (res) {
+            if (res.code !== 200) {
+                return;
+            }
+            var status = res.data;
+            var el = document.getElementById('runStatus');
+            var runBtn = document.getElementById('runBtn');
+            if (status.running) {
+                el.className = 'status-line status-running';
+                el.innerText = '运行中...（开始于 ' + (status.started_at || '-') + '）';
+                runBtn.disabled = true;
+                runBtn.classList.add('layui-btn-disabled');
+            } else {
+                runBtn.disabled = false;
+                runBtn.classList.remove('layui-btn-disabled');
+                if (status.error) {
+                    el.className = 'status-line status-error';
+                    el.innerText = '运行失败：' + status.error + '（' + (status.finished_at || '-') + '）';
+                } else if (status.finished_at) {
+                    el.className = 'status-line';
+                    el.innerText = '运行完成（' + status.finished_at + '）';
+                } else {
+                    el.className = 'status-line';
+                    el.innerText = '空闲';
+                }
+                if (pollTimer) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                }
+            }
+        });
+}
+
+/* 页面加载时查询一次状态 */
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.layer) {
+        pollStatus();
+    } else {
+        setTimeout(pollStatus, 500);
+    }
+});
+</script>
+</body>
+</html>
