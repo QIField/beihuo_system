@@ -6,8 +6,19 @@
 # @Software: PyCharm
 
 
-from app.scripts.spiders.spider_entities.cassmall_login import get_cookie_dict
+from app.scripts.spiders.spider_entities.cassmall_login import CassmallLoginService
 from app.scripts.spiders.spider_tool import SpiderTool
+
+
+COMPANY_CONFIG = {
+    'fsbbr': {'key': 'fs', 'name': '佛山'},
+    'zsbbr': {'key': 'zs', 'name': '中山'},
+    'zhbbr': {'key': 'zh', 'name': '珠海'},
+    'dghf': {'key': 'hf', 'name': '合峰'},
+    'dgby': {'key': 'by', 'name': '百业'},
+}
+# key -> company 的反向映射
+_KEY_TO_COMPANY = {v['key']: k for k, v in COMPANY_CONFIG.items()}
 
 
 class CassmallSpider:
@@ -20,27 +31,38 @@ class CassmallSpider:
     BASE_URL = "https://www.cassmall.com"
 
     def __init__(self, cookie=None, key="fs", timeout=10, retry_count=3):
+        """
+        初始化开思爬虫
+
+        Args:
+            cookie: 直接传入 cookie 字符串（优先使用）
+            key: 公司简称（fs/zs/zh/hf/by），用于从配置获取 cookie
+            timeout: 请求超时时间
+            retry_count: 重试次数
+        """
         # 核心：实例化独立爬虫工具（组合模式）
         self.spider_tool = SpiderTool(timeout, retry_count)
         # 必传Cookie（业务私有属性）
-        if cookie is None:
-            self.cookie = self._set_cookie(key)
-        else:
+        if cookie is not None:
             self.cookie = cookie
+        else:
+            
+           
+            company = _KEY_TO_COMPANY.get(key, 'fsbbr')
+            self.cookie = self._set_cookie(company)
 
-
-
-    def _set_cookie(self,key):
+    def _set_cookie(self, company):
         """
-        设置Cookie
-        :param cookie: Cookie字符串
-        """
-        cookie_dict = get_cookie_dict(key)
+        从配置获取有效 Cookie
+        会自动验证 cookie 有效性，失效则自动重新登录
 
-        # 按Cookie键名的字母顺序排序，模拟浏览器发送Cookie的顺序
-        # 使用sorted()对字典项按key排序，确保生成的Cookie字符串顺序一致
-        cookie = "; ".join([f"{k}={v}" for k, v in sorted(cookie_dict.items(), key=lambda x: x[0])])    # pyright: ignore[reportOptionalMemberAccess]
-        return cookie
+        Args:
+            company: 公司代码（fsbbr/zsbbr/zhbbr/dghf/dgby）
+
+        Returns:
+            str: Cookie 字符串
+        """
+        return CassmallLoginService.get_valid_config(company)
         
         
     def _get_auth_header(self):
