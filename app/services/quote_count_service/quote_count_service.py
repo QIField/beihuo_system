@@ -23,6 +23,9 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 from app.utils.database_connection import db_cursor
+from app.utils.logger_config import get_task_logger
+
+logger = get_task_logger('ks_quote_count')
 
 
 
@@ -220,7 +223,7 @@ class QuoteCountSyncService:
                 result = response.json()
 
                 if result.get('code') == 401 or result.get('msg') == '登录已过期':
-                    print(f"[请求] 登录状态失效，尝试刷新cookie...")
+                    logger.warning(f"[请求] 登录状态失效，尝试刷新cookie...")
                     self._refresh_session()
                     if attempt < self.MAX_RETRY - 1:
                         time.sleep(self.RETRY_DELAY)
@@ -232,16 +235,16 @@ class QuoteCountSyncService:
 
             except requests.exceptions.HTTPError as e:
                 if '401' in str(e):
-                    print(f"[请求][{attempt+1}/{self.MAX_RETRY}] 认证失败(401)，尝试刷新cookie...")
+                    logger.warning(f"[请求][{attempt+1}/{self.MAX_RETRY}] 认证失败(401)，尝试刷新cookie...")
                     try:
                         self._refresh_session()
                         if attempt < self.MAX_RETRY - 1:
                             time.sleep(self.RETRY_DELAY)
                             continue
                     except Exception as refresh_err:
-                        print(f"[请求] 刷新cookie失败：{refresh_err}")
+                        logger.error(f"[请求] 刷新cookie失败：{refresh_err}")
                 else:
-                    print(f"[请求][{attempt+1}/{self.MAX_RETRY}] HTTP错误: {e}")
+                    logger.error(f"[请求][{attempt+1}/{self.MAX_RETRY}] HTTP错误: {e}")
 
                 if attempt < self.MAX_RETRY - 1:
                     time.sleep(self.RETRY_DELAY)
@@ -250,7 +253,7 @@ class QuoteCountSyncService:
                     return None
 
             except Exception as e:
-                print(f"[请求][{attempt+1}/{self.MAX_RETRY}] 请求失败: {e}")
+                logger.error(f"[请求][{attempt+1}/{self.MAX_RETRY}] 请求失败: {e}")
                 if attempt < self.MAX_RETRY - 1:
                     time.sleep(self.RETRY_DELAY)
                     continue
@@ -295,11 +298,11 @@ class QuoteCountSyncService:
             )
 
             if not result:
-                print(f"[订单列表] 第{page_num}页请求失败，跳过")
+                logger.error(f"[订单列表] 第{page_num}页请求失败，跳过")
                 break
 
             if result.get('code') != 200:
-                print(f"[订单列表] API返回错误: {result.get('msg')}")
+                logger.error(f"[订单列表] API返回错误: {result.get('msg')}")
                 break
 
             data = result.get('data', {})
@@ -325,7 +328,7 @@ class QuoteCountSyncService:
                         'car_brand_name': car_brand_name,
                     })
 
-            print(f"[订单列表] 第{page_num}页获取 {len(quotation_list)} 条订单")
+            logger.info(f"[订单列表] 第{page_num}页获取 {len(quotation_list)} 条订单")
 
             total_elements = data.get('totalElements', 0)
             total_pages = (total_elements + self.PAGE_SIZE - 1) // self.PAGE_SIZE
@@ -335,7 +338,7 @@ class QuoteCountSyncService:
             page_num += 1
             time.sleep(0.5)  # 翻页间隔0.5秒
 
-        print(f"[订单列表] 共获取 {len(orders)} 个订单")
+        logger.info(f"[订单列表] 共获取 {len(orders)} 个订单")
         return orders
 
     def _fetch_inquiry_basic(self, order_id: str) -> Optional[str]:
@@ -616,6 +619,7 @@ class QuoteCountSyncService:
         if not items:
             return 0
 
+        logger.info(f"[数据库保存] 批量保存 {len(items)} 条询价明细")
         with db_cursor() as cursor:
             insert_sql = """
                 INSERT INTO crmapp_ks_inquiry_detail
@@ -708,11 +712,11 @@ class QuoteCountSyncService:
             'saved': 0
         }
         
-        print(f"\n{'='*70}")
-        print(f"开思询价明细爬取服务")
-        print(f"开始时间: {datetime.now()}")
-        print(f"爬取范围: 近{days}天")
-        print(f"{'='*70}")
+        logger.info(f"\n{'='*70}")
+        logger.info(f"开思询价明细爬取服务")
+        logger.info(f"开始时间: {datetime.now()}")
+        logger.info(f"爬取范围: 近{days}天")
+        logger.info(f"{'='*70}")
         
         # 倒序处理（今天 → 昨天 → ...）
         for i in range(days):
@@ -723,17 +727,17 @@ class QuoteCountSyncService:
             start_ts = int(datetime.combine(target_date, datetime.min.time()).timestamp() * 1000)
             end_ts = int(datetime.combine(target_date, datetime.max.time()).timestamp() * 1000)
             
-            print(f"\n{'='*60}")
-            print(f"[每日爬取] 处理日期: {date_str}")
-            print(f"{'='*60}")
+            logger.info(f"\n{'='*60}")
+            logger.info(f"[每日爬取] 处理日期: {date_str}")
+            logger.info(f"{'='*60}")
             
             # 1. 获取该日期的所有订单
             orders = self._fetch_quotation_list(start_ts, end_ts)
             if not orders:
-                print(f"[每日爬取] {date_str} 无订单数据")
+                logger.info(f"[每日爬取] {date_str} 无订单数据")
                 continue
 
-            print(f"[每日爬取] 获取 {len(orders)} 个订单")
+            logger.info(f"[每日爬取] 获取 {len(orders)} 个订单")
 
             # 2. 获取每个订单的明细
             all_items = []
@@ -752,14 +756,14 @@ class QuoteCountSyncService:
                 all_items.extend(items)
                 
                 if idx % 50 == 0:
-                    print(f"[进度] 已处理 {idx}/{len(orders)} 个订单，获取 {len(all_items)} 条明细")
+                    logger.info(f"[进度] 已处理 {idx}/{len(orders)} 个订单，获取 {len(all_items)} 条明细")
                 
                 time.sleep(0.2)  # 订单明细请求间隔0.2秒
             
             # 3. 批量保存明细
             if all_items:
                 saved = self._save_inquiry_details(all_items)
-                print(f"[保存] {date_str} 完成: 保存 {saved} 条明细")
+                logger.info(f"[保存] {date_str} 完成: 保存 {saved} 条明细")
                 
                 all_results['dates'].append(date_str)
                 all_results['total_orders'] += len(orders)
@@ -768,16 +772,16 @@ class QuoteCountSyncService:
             
             # 4. 日期之间暂停
             if i < days - 1:
-                print(f"[暂停] 等待1秒后继续下一天...")
+                logger.info(f"[暂停] 等待1秒后继续下一天...")
                 time.sleep(1)
         
-        print(f"\n{'='*70}")
-        print(f"询价明细爬取完成!")
-        print(f"处理日期: {', '.join(all_results['dates'])}")
-        print(f"总订单数: {all_results['total_orders']}")
-        print(f"总明细数: {all_results['total_items']}")
-        print(f"保存记录: {all_results['saved']}")
-        print(f"{'='*70}")
+        logger.info(f"\n{'='*70}")
+        logger.info(f"询价明细爬取完成!")
+        logger.info(f"处理日期: {', '.join(all_results['dates'])}")
+        logger.info(f"总订单数: {all_results['total_orders']}")
+        logger.info(f"总明细数: {all_results['total_items']}")
+        logger.info(f"保存记录: {all_results['saved']}")
+        logger.info(f"{'='*70}")
         
         return all_results
 
@@ -806,10 +810,10 @@ class QuoteCountSyncService:
             (current_year, current_month)
         ]
         
-        print(f"\n{'='*70}")
-        print(f"询价统计更新服务")
-        print(f"开始时间: {datetime.now()}")
-        print(f"{'='*70}")
+        logger.info(f"\n{'='*70}")
+        logger.info(f"询价统计更新服务")
+        logger.info(f"开始时间: {datetime.now()}")
+        logger.info(f"{'='*70}")
         
         results = []
         with db_cursor() as cursor:
@@ -821,7 +825,7 @@ class QuoteCountSyncService:
                 else:
                     next_month = f"{year}-{month + 1:02d}-01"
                 
-                print(f"\n[统计] 处理 {year_month} 的数据...")
+                logger.info(f"\n[统计] 处理 {year_month} 的数据...")
                 
                 # 先删除该月的旧统计数据
                 cursor.execute(
@@ -830,7 +834,7 @@ class QuoteCountSyncService:
                 )
                 deleted = cursor.rowcount
                 if deleted > 0:
-                    print(f"[统计] 已删除 {year_month} 旧数据 {deleted} 条")
+                    logger.info(f"[统计] 已删除 {year_month} 旧数据 {deleted} 条")
                 
                 # 从明细表统计并插入（合并开思和微信数据）
                 stats_sql = """
@@ -881,18 +885,18 @@ class QuoteCountSyncService:
                 ))
                 affected = cursor.rowcount
 
-                print(f"[统计] {year_month} 更新完成: {affected} 条记录")
+                logger.info(f"[统计] {year_month} 更新完成: {affected} 条记录")
                 
                 results.append({
                     'year_month': year_month,
                     'updated_records': affected
                 })
         
-        print(f"\n{'='*70}")
-        print(f"询价统计更新完成!")
+        logger.info(f"\n{'='*70}")
+        logger.info(f"询价统计更新完成!")
         for r in results:
-            print(f"  - {r['year_month']}: {r['updated_records']} 条")
-        print(f"{'='*70}")
+            logger.info(f"  - {r['year_month']}: {r['updated_records']} 条")
+        logger.info(f"{'='*70}")
         
         return {
             'months': [r['year_month'] for r in results],
@@ -908,10 +912,10 @@ class QuoteCountSyncService:
         Returns:
             dict: 包含开思爬取结果和统计更新结果
         """
-        print(f"\n{'='*70}")
-        print(f"开思询价同步服务")
-        print(f"开始时间: {datetime.now()}")
-        print(f"{'='*70}")
+        logger.info(f"\n{'='*70}")
+        logger.info(f"开思询价同步服务")
+        logger.info(f"开始时间: {datetime.now()}")
+        logger.info(f"{'='*70}")
         
         # 1. 爬取近5天的开思询价明细
         sync_days = 5
@@ -922,7 +926,7 @@ class QuoteCountSyncService:
             from app.services.ks_inquiry_service.ks_unquoted_products_service import KsUnquotedProductsService
             unquoted_result = KsUnquotedProductsService.calculate_recent_days(days=2)
         except Exception as e:
-            print(f"[QuoteCountSyncService] 计算未报价产品失败: {e}")
+            logger.error(f"[QuoteCountSyncService] 计算未报价产品失败: {e}")
             unquoted_result = {'matched_parts': 0, 'updated_rows': 0, 'error': str(e)}
         
         # 3. 更新统计表（上月+本月）
@@ -962,11 +966,11 @@ class QuoteCountSyncService:
             'saved': 0
         }
 
-        print(f"\n{'='*70}")
-        print(f"开思询价明细日期范围爬取服务")
-        print(f"开始时间: {datetime.now()}")
-        print(f"爬取范围: {begin_date} ~ {end_date}")
-        print(f"{'='*70}")
+        logger.info(f"\n{'='*70}")
+        logger.info(f"开思询价明细日期范围爬取服务")
+        logger.info(f"开始时间: {datetime.now()}")
+        logger.info(f"爬取范围: {begin_date} ~ {end_date}")
+        logger.info(f"{'='*70}")
 
         current = start_date
         day_count = 0
@@ -977,17 +981,17 @@ class QuoteCountSyncService:
             start_ts = int(datetime.combine(current, datetime.min.time()).timestamp() * 1000)
             end_ts = int(datetime.combine(current, datetime.max.time()).timestamp() * 1000)
 
-            print(f"\n{'='*60}")
-            print(f"[每日爬取] 处理日期: {date_str}")
-            print(f"{'='*60}")
+            logger.info(f"\n{'='*60}")
+            logger.info(f"[每日爬取] 处理日期: {date_str}")
+            logger.info(f"{'='*60}")
 
             orders = self._fetch_quotation_list(start_ts, end_ts)
             if not orders:
-                print(f"[每日爬取] {date_str} 无订单数据")
+                logger.info(f"[每日爬取] {date_str} 无订单数据")
                 current += timedelta(days=1)
                 continue
 
-            print(f"[每日爬取] 获取 {len(orders)} 个订单")
+            logger.info(f"[每日爬取] 获取 {len(orders)} 个订单")
 
             all_items = []
             for idx, order in enumerate(orders, 1):
@@ -1004,13 +1008,13 @@ class QuoteCountSyncService:
                 all_items.extend(items)
 
                 if idx % 50 == 0:
-                    print(f"[进度] 已处理 {idx}/{len(orders)} 个订单，获取 {len(all_items)} 条明细")
+                    logger.info(f"[进度] 已处理 {idx}/{len(orders)} 个订单，获取 {len(all_items)} 条明细")
 
                 time.sleep(0.2)
 
             if all_items:
                 saved = self._save_inquiry_details(all_items)
-                print(f"[保存] {date_str} 完成: 保存 {saved} 条明细")
+                logger.info(f"[保存] {date_str} 完成: 保存 {saved} 条明细")
 
                 all_results['dates'].append(date_str)
                 all_results['total_orders'] += len(orders)
@@ -1018,19 +1022,17 @@ class QuoteCountSyncService:
                 all_results['saved'] += saved
 
             if current < end_date:
-                print(f"[暂停] 等待1秒后继续下一天...")
+                logger.info(f"[暂停] 等待1秒后继续下一天...")
                 time.sleep(1)
 
             current += timedelta(days=1)
 
-        print(f"\n{'='*70}")
-        print(f"询价明细日期范围爬取完成!")
-        print(f"处理日期: {', '.join(all_results['dates'])}")
-        print(f"总订单数: {all_results['total_orders']}")
-        print(f"总明细数: {all_results['total_items']}")
-        print(f"保存记录: {all_results['saved']}")
-        print(f"{'='*70}")
+        logger.info(f"\n{'='*70}")
+        logger.info(f"询价明细日期范围爬取完成!")
+        logger.info(f"处理日期: {', '.join(all_results['dates'])}")
+        logger.info(f"总订单数: {all_results['total_orders']}")
+        logger.info(f"总明细数: {all_results['total_items']}")
+        logger.info(f"保存记录: {all_results['saved']}")
+        logger.info(f"{'='*70}")
 
         return all_results
-
-
