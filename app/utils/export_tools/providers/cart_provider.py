@@ -122,17 +122,17 @@ def fetch_cart_data(**search_params) -> list:
                 fallback_to_string = not suppliers
                 if fallback_to_string:
                     supplier_tuples = parse_supplier_string(row.get('supplier', ''))
-                    # 补齐日期占位符，保持统一三元组格式
-                    suppliers = [('', name, price) for name, price in supplier_tuples]
+                    # 补齐日期、数量占位符，保持统一四元组格式
+                    suppliers = [('', name, '-', price) for name, price in supplier_tuples]
 
-                for date, supplier_name, price in suppliers:
+                for date, supplier_name, quantity, price in suppliers:
                     new_row = row.copy()
                     if fallback_to_string and price == 'N/A':
                         new_row['supplier'] = supplier_name
                     elif date:
-                        new_row['supplier'] = f"{date} - {supplier_name} - {price}"
+                        new_row['supplier'] = f"{date} - {supplier_name} - {quantity} - {price}"
                     else:
-                        new_row['supplier'] = f"{supplier_name} - {price}"
+                        new_row['supplier'] = f"{supplier_name} - {quantity} - {price}"
                     expanded_rows.append(new_row)
             rows = expanded_rows
         else:

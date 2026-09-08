@@ -1250,6 +1250,7 @@
                             return {
                                 name: r.supplier_name || '',
                                 price: r.purchase_price !== undefined ? String(r.purchase_price) : '',
+                                quantity: r.purchase_quantity !== undefined && r.purchase_quantity !== null ? String(r.purchase_quantity) : '',
                                 date: r.purchase_date || ''
                             };
                         });
@@ -1266,6 +1267,7 @@
                 suppliers.push({
                     name: match[1].trim(),
                     price: match[2].trim(),
+                    quantity: '',
                     date: ''
                 });
             }
@@ -1303,19 +1305,21 @@
                 tableContent = '<table style="margin:0;border-collapse:collapse;width:100%;font-size:12px;">';
                 tableContent += '<thead><tr>';
                 if (hasDate) {
-                    tableContent += '<th style="width:25%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">日期</th>';
-                    tableContent += '<th style="width:45%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">供应商</th>';
-                    tableContent += '<th style="width:30%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">单价</th>';
+                    tableContent += '<th style="width:24%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">日期</th>';
+                    tableContent += '<th style="width:40%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">供应商</th>';
+                    tableContent += '<th style="width:14%;text-align:right;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">数量</th>';
+                    tableContent += '<th style="width:22%;text-align:right;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">单价</th>';
                 } else {
-                    tableContent += '<th style="width:70%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">供应商</th>';
-                    tableContent += '<th style="width:30%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">单价</th>';
+                    tableContent += '<th style="width:58%;text-align:left;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">供应商</th>';
+                    tableContent += '<th style="width:18%;text-align:right;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">数量</th>';
+                    tableContent += '<th style="width:24%;text-align:right;padding:10px 12px;border-bottom:1px solid #eee;background:#f8f9fa;font-weight:500;">单价</th>';
                 }
                 tableContent += '</tr></thead><tbody>';
                 suppliers.forEach(function(supplier) {
                     if (hasDate) {
-                        tableContent += `<tr><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.date}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                        tableContent += `<tr><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.date}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;text-align:right;">${supplier.quantity || '-'}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;text-align:right;">${supplier.price}</td></tr>`;
                     } else {
-                        tableContent += `<tr><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                        tableContent += `<tr><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;text-align:right;">${supplier.quantity || '-'}</td><td style="padding:8px 12px;border-bottom:1px solid #f6f6f6;text-align:right;">${supplier.price}</td></tr>`;
                     }
                 });
                 tableContent += '</tbody></table>';

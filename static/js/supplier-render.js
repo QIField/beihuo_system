@@ -11,7 +11,7 @@
     /**
      * 解析供应商数据
      * @param {string} jsonRecords  - purchase_records JSON 字符串
-     * @returns {Array} 解析后的记录列表 [{date, name, price}]
+     * @returns {Array} 解析后的记录列表 [{date, name, quantity, price}]
      */
     function parseSupplierRecords(jsonRecords) {
         if (!jsonRecords) return [];
@@ -23,6 +23,7 @@
                     return {
                         date: r.purchase_date || '',
                         name: r.supplier_name || '',
+                        quantity: r.purchase_quantity !== undefined && r.purchase_quantity !== null ? String(r.purchase_quantity) : '',
                         price: r.purchase_price !== undefined ? String(r.purchase_price) : ''
                     };
                 });
@@ -50,12 +51,14 @@
                         '<div class="supplier-tooltip-row" style="display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
                             '<span style="min-width: 90px; color: #666;">' + (s.date || '-') + '</span>' +
                             '<span style="flex: 1; color: #333;">' + s.name + '</span>' +
+                            '<span style="min-width: 50px; text-align: right; color: #666; white-space: nowrap;">' + (s.quantity || '-') + '</span>' +
                             '<span style="min-width: 60px; text-align: right; color: #e91e63; font-weight: 500; white-space: nowrap;">' + (s.price || '-') + '</span>' +
                         '</div>';
                 } else {
                     tooltipContent +=
                         '<div class="supplier-tooltip-row" style="display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
                             '<span style="flex: 1; color: #333;">' + s.name + '</span>' +
+                            '<span style="min-width: 50px; text-align: right; color: #666; white-space: nowrap;">' + (s.quantity || '-') + '</span>' +
                             '<span style="min-width: 60px; text-align: right; color: #e91e63; font-weight: 500; white-space: nowrap;">' + (s.price || '-') + '</span>' +
                         '</div>';
                 }
@@ -64,7 +67,7 @@
             tooltipContent = '<div class="supplier-tooltip-row" style="padding: 8px 16px; color: #999;">暂无供应商信息</div>';
         }
 
-        var headerText = hasDate ? '日期 - 供应商 - 单价' : '供应商 - 单价';
+        var headerText = hasDate ? '日期 - 供应商 - 数量 - 单价' : '供应商 - 数量 - 单价';
         return '<div class="supplier-tooltip-header" style="padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #e6e6e6; border-radius: 8px 8px 0 0; font-weight: 500; color: #333; font-size: 14px;">' +
             headerText + '</div>' +
             '<div class="supplier-tooltip-content" style="max-height: 300px; overflow-y: auto;">' + tooltipContent + '</div>';

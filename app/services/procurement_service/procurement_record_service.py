@@ -9,8 +9,8 @@
 
 数据格式示例:
     [
-        {"supplier_name": "上海福宝盟汽配", "purchase_price": 112.00, "purchase_date": "2026-01-12"},
-        {"supplier_name": "上海佳配电子商务有限公司", "purchase_price": 115.00, "purchase_date": "2025-12-20"}
+        {"supplier_name": "上海福宝盟汽配", "purchase_price": 112.00, "purchase_quantity": 5, "purchase_date": "2026-01-12"},
+        {"supplier_name": "上海佳配电子商务有限公司", "purchase_price": 115.00, "purchase_quantity": 2, "purchase_date": "2025-12-20"}
     ]
 
 使用示例:
@@ -49,6 +49,7 @@ def parse_purchasing_record(purchasing_record: str) -> List[Dict]:
         {
             'supplier_name': '上海福宝盟汽配',   # 供应商名称
             'purchase_price': 112.00,            # 采购单价
+            'purchase_quantity': 5,              # 采购数量
             'purchase_date': '2026-01-12'        # 采购日期
         }
     
@@ -58,6 +59,7 @@ def parse_purchasing_record(purchasing_record: str) -> List[Dict]:
         [{
             'supplier_name': '上海福宝盟汽配',
             'purchase_price': 112.00,
+            'purchase_quantity': 5,
             'purchase_date': '2026-01-12'
         }]
     """
@@ -92,7 +94,7 @@ def parse_single_record(record: str) -> Optional[Dict]:
         record: 单条记录字符串
         
     Returns:
-        解析后的字典（只包含供应商、价格、日期），解析失败返回 None
+        解析后的字典（包含供应商、价格、数量、日期），解析失败返回 None
     """
     try:
         # 提取日期（前10位）
@@ -112,9 +114,14 @@ def parse_single_record(record: str) -> Optional[Dict]:
         price_match = re.search(r'单价:([\d.]+)', record)
         purchase_price = float(price_match.group(1)) if price_match else 0.0
         
+        # 提取采购数量
+        quantity_match = re.search(r'采购:([\d.]+)', record)
+        purchase_quantity = int(float(quantity_match.group(1))) if quantity_match else 0
+        
         return {
             'supplier_name': supplier_name,
             'purchase_price': purchase_price,
+            'purchase_quantity': purchase_quantity,
             'purchase_date': purchase_date
         }
         

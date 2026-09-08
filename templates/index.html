@@ -3283,14 +3283,14 @@ function bindSupplierTooltipEvents() {
                 // 构建表格内容
                 let tableContent = '<table class="supplier-tooltip-table" style="margin:0;border-collapse:collapse;width:100%;font-size:12px;">';
                 if (hasDate) {
-                    tableContent += '<thead><tr><th style="width:25%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">日期</th><th style="width:45%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">供应商</th><th style="width:30%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">单价</th></tr></thead><tbody>';
+                    tableContent += '<thead><tr><th style="width:24%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">日期</th><th style="width:40%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">供应商</th><th style="width:14%;text-align:right;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">数量</th><th style="width:22%;text-align:right;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">单价</th></tr></thead><tbody>';
                     suppliers.forEach(function(supplier) {
-                        tableContent += `<tr><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.date || '-'}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                        tableContent += `<tr><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.date || '-'}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;text-align:right;">${supplier.quantity || '-'}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;text-align:right;">${supplier.price}</td></tr>`;
                     });
                 } else {
-                    tableContent += '<thead><tr><th style="width:70%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">供应商</th><th style="width:30%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">单价</th></tr></thead><tbody>';
+                    tableContent += '<thead><tr><th style="width:58%;text-align:left;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">供应商</th><th style="width:18%;text-align:right;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">数量</th><th style="width:24%;text-align:right;padding:8px;border-bottom:1px solid #eee;background:#f8f9fa;">单价</th></tr></thead><tbody>';
                     suppliers.forEach(function(supplier) {
-                        tableContent += `<tr><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.price}</td></tr>`;
+                        tableContent += `<tr><td style="padding:8px;border-bottom:1px solid #f6f6f6;">${supplier.name}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;text-align:right;">${supplier.quantity || '-'}</td><td style="padding:8px;border-bottom:1px solid #f6f6f6;text-align:right;">${supplier.price}</td></tr>`;
                     });
                 }
                 tableContent += '</tbody></table>';
@@ -3440,6 +3440,7 @@ function bindSupplierTooltipEvents() {
                         return {
                             name: r.supplier_name || '',
                             price: r.purchase_price !== undefined ? String(r.purchase_price) : '',
+                            quantity: r.purchase_quantity !== undefined && r.purchase_quantity !== null ? String(r.purchase_quantity) : '',
                             date: r.purchase_date || ''
                         };
                     });
@@ -3457,7 +3458,7 @@ function bindSupplierTooltipEvents() {
             const name = match[1].trim();
             const price = match[2].trim();
             if (name) {
-                suppliers.push({ name: name, price: price, date: '' });
+                suppliers.push({ name: name, price: price, quantity: '', date: '' });
             }
         }
         return suppliers;

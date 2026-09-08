@@ -299,27 +299,30 @@ class CartDataService:
             purchase_records = item.get('purchase_records', '')
             suppliers = self._parse_purchase_records(purchase_records)
 
-            for supplier_name, price in suppliers:
+            for supplier_name, quantity, price in suppliers:
                 supplier_item = item.copy()
-                # 使用中文冒号，与前端展示格式保持一致
-                supplier_item['supplier'] = f"{supplier_name}：{price}"
+                # 使用中文冒号，与前端展示格式保持一致；有数量时追加（×N）
+                if quantity and quantity != '-':
+                    supplier_item['supplier'] = f"{supplier_name}：{price}（×{quantity}）"
+                else:
+                    supplier_item['supplier'] = f"{supplier_name}：{price}"
                 expanded_result.append(supplier_item)
 
         return expanded_result
 
     def _parse_purchase_records(self, records_json: str) -> List[tuple]:
         """
-        解析 purchase_records JSON，提取供应商名称和价格
+        解析 purchase_records JSON，提取供应商名称、采购数量和价格
         与 crawl_service.py / search_in_crm.py 统一的数据格式
 
         示例：
-        '[{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_date":"2026-01-12"}]'
-        -> [("佛山德孚", "15.00")]
+        '[{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_quantity":2,"purchase_date":"2026-01-12"}]'
+        -> [("佛山德孚", "2", "15.00")]
         """
         import json
 
         if not records_json or not isinstance(records_json, str):
-            return [("未知供应商", "N/A")]
+            return [("未知供应商", "-", "N/A")]
 
         try:
             records = json.loads(records_json)
@@ -328,10 +331,12 @@ class CartDataService:
                 for r in records:
                     name = r.get('supplier_name', '').strip()
                     price = r.get('purchase_price', 0.0)
+                    quantity = r.get('purchase_quantity')
+                    quantity_str = str(int(float(quantity))) if quantity not in (None, '') else '-'
                     if name:
-                        suppliers.append((name, f"{price:.2f}"))
-                return suppliers if suppliers else [("未知供应商", "N/A")]
-        except (json.JSONDecodeError, TypeError):
+                        suppliers.append((name, quantity_str, f"{float(price):.2f}"))
+                return suppliers if suppliers else [("未知供应商", "-", "N/A")]
+        except (json.JSONDecodeError, TypeError, ValueError):
             pass
 
-        return [("未知供应商", "N/A")]
+        return [("未知供应商", "-", "N/A")]
