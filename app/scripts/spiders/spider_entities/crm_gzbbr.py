@@ -132,6 +132,46 @@ class CrmGzbbrSpider:
         # ==================================
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
 
+    # https://crm.gzbbr.com/api/Crm.Orders/orders_view?orders_id=2075261&page=1&limit=50
+    def get_orders_view(self, orders_id, page=1, limit=50):
+        """
+        获取订单详情视图
+
+        :param orders_id: CRM 订单 ID
+        :param page: 分页页码，默认1
+        :param limit: 分页每页数量，默认50
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/Crm.Orders/orders_view"
+        params = {
+            "orders_id": orders_id,
+            "page": page,
+            "limit": limit,
+        }
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{params}")
+        return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
+    # https://crm.gzbbr.com/api/Crm.Delivery/deliveryView?delivery_id=1919278&page=1&limit=20
+    def get_delivery_view(self, delivery_id, page=1, limit=20):
+        """
+        获取发货单详情视图
+
+        :param delivery_id: 发货单 ID
+        :param page: 分页页码，默认1
+        :param limit: 分页每页数量，默认20
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/Crm.Delivery/deliveryView"
+        params = {
+            "delivery_id": delivery_id,
+            "page": page,
+            "limit": limit,
+        }
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{params}")
+        return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
 
     # https://crm.gzbbr.com/api/Crm.Partner/partnerList?page=1&limit=200
     def get_partnerList(self, page=1, limit=200):

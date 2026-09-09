@@ -2,68 +2,190 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>订单信息</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no">
+    <title>订单查询</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; }
         body {
-            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
             background: #f5f6f8;
             color: #333;
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
-        .page { max-width: 480px; margin: 0 auto; padding: 16px; }
+        .page {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 12px 16px 24px;
+        }
+
+        /* 顶部状态卡片 */
+        .status-card {
+            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+            border-radius: 16px;
+            padding: 24px 20px;
+            color: #fff;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        .status-card .status-label { font-size: 13px; opacity: .85; margin-bottom: 8px; }
+        .status-card .status-value { font-size: 24px; font-weight: 600; }
+        .status-card.shipped { background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%); }
+        .status-card.picked { background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%); }
+        .status-card.ordered { background: linear-gradient(135deg, #fa8c16 0%, #d46b08 100%); }
+
+        /* 进度时间轴 */
+        .timeline {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px 16px;
+            margin-bottom: 12px;
+        }
+        .timeline-title { font-size: 15px; font-weight: 600; margin-bottom: 18px; color: #222; }
+        .timeline-item {
+            display: flex;
+            position: relative;
+            padding-bottom: 20px;
+        }
+        .timeline-item:last-child { padding-bottom: 0; }
+        .timeline-item:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            left: 7px;
+            top: 18px;
+            bottom: 0;
+            width: 2px;
+            background: #e8e8e8;
+        }
+        .timeline-item.active:not(:last-child)::after { background: #1677ff; }
+        .timeline-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e8e8e8;
+            margin-right: 12px;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+        }
+        .timeline-item.active .timeline-dot { background: #1677ff; }
+        .timeline-item.shipped .timeline-dot { background: #52c41a; }
+        .timeline-content { flex: 1; }
+        .timeline-name { font-size: 15px; color: #666; margin-bottom: 4px; }
+        .timeline-item.active .timeline-name,
+        .timeline-item.shipped .timeline-name { color: #222; font-weight: 500; }
+        .timeline-time { font-size: 13px; color: #999; }
+        .timeline-item.active .timeline-time,
+        .timeline-item.shipped .timeline-time { color: #1677ff; }
+        .timeline-item.shipped .timeline-time { color: #52c41a; }
+
+        /* 信息卡片 */
         .card {
             background: #fff;
             border-radius: 12px;
-            padding: 20px;
+            padding: 18px 16px;
             margin-bottom: 12px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, .05);
         }
-        .card-title { font-size: 14px; color: #999; margin-bottom: 14px; }
+        .card-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 14px; }
         .row {
             display: flex;
             justify-content: space-between;
-            padding: 10px 0;
+            align-items: flex-start;
+            padding: 12px 0;
             font-size: 15px;
             border-bottom: 1px solid #f2f2f2;
         }
-        .row:last-child { border-bottom: none; }
+        .row:last-child { border-bottom: none; padding-bottom: 0; }
+        .row:first-child { padding-top: 0; }
         .row .label { color: #999; flex-shrink: 0; margin-right: 16px; }
-        .row .value { color: #222; text-align: right; word-break: break-all; }
-        .amount { font-size: 20px; font-weight: 600; color: #1677ff; }
-        .empty { text-align: center; padding: 80px 24px; }
-        .empty .icon { font-size: 48px; margin-bottom: 16px; }
-        .empty .title { font-size: 16px; color: #555; margin-bottom: 8px; }
-        .empty p { color: #999; font-size: 13px; }
-        footer { text-align: center; color: #bbb; font-size: 12px; padding: 24px 0; }
+        .row .value { color: #222; text-align: right; word-break: break-all; line-height: 1.4; }
+
+        /* 空状态 */
+        .empty-card {
+            background: #fff;
+            border-radius: 16px;
+            text-align: center;
+            padding: 64px 24px;
+            margin-top: 40px;
+        }
+        .empty-card .icon { font-size: 56px; margin-bottom: 16px; }
+        .empty-card .title { font-size: 17px; color: #333; margin-bottom: 8px; font-weight: 500; }
+        .empty-card p { color: #999; font-size: 14px; line-height: 1.6; }
+
+        footer { text-align: center; color: #bbb; font-size: 12px; padding: 16px 0 8px; }
     </style>
 </head>
 <body>
 <div class="page">
     {% if order %}
-    <div class="card">
-        <div class="card-title">订单信息</div>
-        <div class="row"><span class="label">订单号</span><span class="value">{{ order.order_no }}</span></div>
-        {% if order.kingdee_no %}
-        <div class="row"><span class="label">金蝶单号</span><span class="value">{{ order.kingdee_no }}</span></div>
-        {% endif %}
-        <div class="row"><span class="label">客户</span><span class="value">{{ order.customer_name or '-' }}</span></div>
-        <div class="row"><span class="label">件数</span><span class="value">{{ order.quantity if order.quantity is not none else '-' }}</span></div>
-        <div class="row"><span class="label">金额</span><span class="value amount">{{ '%.2f'|format(order.amount or 0) }}</span></div>
-        <div class="row"><span class="label">状态</span><span class="value">{{ order.status if order.status is not none else '-' }}</span></div>
-        {% if order.handler %}
-        <div class="row"><span class="label">经手人</span><span class="value">{{ order.handler }}</span></div>
-        {% endif %}
-        <div class="row"><span class="label">创建时间</span><span class="value">{{ order.created_at or '-' }}</span></div>
+    <!-- 顶部大状态 -->
+    <div class="status-card {% if order.status == '已出库' %}shipped{% elif order.status == '仓库已接单' %}picked{% else %}ordered{% endif %}">
+        <div class="status-label">当前状态</div>
+        <div class="status-value">{{ order.status or '已下单' }}</div>
     </div>
 
-    {# 商品明细区块：数据源与页面内容确定后在此扩展 #}
+    <!-- 进度时间轴 -->
+    <div class="timeline">
+        <div class="timeline-title">物流进度</div>
+
+        <div class="timeline-item {% if order.create_date %}active{% endif %}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+                <div class="timeline-name">已下单</div>
+                <div class="timeline-time">{{ order.create_date or '待更新' }}</div>
+            </div>
+        </div>
+
+        <div class="timeline-item {% if order.jhdate %}active{% endif %}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+                <div class="timeline-name">仓库已接单</div>
+                <div class="timeline-time">{{ order.jhdate or '待更新' }}</div>
+            </div>
+        </div>
+
+        <div class="timeline-item {% if order.ship_date %}shipped{% endif %}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+                <div class="timeline-name">已出库</div>
+                <div class="timeline-time">{{ order.ship_date or '待更新' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 订单信息 -->
+    <div class="card">
+        <div class="card-title">订单信息</div>
+        <div class="row">
+            <span class="label">订单号</span>
+            <span class="value">{{ order.orders_no }}</span>
+        </div>
+        {% if order.create_date %}
+        <div class="row">
+            <span class="label">下单时间</span>
+            <span class="value">{{ order.create_date }}</span>
+        </div>
+        {% endif %}
+        {% if order.jhdate %}
+        <div class="row">
+            <span class="label">接单时间</span>
+            <span class="value">{{ order.jhdate }}</span>
+        </div>
+        {% endif %}
+        {% if order.ship_date %}
+        <div class="row">
+            <span class="label">发货时间</span>
+            <span class="value">{{ order.ship_date }}</span>
+        </div>
+        {% endif %}
+    </div>
     {% else %}
-    <div class="card empty">
+    <div class="empty-card">
         <div class="icon">&#128269;</div>
         <div class="title">未找到订单信息</div>
-        <p>链接可能无效或订单不存在，请重新扫码获取</p>
+        <p>链接可能无效或订单不存在<br>请重新扫码获取</p>
     </div>
     {% endif %}
     <footer>FSBBR · 订单查询</footer>
