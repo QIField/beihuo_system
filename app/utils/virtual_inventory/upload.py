@@ -456,6 +456,16 @@ def start_b2b_upload_with_brand_mapping(today_only=False, companies=None):
                     if feier_removed > 0:
                         logger.info(f"[{company}] 页 {page_no} 菲尔品牌剔除 {feier_removed} 条")
 
+                # 过滤沐博/宝翼隆的菲比品牌数据
+                rows_before_special = len(rows)
+                rows = [
+                    row for row in rows
+                    if not (row.get('supplier_name') in ('沐博', '宝翼隆') and row.get('brand') == '菲比')
+                ]
+                special_removed = rows_before_special - len(rows)
+                if special_removed > 0:
+                    logger.info(f"[{company}] 页 {page_no} 沐博/宝翼隆菲比品牌剔除 {special_removed} 条")
+
                 if not rows:
                     logger.info(f"[{company}] 页 {page_no} 过滤后无数据，跳过")
                     processed_total += page_row_count
