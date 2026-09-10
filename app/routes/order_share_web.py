@@ -18,6 +18,7 @@ import time
 
 from flask import Blueprint, render_template, request
 
+from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.services.order_share_service import crypto_service, order_view_service
 
 logger = logging.getLogger("order_share")
@@ -42,10 +43,14 @@ def order_share_page():
         logger.exception("[订单分享] 解密失败: %s", e)
         order_no = None
 
-    if order_no:
-        order = order_view_service.get_order_basic_by_no(order_no)
-    else:
-        order = None
+    spider = CrmGzbbrSpider()
+    try:
+        if order_no:
+            order = order_view_service.get_order_basic_by_no(order_no, crm_spider=spider)
+        else:
+            order = None
+    finally:
+        spider.close()
 
     elapsed = (time.time() - start) * 1000
     if order:

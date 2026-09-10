@@ -15,11 +15,12 @@
 from app.services.order_share_service.order_status_service import get_order_status_view
 
 
-def get_order_basic_by_no(order_no):
+def get_order_basic_by_no(order_no, crm_spider=None):
     """
     按订单号查询订单信息（对客页面用）
 
     :param order_no: 订单号（明文）
+    :param crm_spider: 可选复用的 CrmGzbbrSpider 实例
     :return: 页面展示字段字典；查不到返回 None
     """
-    return get_order_status_view(order_no)
+    return get_order_status_view(order_no, crm_spider=crm_spider)

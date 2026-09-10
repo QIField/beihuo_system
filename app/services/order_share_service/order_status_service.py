@@ -278,10 +278,8 @@ def _fetch_jhdate(spider, delivery_id):
 
 def _fetch_wms_info(orders_id):
     """查 wms_orders 获取 ship_date 和 photos"""
-    step_start = time.time()
     with orm_session() as session:
         row = session.execute(_WMS_INFO_SQL, {"orders_id": orders_id}).mappings().first()
-    logger.info("[订单分享] wms_orders SQL orders_id=%s cost=%.0fms", orders_id, (time.time() - step_start) * 1000)
     if not row:
         return None, None
     return row["ship_date"], row["photos"]
