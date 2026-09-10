@@ -7,6 +7,7 @@
 
 import logging
 
+from app.models.orm_models.brand_qpl_mapping import BrandQplMapping
 from app.models.orm_models.crmapp_compare_summary import CrmappCompareSummary
 from app.models.orm_models.qpl_virtual_qty import QplVirtualQty
 from app.utils.orm.session import orm_session
@@ -43,17 +44,28 @@ def _resolve_brand_part_no(row, brand_code_map):
     return None
 
 
-def _match_brand_quality(pp):
+def _load_brand_quality_map(session, pp_list):
     """
-    根据 pp 匹配品牌与品质（预留，待匹配表完善后实现）
+    批量查询 brand_qpl_mapping，建立 pp -> (qpl_brand, qpl_quality) 映射
 
     Args:
-        pp: 对应开思要求的品牌
+        session: SQLAlchemy Session
+        pp_list: pp 列表
 
     Returns:
-        tuple: (品牌, 品质)
+        dict: {pp: (qpl_brand, qpl_quality)}
     """
-    return None, None
+    valid_pp_list = [pp for pp in pp_list if pp]
+    if not valid_pp_list:
+        return {}
+
+    results = (
+        session.query(BrandQplMapping.data_brand, BrandQplMapping.qpl_brand, BrandQplMapping.qpl_quality)
+        .filter(BrandQplMapping.data_brand.in_(valid_pp_list))
+        .all()
+    )
+
+    return {data_brand: (qpl_brand, qpl_quality) for data_brand, qpl_brand, qpl_quality in results}
 
 
 def _load_brand_code_map(session, merchant_codes, company='fsbbr'):
@@ -87,6 +99,9 @@ def fetch_virtual_inventory_records():
     """
     查询 qpl_virtual_qty 全表数据，并转换为导入需要的字段
 
+    pp 需在 brand_qpl_mapping 中匹配到 qpl_brand 和 qpl_quality，
+    未匹配到的记录直接丢弃，不生成到 Excel。
+
     Returns:
         list[dict]: 每条记录包含
             product_name, oe, brand_part_no, reference_price,
@@ -108,8 +123,17 @@ def fetch_virtual_inventory_records():
         merchant_codes = [r.merchant_code for r in rows if r.merchant_code]
         brand_code_map = _load_brand_code_map(session, merchant_codes)
 
+        pp_list = [r.pp for r in rows if r.pp]
+        brand_quality_map = _load_brand_quality_map(session, pp_list)
+
     records = []
+    skipped_count = 0
     for r in rows:
+        brand, quality = brand_quality_map.get(r.pp, (None, None))
+        if not brand or not quality:
+            skipped_count += 1
+            continue
+
         row_dict = {
             'oe': r.ys_oe1,
             'product_name': r.product_name1,
@@ -119,7 +143,6 @@ def fetch_virtual_inventory_records():
             'merchant_code': r.merchant_code,
         }
         brand_part_no = _resolve_brand_part_no(row_dict, brand_code_map)
-        brand, quality = _match_brand_quality(r.pp)
 
         records.append({
             'product_name': r.product_name1,
@@ -131,5 +154,8 @@ def fetch_virtual_inventory_records():
             'quality': quality,
         })
 
-    logger.info(f"[虚拟库存] 查询到 {len(records)} 条待导入记录")
+    logger.info(
+        f"[虚拟库存] 查询到 {len(rows)} 条原始记录，"
+        f"匹配成功 {len(records)} 条，跳过 {skipped_count} 条"
+    )
     return records
