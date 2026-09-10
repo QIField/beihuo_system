@@ -14,12 +14,13 @@
 """
 
 import logging
+import time
 
 from flask import Blueprint, render_template, request
 
 from app.services.order_share_service import crypto_service, order_view_service
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("order_share")
 
 order_share_web_bp = Blueprint(
     "order_share_web",
@@ -31,15 +32,26 @@ order_share_web_bp = Blueprint(
 @order_share_web_bp.route("/order/view")
 def order_share_page():
     """扫码/输入网址进入的订单信息页"""
+    start = time.time()
     cipher = (request.args.get("no") or "").strip()
+    logger.info("[订单分享] 收到请求 cipher=%s...", cipher[:20])
 
-    order_no = crypto_service.decrypt_order_no(cipher)
-    order = order_view_service.get_order_basic_by_no(order_no) if order_no else None
+    try:
+        order_no = crypto_service.decrypt_order_no(cipher)
+    except Exception as e:
+        logger.exception("[订单分享] 解密失败: %s", e)
+        order_no = None
 
-    if order:
-        logger.info("[订单分享] 页面访问成功 order_no=%s", order_no)
+    if order_no:
+        order = order_view_service.get_order_basic_by_no(order_no)
     else:
-        logger.info("[订单分享] 页面访问失败（链接无效或订单不存在）")
+        order = None
+
+    elapsed = (time.time() - start) * 1000
+    if order:
+        logger.info("[订单分享] 页面访问成功 order_no=%s cost=%.0fms", order_no, elapsed)
+    else:
+        logger.info("[订单分享] 页面访问失败（链接无效或订单不存在）cost=%.0fms", elapsed)
 
     # 链接无效、解密失败、订单不存在，统一渲染友好提示页
     return render_template("order_share/order_detail.html", order=order)

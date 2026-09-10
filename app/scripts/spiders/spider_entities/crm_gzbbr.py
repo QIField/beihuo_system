@@ -96,7 +96,7 @@ class CrmGzbbrSpider:
     # is_wms 是否WMS订单
     def get_mergeOrderList(self, page=1, limit=200, orderdate_start=None, orderdate_end=None,
                            status=None, order_type_id=None, level_id=None,
-                           is_wms=None, order_source_type=None):
+                           is_wms=None, order_source_type=None, orders_no=None):
         """
         获取合并订单列表
 
@@ -109,6 +109,7 @@ class CrmGzbbrSpider:
         :param level_id: 客户等级，维修厂（27）、同行（25）
         :param is_wms: 是否WMS订单
         :param order_source_type: 业务类型
+        :param orders_no: 精确订单号过滤（有值时优先使用）
         :return: 请求响应对象
         """
         url = f"{self.BASE_URL}/api/Crm.Orders/mergeOrderList"
@@ -121,6 +122,8 @@ class CrmGzbbrSpider:
             "is_wms": is_wms,
             "order_source_type": order_source_type,
         }
+        if orders_no:
+            params["orders_no"] = orders_no
         if orderdate_start and orderdate_end:
             params["orderdate[]"] = [orderdate_start, orderdate_end]
         # query_string = urlencode(params, doseq=True)

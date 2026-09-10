@@ -19,6 +19,7 @@
 """
 
 import logging
+import time
 from datetime import datetime, timedelta
 
 from sqlalchemy import text
@@ -28,18 +29,20 @@ from app.models.orm_models.order_delivery_info import OrderDeliveryInfo
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.utils.orm.session import orm_session
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("order_share")
 
 STATUS_ORDERED = OrderDeliveryInfo.STATUS_ORDERED
 STATUS_PICKED = OrderDeliveryInfo.STATUS_PICKED
 STATUS_SHIPPED = OrderDeliveryInfo.STATUS_SHIPPED
 
-_WMS_SHIP_DATE_SQL = text("""
-    SELECT ship_date
+_WMS_INFO_SQL = text("""
+    SELECT ship_date, photos
     FROM wms_orders
     WHERE order_id = :orders_id
     LIMIT 1
 """)
+
+_PHOTO_BASE_URL = "https://jh.fsbbr.net/uploads/"
 
 
 def get_order_status_view(orders_no, crm_spider=None, refresh=False):
@@ -51,6 +54,7 @@ def get_order_status_view(orders_no, crm_spider=None, refresh=False):
     :param refresh: 是否强制刷新（当前未用于绕过缓存，仅作为扩展预留）
     :return: 页面展示字段字典；查不到或接口异常返回 None
     """
+    start = time.time()
     own_spider = crm_spider is None
     spider = crm_spider or CrmGzbbrSpider()
 
@@ -59,7 +63,12 @@ def get_order_status_view(orders_no, crm_spider=None, refresh=False):
 
         # 已出库：直接返回，无需再查
         if cached and cached.get("status") == STATUS_SHIPPED:
+            logger.info("[订单分享] %s 命中已出库缓存", orders_no)
             return _build_view(cached)
+
+        # 旧缓存可能缺少 handler（字段新增前生成），先补全
+        if cached and not cached.get("handler"):
+            cached = _fill_handler(spider, cached)
 
         # 已下单：直接从 deliveryView 开始查 jhdate
         if cached and cached.get("status") == STATUS_ORDERED and cached.get("delivery_id"):
@@ -68,7 +77,7 @@ def get_order_status_view(orders_no, crm_spider=None, refresh=False):
 
         # 仓库已接单：直接查 wms_orders 的 ship_date
         if cached and cached.get("status") == STATUS_PICKED and cached.get("orders_id"):
-            record = _advance_from_picked(cached)
+            record = _advance_from_picked(spider, cached)
             return _build_view(record) if record else _build_view(cached)
 
         # 无缓存 或 状态异常：走完整流程
@@ -83,16 +92,22 @@ def get_order_status_view(orders_no, crm_spider=None, refresh=False):
     finally:
         if own_spider:
             spider.close()
+        elapsed = (time.time() - start) * 1000
+        logger.info("[订单分享] get_order_status_view 总耗时 orders_no=%s cost=%.0fms", orders_no, elapsed)
 
 
 def _full_flow(spider, orders_no):
     """完整流程：从 mergeOrderList 开始，一步步推进到最终状态"""
-    orders_id = _fetch_orders_id(spider, orders_no)
+    step_start = time.time()
+    orders_id, handler = _fetch_orders_id(spider, orders_no)
+    logger.info("[订单分享] mergeOrderList orders_no=%s cost=%.0fms", orders_no, (time.time() - step_start) * 1000)
     if not orders_id:
         logger.warning("[订单分享] mergeOrderList 未找到订单 %s", orders_no)
         return None
 
+    step_start = time.time()
     create_date, delivery_id = _fetch_orders_view(spider, orders_id)
+    logger.info("[订单分享] orders_view orders_no=%s cost=%.0fms", orders_no, (time.time() - step_start) * 1000)
 
     # 此时还无法判断状态，先按已下单存一份（delivery_id 可能为空则停止）
     if not delivery_id:
@@ -100,6 +115,7 @@ def _full_flow(spider, orders_no):
         return order_share_dao.upsert({
             "orders_id": orders_id,
             "orders_no": orders_no,
+            "handler": handler,
             "create_date": create_date,
             "delivery_id": None,
             "jhdate": None,
@@ -107,11 +123,14 @@ def _full_flow(spider, orders_no):
             "status": STATUS_ORDERED,
         })
 
+    step_start = time.time()
     jhdate = _fetch_jhdate(spider, delivery_id)
+    logger.info("[订单分享] deliveryView orders_no=%s cost=%.0fms", orders_no, (time.time() - step_start) * 1000)
     if not jhdate:
         return order_share_dao.upsert({
             "orders_id": orders_id,
             "orders_no": orders_no,
+            "handler": handler,
             "create_date": create_date,
             "delivery_id": delivery_id,
             "jhdate": None,
@@ -119,59 +138,97 @@ def _full_flow(spider, orders_no):
             "status": STATUS_ORDERED,
         })
 
-    ship_date = _fetch_ship_date(orders_id)
+    step_start = time.time()
+    ship_date, photos = _fetch_wms_info(orders_id)
+    logger.info("[订单分享] wms_orders orders_no=%s cost=%.0fms", orders_no, (time.time() - step_start) * 1000)
     status = STATUS_SHIPPED if ship_date else STATUS_PICKED
 
     return order_share_dao.upsert({
         "orders_id": orders_id,
         "orders_no": orders_no,
+        "handler": handler,
         "create_date": create_date,
         "delivery_id": delivery_id,
         "jhdate": jhdate,
         "ship_date": ship_date,
+        "photos": photos,
         "status": status,
     })
 
 
 def _advance_from_ordered(spider, cached):
     """已下单状态推进：查 deliveryView 的 jhdate"""
+    orders_no = cached["orders_no"]
+    step_start = time.time()
     jhdate = _fetch_jhdate(spider, cached["delivery_id"])
+    logger.info("[订单分享] deliveryView orders_no=%s cost=%.0fms", orders_no, (time.time() - step_start) * 1000)
     if not jhdate:
         return None  # 状态不变
 
-    ship_date = _fetch_ship_date(cached["orders_id"])
+    step_start = time.time()
+    ship_date, photos = _fetch_wms_info(cached["orders_id"])
+    logger.info("[订单分享] wms_orders orders_no=%s cost=%.0fms", orders_no, (time.time() - step_start) * 1000)
     status = STATUS_SHIPPED if ship_date else STATUS_PICKED
 
     return order_share_dao.upsert({
         "orders_id": cached["orders_id"],
         "orders_no": cached["orders_no"],
+        "handler": cached.get("handler"),
         "create_date": cached["create_date"],
         "delivery_id": cached["delivery_id"],
         "jhdate": jhdate,
         "ship_date": ship_date,
+        "photos": photos,
         "status": status,
     })
 
 
-def _advance_from_picked(cached):
-    """仓库已接单状态推进：查 wms_orders 的 ship_date"""
-    ship_date = _fetch_ship_date(cached["orders_id"])
+def _advance_from_picked(spider, cached):
+    """仓库已接单状态推进：查 wms_orders 的 ship_date 与 photos"""
+    orders_no = cached["orders_no"]
+    step_start = time.time()
+    ship_date, photos = _fetch_wms_info(cached["orders_id"])
+    logger.info("[订单分享] wms_orders orders_no=%s cost=%.0fms", orders_no, (time.time() - step_start) * 1000)
     if not ship_date:
-        return None  # 状态不变
+        # 状态不变，但 photos 可能已更新，仍写回缓存
+        if photos != cached.get("photos"):
+            return order_share_dao.upsert({
+                "orders_id": cached["orders_id"],
+                "orders_no": cached["orders_no"],
+                "handler": cached.get("handler"),
+                "create_date": cached["create_date"],
+                "delivery_id": cached["delivery_id"],
+                "jhdate": cached["jhdate"],
+                "ship_date": cached.get("ship_date"),
+                "photos": photos,
+                "status": STATUS_PICKED,
+            })
+        return None
 
     return order_share_dao.upsert({
         "orders_id": cached["orders_id"],
         "orders_no": cached["orders_no"],
+        "handler": cached.get("handler"),
         "create_date": cached["create_date"],
         "delivery_id": cached["delivery_id"],
         "jhdate": cached["jhdate"],
         "ship_date": ship_date,
+        "photos": photos,
         "status": STATUS_SHIPPED,
     })
 
 
+def _fill_handler(spider, cached):
+    """补全缓存中的 handler 字段（字段新增前生成的旧缓存可能没有）"""
+    _, handler = _fetch_orders_id(spider, cached["orders_no"])
+    cached = dict(cached)
+    cached["handler"] = handler if handler else "无"
+    order_share_dao.upsert(cached)
+    return cached
+
+
 def _fetch_orders_id(spider, orders_no):
-    """调 mergeOrderList 获取 orders_id（默认近半个月）"""
+    """调 mergeOrderList 获取 orders_id 与经手人（默认近半个月 + 订单号精确匹配）"""
     now = datetime.now()
     start = now - timedelta(days=15)
     start_ms = int(start.timestamp() * 1000)
@@ -182,6 +239,7 @@ def _fetch_orders_id(spider, orders_no):
         limit=50,
         orderdate_start=start_ms,
         orderdate_end=end_ms,
+        orders_no=orders_no,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -189,8 +247,8 @@ def _fetch_orders_id(spider, orders_no):
     order_list = data.get("data", {}).get("list", {}).get("data", [])
     for item in order_list:
         if item.get("orders_no") == orders_no:
-            return item.get("orders_id")
-    return None
+            return item.get("orders_id"), item.get("handler")
+    return None, None
 
 
 def _fetch_orders_view(spider, orders_id):
@@ -199,9 +257,11 @@ def _fetch_orders_view(spider, orders_id):
     resp.raise_for_status()
     data = resp.json()
 
-    table_header = data.get("data", {}).get("TableHeader", {})
+    payload = data.get("data", {})
+    table_header = payload.get("TableHeader", {})
     create_date_raw = table_header.get("create_date")
-    delivery_id = table_header.get("delivery_id")
+    # delivery_id 在 data 顶层，不在 TableHeader 内
+    delivery_id = payload.get("delivery_id")
 
     return _normalize_timestamp(create_date_raw), delivery_id
 
@@ -216,11 +276,15 @@ def _fetch_jhdate(spider, delivery_id):
     return _normalize_datetime(jhdate_raw)
 
 
-def _fetch_ship_date(orders_id):
-    """查 wms_orders 获取 ship_date"""
+def _fetch_wms_info(orders_id):
+    """查 wms_orders 获取 ship_date 和 photos"""
+    step_start = time.time()
     with orm_session() as session:
-        row = session.execute(_WMS_SHIP_DATE_SQL, {"orders_id": orders_id}).mappings().first()
-    return row["ship_date"] if row else None
+        row = session.execute(_WMS_INFO_SQL, {"orders_id": orders_id}).mappings().first()
+    logger.info("[订单分享] wms_orders SQL orders_id=%s cost=%.0fms", orders_id, (time.time() - step_start) * 1000)
+    if not row:
+        return None, None
+    return row["ship_date"], row["photos"]
 
 
 def _normalize_timestamp(ts):
@@ -263,11 +327,22 @@ def _build_view(record):
     return {
         "orders_id": getter("orders_id"),
         "orders_no": getter("orders_no"),
+        "tracking_no": getter("tracking_no"),
+        "handler": getter("handler"),
         "status": getter("status"),
         "create_date": _format_timestamp(getter("create_date")),
         "jhdate": _format_datetime(getter("jhdate")),
         "ship_date": _format_datetime(getter("ship_date")),
+        "photo_urls": _build_photo_urls(getter("photos")),
     }
+
+
+def _build_photo_urls(photos_raw):
+    """把 wms_orders.photos 逗号分隔文件名转成完整 URL 列表"""
+    if not photos_raw:
+        return []
+    filenames = [name.strip() for name in str(photos_raw).split(",") if name.strip()]
+    return [f"{_PHOTO_BASE_URL}{name}" for name in filenames]
 
 
 def _format_datetime(value):

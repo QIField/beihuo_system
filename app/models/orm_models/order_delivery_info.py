@@ -14,7 +14,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Column, BigInteger, String, DateTime
+from sqlalchemy import Column, BigInteger, String, DateTime, Text
 
 from app.models.orm_models.base_models import BaseModels
 
@@ -28,10 +28,12 @@ class OrderDeliveryInfo(BaseModels):
         `id`            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         `orders_id`     BIGINT UNSIGNED NOT NULL,
         `orders_no`     VARCHAR(64) NOT NULL,
+        `handler`       VARCHAR(64) COMMENT '经手人',
         `create_date`   BIGINT COMMENT 'CRM 订单创建时间（秒级时间戳）',
         `delivery_id`   BIGINT COMMENT '发货单 ID',
         `jhdate`        DATETIME COMMENT '拣货日期',
         `ship_date`     DATETIME COMMENT 'WMS 发货日期',
+        `photos`        TEXT COMMENT 'WMS 照片文件名列表（逗号分隔）',
         `status`        VARCHAR(16) NOT NULL COMMENT '已下单 / 仓库已接单 / 已出库',
         `created_at`    DATETIME DEFAULT CURRENT_TIMESTAMP,
         `updated_at`    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -39,6 +41,10 @@ class OrderDeliveryInfo(BaseModels):
         KEY `idx_orders_no` (`orders_no`),
         KEY `idx_status` (`status`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单物流状态（对客扫码查询用）';
+
+    已建表需新增字段：
+    ALTER TABLE `order_delivery_info` ADD COLUMN `handler` VARCHAR(64) COMMENT '经手人' AFTER `orders_no`;
+    ALTER TABLE `order_delivery_info` ADD COLUMN `photos` TEXT COMMENT 'WMS 照片文件名列表（逗号分隔）' AFTER `ship_date`;
     """
 
     __tablename__ = "order_delivery_info"
@@ -50,10 +56,12 @@ class OrderDeliveryInfo(BaseModels):
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="自增主键")
     orders_id = Column(BigInteger, nullable=False, comment="CRM 订单 ID")
     orders_no = Column(String(64), nullable=False, comment="CRM 订单号")
+    handler = Column(String(64), nullable=True, comment="经手人")
     create_date = Column(BigInteger, nullable=True, comment="CRM 订单创建时间（秒级时间戳）")
     delivery_id = Column(BigInteger, nullable=True, comment="发货单 ID")
     jhdate = Column(DateTime, nullable=True, comment="拣货日期")
     ship_date = Column(DateTime, nullable=True, comment="WMS 发货日期")
+    photos = Column(Text, nullable=True, comment="WMS 照片文件名列表（逗号分隔）")
     status = Column(String(16), nullable=False, comment="已下单 / 仓库已接单 / 已出库")
     created_at = Column(DateTime, nullable=True, default=datetime.now, comment="记录创建时间")
     updated_at = Column(DateTime, nullable=True, default=datetime.now, onupdate=datetime.now, comment="记录更新时间")
@@ -62,10 +70,12 @@ class OrderDeliveryInfo(BaseModels):
         return {
             "orders_id": self.orders_id,
             "orders_no": self.orders_no,
+            "handler": self.handler,
             "create_date": self.create_date,
             "delivery_id": self.delivery_id,
             "jhdate": self.jhdate.strftime("%Y-%m-%d %H:%M:%S") if self.jhdate else None,
             "ship_date": self.ship_date.strftime("%Y-%m-%d %H:%M:%S") if self.ship_date else None,
+            "photos": self.photos,
             "status": self.status,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
             "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M:%S") if self.updated_at else None,

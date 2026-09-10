@@ -18,23 +18,22 @@
         .page {
             max-width: 480px;
             margin: 0 auto;
-            padding: 12px 16px 24px;
+            padding: 0 0 24px;
         }
 
-        /* 顶部状态卡片 */
-        .status-card {
-            background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
-            border-radius: 16px;
-            padding: 24px 20px;
-            color: #fff;
-            margin-bottom: 12px;
+        /* 顶部标题栏 */
+        .header {
+            background: #fff;
+            padding: 16px;
             text-align: center;
+            font-size: 17px;
+            font-weight: 600;
+            color: #222;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 12px;
         }
-        .status-card .status-label { font-size: 13px; opacity: .85; margin-bottom: 8px; }
-        .status-card .status-value { font-size: 24px; font-weight: 600; }
-        .status-card.shipped { background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%); }
-        .status-card.picked { background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%); }
-        .status-card.ordered { background: linear-gradient(135deg, #fa8c16 0%, #d46b08 100%); }
+
+        .content { padding: 0 16px; }
 
         /* 进度时间轴 */
         .timeline {
@@ -81,6 +80,55 @@
         .timeline-item.shipped .timeline-time { color: #1677ff; }
         .timeline-item.shipped .timeline-time { color: #52c41a; }
 
+        /* 照片区域 */
+        .photos-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 18px 16px;
+            margin-bottom: 12px;
+        }
+        .photos-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 14px; }
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .photo-item {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+            border: 1px solid #f0f0f0;
+        }
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* 图片放大预览 */
+        .photo-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .photo-overlay.active { display: flex; }
+        .photo-overlay img {
+            max-width: 100%;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
         /* 信息卡片 */
         .card {
             background: #fff;
@@ -119,76 +167,103 @@
 </head>
 <body>
 <div class="page">
-    {% if order %}
-    <!-- 顶部大状态 -->
-    <div class="status-card {% if order.status == '已出库' %}shipped{% elif order.status == '仓库已接单' %}picked{% else %}ordered{% endif %}">
-        <div class="status-label">当前状态</div>
-        <div class="status-value">{{ order.status or '已下单' }}</div>
-    </div>
+    <div class="header">FSBBR订单查询</div>
 
-    <!-- 进度时间轴 -->
-    <div class="timeline">
-        <div class="timeline-title">物流进度</div>
-
-        <div class="timeline-item {% if order.create_date %}active{% endif %}">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-                <div class="timeline-name">已下单</div>
-                <div class="timeline-time">{{ order.create_date or '待更新' }}</div>
-            </div>
-        </div>
-
-        <div class="timeline-item {% if order.jhdate %}active{% endif %}">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-                <div class="timeline-name">仓库已接单</div>
-                <div class="timeline-time">{{ order.jhdate or '待更新' }}</div>
-            </div>
-        </div>
-
-        <div class="timeline-item {% if order.ship_date %}shipped{% endif %}">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-                <div class="timeline-name">已出库</div>
-                <div class="timeline-time">{{ order.ship_date or '待更新' }}</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 订单信息 -->
+    <div class="content">
+        {% if order %}
+        <!-- 订单信息 -->
     <div class="card">
         <div class="card-title">订单信息</div>
         <div class="row">
             <span class="label">订单号</span>
             <span class="value">{{ order.orders_no }}</span>
         </div>
-        {% if order.create_date %}
         <div class="row">
-            <span class="label">下单时间</span>
-            <span class="value">{{ order.create_date }}</span>
+            <span class="label">物流单号</span>
+            <span class="value">{{ order.tracking_no | default('', true) }}</span>
         </div>
-        {% endif %}
-        {% if order.jhdate %}
         <div class="row">
-            <span class="label">接单时间</span>
-            <span class="value">{{ order.jhdate }}</span>
+            <span class="label">经手人</span>
+            <span class="value">{{ order.handler | default('', true) }}</span>
         </div>
-        {% endif %}
-        {% if order.ship_date %}
-        <div class="row">
-            <span class="label">发货时间</span>
-            <span class="value">{{ order.ship_date }}</span>
-        </div>
-        {% endif %}
     </div>
-    {% else %}
-    <div class="empty-card">
-        <div class="icon">&#128269;</div>
-        <div class="title">未找到订单信息</div>
-        <p>链接可能无效或订单不存在<br>请重新扫码获取</p>
+
+        <!-- 进度时间轴 -->
+        <div class="timeline">
+            <div class="timeline-title">物流进度</div>
+
+            <div class="timeline-item {% if order.create_date %}active{% endif %}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-name">已下单</div>
+                    <div class="timeline-time">{{ order.create_date or '待更新' }}</div>
+                </div>
+            </div>
+
+            <div class="timeline-item {% if order.jhdate %}active{% endif %}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-name">仓库已接单</div>
+                    <div class="timeline-time">{{ order.jhdate or '待更新' }}</div>
+                </div>
+            </div>
+
+            <div class="timeline-item {% if order.ship_date %}shipped{% endif %}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-name">已出库</div>
+                    <div class="timeline-time">{{ order.ship_date or '待更新' }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 发货照片 -->
+        {% if order.photo_urls %}
+        <div class="photos-card">
+            <div class="photos-title">发货照片</div>
+            <div class="photo-grid">
+                {% for url in order.photo_urls %}
+                <div class="photo-item">
+                    <img src="{{ url }}" alt="发货照片" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-card">
+            <div class="icon">&#128269;</div>
+            <div class="title">未找到订单信息</div>
+            <p>链接可能无效或订单不存在<br>请重新扫码获取</p>
+        </div>
+        {% endif %}
+        <footer>FSBBR · 订单查询</footer>
     </div>
-    {% endif %}
-    <footer>FSBBR · 订单查询</footer>
 </div>
+
+<!-- 图片放大预览层 -->
+<div class="photo-overlay" id="photoOverlay">
+    <img src="" alt="放大预览" id="photoOverlayImg">
+</div>
+
+<script>
+(function () {
+    var overlay = document.getElementById('photoOverlay');
+    var overlayImg = document.getElementById('photoOverlayImg');
+
+    document.querySelectorAll('.photo-item img').forEach(function (img) {
+        img.addEventListener('click', function () {
+            overlayImg.src = this.src;
+            overlay.classList.add('active');
+        });
+    });
+
+    overlay.addEventListener('click', function () {
+        overlay.classList.remove('active');
+        overlayImg.src = '';
+    });
+})();
+</script>
+
 </body>
 </html>

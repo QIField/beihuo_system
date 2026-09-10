@@ -25,10 +25,12 @@ def _to_dict(record):
         "id": record.id,
         "orders_id": record.orders_id,
         "orders_no": record.orders_no,
+        "handler": record.handler,
         "create_date": record.create_date,
         "delivery_id": record.delivery_id,
         "jhdate": record.jhdate,
         "ship_date": record.ship_date,
+        "photos": record.photos,
         "status": record.status,
         "created_at": record.created_at,
         "updated_at": record.updated_at,
@@ -53,7 +55,7 @@ def upsert(record_dict):
     """
     插入或更新订单物流状态记录，返回 dict
 
-    :param record_dict: 包含 orders_id, orders_no, create_date, delivery_id, jhdate, ship_date, status
+    :param record_dict: 包含 orders_id, orders_no, handler, create_date, delivery_id, jhdate, ship_date, status
     """
     with orm_session() as session:
         existing = session.query(OrderDeliveryInfo).filter_by(
