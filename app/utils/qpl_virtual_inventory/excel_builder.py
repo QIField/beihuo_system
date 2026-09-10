@@ -78,20 +78,20 @@ def build_import_excel(rows, output_path):
     if max_row >= DATA_START_ROW:
         ws.delete_rows(DATA_START_ROW, max_row - DATA_START_ROW + 1)
 
+    current_row = DATA_START_ROW
     for row_data in rows:
-        row = DATA_START_ROW
-        ws.cell(row=row, column=COL_PRODUCT_NAME, value=row_data.get('product_name'))
-        ws.cell(row=row, column=COL_BRAND, value=row_data.get('brand'))
-        ws.cell(row=row, column=COL_QUALITY, value=row_data.get('quality'))
-        ws.cell(row=row, column=COL_OE, value=row_data.get('oe'))
-        ws.cell(row=row, column=COL_BRAND_PART_NO, value=row_data.get('brand_part_no'))
-        ws.cell(row=row, column=COL_MERCHANT_CODE, value=row_data.get('merchant_code'))
-        ws.cell(row=row, column=COL_PRICE, value=row_data.get('price'))
-        ws.cell(row=row, column=COL_STOCK, value=row_data.get('stock'))
-        ws.cell(row=row, column=COL_IN_STOCK, value=row_data.get('in_stock'))
-        ws.cell(row=row, column=COL_STOCK_TIME, value=row_data.get('stock_time'))
-        ws.cell(row=row, column=COL_AUTO_QUOTE, value=row_data.get('auto_quote'))
-        DATA_START_ROW += 1
+        ws.cell(row=current_row, column=COL_PRODUCT_NAME, value=row_data.get('product_name'))
+        ws.cell(row=current_row, column=COL_BRAND, value=row_data.get('brand'))
+        ws.cell(row=current_row, column=COL_QUALITY, value=row_data.get('quality'))
+        ws.cell(row=current_row, column=COL_OE, value=row_data.get('oe'))
+        ws.cell(row=current_row, column=COL_BRAND_PART_NO, value=row_data.get('brand_part_no'))
+        ws.cell(row=current_row, column=COL_MERCHANT_CODE, value=row_data.get('merchant_code'))
+        ws.cell(row=current_row, column=COL_PRICE, value=row_data.get('price'))
+        ws.cell(row=current_row, column=COL_STOCK, value=row_data.get('stock'))
+        ws.cell(row=current_row, column=COL_IN_STOCK, value=row_data.get('in_stock'))
+        ws.cell(row=current_row, column=COL_STOCK_TIME, value=row_data.get('stock_time'))
+        ws.cell(row=current_row, column=COL_AUTO_QUOTE, value=row_data.get('auto_quote'))
+        current_row += 1
 
     wb.save(output_path)
     wb.close()

@@ -54,8 +54,8 @@ def upload_product_import(file_path, company='fsbbr'):
             'response': result,
         }
 
-    # 汽配龙实际成功响应格式待运行时确认，先按常规 code 判断
-    success = isinstance(result, dict) and str(result.get('code', '')) in ('200', '0', '100000')
+    # 汽配龙成功响应 code 为 10000（已实测确认）
+    success = isinstance(result, dict) and str(result.get('code', '')) == '10000'
     return {
         'success': success,
         'token_invalid': False,

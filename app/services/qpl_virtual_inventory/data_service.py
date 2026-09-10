@@ -7,6 +7,8 @@
 
 import logging
 
+from sqlalchemy import func
+
 from app.models.orm_models.brand_qpl_mapping import BrandQplMapping
 from app.models.orm_models.crmapp_compare_summary import CrmappCompareSummary
 from app.models.orm_models.qpl_virtual_qty import QplVirtualQty
@@ -95,12 +97,15 @@ def _load_brand_code_map(session, merchant_codes, company='fsbbr'):
     return {frey_no: brand_code for frey_no, brand_code in results if frey_no}
 
 
-def fetch_virtual_inventory_records():
+def fetch_virtual_inventory_records(limit=None):
     """
-    查询 qpl_virtual_qty 全表数据，并转换为导入需要的字段
+    查询 qpl_virtual_qty 数据，并转换为导入需要的字段
 
     pp 需在 brand_qpl_mapping 中匹配到 qpl_brand 和 qpl_quality，
     未匹配到的记录直接丢弃，不生成到 Excel。
+
+    Args:
+        limit: 限制返回记录数，None 表示不限制；大于0时随机取样
 
     Returns:
         list[dict]: 每条记录包含
@@ -108,17 +113,17 @@ def fetch_virtual_inventory_records():
             number_of_inventories, brand, quality
     """
     with orm_session() as session:
-        rows = (
-            session.query(
-                QplVirtualQty.ys_oe1,
-                QplVirtualQty.product_name1,
-                QplVirtualQty.pp,
-                QplVirtualQty.reference_price,
-                QplVirtualQty.number_of_inventories,
-                QplVirtualQty.merchant_code,
-            )
-            .all()
+        query = session.query(
+            QplVirtualQty.ys_oe1,
+            QplVirtualQty.product_name1,
+            QplVirtualQty.pp,
+            QplVirtualQty.reference_price,
+            QplVirtualQty.number_of_inventories,
+            QplVirtualQty.merchant_code,
         )
+        if limit:
+            query = query.order_by(func.rand()).limit(limit)
+        rows = query.all()
 
         merchant_codes = [r.merchant_code for r in rows if r.merchant_code]
         brand_code_map = _load_brand_code_map(session, merchant_codes)
