@@ -13,6 +13,7 @@ from .report_wx_quote_data_web import report_wx_quote_data_web_bp
 from .warehouse_manager_web import warehouse_manager_web_bp
 from .qpl_quote_web import qpl_quote_web_bp
 from .excel_download import excel_download_bp
+from .reconciliation_web import reconciliation_web_bp
 
 
 common_web_bp = Blueprint(
@@ -45,6 +46,9 @@ common_web_bp.register_blueprint(pp_alias_manager_web_bp)
 
 from .stock_safe_web import stock_safe_web_bp
 common_web_bp.register_blueprint(stock_safe_web_bp)
+
+from .reconciliation_web import reconciliation_web_bp
+common_web_bp.register_blueprint(reconciliation_web_bp)
 
 from .wms_inventory_operation_web import wms_inventory_operation_web_bp
 common_web_bp.register_blueprint(wms_inventory_operation_web_bp)

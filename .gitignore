@@ -65,3 +65,4 @@ docker/logs/
 /sql
 /.trae
 log.txt
+/static/excel/reconciliation/temp/

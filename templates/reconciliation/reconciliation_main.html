@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>开思对账 - 开思vs金蝶应收单</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <style>
+        .layui-card {
+            margin: 15px;
+        }
+        .layui-card-header {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .upload-area {
+            padding: 20px;
+        }
+        .upload-item {
+            margin-bottom: 15px;
+        }
+        .upload-item .layui-form-label {
+            width: 160px;
+        }
+        .upload-item .layui-input-block {
+            margin-left: 190px;
+        }
+        .file-name {
+            display: inline-block;
+            margin-left: 10px;
+            color: #666;
+            font-size: 12px;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        .result-area {
+            padding: 20px;
+            display: none;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-card .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1E9FFF;
+            margin-bottom: 5px;
+        }
+        .stat-card .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+        .download-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .download-btn {
+            margin-right: 10px;
+        }
+        .reason-detail {
+            margin-top: 15px;
+        }
+        .reason-detail table {
+            font-size: 12px;
+        }
+        .loading-tip {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="layui-card">
+        <div class="layui-card-header">开思对账（开思 vs 金蝶应收单）</div>
+        <div class="layui-card-body">
+
+            <!-- 上传区域 -->
+            <div class="upload-area">
+                <form class="layui-form" lay-filter="uploadForm">
+                    <div class="upload-item">
+                        <label class="layui-form-label">开思电子对账单</label>
+                        <div class="layui-input-block">
+                            <button type="button" class="layui-btn layui-btn-normal" id="btnKsStatement">
+                                <i class="layui-icon layui-icon-upload"></i> 选择文件
+                            </button>
+                            <span class="file-name" id="nameKsStatement">未选择文件</span>
+                            <input type="file" id="fileKsStatement" accept=".xlsx,.xls" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="upload-item">
+                        <label class="layui-form-label">订单结算明细</label>
+                        <div class="layui-input-block">
+                            <button type="button" class="layui-btn layui-btn-normal" id="btnKsDetail">
+                                <i class="layui-icon layui-icon-upload"></i> 选择文件
+                            </button>
+                            <span class="file-name" id="nameKsDetail">未选择文件</span>
+                            <input type="file" id="fileKsDetail" accept=".xlsx,.xls" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="upload-item">
+                        <label class="layui-form-label">应收单（金蝶）</label>
+                        <div class="layui-input-block">
+                            <button type="button" class="layui-btn layui-btn-normal" id="btnArBill">
+                                <i class="layui-icon layui-icon-upload"></i> 选择文件
+                            </button>
+                            <span class="file-name" id="nameArBill">未选择文件</span>
+                            <input type="file" id="fileArBill" accept=".xlsx,.xls" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="upload-item" style="padding: 8px 15px; background: #f8f9fa; border-radius: 4px;">
+                        <label class="layui-form-label" style="width: 160px; color: #999;">收款单导入模板</label>
+                        <div class="layui-input-block" style="margin-left: 190px; line-height: 38px; color: #5FB878;">
+                            <i class="layui-icon layui-icon-ok"></i> 已配置（服务器固定模板，无需上传）
+                        </div>
+                    </div>
+
+                    <div class="upload-item">
+                        <label class="layui-form-label">收款单业务日期</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="skd_date" id="skdDate" value=""
+                                   class="layui-input" style="width: 200px;" placeholder="请输入业务日期">
+                        </div>
+                    </div>
+
+                    <div class="upload-item" style="text-align: center; margin-top: 30px;">
+                        <button type="button" class="layui-btn layui-btn-lg" id="btnStartProcess">
+                            <i class="layui-icon layui-icon-release"></i> 开始对账
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 结果区域 -->
+            <div class="result-area" id="resultArea">
+                <fieldset class="layui-elem-field layui-field-title">
+                    <legend>对账结果</legend>
+                </fieldset>
+
+                <!-- 统计卡片 -->
+                <div class="stats-grid" id="statsGrid"></div>
+
+                <!-- 下载区域 -->
+                <div class="download-section">
+                    <h3>结果文件下载</h3>
+                    <div id="downloadBtns"></div>
+                </div>
+
+                <!-- 原因明细 -->
+                <div class="reason-detail" id="reasonDetail"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script>
+        layui.use(['layer', 'jquery', 'form'], function(){
+            var layer = layui.layer;
+            var $ = layui.$;
+            var form = layui.form;
+
+            // 存储已选择的文件
+            var selectedFiles = {
+                ks_statement: null,
+                ks_detail: null,
+                ar_bill: null
+            };
+
+            // ---- 默认收款单业务日期 = 今天（YYYY/M/D，与后端 get_default_skd_date 一致） ----
+            var now = new Date();
+            $('#skdDate').val(now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate());
+
+            // ---- 绑定文件选择按钮 ----
+            function bindFileSelect(btnId, inputId, nameId, fileKey) {
+                $('#' + btnId).click(function(){
+                    $('#' + inputId).click();
+                });
+                $('#' + inputId).change(function(){
+                    var file = this.files[0];
+                    if(file){
+                        selectedFiles[fileKey] = file;
+                        $('#' + nameId).text(file.name);
+                    }
+                });
+            }
+
+            bindFileSelect('btnKsStatement', 'fileKsStatement', 'nameKsStatement', 'ks_statement');
+            bindFileSelect('btnKsDetail', 'fileKsDetail', 'nameKsDetail', 'ks_detail');
+            bindFileSelect('btnArBill', 'fileArBill', 'nameArBill', 'ar_bill');
+
+            // ---- 开始对账按钮 ----
+            $('#btnStartProcess').click(function(){
+                // 校验文件是否都选了
+                var missing = [];
+                var fileLabels = {
+                    ks_statement: '开思电子对账单',
+                    ks_detail: '订单结算明细',
+                    ar_bill: '应收单（金蝶）'
+                };
+                for(var key in fileLabels){
+                    if(!selectedFiles[key]){
+                        missing.push(fileLabels[key]);
+                    }
+                }
+                if(missing.length > 0){
+                    layer.msg('请先选择文件：' + missing.join('、'), {icon: 0});
+                    return;
+                }
+
+                // 构造 FormData
+                var formData = new FormData();
+                formData.append('ks_statement', selectedFiles.ks_statement);
+                formData.append('ks_detail', selectedFiles.ks_detail);
+                formData.append('ar_bill', selectedFiles.ar_bill);
+                formData.append('skd_date', $('#skdDate').val());
+
+                // 显示加载
+                var loading = layer.load(2, {
+                    shade: [0.3, '#000'],
+                    content: '正在对账处理中，请稍候...'
+                });
+
+                // 发送请求
+                $.ajax({
+                    url: '/new/api/reconciliation/upload-and-process',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(res){
+                        layer.close(loading);
+                        if(res && res.code === 0 && res.data){
+                            layer.msg('对账完成！', {icon: 1});
+                            renderResult(res.data);
+                        } else {
+                            layer.msg((res && res.msg) || '对账失败', {icon: 2});
+                        }
+                    },
+                    error: function(xhr){
+                        layer.close(loading);
+                        var msg = '请求失败，请稍后重试';
+                        var raw = '';
+                        try{
+                            var res = JSON.parse(xhr.responseText);
+                            if(res && res.msg) msg = res.msg;
+                        }catch(e){
+                            // 非 JSON 响应（如 502/超时/HTML 错误页），尝试提取文本
+                            if(xhr.responseText){
+                                raw = (xhr.responseText || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                                if(raw && raw.length > 60){
+                                    raw = raw.substring(0, 60) + '...';
+                                }
+                            }
+                        }
+                        if(raw){
+                            layer.msg(msg + '（' + raw + '）', {icon: 2});
+                        } else {
+                            layer.msg(msg, {icon: 2});
+                        }
+                    }
+                });
+            });
+
+            // ---- 渲染结果 ----
+            function renderResult(data) {
+                // 数据防御：data / stats 缺失时提示并中止，避免 JS 中断无任何反馈
+                if(!data || typeof data !== 'object'){
+                    layer.msg('返回数据格式异常', {icon: 2});
+                    return;
+                }
+                var stats = data.stats || {};
+                $('#resultArea').show();
+
+                // 统计卡片
+                var statItems = [
+                    { label: '开思合并行数', value: stats['开思合并行数'] || 0, color: '#1E9FFF' },
+                    { label: '合并命中行数', value: stats['合并命中行数'] || 0, color: '#5FB878' },
+                    { label: '开思剩下行数', value: stats['开思剩下行数'] || 0, color: '#FFB800' },
+                    { label: '金蝶剩下行数', value: stats['金蝶剩下行数'] || 0, color: '#FF5722' },
+                    { label: '生成收款单数', value: stats['生成收款单数'] || 0, color: '#01AAED' },
+                ];
+
+                var statsHtml = '';
+                for(var i = 0; i < statItems.length; i++){
+                    var item = statItems[i];
+                    statsHtml += '<div class="stat-card">';
+                    statsHtml += '<div class="stat-number" style="color:' + item.color + ';">' + item.value + '</div>';
+                    statsHtml += '<div class="stat-label">' + item.label + '</div>';
+                    statsHtml += '</div>';
+                }
+                $('#statsGrid').html(statsHtml);
+
+                // 下载按钮
+                var dlHtml = '';
+                if(data.merge_result_url){
+                    dlHtml += '<a href="' + data.merge_result_url + '" class="layui-btn layui-btn-normal download-btn" download>';
+                    dlHtml += '<i class="layui-icon layui-icon-download-circle"></i> 下载对账结果（合并数据/开思剩下/金蝶剩下）';
+                    dlHtml += '</a>';
+                }
+                if(data.payment_bill_url){
+                    dlHtml += '<a href="' + data.payment_bill_url + '" class="layui-btn layui-btn-warm download-btn" download>';
+                    dlHtml += '<i class="layui-icon layui-icon-download-circle"></i> 下载收款单导入文件';
+                    dlHtml += '</a>';
+                }
+                $('#downloadBtns').html(dlHtml);
+
+                // 原因明细
+                var reasonHtml = '';
+                var ksReasons = stats['开思剩下原因'] || {};
+                var arReasons = stats['金蝶剩下原因'] || {};
+
+                if(Object.keys(ksReasons).length > 0 || Object.keys(arReasons).length > 0){
+                    reasonHtml += '<fieldset class="layui-elem-field layui-field-title">';
+                    reasonHtml += '<legend>剩余原因明细</legend>';
+                    reasonHtml += '</fieldset>';
+                    reasonHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">';
+
+                    // 开思剩下原因
+                    reasonHtml += '<div>';
+                    reasonHtml += '<h4 style="margin-bottom: 10px;">开思剩下原因</h4>';
+                    reasonHtml += '<table class="layui-table" lay-skin="line">';
+                    reasonHtml += '<thead><tr><th>原因</th><th style="width: 100px;">数量</th></tr></thead>';
+                    reasonHtml += '<tbody>';
+                    for(var reason in ksReasons){
+                        reasonHtml += '<tr><td>' + reason + '</td><td>' + ksReasons[reason] + '</td></tr>';
+                    }
+                    if(Object.keys(ksReasons).length === 0){
+                        reasonHtml += '<tr><td colspan="2" style="text-align:center; color:#999;">无</td></tr>';
+                    }
+                    reasonHtml += '</tbody></table></div>';
+
+                    // 金蝶剩下原因
+                    reasonHtml += '<div>';
+                    reasonHtml += '<h4 style="margin-bottom: 10px;">金蝶剩下原因</h4>';
+                    reasonHtml += '<table class="layui-table" lay-skin="line">';
+                    reasonHtml += '<thead><tr><th>原因</th><th style="width: 100px;">数量</th></tr></thead>';
+                    reasonHtml += '<tbody>';
+                    for(var reason2 in arReasons){
+                        reasonHtml += '<tr><td>' + reason2 + '</td><td>' + arReasons[reason2] + '</td></tr>';
+                    }
+                    if(Object.keys(arReasons).length === 0){
+                        reasonHtml += '<tr><td colspan="2" style="text-align:center; color:#999;">无</td></tr>';
+                    }
+                    reasonHtml += '</tbody></table></div>';
+
+                    reasonHtml += '</div>';
+                }
+                $('#reasonDetail').html(reasonHtml);
+
+                // 滚动到结果区域
+                $('html, body').animate({
+                    scrollTop: $('#resultArea').offset().top - 20
+                }, 500);
+            }
+
+        });
+    </script>
+</body>
+</html>

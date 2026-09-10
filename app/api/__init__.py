@@ -64,6 +64,10 @@ api_bp.register_blueprint(task_manager_bp)
 from .stock_safe_api import stock_safe_bp
 api_bp.register_blueprint(stock_safe_bp)
 
+# 注册开思对账 API
+from .reconciliation_api import reconciliation_bp
+api_bp.register_blueprint(reconciliation_bp)
+
 # 注册 WMS 库存操作推送管理 API
 from .wms_inventory_operation_api import wms_inventory_operation_bp
 api_bp.register_blueprint(wms_inventory_operation_bp)
