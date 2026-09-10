@@ -20,7 +20,8 @@ from .crm_pp_name import CrmPpName
 from .crm_pp_name_log import CrmPpNameLog
 from .crm_pp_alias_pool import CrmPpAliasPool
 from .crm_pp_alias_pool_log import CrmPpAliasPoolLog
+from .brand_qpl_mapping import BrandQplMapping
 from .vin_vehicle_full_info import VinVehicleFullInfo
 from .ks_inquiry_summary_models import KsInquiryOeMonthlySummary, KsInquiryCustomerByOeMonthlySummary
 
-__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "WeixinDecodingVin", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog", "CrmPpAliasPool", "CrmPpAliasPoolLog", "VinVehicleFullInfo", "KsInquiryOeMonthlySummary", "KsInquiryCustomerByOeMonthlySummary"]
+__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "WeixinDecodingVin", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog", "CrmPpAliasPool", "CrmPpAliasPoolLog", "BrandQplMapping", "VinVehicleFullInfo", "KsInquiryOeMonthlySummary", "KsInquiryCustomerByOeMonthlySummary"]

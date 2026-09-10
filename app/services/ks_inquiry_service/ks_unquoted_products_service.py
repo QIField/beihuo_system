@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 from typing import Dict, Set, List, Tuple
 
 from app.utils.database_connection import db_cursor
+from app.utils.logger_config import get_task_logger
+
+logger = get_task_logger('ks_quote_count')
 
 
 class KsUnquotedProductsService:
@@ -24,6 +27,7 @@ class KsUnquotedProductsService:
     @staticmethod
     def calculate_recent_days(days: int = 5) -> Dict[str, int]:
         begin_date = (datetime.now().date() - timedelta(days=days - 1)).strftime('%Y-%m-%d')
+        logger.info(f"[未报价产品计算] 开始，范围近{days}天，开始日期={begin_date}")
 
         with db_cursor() as cursor:
             cursor.execute(
@@ -36,6 +40,7 @@ class KsUnquotedProductsService:
                 (begin_date,)
             )
             inquiry_rows = cursor.fetchall()
+            logger.info(f"[未报价产品计算] 查询到 {len(inquiry_rows)} 条询价记录")
 
             quoted_map: Dict[Tuple[str, str], Set[str]] = {}
             parts_by_company: Dict[str, Set[str]] = {}
@@ -56,6 +61,7 @@ class KsUnquotedProductsService:
                     quoted_map[key].add(str(brand).strip())
 
             if not quoted_map:
+                logger.info("[未报价产品计算] 无有效询价记录，跳过")
                 return {'matched_parts': 0, 'updated_rows': 0}
 
             cursor.execute(
@@ -121,6 +127,6 @@ class KsUnquotedProductsService:
                 updated_rows = cursor.rowcount
 
             matched_parts = sum(1 for products in unquoted_map.values() if products)
-            print(f"[KsUnquotedProductsService] 未报价产品计算完成: 范围近{days}天, 匹配OE数={matched_parts}, 更新行数={updated_rows}")
+            logger.info(f"[未报价产品计算] 完成: 范围近{days}天, 匹配OE数={matched_parts}, 更新行数={updated_rows}")
 
             return {'matched_parts': matched_parts, 'updated_rows': updated_rows}

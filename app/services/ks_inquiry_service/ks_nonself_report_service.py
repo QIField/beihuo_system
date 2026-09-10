@@ -17,6 +17,9 @@ from openpyxl.styles import Alignment
 
 from app.utils.database_connection import db_cursor
 from app.utils.common_util_module.server_push import message_push
+from app.utils.logger_config import get_task_logger
+
+logger = get_task_logger('ks_nonself_report')
 
 
 # 门店映射：company 字段值 -> 中文显示名
@@ -86,9 +89,12 @@ def _fetch_records(company: str, date_str: str, statuses: Tuple[str, ...]) -> Li
         ORDER BY created_at DESC
     """
     params = statuses + (company, date_str)
+    logger.info(f"[数据查询] 门店={company}, 日期={date_str}, 状态={statuses}")
     with db_cursor(dict_cursor=True) as cursor:
         cursor.execute(sql, params)
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        logger.info(f"[数据查询] 门店={company}, 日期={date_str}, 状态={statuses}, 返回 {len(rows)} 条")
+        return rows
 
 
 def _build_sheet_data(records: List[Dict[str, Any]]) -> Tuple[pd.DataFrame, List[Tuple[int, int]]]:
@@ -183,6 +189,7 @@ def _export_to_excel(nonself_records, self_records, company: str, date_str: str)
     file_name = f"{CATEGORY}_{company}_{date_str}.xlsx"
     file_path = os.path.join(EXPORT_DIR, file_name)
 
+    logger.info(f"[Excel导出] 门店={company}, 日期={date_str}, 非本店={len(nonself_records)} 条, 本店={len(self_records)} 条, 文件={file_path}")
     with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
         for sheet_name, records in [("非本店下单", nonself_records), ("本店下单", self_records)]:
             df, merge_ranges = _build_sheet_data(records)
@@ -196,7 +203,9 @@ def _export_to_excel(nonself_records, self_records, company: str, date_str: str)
             _apply_inquiryid_merges(ws, merge_ranges)
             ws.freeze_panes = "A2"
             _auto_fit_columns(ws)
+            logger.info(f"[Excel导出] 工作表={sheet_name}, 行数={len(df)}, 合并范围数={len(merge_ranges)}")
 
+    logger.info(f"[Excel导出] 完成: {file_path}")
     return file_path
 
 
@@ -244,11 +253,12 @@ def run_ks_nonself_daily_report() -> Dict[str, Any]:
     date_str = yesterday.strftime("%Y-%m-%d")
     now_str = now.strftime("%Y-%m-%d %H:%M")
 
-    print(f"\n[开思下单汇报] 开始执行，数据日期：{date_str}")
+    logger.info(f"[开思下单汇报] 开始执行，数据日期：{date_str}")
 
     summary = {"date": date_str, "stores": []}
 
     for company, store_name in KS_NONSELF_STORE_MAP.items():
+        logger.info(f"[开思下单汇报] 处理门店：{store_name}({company})")
         nonself_records = _fetch_records(company, date_str, ("非本店下单",))
         same_quote_not_self_records = _fetch_records(company, date_str, ("已在本店其他品质",))
         self_order_records = _fetch_records(company, date_str, ("本店下单",))
@@ -272,24 +282,29 @@ def run_ks_nonself_daily_report() -> Dict[str, Any]:
         }
 
         if total_count == 0:
-            print(f"[开思下单汇报] {store_name}({company}) 无数据，跳过推送")
+            logger.info(f"[开思下单汇报] {store_name}({company}) 无数据，跳过推送")
         else:
-            file_path = _export_to_excel(nonself_records, self_records, company, date_str)
-            store_result["file_path"] = file_path
+            try:
+                file_path = _export_to_excel(nonself_records, self_records, company, date_str)
+                store_result["file_path"] = file_path
 
-            download_url = _build_download_url(company, date_str)
-            message = _build_message(
-                now_str, date_str, store_name, nonself_count, self_count,
-                same_quote_not_self_count, self_order_count, download_url
-            )
+                download_url = _build_download_url(company, date_str)
+                message = _build_message(
+                    now_str, date_str, store_name, nonself_count, self_count,
+                    same_quote_not_self_count, self_order_count, download_url
+                )
 
-            push_resp = message_push("开思", message)
-            store_result["pushed"] = True
-            print(f"[开思下单汇报] {store_name}({company}) 推送成功，"
-                  f"非本店{nonself_count} 条，本店{self_count} 条（已在本店其他品质{same_quote_not_self_count} 条，"
-                  f"本店下单{self_order_count} 条），文件：{file_path}，响应：{push_resp}")
+                logger.info(f"[开思下单汇报] {store_name}({company}) 开始推送消息")
+                push_resp = message_push("开思", message)
+                store_result["pushed"] = True
+                logger.info(f"[开思下单汇报] {store_name}({company}) 推送成功，"
+                            f"非本店{nonself_count} 条，本店{self_count} 条（已在本店其他品质{same_quote_not_self_count} 条，"
+                            f"本店下单{self_order_count} 条），文件：{file_path}，响应：{push_resp}")
+            except Exception:
+                logger.exception(f"[开思下单汇报] {store_name}({company}) 导出或推送失败")
+                store_result["pushed"] = False
 
         summary["stores"].append(store_result)
 
-    print(f"[开思下单汇报] 执行完成\n")
+    logger.info(f"[开思下单汇报] 执行完成，结果：{summary}")
     return summary

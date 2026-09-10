@@ -418,6 +418,7 @@ var CartPanel = (function() {
                     return {
                         name: r.supplier_name || '',
                         price: r.purchase_price !== undefined ? String(r.purchase_price) : '',
+                        quantity: r.purchase_quantity !== undefined && r.purchase_quantity !== null ? String(r.purchase_quantity) : '',
                         date: r.purchase_date || ''
                     };
                 });
@@ -468,20 +469,22 @@ var CartPanel = (function() {
                             'padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
                             '<span style="flex: 1; padding-right: 8px; color: #333;">' + (supplier.date || '-') + '</span>' +
                             '<span style="flex: 2; padding-right: 16px; color: #333;">' + supplier.name + '</span>' +
-                            '<span style="color: #666; white-space: nowrap;">' + supplier.price + '</span>' +
+                            '<span style="padding-right: 12px; color: #666; white-space: nowrap;">' + (supplier.quantity || '-') + '</span>' +
+                            '<span style="color: #e91e63; font-weight: 500; white-space: nowrap;">' + supplier.price + '</span>' +
                             '</div>';
                     } else {
                         tooltipContent += '<div class="supplier-tooltip-row" style="display: flex; justify-content: space-between; ' +
                             'padding: 8px 16px; border-bottom: 1px solid #f6f6f6;">' +
                             '<span class="supplier-name" style="flex: 1; padding-right: 16px; color: #333;">' + supplier.name + '</span>' +
-                            '<span class="supplier-price" style="color: #666; white-space: nowrap;">' + supplier.price + '</span>' +
+                            '<span style="padding-right: 12px; color: #666; white-space: nowrap;">' + (supplier.quantity || '-') + '</span>' +
+                            '<span class="supplier-price" style="color: #e91e63; font-weight: 500; white-space: nowrap;">' + supplier.price + '</span>' +
                             '</div>';
                     }
                 });
             } else {
                 tooltipContent = '<div class="supplier-tooltip-row" style="padding: 8px 16px; color: #999;">暂无供应商信息</div>';
             }
-            var headerText = hasDate ? '日期 - 供应商 - 单价' : '供应商 - 单价';
+            var headerText = hasDate ? '日期 - 供应商 - 数量 - 单价' : '供应商 - 数量 - 单价';
             layer.innerHTML = '<div class="supplier-tooltip-header" style="padding: 12px 16px; background: #f8f9fa; ' +
                 'border-bottom: 1px solid #e6e6e6; border-radius: 8px 8px 0 0; font-weight: 500; color: #333; font-size: 14px;">' +
                 headerText + '</div>' +

@@ -12,6 +12,7 @@ from . import api_client
 from . import data_processor
 from . import db_service
 from .config import COMPANIES
+from app.services.b2b_intransit_service.sync_service import run_in_transit_sync_for_company
 
 # 并发控制锁
 _fetch_task_lock = threading.Lock()
@@ -166,6 +167,66 @@ def _merge_vehicle_mapping(company: str, records: list) -> list:
         conn.close()
 
 
+def _sync_intransit_map(company: str) -> dict:
+    """
+    同步单公司 B2B 在途数据，返回 {frey_no: 聚合后 purchase_quantity}
+
+    同步失败时抛出异常。
+
+    Args:
+        company: 门店代码
+
+    Returns:
+        物料条码 -> 在途总数的映射 dict
+    """
+    import pymysql.cursors
+    from app.utils.database_connection import get_db_connection
+
+    print(f"[在途] [{company}] 开始同步 B2B 在途数据...")
+
+    # 1. 同步该公司在途数据到 b2b_intransit_stock
+    run_in_transit_sync_for_company(company)
+
+    conn = get_db_connection()
+    cursor = conn.cursor(pymysql.cursors.DictCursor)
+
+    try:
+        # 2. 按 frey_no 聚合在途采购数量
+        cursor.execute("""
+            SELECT frey_no, SUM(purchase_quantity) AS total_qty
+            FROM b2b_intransit_stock
+            WHERE company = %s AND frey_no IS NOT NULL AND frey_no != ''
+            GROUP BY frey_no
+        """, (company,))
+        return {row['frey_no']: row['total_qty'] or 0 for row in cursor.fetchall()}
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def _apply_intransit_to_records(records: list, intransit_map: dict) -> None:
+    """
+    将聚合后的在途数量写入 records，未匹配到的条码置 0
+
+    Args:
+        records: 备货记录列表
+        intransit_map: 物料条码 -> 在途总数的映射
+    """
+    matched_count = 0
+    for record in records:
+        barcode = record.get('物料条码')
+        if barcode and barcode in intransit_map:
+            record['在途数量'] = intransit_map[barcode]
+            matched_count += 1
+        else:
+            record['在途数量'] = 0
+
+    print(
+        f"[在途] 在途数量替换完成: 共 {len(records)} 条, "
+        f"匹配 {matched_count} 条, 未匹配置 0 {len(records) - matched_count} 条"
+    )
+
+
 def fetch_company(company: str) -> int:
     """
     拉取单个门店数据
@@ -203,13 +264,20 @@ def fetch_company(company: str) -> int:
     print(f"[车型] 门店 {company} 开始获取车型映射...")
     records = _merge_vehicle_mapping(company, records)
     
-    # 4. 保存到数据库（已包含车型和替换号）
+    # 4. 同步 B2B 在途数据并替换 records 中的在途数量
+    try:
+        intransit_map = _sync_intransit_map(company)
+        _apply_intransit_to_records(records, intransit_map)
+    except Exception as e:
+        print(f"[警告] 门店 {company} 在途同步失败，使用 BI 原值: {e}")
+    
+    # 5. 保存到数据库（已包含车型、替换号和正确的在途数量）
     saved_count = db_service.save_company_data(company, records)
     
     if saved_count >= 0:
         print(f"[成功] 门店 {company} 数据保存完成，共 {saved_count} 条")
         
-        # 5. 异步执行购物车更新（车型映射已完成，不需要再执行）
+        # 6. 异步执行购物车更新（车型映射已完成，不需要再执行）
         threading.Thread(target=_update_cart_only, args=(company,), daemon=True).start()
     else:
         print(f"[失败] 门店 {company} 数据保存失败")

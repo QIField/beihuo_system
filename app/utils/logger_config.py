@@ -68,6 +68,7 @@ ERROR_LOG = os.path.join(TASK_LOG_DIR, 'errors.log')
 # 新任务需要记录独立日志时，在此添加即可
 TASK_LOGGERS = [
     'qpl_auto_bill',                # 汽配龙自动报价
+    'qpl_virtual_inventory',        # 汽配龙虚拟库存导入
     'btl_auto_bill',                # 巴图鲁自动报价
     'ks_auto_bill',                 # 开思自动对单
     'crm_warehouse_inventory_sync', # CRM 仓库库存同步
@@ -87,8 +88,12 @@ TASK_LOGGERS = [
     'purchase_history_compare',     # 采购历史比对功能
     'crm_full_crawl',               # CRM 全量数据爬取
     'ks_inquiry_export',            # 开思询价导出
+    'ks_nonself_report',            # 开思非本店下单业务汇报
+    'ks_quote_count',               # 开思询价明细爬取与统计
     'wx_chat_image_parse',          # 微信群聊图片解析
     'data_gzbbr_login',             # data.gzbbr.com 自动登录更新 Cookie
+    'b2b_intransit_sync',           # B2B 在途库存同步
+    'order_share',                  # 订单分享公开页面（扫码查询）
 ]
 
 

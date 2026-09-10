@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no">
+    <title>订单查询</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #f5f6f8;
+            color: #333;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .page {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 0 0 24px;
+        }
+
+        /* 顶部标题栏 */
+        .header {
+            background: #fff;
+            padding: 16px;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 600;
+            color: #222;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 12px;
+        }
+
+        .content { padding: 0 16px; }
+
+        /* 进度时间轴 */
+        .timeline {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px 16px;
+            margin-bottom: 12px;
+        }
+        .timeline-title { font-size: 15px; font-weight: 600; margin-bottom: 18px; color: #222; }
+        .timeline-item {
+            display: flex;
+            position: relative;
+            padding-bottom: 20px;
+        }
+        .timeline-item:last-child { padding-bottom: 0; }
+        .timeline-item:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            left: 7px;
+            top: 18px;
+            bottom: 0;
+            width: 2px;
+            background: #e8e8e8;
+        }
+        .timeline-item.active:not(:last-child)::after { background: #1677ff; }
+        .timeline-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e8e8e8;
+            margin-right: 12px;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 1;
+        }
+        .timeline-item.active .timeline-dot { background: #1677ff; }
+        .timeline-item.shipped .timeline-dot { background: #52c41a; }
+        .timeline-content { flex: 1; }
+        .timeline-name { font-size: 15px; color: #666; margin-bottom: 4px; }
+        .timeline-item.active .timeline-name,
+        .timeline-item.shipped .timeline-name { color: #222; font-weight: 500; }
+        .timeline-time { font-size: 13px; color: #999; }
+        .timeline-item.active .timeline-time,
+        .timeline-item.shipped .timeline-time { color: #1677ff; }
+        .timeline-item.shipped .timeline-time { color: #52c41a; }
+
+        /* 照片区域 */
+        .photos-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 18px 16px;
+            margin-bottom: 12px;
+        }
+        .photos-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 14px; }
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .photo-item {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+            border: 1px solid #f0f0f0;
+        }
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* 图片放大预览 */
+        .photo-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .photo-overlay.active { display: flex; }
+        .photo-overlay img {
+            max-width: 100%;
+            max-height: 90vh;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        /* 信息卡片 */
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 18px 16px;
+            margin-bottom: 12px;
+        }
+        .card-title { font-size: 15px; font-weight: 600; color: #222; margin-bottom: 14px; }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 12px 0;
+            font-size: 15px;
+            border-bottom: 1px solid #f2f2f2;
+        }
+        .row:last-child { border-bottom: none; padding-bottom: 0; }
+        .row:first-child { padding-top: 0; }
+        .row .label { color: #999; flex-shrink: 0; margin-right: 16px; }
+        .row .value { color: #222; text-align: right; word-break: break-all; line-height: 1.4; }
+
+        /* 空状态 */
+        .empty-card {
+            background: #fff;
+            border-radius: 16px;
+            text-align: center;
+            padding: 64px 24px;
+            margin-top: 40px;
+        }
+        .empty-card .icon { font-size: 56px; margin-bottom: 16px; }
+        .empty-card .title { font-size: 17px; color: #333; margin-bottom: 8px; font-weight: 500; }
+        .empty-card p { color: #999; font-size: 14px; line-height: 1.6; }
+
+        footer { text-align: center; color: #bbb; font-size: 12px; padding: 16px 0 8px; }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="header">FSBBR订单查询</div>
+
+    <div class="content">
+        {% if order %}
+        <!-- 订单信息 -->
+    <div class="card">
+        <div class="card-title">订单信息</div>
+        <div class="row">
+            <span class="label">订单号</span>
+            <span class="value">{{ order.orders_no }}</span>
+        </div>
+        <div class="row">
+            <span class="label">物流单号</span>
+            <span class="value">{{ order.tracking_no | default('', true) }}</span>
+        </div>
+        <div class="row">
+            <span class="label">经手人</span>
+            <span class="value">{{ order.handler | default('', true) }}</span>
+        </div>
+    </div>
+
+        <!-- 进度时间轴 -->
+        <div class="timeline">
+            <div class="timeline-title">物流进度</div>
+
+            <div class="timeline-item {% if order.create_date %}active{% endif %}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-name">已下单</div>
+                    <div class="timeline-time">{{ order.create_date or '待更新' }}</div>
+                </div>
+            </div>
+
+            <div class="timeline-item {% if order.jhdate %}active{% endif %}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-name">仓库已接单</div>
+                    <div class="timeline-time">{{ order.jhdate or '待更新' }}</div>
+                </div>
+            </div>
+
+            <div class="timeline-item {% if order.ship_date %}shipped{% endif %}">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-name">已出库</div>
+                    <div class="timeline-time">{{ order.ship_date or '待更新' }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 发货照片 -->
+        {% if order.photo_urls %}
+        <div class="photos-card">
+            <div class="photos-title">发货照片</div>
+            <div class="photo-grid">
+                {% for url in order.photo_urls %}
+                <div class="photo-item">
+                    <img src="{{ url }}" alt="发货照片" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-card">
+            <div class="icon">&#128269;</div>
+            <div class="title">未找到订单信息</div>
+            <p>链接可能无效或订单不存在<br>请重新扫码获取</p>
+        </div>
+        {% endif %}
+        <footer>FSBBR · 订单查询</footer>
+    </div>
+</div>
+
+<!-- 图片放大预览层 -->
+<div class="photo-overlay" id="photoOverlay">
+    <img src="" alt="放大预览" id="photoOverlayImg">
+</div>
+
+<script>
+(function () {
+    var overlay = document.getElementById('photoOverlay');
+    var overlayImg = document.getElementById('photoOverlayImg');
+
+    document.querySelectorAll('.photo-item img').forEach(function (img) {
+        img.addEventListener('click', function () {
+            overlayImg.src = this.src;
+            overlay.classList.add('active');
+        });
+    });
+
+    overlay.addEventListener('click', function () {
+        overlay.classList.remove('active');
+        overlayImg.src = '';
+    });
+})();
+</script>
+
+</body>
+</html>

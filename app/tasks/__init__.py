@@ -20,6 +20,7 @@ from .mercedes_replace_number_sync_task import register_mercedes_replace_number_
 from .wx_chat_image_parse_task import register_wx_chat_image_parse_tasks
 from .data_gzbbr_login_task import register_data_gzbbr_login_tasks
 from .ks_inquiry_summary_tasks import register_ks_inquiry_summary_tasks
+from .qpl_virtual_inventory_import_task import register_qpl_virtual_inventory_import_tasks
 from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
 
 
@@ -51,34 +52,37 @@ def register_all_tasks(task_manager):
     # 7. 注册汽配龙下单状态同步定时任务（每天11:00）
     register_qpl_order_status_sync_tasks(task_manager)
     
-    # 8. 注册CRM仓库库存同步定时任务（每天8:00和20:00）
+    # 8. 注册汽配龙虚拟库存导入定时任务（每天06:00）
+    register_qpl_virtual_inventory_import_tasks(task_manager)
+    
+    # 9. 注册CRM仓库库存同步定时任务（每天8:00和20:00）
     register_crm_warehouse_inventory_sync_tasks(task_manager)
 
-    # 9. 注册VIN车辆信息补全定时任务（每天9:00，最多50条）
+    # 10. 注册VIN车辆信息补全定时任务（每天9:00，最多50条）
     register_vin_vehicle_info_sync_tasks(task_manager)
 
-    # 10. 注册WMS订单推送定时任务（每天07:00、14:00-19:00）
+    # 11. 注册WMS订单推送定时任务（每天07:00、14:00-19:00）
     register_wms_order_push_tasks(task_manager)
 
-    # 11. 注册WMS采购入库单明细同步定时任务（按指定字段，每天06:00）
+    # 12. 注册WMS采购入库单明细同步定时任务（按指定字段，每天06:00）
     register_wms_return_items_detail_tasks(task_manager)
 
-    # 12. 注册CRM产品价格同步定时任务（每天03:00）
+    # 13. 注册CRM产品价格同步定时任务（每天03:00）
     register_crm_price_sync_tasks(task_manager)
 
-    # 13. 注册奔驰报价OE替换号自动同步定时任务（每天04:00）
+    # 14. 注册奔驰报价OE替换号自动同步定时任务（每天04:00）
     register_mercedes_replace_number_sync_tasks(task_manager)
 
-    # 14. 注册微信群聊图片解析定时任务（每天03:00）
+    # 15. 注册微信群聊图片解析定时任务（每天03:00）
     register_wx_chat_image_parse_tasks(task_manager)
 
-    # 15. 注册 data.gzbbr.com 每日登录更新 Cookie 定时任务（每天07:00）
+    # 16. 注册 data.gzbbr.com 每日登录更新 Cookie 定时任务（每天07:00）
     register_data_gzbbr_login_tasks(task_manager)
 
-    # 16. 注册WMS库存操作自动推送定时任务（每天10:00、20:00）
+    # 17. 注册WMS库存操作自动推送定时任务（每天10:00、20:00）
     register_wms_inventory_operation_tasks(task_manager)
 
-    # 17. 注册OE军备统计月度汇总定时任务（每天02:30）
+    # 18. 注册OE军备统计月度汇总定时任务（每天02:30）
     register_ks_inquiry_summary_tasks(task_manager)
 
 
