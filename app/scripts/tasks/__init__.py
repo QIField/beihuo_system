@@ -69,6 +69,6 @@ def expansion_tasks(task_manager):
     from app.scripts.tasks.stock_safe_tasks import stock_safe_sales_refund_register
     stock_safe_sales_refund_register(task_manager)
 
-    # 注册每日销售订单历史数据爬取（每天凌晨5:00，更新最近3天）
-    from app.scripts.tasks.stock_safe_tasks import stock_safe_daily_sales_crawl_register
-    stock_safe_daily_sales_crawl_register(task_manager)
+    # 注册每日销售爬取 + 补货清单下载链接生成（每天凌晨3:00，爬虫最先执行）
+    from app.scripts.tasks.stock_safe_tasks import stock_safe_crawl_replenish_register
+    stock_safe_crawl_replenish_register(task_manager)
