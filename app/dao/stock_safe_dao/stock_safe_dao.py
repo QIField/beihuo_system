@@ -86,6 +86,8 @@ def fetch_sales_with_inventory(company: str = 'fsbbr') -> list:
             AND s.frey_no = b.物料条码 COLLATE utf8mb4_unicode_ci
         WHERE s.number IS NULL
           AND b.company = :company
+          AND b.oe IS NOT NULL AND b.oe != ''
+          AND (b.库存数量 > 0 OR b.在途数量 > 0)
     """)
 
     with orm_session() as session:

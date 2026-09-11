@@ -13,7 +13,7 @@
 
 筛选规则（固定）：
     - 销售状态：销量低、销量正常
-    - 库存状态：建议补货、可根据情况补货、需补货、紧急补货
+    - 库存状态：需补货|可卖天数较少、需补货、紧急补货
 
 说明：
     - 不过滤废弃数据（stock_safe_useless_data），即不含数据范围筛选。
@@ -25,7 +25,7 @@ from sqlalchemy import case
 
 # 补货清单固定的筛选条件（与业务规则保持一致，集中定义便于维护）
 SALES_STATUS_LIST = ['销量低', '销量正常']
-STOCK_STATUS_LIST = ['建议补货', '可根据情况补货', '需补货', '紧急补货']
+STOCK_STATUS_LIST = ['需补货|可卖天数较少', '需补货', '紧急补货']
 
 
 def fetch_replenish_data(session) -> list:
@@ -35,7 +35,7 @@ def fetch_replenish_data(session) -> list:
     使用业务层传入的 session 查询（不在本 DAO 开启事务），会话由调用方管理，
     以保持整条业务链路的原子性。
 
-    排序：库存状态按 紧急补货 > 需补货 > 建议补货 > 可根据情况补货 的紧急程度，
+    排序：库存状态按 紧急补货 > 需补货|可卖天数较少 > 需补货 的紧急程度，
     再按可用库存升序。
 
     Args:
@@ -55,10 +55,9 @@ def fetch_replenish_data(session) -> list:
         .order_by(
             case(
                 (StockSafe.stock_status == '紧急补货', 1),
-                (StockSafe.stock_status == '需补货', 2),
-                (StockSafe.stock_status == '建议补货', 3),
-                (StockSafe.stock_status == '可根据情况补货', 4),
-                else_=5,
+                (StockSafe.stock_status == '需补货|可卖天数较少', 2),
+                (StockSafe.stock_status == '需补货', 3),
+                else_=4,
             ),
             StockSafe.available_stock.asc(),
         )

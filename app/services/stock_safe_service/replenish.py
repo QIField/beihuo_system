@@ -13,7 +13,7 @@
 
 筛选规则（固定，查询逻辑位于 replenish_dao）：
     - 销售状态：销量低、销量正常
-    - 库存状态：建议补货、可根据情况补货、需补货、紧急补货
+    - 库存状态：需补货|可卖天数较少、需补货、紧急补货
 
 说明：
     - 不过滤废弃数据（stock_safe_useless_data），即不做数据范围筛选。
@@ -26,7 +26,6 @@
 import os
 import sys
 from typing import List, Dict, Any, Optional
-import math
 
 import pandas as pd
 
@@ -62,7 +61,6 @@ EXCEL_COLUMN_CONFIG: List[Dict[str, str]] = [
     {"field": "avg_daily_sales",      "header": "平均日销量"},
     {"field": "available_stock",      "header": "可用库存"},
     {"field": "transit_quantity",     "header": "在途数量"},
-    {"field": "suggest_replenish_qty","header": "建议补货数量"},
     {"field": "stock_lower_limit",    "header": "库存下限"},
     {"field": "stock_upper_limit",    "header": "库存上限"},
     {"field": "sellable_days",        "header": "可卖天数"},
@@ -74,39 +72,12 @@ EXCEL_COLUMN_CONFIG: List[Dict[str, str]] = [
 
 # ---------- 对外服务接口 ----------
 
-def compute_suggest_replenish_qty(
-    stock_upper_limit: float,
-    available_stock: Any,
-    transit_quantity: Any,
-) -> int:
-    """
-    计算建议补货数量
-
-    公式：建议补货数量 = 库存上限取整 - 可用库存 - 在途数量；
-    若计算结果小于 0，则归 0。
-
-    Args:
-        stock_upper_limit: 库存上限
-        available_stock: 可用库存
-        transit_quantity: 在途数量
-
-    Returns:
-        int: 建议补货数量（不小于 0）
-    """
-    upper = math.ceil(stock_upper_limit) if stock_upper_limit is not None else 0
-    avail = int(available_stock or 0)
-    transit = int(transit_quantity or 0)
-    qty = upper - avail - transit
-    return max(qty, 0)
-
-
 def get_replenish_data() -> pd.DataFrame:
     """
     获取安全库存补货清单数据（DataFrame，中文表头）
 
     通过 replenish_dao 按固定补货条件查询，返回列顺序与 Excel 列配置一致、
-    表头为中文的 DataFrame；其中“建议补货数量”列为计算列。空数据时返回空
-    DataFrame（保留列结构）。
+    表头为中文的 DataFrame。空数据时返回空 DataFrame（保留列结构）。
 
     Returns:
         pd.DataFrame: 列名为中文表头的补货数据，无记录时返回空 DataFrame
@@ -121,11 +92,6 @@ def get_replenish_data() -> pd.DataFrame:
     df_rows = []
     for rec in records:
         row = {f: rec.get(f, None) for f in field_list}
-        row["suggest_replenish_qty"] = compute_suggest_replenish_qty(
-            rec.get("stock_upper_limit"),
-            rec.get("available_stock"),
-            rec.get("transit_quantity"),
-        )
         df_rows.append(row)
 
     df = pd.DataFrame(df_rows, columns=field_list)
@@ -267,9 +233,9 @@ def cleanup_old_files(days: int = 30) -> int:
     """
     清理 temp/stock_safe_data 目录下过期（超过指定天数）的补货 Excel 文件
 
-    判断依据：优先使用文件名中的业务时间戳（补货清单_YYYYMMDD_HHMMSS.xlsx），
-    解析失败时回退为文件的最后修改时间（mtime）。文件时间早于
-    (当前时间 - days 天) 即清理。
+    仅处理本模块生成的补货清单文件（文件名格式：补货清单_YYYYMMDD_HHMMSS.xlsx），
+    按文件名中的业务时间戳判断；文件名格式不符的文件一律跳过，不删除。
+    文件时间早于 (当前时间 - days 天) 即清理。
 
     Args:
         days: 保留天数，默认 30 天
@@ -290,9 +256,11 @@ def cleanup_old_files(days: int = 30) -> int:
         file_path = os.path.join(EXPORT_DIR, name)
         if not os.path.isfile(file_path):
             continue
+        # 仅处理本模块生成的补货清单文件，文件名格式不符的一律跳过
+        file_dt = _parse_file_ts(name)
+        if file_dt is None:
+            continue
         try:
-            # 优先按文件名时间戳判断，解析失败回退 mtime
-            file_dt = _parse_file_ts(name) or datetime.fromtimestamp(os.path.getmtime(file_path))
             if file_dt < cutoff_dt:
                 os.remove(file_path)
                 removed += 1
@@ -310,5 +278,5 @@ def cleanup_old_files(days: int = 30) -> int:
 
 # if __name__ == "__main__":
 #     # 本地测试：先清理过期文件，再生成 Excel
-#     cleanup_old_files()
+#     # cleanup_old_files()
 #     generate_replenish_excel()

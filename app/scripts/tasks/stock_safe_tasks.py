@@ -283,5 +283,5 @@ def stock_safe_sales_refund_register(task_manager) -> None:
         print(f"[销售退货流程] 注册失败: {e}")
 
 
-if __name__ == "__main__":
-    _stock_safe_crawl_replenish_pipeline()
+# if __name__ == "__main__":
+#     _stock_safe_crawl_replenish_pipeline()

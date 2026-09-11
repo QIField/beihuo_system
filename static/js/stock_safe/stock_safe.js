@@ -44,6 +44,10 @@
     // 废弃操作防重复提交
     var isAbandoning = false;
 
+    // Excel 式框选状态：ranges 为选区集合（每个选区 {sRow,eRow,sCol,eCol}，行列均为显示序号），
+    // anchor 为锚点（最近一次普通点击的单元格），供 Shift 扩展使用。
+    var excelSel = { ranges: [], anchor: null, dragging: false };
+
     // 列定义（升序/降序通过 onSortChanged 走后端）
     var COLUMN_DEFS = [
         {
@@ -189,6 +193,244 @@
     }
 
     // ============================================================
+    // Excel 式框选 & 复制（自定义实现，参考公共组件 ag-grid-utils.js 的
+    // initDragSelection / initShortcuts 思路，但不依赖其存在/修复其缺陷）
+    // 功能：拖拽框选 / Shift 扩展 / Ctrl 追加多选区，Ctrl+C 复制选中区域
+    //       （Tab 分隔，可直接粘贴到 Excel），Ctrl+A 全选，Esc 取消。
+    // ============================================================
+    function initExcelSelection() {
+        var gridDiv = document.getElementById('stockSafeGrid');
+        if (!gridDiv || !gridApi) return;
+
+        // 由事件目标定位到 {row, col}（col 为当前显示列顺序中的序号）
+        function posFromEvent(e) {
+            var cell = e.target.closest('.ag-cell');
+            if (!cell) return null;
+            var rowEl = cell.closest('.ag-row');
+            if (!rowEl) return null;
+            var rowIndex = parseInt(rowEl.getAttribute('row-index'), 10);
+            if (isNaN(rowIndex)) return null;
+            var colId = cell.getAttribute('col-id');
+            var cols = gridColumnApi.getAllDisplayedColumns();
+            for (var i = 0; i < cols.length; i++) {
+                if (cols[i].getColId() === colId) return { row: rowIndex, col: i };
+            }
+            return null;
+        }
+
+        // 鼠标按下：普通点击选单格 / Shift 扩展 / Ctrl 追加多选区
+        gridDiv.addEventListener('mousedown', function (e) {
+            if (e.button !== 0) return;
+            // 忽略复选框、按钮、表头
+            if (e.target.closest('input,button,.ag-header-cell,.ag-checkbox-input')) return;
+            var pos = posFromEvent(e);
+            if (!pos) return;
+
+            if (e.shiftKey && excelSel.ranges.length && excelSel.anchor) {
+                // Shift：以锚点扩展最近一次选区
+                var last = excelSel.ranges[excelSel.ranges.length - 1];
+                last.sRow = Math.min(excelSel.anchor.row, pos.row);
+                last.eRow = Math.max(excelSel.anchor.row, pos.row);
+                last.sCol = Math.min(excelSel.anchor.col, pos.col);
+                last.eCol = Math.max(excelSel.anchor.col, pos.col);
+                excelSel.dragging = true;
+            } else if (e.ctrlKey || e.metaKey) {
+                // Ctrl：追加新选区
+                excelSel.ranges.push({ sRow: pos.row, eRow: pos.row, sCol: pos.col, eCol: pos.col });
+                excelSel.anchor = { row: pos.row, col: pos.col };
+                excelSel.dragging = true;
+            } else {
+                // 普通点击：仅选中该单元格
+                excelSel.ranges = [{ sRow: pos.row, eRow: pos.row, sCol: pos.col, eCol: pos.col }];
+                excelSel.anchor = { row: pos.row, col: pos.col };
+                excelSel.dragging = true;
+            }
+            applyExcelHighlights();
+        });
+
+        // 鼠标拖动：动态扩展最近一次选区
+        gridDiv.addEventListener('mousemove', function (e) {
+            if (!excelSel.dragging || !excelSel.ranges.length) return;
+            var pos = posFromEvent(e);
+            if (!pos) return;
+            var last = excelSel.ranges[excelSel.ranges.length - 1];
+            last.eRow = pos.row;
+            last.eCol = pos.col;
+            scheduleHighlightRefresh();
+        });
+
+        // 松开鼠标结束拖动
+        document.addEventListener('mouseup', function () {
+            excelSel.dragging = false;
+        });
+
+        // 拖动时禁止浏览器文本选择
+        gridDiv.addEventListener('selectstart', function (e) {
+            if (excelSel.dragging) e.preventDefault();
+        });
+
+        // 快捷键（捕获阶段，先于 AG Grid 内部处理，避免冲突）
+        gridDiv.addEventListener('keydown', function (e) {
+            var k = (e.key || '').toLowerCase();
+            if ((e.ctrlKey || e.metaKey) && k === 'c') {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                copyExcelSelection();
+            } else if ((e.ctrlKey || e.metaKey) && k === 'a') {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                selectAllExcelCells();
+            } else if (e.key === 'Escape') {
+                clearExcelSelection();
+            }
+        }, true);
+    }
+
+    // 将当前选中的单元格区域刷上高亮（锚点单元格用 Excel 风格的白底蓝框）
+    function applyExcelHighlights() {
+        var gridDiv = document.getElementById('stockSafeGrid');
+        if (!gridDiv) return;
+        var old = gridDiv.querySelectorAll('.ag-cell.excel-range-selected, .ag-cell.excel-range-active');
+        for (var i = 0; i < old.length; i++) {
+            old[i].classList.remove('excel-range-selected', 'excel-range-active');
+        }
+        if (!excelSel.ranges.length) return;
+
+        var cols = gridColumnApi.getAllDisplayedColumns();
+        excelSel.ranges.forEach(function (rng) {
+            for (var r = rng.sRow; r <= rng.eRow; r++) {
+                var rowEls = gridDiv.querySelectorAll('.ag-row[row-index="' + r + '"]');
+                for (var k = 0; k < rowEls.length; k++) {
+                    for (var c = rng.sCol; c <= rng.eCol; c++) {
+                        var col = cols[c];
+                        if (!col) continue;
+                        var cell = rowEls[k].querySelector('.ag-cell[col-id="' + col.getColId() + '"]');
+                        if (cell) cell.classList.add('excel-range-selected');
+                    }
+                }
+            }
+        });
+
+        if (excelSel.anchor) {
+            var anchorCol = cols[excelSel.anchor.col];
+            if (anchorCol) {
+                var rowEls = gridDiv.querySelectorAll('.ag-row[row-index="' + excelSel.anchor.row + '"]');
+                for (var k = 0; k < rowEls.length; k++) {
+                    var cell = rowEls[k].querySelector('.ag-cell[col-id="' + anchorCol.getColId() + '"]');
+                    if (cell) cell.classList.add('excel-range-active');
+                }
+            }
+        }
+    }
+
+    // 滚动/重绘触发的高亮刷新（rAF 节流，避免高频 mousemove 卡顿）
+    var highlightRAF = null;
+    function scheduleHighlightRefresh() {
+        if (highlightRAF) return;
+        highlightRAF = requestAnimationFrame(function () {
+            highlightRAF = null;
+            applyExcelHighlights();
+        });
+    }
+
+    // 清空选区
+    function clearExcelSelection() {
+        excelSel.ranges = [];
+        excelSel.anchor = null;
+        excelSel.dragging = false;
+        var gridDiv = document.getElementById('stockSafeGrid');
+        if (gridDiv) {
+            var els = gridDiv.querySelectorAll('.ag-cell.excel-range-selected, .ag-cell.excel-range-active');
+            for (var i = 0; i < els.length; i++) {
+                els[i].classList.remove('excel-range-selected', 'excel-range-active');
+            }
+        }
+    }
+
+    // Ctrl+A：选中当前页全部行 × 全部列
+    function selectAllExcelCells() {
+        if (!gridApi || !gridColumnApi) return;
+        var rowCount = gridApi.getDisplayedRowCount();
+        var colCount = gridColumnApi.getAllDisplayedColumns().length;
+        if (!rowCount || !colCount) return;
+        excelSel.ranges = [{ sRow: 0, eRow: rowCount - 1, sCol: 0, eCol: colCount - 1 }];
+        excelSel.anchor = { row: 0, col: 0 };
+        applyExcelHighlights();
+    }
+
+    // 读取某个单元格的"复制文本"（与界面显示一致：序号/格式化数值，按钮列/复选框列不复制）
+    function getCellCopyText(rowIndex, colIndex) {
+        var cols = gridColumnApi.getAllDisplayedColumns();
+        var col = cols[colIndex];
+        if (!col) return '';
+        var colDef = col.getColDef();
+        var rowNode = gridApi.getDisplayedRowAtIndex(rowIndex);
+        if (!rowNode) return '';
+
+        // 操作列（废弃/恢复按钮）与复选框列：不复制
+        if (colDef.headerName === '操作' || colDef.checkboxSelection) return '';
+        // 序号列：输出当前页全局序号
+        if (colDef.headerName === '序号') {
+            var idx = rowIndex + 1;
+            if (pagination) {
+                idx = (pagination.currentPage - 1) * pagination.currentPageSize + rowIndex + 1;
+            }
+            return String(idx);
+        }
+        if (colDef.field == null) return '';
+        var value = rowNode.data ? rowNode.data[colDef.field] : null;
+        // 有 valueFormatter 的列：复制格式化后的显示值（所见即所得）
+        if (typeof colDef.valueFormatter === 'function') {
+            var fmt = colDef.valueFormatter({
+                value: value,
+                node: rowNode,
+                data: rowNode.data,
+                column: col,
+                api: gridApi,
+                columnApi: gridColumnApi,
+                context: undefined
+            });
+            return fmt == null ? '' : String(fmt);
+        }
+        return value == null ? '' : String(value);
+    }
+
+    // Ctrl+C：把选中区域按 Tab 分隔输出到剪贴板（可直接粘贴到 Excel）
+    function copyExcelSelection() {
+        if (!excelSel.ranges.length) {
+            layui.use(['layer'], function (l) { l.msg('请先拖拽框选要复制的单元格区域', { icon: 0 }); });
+            return;
+        }
+        var parts = [];
+        var totalCells = 0;
+        excelSel.ranges.forEach(function (rng) {
+            var lines = [];
+            for (var r = rng.sRow; r <= rng.eRow; r++) {
+                var cells = [];
+                for (var c = rng.sCol; c <= rng.eCol; c++) {
+                    cells.push(getCellCopyText(r, c));
+                    totalCells++;
+                }
+                lines.push(cells.join('\t'));
+            }
+            parts.push(lines.join('\n'));
+        });
+        writeClipboardText(parts.join('\n\n'));
+        layui.use(['layer'], function (l) {
+            l.msg('已复制 ' + totalCells + ' 个单元格，可直接粘贴到 Excel', { icon: 1, time: 1600 });
+        });
+    }
+
+    // 写剪贴板（优先 navigator.clipboard，失败回退 execCommand）
+    function writeClipboardText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).catch(function () { fallbackCopy(text); });
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    // ============================================================
     // DOM 初始化
     // ============================================================
     document.addEventListener('DOMContentLoaded', function () {
@@ -220,8 +462,15 @@
             suppressRowClickSelection: true,
             suppressMovableColumns: false,
             animateRows: false,
-            enableCellTextSelection: true,
+            // ---- Excel 式框选与复制（自定义实现，见 initExcelSelection） ----
+            // 注意：当前 ag-grid-community.min.js 未内置 range 模块，enableRangeSelection 不可用，
+            // 因此框选/复制由本页面自行实现，此处关闭单元格文本拖选以让位给框选。
+            enableCellTextSelection: false,
             ensureDomOrder: true,
+            // 滚动 / 重绘会导致单元格重建，滚动结束后重新刷选框高亮
+            onBodyScroll: function () {
+                if (excelSel && excelSel.ranges.length) scheduleHighlightRefresh();
+            },
             // ---- 排序变化：保留前端箭头显示；切回第 1 页；走后端 ORDER BY ----
             onSortChanged: function (params) {
                 if (!gridColumnApi) return;
@@ -257,6 +506,7 @@
                 });
 
                 initDoubleClickCopy();
+                initExcelSelection();
             }
         };
 
@@ -646,6 +896,8 @@
         try {
             gridColumnApi.applyColumnState({ state: state, applyOrder: false });
         } catch (e) { console.warn('applyColumnState 失败:', e); }
+        // 列显隐变化会改变显示列序号，清空已有的框选
+        clearExcelSelection();
     }
 
     // ============================================================
@@ -712,6 +964,8 @@
                     var data = res.data || {};
                     var list = data.list || [];
                     if (gridApi) gridApi.setRowData(list);
+                    // 数据刷新后，清空上一轮的框选（行序号已变化）
+                    clearExcelSelection();
 
                     // 更新公共分页组件
                     if (pagination) {
