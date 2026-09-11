@@ -7,7 +7,7 @@
 
 import logging
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from app.models.orm_models.brand_qpl_mapping import BrandQplMapping
 from app.models.orm_models.crmapp_compare_summary import CrmappCompareSummary
@@ -97,9 +97,75 @@ def _load_brand_code_map(session, merchant_codes, company='fsbbr'):
     return {frey_no: brand_code for frey_no, brand_code in results if frey_no}
 
 
+def fetch_changsheng_raw_records():
+    """
+    从 changsheng_raw_inventory 获取最新一天、会被映射为"原厂国内4s件"的数据。
+
+    映射规则：
+    1. brand_name = '原厂大库'（经 normalize_brand 会映射为'原厂国内4s件'）
+    2. brand_name = '原厂再制造' 且 清洗后的oe 以 '80' 结尾
+
+    Returns:
+        list[dict]: 每条记录包含
+            product_name, oe, brand_part_no, reference_price,
+            number_of_inventories, brand, quality
+    """
+    with orm_session() as session:
+        try:
+            latest_date = session.execute(
+                text("SELECT DATE(MAX(fetch_time)) FROM changsheng_raw_inventory")
+            ).scalar()
+
+            if not latest_date:
+                logger.info("[昌盛原始数据] changsheng_raw_inventory 无数据")
+                return []
+
+            rows = session.execute(
+                text("""
+                    SELECT part_name, `清洗后的oe`, sale_price, brand_name
+                    FROM changsheng_raw_inventory
+                    WHERE DATE(fetch_time) = :latest_date
+                """),
+                {'latest_date': latest_date}
+            ).fetchall()
+
+            records = []
+            for row in rows:
+                brand_name = str(row.brand_name or '').strip()
+                cleaned_oe = str(row.清洗后的oe or '').strip()
+
+                is_original_4s = False
+                if brand_name == '原厂大库':
+                    is_original_4s = True
+                elif brand_name == '原厂再制造' and cleaned_oe.endswith('80'):
+                    is_original_4s = True
+
+                if not is_original_4s or not cleaned_oe:
+                    continue
+
+                records.append({
+                    'product_name': row.part_name,
+                    'oe': cleaned_oe,
+                    'brand_part_no': None,
+                    'reference_price': row.sale_price,
+                    'number_of_inventories': 12,
+                    'brand': '4S原厂件',
+                    'quality': '国内品牌',
+                })
+
+            logger.info(
+                f"[昌盛原始数据] 最新 {latest_date} 共 {len(records)} 条映射为原厂国内4s件"
+            )
+            return records
+        except Exception:
+            logger.exception("[昌盛原始数据] 获取失败，跳过")
+            return []
+
+
 def fetch_virtual_inventory_records(limit=None):
     """
-    查询 qpl_virtual_qty 数据，并转换为导入需要的字段
+    查询 qpl_virtual_qty 数据，并转换为导入需要的字段；
+    同时合并 changsheng_raw_inventory 中映射为"原厂国内4s件"的数据。
 
     pp 需在 brand_qpl_mapping 中匹配到 qpl_brand 和 qpl_quality，
     未匹配到的记录直接丢弃，不生成到 Excel。
@@ -163,4 +229,14 @@ def fetch_virtual_inventory_records(limit=None):
         f"[虚拟库存] 查询到 {len(rows)} 条原始记录，"
         f"匹配成功 {len(records)} 条，跳过 {skipped_count} 条"
     )
+
+    # 合并昌盛原始数据中映射为"原厂国内4s件"的记录
+    changsheng_records = fetch_changsheng_raw_records()
+    if changsheng_records:
+        records.extend(changsheng_records)
+        logger.info(
+            f"[虚拟库存] 合并昌盛原始数据 {len(changsheng_records)} 条，"
+            f"总记录数 {len(records)} 条"
+        )
+
     return records
