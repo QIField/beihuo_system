@@ -137,7 +137,7 @@ def chuli_beiermale(male, beier, ntf, jky):
     logger.info(male)
     data = []
 
-    # 马勒-贝洱对比组
+    # 马勒-贝洱对比组：最终只输出马勒品牌
     for number in male:
         if number not in beier:
             # 确保价格是数值类型后再进行计算
@@ -148,9 +148,9 @@ def chuli_beiermale(male, beier, ntf, jky):
                 except ValueError:
                     logger.warning(f"警告: 无法将价格 '{price_value}' 转换为数值，跳过此项")
                     continue
-            adjusted_price = process_price_by_brand(price_value, '贝洱')
+            adjusted_price = process_price_by_brand(price_value, '马勒')
             data.append([
-                number, '贝洱', adjusted_price, price_value, male[number]['stock']
+                number, '马勒', adjusted_price, price_value, male[number]['stock']
             ])
 
     for number in beier:
