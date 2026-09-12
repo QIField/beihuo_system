@@ -72,6 +72,10 @@ api_bp.register_blueprint(reconciliation_bp)
 from .wms_inventory_operation_api import wms_inventory_operation_bp
 api_bp.register_blueprint(wms_inventory_operation_bp)
 
+# 注册飞书任务同步回调 API
+from .lark_task_api import lark_task_bp
+api_bp.register_blueprint(lark_task_bp)
+
 
 # 注册 CRM 零件品牌别名 API
 from . import pp_alias_api

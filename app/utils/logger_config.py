@@ -94,6 +94,7 @@ TASK_LOGGERS = [
     'data_gzbbr_login',             # data.gzbbr.com 自动登录更新 Cookie
     'b2b_intransit_sync',           # B2B 在途库存同步
     'order_share',                  # 订单分享公开页面（扫码查询）
+    'lark_task_sync',               # 飞书任务双向同步
 ]
 
 
