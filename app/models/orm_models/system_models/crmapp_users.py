@@ -42,6 +42,10 @@ class CrmappUsers(BaseModels):
     department = Column(String(20), nullable=True, comment='板块:业务/市场/后勤')
     job_level = Column(String(20), nullable=True, comment='职级:经理/主管/业务员')
 
+    # 飞书联系人反查信息
+    mobile = Column(String(20), nullable=True, comment='手机号，用于飞书反查')
+    email = Column(String(100), nullable=True, comment='邮箱，用于飞书反查')
+
     # JSON 字段：登录IP记录（最多保留5个最近的IP地址）
     ip_records = Column(JSON, nullable=True, comment='登录IP记录，最多保留5个最近的IP地址')
 
@@ -55,8 +59,12 @@ class CrmappUsers(BaseModels):
     # 定义唯一约束与索引（与数据库保持一致）
     __table_args__ = (
         UniqueConstraint('username', name='username'),
+        UniqueConstraint('mobile', name='uk_mobile'),
+        UniqueConstraint('email', name='uk_email'),
         Index('idx_username', 'username'),
         Index('idx_store', 'store'),
+        Index('idx_mobile', 'mobile'),
+        Index('idx_email', 'email'),
         {
             'comment': '用户表'
         }
@@ -123,6 +131,8 @@ class CrmappUsers(BaseModels):
             'store': self.store,
             'department': self.department,
             'job_level': self.job_level,
+            'mobile': self.mobile,
+            'email': self.email,
             'can_delete_cart': self.can_delete_cart,
             'can_process_orders': self.can_process_orders,
             'can_inquiry_module': self.can_inquiry_module,

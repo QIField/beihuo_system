@@ -12,6 +12,9 @@ TENANT_ACCESS_TOKEN_URL = f"{LARK_OPEN_API_HOST}/open-apis/auth/v3/tenant_access
 # 创建任务接口
 CREATE_TASK_URL = f"{LARK_OPEN_API_HOST}/open-apis/task/v2/tasks"
 
+# 批量通过手机号/邮箱获取用户 ID 接口
+BATCH_GET_USER_ID_URL = f"{LARK_OPEN_API_HOST}/open-apis/contact/v3/users/batch_get_id"
+
 # 飞书配置在 beihuo_system_config 表中的 config_key
 LARK_APP_ID_KEY = "lark_app_id"
 LARK_APP_SECRET_KEY = "lark_app_secret"

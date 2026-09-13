@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业业务系统 - 用户绑定</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='business_task_web/css/style.css') }}">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+                        slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-700 antialiased" x-data="userApp()">
+    <header class="fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4 lg:px-6">
+        <div class="flex items-center gap-3">
+            <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">B</div>
+                <span class="text-lg font-semibold text-slate-800 tracking-tight">Beihuo 业务系统</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3 pl-4 border-l border-slate-200">
+                <div class="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold">AD</div>
+                <div class="hidden md:block text-sm">
+                    <div class="font-medium text-slate-800">管理员</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <aside class="fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-slate-200 z-30 transform transition-transform duration-300 ease-in-out lg:translate-x-0"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+           @click.away="sidebarOpen = false">
+        <nav class="p-4 space-y-1 h-full overflow-y-auto">
+            <template x-for="item in menu" :key="item.name">
+                <a :href="item.href"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
+                   :class="item.active ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'">
+                    <span x-html="item.icon" class="w-5 h-5"></span>
+                    <span x-text="item.name"></span>
+                </a>
+            </template>
+        </nav>
+    </aside>
+
+    <div x-show="sidebarOpen" class="fixed inset-0 bg-black/30 z-20 lg:hidden" @click="sidebarOpen = false" x-transition.opacity></div>
+
+    <main class="pt-16 lg:pl-64 min-h-screen">
+        <div class="p-4 lg:p-8 max-w-7xl mx-auto">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">用户绑定</h1>
+                    <p class="mt-1 text-sm text-slate-500">管理业务用户与飞书 open_id 的映射关系</p>
+                </div>
+                <button @click="openModal = true" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-all shadow-sm hover:shadow active:scale-95 flex items-center gap-2 self-start sm:self-auto">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    新增绑定
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 左侧：业务用户列表 -->
+                <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                        <h2 class="text-sm font-semibold text-slate-900">未绑定用户</h2>
+                        <span class="text-xs text-slate-500" x-text="unboundUsers.length + ' 人'"></span>
+                    </div>
+                    <div class="p-3 flex-1 flex flex-col">
+                        <input type="text" x-model="userKeyword" placeholder="搜索用户" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-3">
+                        <div class="flex items-center justify-between mb-2 px-1">
+                            <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                                <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded border-slate-300 text-primary-600 focus:ring-primary-500">
+                                <span>全选</span>
+                            </label>
+                            <button @click="batchBindByContact()" :disabled="selectedUserIds.length === 0 || binding" class="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5">
+                                <svg x-show="binding" class="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                <span x-text="binding ? '获取中...' : '批量获取飞书ID'"></span>
+                            </button>
+                        </div>
+                        <div class="space-y-1 max-h-96 overflow-y-auto">
+                            <template x-for="user in unboundUsers" :key="user.id">
+                                <div class="flex items-start gap-2 p-3 rounded-lg transition-colors border"
+                                     :class="selectedUserIds.includes(user.id) ? 'bg-primary-50 border-primary-200' : 'hover:bg-slate-50 border-transparent'">
+                                    <input type="checkbox" :value="user.id" x-model="selectedUserIds" class="mt-1 rounded border-slate-300 text-primary-600 focus:ring-primary-500">
+                                    <div class="flex-1 min-w-0 cursor-pointer" @click="toggleSelect(user.id)">
+                                        <div class="flex items-center justify-between">
+                                            <div class="text-sm font-medium text-slate-900" x-text="user.name"></div>
+                                            <button @click.stop="openContactModal(user)" class="text-xs text-primary-600 hover:text-primary-700 font-medium">编辑</button>
+                                        </div>
+                                        <div class="text-xs text-slate-500" x-text="user.dept + ' · ' + user.store"></div>
+                                        <div class="mt-1 flex flex-wrap gap-1.5">
+                                            <span x-show="user.mobile" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-600" x-text="user.mobile"></span>
+                                            <span x-show="user.email" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-600" x-text="user.email"></span>
+                                            <span x-show="!user.mobile && !user.email" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-600">未填写联系方式</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧：绑定列表 -->
+                <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                        <h2 class="text-sm font-semibold text-slate-900">已绑定列表</h2>
+                        <span class="text-xs text-slate-500">共 <span x-text="mappings.length"></span> 条</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-5 py-3.5 font-semibold text-slate-700">业务用户</th>
+                                    <th class="px-5 py-3.5 font-semibold text-slate-700">部门/门店</th>
+                                    <th class="px-5 py-3.5 font-semibold text-slate-700">飞书 open_id</th>
+                                    <th class="px-5 py-3.5 font-semibold text-slate-700">状态</th>
+                                    <th class="px-5 py-3.5 font-semibold text-slate-700 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <template x-for="item in mappings" :key="item.id">
+                                    <tr class="hover:bg-slate-50 transition-colors">
+                                        <td class="px-5 py-4">
+                                            <div class="font-medium text-slate-900" x-text="item.name"></div>
+                                            <div class="text-xs text-slate-500" x-text="'ID: ' + item.userId"></div>
+                                        </td>
+                                        <td class="px-5 py-4 text-slate-600">
+                                            <div x-text="item.dept"></div>
+                                            <div class="text-xs text-slate-400" x-text="item.store"></div>
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            <code class="px-2 py-1 bg-slate-100 rounded text-xs text-slate-700 font-mono" x-text="item.openId"></code>
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                                  :class="item.status === '有效' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                                                  x-text="item.status"></span>
+                                        </td>
+                                        <td class="px-5 py-4 text-right">
+                                            <button @click="editMapping(item)" class="text-primary-600 hover:text-primary-700 font-medium text-xs mr-3">编辑</button>
+                                            <button @click="toggleStatus(item)" class="text-slate-500 hover:text-slate-700 font-medium text-xs" x-text="item.status === '有效' ? '禁用' : '启用'"></button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 编辑联系方式弹窗 -->
+    <div x-show="contactModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="absolute inset-0 bg-black/40" @click="contactModal = false" x-transition.opacity></div>
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-900">编辑联系方式</h3>
+                <button @click="contactModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">用户</label>
+                    <div class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700" x-text="contactForm.name || '-'"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">手机号</label>
+                    <input type="text" x-model="contactForm.mobile" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="用于飞书反查">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">邮箱</label>
+                    <input type="text" x-model="contactForm.email" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="用于飞书反查">
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+                <button @click="contactModal = false" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">取消</button>
+                <button @click="saveContact()" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors active:scale-95">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增/编辑绑定弹窗 -->
+    <div x-show="openModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="absolute inset-0 bg-black/40" @click="openModal = false" x-transition.opacity></div>
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-900" x-text="editingId ? '编辑绑定' : '新增绑定'"></h3>
+                <button @click="openModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">业务用户</label>
+                    <select x-model="form.userId" :disabled="editingId" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50">
+                        <option value="">请选择用户</option>
+                        <template x-for="user in candidates" :key="user.id">
+                            <option :value="user.id" x-text="user.name + ' (' + user.dept + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">飞书 open_id</label>
+                    <input type="text" x-model="form.openId" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="ou_xxxxxxxxxxxxxxxx">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">状态</label>
+                    <div class="flex items-center gap-3">
+                        <label class="flex items-center gap-2">
+                            <input type="radio" x-model="form.status" value="1" class="text-primary-600 focus:ring-primary-500">
+                            <span class="text-sm text-slate-700">有效</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input type="radio" x-model="form.status" value="0" class="text-primary-600 focus:ring-primary-500">
+                            <span class="text-sm text-slate-700">无效</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+                <button @click="openModal = false" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">取消</button>
+                <button @click="saveMapping()" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors active:scale-95">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='business_task_web/js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='business_task_web/js/users.js') }}"></script>
+</body>
+</html>

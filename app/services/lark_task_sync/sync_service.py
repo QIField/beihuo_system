@@ -57,11 +57,16 @@ def _do_sync_once(business_task_id, attempt=1):
 
         # 调飞书创建任务
         due_time = task.deadline.strftime('%Y-%m-%dT%H:%M:%S+08:00') if task.deadline else None
+        logger.info(
+            f"[飞书同步] 开始调用创建任务, business_id={business_task_id}, "
+            f"summary={task.title}, owner_open_id={owner_open_id}, due_time={due_time}"
+        )
         result = create_lark_task(
             summary=task.title,
             due_time=due_time,
             owner_open_id=owner_open_id,
         )
+        logger.info(f"[飞书同步] 飞书创建任务响应, business_id={business_task_id}, result={result}")
 
         task_guid = result['task']['guid']
         LarkTaskSyncModels.create_mapping(
