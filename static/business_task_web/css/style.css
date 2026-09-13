@@ -1,0 +1,81 @@
+:root {
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-700: #334155;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-feature-settings: "tnum";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Alpine.js  cloak */
+[x-cloak] {
+    display: none !important;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* 按钮点击反馈 */
+button, a {
+    -webkit-tap-highlight-color: transparent;
+}
+
+button:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+/* 表单焦点统一 */
+input:focus, select:focus, textarea:focus {
+    outline: none;
+}
+
+/* 表格行悬停 */
+tr {
+    transition: background-color 0.15s ease;
+}
+
+/* 移动端侧边栏动画 */
+aside {
+    will-change: transform;
+}
+
+/* 卡片阴影过渡 */
+.shadow-sm {
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* 弹窗动画辅助 */
+.fixed.inset-0.z-50 {
+    backdrop-filter: blur(2px);
+}

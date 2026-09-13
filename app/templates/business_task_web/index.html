@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业业务系统 - 仪表盘</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='business_task_web/css/style.css') }}">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+                        slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-700 antialiased" x-data="app()">
+    <!-- 顶部导航栏 -->
+    <header class="fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4 lg:px-6">
+        <div class="flex items-center gap-3">
+            <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">B</div>
+                <span class="text-lg font-semibold text-slate-800 tracking-tight">Beihuo 业务系统</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <button class="relative p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            <div class="flex items-center gap-3 pl-4 border-l border-slate-200">
+                <div class="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold">AD</div>
+                <div class="hidden md:block text-sm">
+                    <div class="font-medium text-slate-800">管理员</div>
+                    <div class="text-slate-500 text-xs">admin@beihuo.com</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 侧边菜单 -->
+    <aside class="fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-slate-200 z-30 transform transition-transform duration-300 ease-in-out lg:translate-x-0"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+           @click.away="sidebarOpen = false">
+        <nav class="p-4 space-y-1 h-full overflow-y-auto">
+            <template x-for="item in menu" :key="item.name">
+                <div>
+                    <a :href="item.href"
+                       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
+                       :class="item.active ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'">
+                        <span x-html="item.icon" class="w-5 h-5"></span>
+                        <span x-text="item.name"></span>
+                    </a>
+                </div>
+            </template>
+        </nav>
+    </aside>
+
+    <!-- 遮罩 -->
+    <div x-show="sidebarOpen" class="fixed inset-0 bg-black/30 z-20 lg:hidden" @click="sidebarOpen = false" x-transition.opacity></div>
+
+    <!-- 主内容区 -->
+    <main class="pt-16 lg:pl-64 min-h-screen transition-all duration-300">
+        <div class="p-4 lg:p-8 max-w-7xl mx-auto">
+            <!-- 页面标题 -->
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold text-slate-900">仪表盘</h1>
+                <p class="mt-1 text-sm text-slate-500">概览今日任务、用户绑定与系统状态</p>
+            </div>
+
+            <!-- 统计卡片 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-500">任务总数</p>
+                            <p class="text-2xl font-bold text-slate-900 mt-1" x-text="stats.total">0</p>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-xs">
+                        <span class="text-emerald-600 font-medium flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            +12%
+                        </span>
+                        <span class="text-slate-400 ml-2">较昨日</span>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-500">已完成</p>
+                            <p class="text-2xl font-bold text-slate-900 mt-1" x-text="stats.completed">0</p>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs text-slate-400">完成率 75%</div>
+                </div>
+
+                <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-500">已绑定飞书</p>
+                            <p class="text-2xl font-bold text-slate-900 mt-1" x-text="stats.synced">0</p>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs text-slate-400">共 68 位系统用户</div>
+                </div>
+
+                <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-500">未完成</p>
+                            <p class="text-2xl font-bold text-slate-900 mt-1" x-text="stats.pending">0</p>
+                        </div>
+                        <div class="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs text-slate-400">需人工处理</div>
+                </div>
+            </div>
+
+            <!-- 快捷操作 -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                        <h2 class="text-base font-semibold text-slate-900">最近任务</h2>
+                        <a href="tasks.html" class="text-sm text-primary-600 hover:text-primary-700 font-medium">查看全部 →</a>
+                    </div>
+                    <div class="divide-y divide-slate-100">
+                        <template x-for="task in recentTasks" :key="task.id">
+                            <div class="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <span class="w-2 h-2 rounded-full" :class="task.status === '已完成' ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                                    <div>
+                                        <p class="text-sm font-medium text-slate-900" x-text="task.title"></p>
+                                        <p class="text-xs text-slate-500 mt-0.5" x-text="task.assignee + ' · ' + task.time"></p>
+                                    </div>
+                                </div>
+                                <span class="px-2.5 py-1 rounded-full text-xs font-medium"
+                                      :class="task.status === '已完成' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+                                      x-text="task.status"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <div class="px-6 py-4 border-b border-slate-100">
+                        <h2 class="text-base font-semibold text-slate-900">快捷入口</h2>
+                    </div>
+                    <div class="p-6 space-y-3">
+                        <a href="tasks.html" class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-primary-300 hover:bg-primary-50 transition-all group">
+                            <div class="w-10 h-10 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center group-hover:bg-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-slate-900">新建任务</p>
+                                <p class="text-xs text-slate-500">单个或批量发放</p>
+                            </div>
+                        </a>
+                        <a href="users.html" class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-primary-300 hover:bg-primary-50 transition-all group">
+                            <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-white transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-slate-900">绑定用户</p>
+                                <p class="text-xs text-slate-500">关联飞书 open_id</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='business_task_web/js/app.js') }}"></script>
+</body>
+</html>

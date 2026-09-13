@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业业务系统 - 任务管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='business_task_web/css/style.css') }}">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+                        slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-700 antialiased" x-data="taskApp()">
+    <header class="fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4 lg:px-6">
+        <div class="flex items-center gap-3">
+            <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">B</div>
+                <span class="text-lg font-semibold text-slate-800 tracking-tight">Beihuo 业务系统</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3 pl-4 border-l border-slate-200">
+                <div class="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold">AD</div>
+                <div class="hidden md:block text-sm">
+                    <div class="font-medium text-slate-800">管理员</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <aside class="fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-slate-200 z-30 transform transition-transform duration-300 ease-in-out lg:translate-x-0"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+           @click.away="sidebarOpen = false">
+        <nav class="p-4 space-y-1 h-full overflow-y-auto">
+            <template x-for="item in menu" :key="item.name">
+                <a :href="item.href"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
+                   :class="item.active ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'">
+                    <span x-html="item.icon" class="w-5 h-5"></span>
+                    <span x-text="item.name"></span>
+                </a>
+            </template>
+        </nav>
+    </aside>
+
+    <div x-show="sidebarOpen" class="fixed inset-0 bg-black/30 z-20 lg:hidden" @click="sidebarOpen = false" x-transition.opacity></div>
+
+    <main class="pt-16 lg:pl-64 min-h-screen">
+        <div class="p-4 lg:p-8 max-w-7xl mx-auto">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">任务管理</h1>
+                    <p class="mt-1 text-sm text-slate-500">创建、发放与跟踪业务任务</p>
+                </div>
+                <button @click="openModal = true" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-all shadow-sm hover:shadow active:scale-95 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    新建任务
+                </button>
+            </div>
+
+            <!-- 筛选栏 -->
+            <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6 shadow-sm">
+                <div class="flex flex-col md:flex-row gap-4">
+                    <div class="flex-1">
+                        <input type="text" x-model="filters.keyword" placeholder="搜索任务标题" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all">
+                    </div>
+                    <div class="flex gap-3">
+                        <select x-model="filters.status" class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            <option value="">全部状态</option>
+                            <option value="pending">未完成</option>
+                            <option value="done">已完成</option>
+                        </select>
+                        <button @click="search()" class="px-5 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 active:scale-95 transition-all">
+                            查询
+                        </button>
+                        <button @click="resetFilters()" class="px-5 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-all">
+                            重置
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据表格 -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th class="px-6 py-3.5 font-semibold text-slate-700">任务标题</th>
+                                <th class="px-6 py-3.5 font-semibold text-slate-700">负责人</th>
+                                <th class="px-6 py-3.5 font-semibold text-slate-700">截止时间</th>
+                                <th class="px-6 py-3.5 font-semibold text-slate-700">业务状态</th>
+                                <th class="px-6 py-3.5 font-semibold text-slate-700">飞书同步</th>
+                                <th class="px-6 py-3.5 font-semibold text-slate-700 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="task in tasks" :key="task.id">
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <div class="font-medium text-slate-900" x-text="task.title"></div>
+                                        <div class="text-xs text-slate-500 mt-0.5 truncate max-w-xs" x-text="task.content"></div>
+                                    </td>
+                                    <td class="px-6 py-4 text-slate-600" x-text="task.assignee"></td>
+                                    <td class="px-6 py-4 text-slate-500" x-text="task.deadline"></td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                              :class="task.status === '已完成' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+                                              x-text="task.status"></span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                              :class="task.sync === '已同步' ? 'bg-blue-50 text-blue-700' : task.sync === '失败' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'">
+                                            <span class="w-1.5 h-1.5 rounded-full" :class="task.sync === '已同步' ? 'bg-blue-500' : task.sync === '失败' ? 'bg-red-500' : 'bg-slate-400'"></span>
+                                            <span x-text="task.sync"></span>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <button @click="toggleStatus(task)" class="text-primary-600 hover:text-primary-700 font-medium text-xs mr-3" x-text="task.status === '已完成' ? '标记未完成' : '标记完成'"></button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+                    <span class="text-xs text-slate-500">共 <span x-text="total"></span> 条记录</span>
+                    <div class="flex items-center gap-2">
+                        <button @click="goPage(page - 1)" :disabled="page <= 1" class="px-3 py-1.5 border border-slate-200 rounded text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50">上一页</button>
+                        <span class="text-xs text-slate-600">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
+                        <button @click="goPage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1.5 border border-slate-200 rounded text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 新建任务弹窗 -->
+    <div x-show="openModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="absolute inset-0 bg-black/40" @click="openModal = false" x-transition.opacity></div>
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-900">新建任务</h3>
+                <button @click="openModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">任务标题</label>
+                    <input type="text" x-model="form.title" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="请输入任务标题">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">任务内容</label>
+                    <textarea x-model="form.content" rows="3" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="请输入任务内容"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5">
+                            负责人 <span class="text-xs text-slate-400 font-normal">（可多选，选多个则批量发放）</span>
+                        </label>
+                        <div class="border border-slate-200 rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                            <template x-for="user in users" :key="user.id">
+                                <label class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 cursor-pointer">
+                                    <input type="checkbox" x-model="form.selected" :value="user.id" class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500">
+                                    <span class="text-sm text-slate-700" x-text="user.username"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5">截止时间</label>
+                        <input type="datetime-local" x-model="form.deadline" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+                <button @click="openModal = false" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">取消</button>
+                <button @click="saveTask()" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors active:scale-95">确定创建</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='business_task_web/js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='business_task_web/js/tasks.js') }}"></script>
+</body>
+</html>

@@ -40,6 +40,10 @@ def expansion_app(app):
     from app.routes.order_share_web import order_share_web_bp
     app.register_blueprint(order_share_web_bp)
 
+    # 注册业务任务管理页面蓝图
+    from app.routes.business_task_web import business_task_web_bp
+    app.register_blueprint(business_task_web_bp)
+
     # 初始化权限检查器：将 PermissionService 的方法注册到 PermissionCheckerRegistry
     # 注册完成后，接口上就可以使用 @require_permission、@require_role 等装饰器
     from app.services.permission_service import init_permission_checkers
