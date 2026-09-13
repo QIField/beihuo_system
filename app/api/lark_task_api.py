@@ -7,7 +7,10 @@
 
 from flask import Blueprint, request, jsonify
 
+from app.utils.logger_config import get_task_logger
 from app.services.lark_task_sync.sync_service import handle_lark_webhook
+
+logger = get_task_logger('lark_task_sync')
 
 lark_task_bp = Blueprint("lark_task", __name__, url_prefix="/lark-task")
 
@@ -22,7 +25,9 @@ def webhook():
     """
     try:
         payload = request.get_json(silent=True) or {}
+        logger.info(f"[飞书回调] 收到原始请求, payload={payload}")
         result = handle_lark_webhook(payload)
+        logger.info(f"[飞书回调] 处理结果, result={result}")
 
         # URL 验证时返回 {challenge: xxx}
         if isinstance(result, dict) and 'challenge' in result:

@@ -58,6 +58,7 @@ document.addEventListener('alpine:init', () => {
                         status: formatTaskStatus(t.status),
                         sync: formatSyncStatus(t.lark_sync_status),
                         rawStatus: t.status,
+                        rawSync: t.lark_sync_status,
                         larkTaskGuid: t.lark_task_guid,
                     }));
                 }
@@ -66,6 +67,17 @@ document.addEventListener('alpine:init', () => {
             } finally {
                 this.loading = false;
             }
+        },
+
+        pollSync(attemptsLeft) {
+            if (attemptsLeft <= 0) return;
+            const hasPending = this.tasks.some(t => t.rawSync === 'not_synced');
+            if (!hasPending) return;
+
+            setTimeout(async () => {
+                await this.search();
+                this.pollSync(attemptsLeft - 1);
+            }, 2000);
         },
 
         resetFilters() {
@@ -112,7 +124,8 @@ document.addEventListener('alpine:init', () => {
                     this.openModal = false;
                     this.form = { title: '', content: '', selected: [], deadline: '' };
                     this.page = 1;
-                    this.search();
+                    await this.search();
+                    this.pollSync(3);
                 } else {
                     alert(res.msg || '创建失败');
                 }

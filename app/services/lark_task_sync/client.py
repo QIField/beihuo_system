@@ -90,7 +90,7 @@ def create_lark_task(summary, due_time=None, owner_open_id=None):
     if due_time:
         body["due_time"] = {"timestamp": due_time, "is_all_day": False}
     if owner_open_id:
-        body["owner"] = {"id": owner_open_id, "type": "user"}
+        body["members"] = [{"id": owner_open_id, "type": "user", "role": "assignee"}]
 
     data = _post_with_retry(CREATE_TASK_URL, body, '飞书创建任务')
     logger.info(f"[飞书创建任务] 成功, guid={data['task']['guid']}")

@@ -217,8 +217,10 @@ class TaskService:
 
     @staticmethod
     def _submit_lark_sync(task_id):
+        from app.utils.logger_config import get_task_logger
+        sync_logger = get_task_logger('lark_task_sync')
+        sync_logger.info(f"[业务任务] 触发飞书同步, task_id={task_id}")
         try:
             submit_create_lark_task(task_id)
         except Exception:
-            # 同步失败不影响业务任务创建结果，由重试机制处理
-            pass
+            sync_logger.exception(f"[业务任务] 触发飞书同步失败, task_id={task_id}")

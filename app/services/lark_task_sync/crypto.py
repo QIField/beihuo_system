@@ -23,7 +23,7 @@ def _get_encrypt_key():
             BeihuoSystemConfig.env == get_current_env(),
             BeihuoSystemConfig.status == 1,
         ).first()
-    return config.config_value if config else None
+        return config.config_value if config else None
 
 
 def decrypt_lark_event(encrypt_msg):

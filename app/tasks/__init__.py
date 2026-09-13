@@ -80,7 +80,8 @@ def register_all_tasks(task_manager):
     register_data_gzbbr_login_tasks(task_manager)
 
     # 17. 注册WMS库存操作自动推送定时任务（每天10:00、20:00）
-    register_wms_inventory_operation_tasks(task_manager)
+    # 临时关闭，暂不运行
+    # register_wms_inventory_operation_tasks(task_manager)
 
     # 18. 注册OE军备统计月度汇总定时任务（每天02:30）
     register_ks_inquiry_summary_tasks(task_manager)
