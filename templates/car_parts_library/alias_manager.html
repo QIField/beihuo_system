@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>别名管理</title>
+  <link rel="stylesheet" href="/static/layui/css/layui.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f0f2f5;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* 头部 */
+    .header {
+      background: #fff;
+      padding: 20px 24px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #262626;
+    }
+
+    .header-subtitle {
+      font-size: 14px;
+      color: #8c8c8c;
+      margin-top: 4px;
+    }
+
+    /* Tab 容器 */
+    .layui-tab-content {
+      padding: 0;
+    }
+
+    .tab-panel {
+      background: #fff;
+      border-radius: 0 0 8px 8px;
+      padding: 20px;
+      min-height: 600px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    /* 搜索区域 */
+    .search-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 16px 20px;
+      background: #fafafa;
+      border: 1px solid #f0f0f0;
+      border-radius: 6px;
+    }
+
+    .search-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .search-item label {
+      font-size: 14px;
+      color: #595959;
+      white-space: nowrap;
+    }
+
+    .search-item input {
+      width: 240px;
+      padding: 8px 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .search-item input:focus {
+      outline: none;
+      border-color: #1890ff;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- 头部 -->
+    <div class="header">
+      <div class="header-title">别名管理</div>
+      <div class="header-subtitle">奔驰错误OE记录查看与奔驰标准OE别名库管理</div>
+    </div>
+
+    <!-- Tab 切换 -->
+    <div class="layui-tab layui-tab-brief" lay-filter="aliasTab">
+      <ul class="layui-tab-title">
+        <li class="layui-this">奔驰错误OE记录</li>
+        <li>奔驰标准OE列表</li>
+      </ul>
+      <div class="layui-tab-content">
+        <!-- Tab1: 奔驰错误OE记录 -->
+        <div class="layui-tab-item layui-show">
+          <div class="tab-panel">
+            <div class="search-panel">
+              <div class="search-item">
+                <label>错误OE</label>
+                <input type="text" id="oeKeyword" placeholder="输入错误OE搜索" autocomplete="off">
+              </div>
+              <button class="layui-btn layui-btn-normal" id="oeSearchBtn">
+                <i class="layui-icon layui-icon-search"></i> 查询
+              </button>
+              <button class="layui-btn layui-btn-primary" id="oeResetBtn">
+                <i class="layui-icon layui-icon-refresh"></i> 重置
+              </button>
+            </div>
+            <table id="oeErrorsTable" lay-filter="oeErrorsTable"></table>
+          </div>
+        </div>
+
+        <!-- Tab2: 奔驰标准OE列表 -->
+        <div class="layui-tab-item">
+          <div class="tab-panel">
+            <div class="search-panel">
+              <div class="search-item">
+                <label>奔驰标准OE</label>
+                <input type="text" id="aliasKeyword" placeholder="输入奔驰标准OE搜索" autocomplete="off">
+              </div>
+             
+              <button class="layui-btn layui-btn-normal" id="aliasSearchBtn">
+                <i class="layui-icon layui-icon-search"></i> 查询
+              </button>
+              <button class="layui-btn layui-btn-primary" id="aliasResetBtn">
+                <i class="layui-icon layui-icon-refresh"></i> 重置
+              </button>
+               <button class="layui-btn layui-btn-normal" id="aliasAddAliasBtn">
+                <i class="layui-icon layui-icon-add-1"></i> 添加别名数据
+              </button>
+            </div>
+            <table id="aliasListTable" lay-filter="aliasListTable"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加别名数据弹窗模板（左标准OE + 右别名，可多条暂存） -->
+  <script type="text/html" id="addAliasDataDialogTpl">
+    {% raw %}
+    <div style="padding: 20px 24px;">
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+        <input type="text" id="addAliasDataStdOe" class="layui-input" placeholder="奔驰标准OE" style="flex: 1;" autocomplete="off">
+        <input type="text" id="addAliasDataAlias" class="layui-input" placeholder="别名" style="flex: 1;" autocomplete="off">
+        <button class="layui-btn layui-btn-normal layui-btn-sm" id="addAliasDataAddBtn">添加</button>
+      </div>
+      <div id="addAliasDataList" style="max-height: 260px; overflow-y: auto; border: 1px solid #f0f0f0; border-radius: 6px;">
+        <table class="layui-table" lay-skin="line" style="margin: 0;">
+          <thead>
+            <tr>
+              <th style="width: 56px;">序号</th>
+              <th>奔驰标准OE</th>
+              <th>别名</th>
+              <th style="width: 60px;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="addAliasDataTbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top: 8px; color: #999; font-size: 12px;">共 <span id="addAliasDataCount">0</span> 条待添加</div>
+    </div>
+    {% endraw %}
+  </script>
+
+  <!-- 添加别名数据暂存列表模板 -->
+  <script type="text/html" id="addAliasDataListTpl">
+    {% raw %}
+    {{# if (!d.list.length) { }}
+    <tr>
+      <td colspan="4" style="text-align:center;color:#999;padding:16px;">暂无数据</td>
+    </tr>
+    {{# } else { }}
+    {{# layui.each(d.list, function (idx, item) { }}
+    <tr>
+      <td>{{ idx + 1 }}</td>
+      <td>{{ item.part_number }}</td>
+      <td>{{ item.part_number_alias }}</td>
+      <td><button class="layui-btn layui-btn-danger layui-btn-xs" data-index="{{ idx }}">删除</button></td>
+    </tr>
+    {{# }); }}
+    {{# } }}
+    {% endraw %}
+  </script>
+
+  <!-- 关联标准OE弹窗模板 -->
+  <script type="text/html" id="addAliasDialogTpl">
+    {% raw %}
+    <div style="padding: 24px 28px;">
+      <div style="margin-bottom: 16px;">
+        <label style="display:block;font-size:14px;color:#595959;margin-bottom:6px;">错误OE</label>
+        <input type="text" id="addAliasWrongOe" class="layui-input" readonly value="{{ d.wrongOe }}">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display:block;font-size:14px;color:#595959;margin-bottom:6px;">奔驰标准OE</label>
+        <input type="text" id="addAliasStdOe" class="layui-input" placeholder="请输入奔驰标准OE" autocomplete="off">
+      </div>
+      <div>
+        <label style="display:block;font-size:14px;color:#595959;margin-bottom:6px;">备注</label>
+        <textarea id="addAliasRemark" class="layui-textarea" rows="2" placeholder="备注（可选）"></textarea>
+      </div>
+    </div>
+    {% endraw %}
+  </script>
+
+  <!-- 添加别名弹窗模板 -->
+  <script type="text/html" id="aliasDetailDialogTpl">
+    {% raw %}
+    <div style="padding: 20px 24px;">
+      <div style="margin-bottom: 14px; font-size: 14px; color: #262626;">
+        <span style="color: #8c8c8c;">奔驰标准OE：</span><strong>{{ d.partNumber }}</strong>
+      </div>
+      <div id="aliasDetailList" style="max-height: 280px; overflow-y: auto; border: 1px solid #f0f0f0; border-radius: 6px;"></div>
+      <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e8e8e8;">
+        <div style="font-size: 14px; color: #595959; margin-bottom: 8px;">添加别名</div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" id="detailAliasName" class="layui-input" placeholder="请输入别名" style="flex: 1;" autocomplete="off">
+          <button class="layui-btn layui-btn-normal layui-btn-sm" id="detailAddAliasBtn">添加</button>
+        </div>
+      </div>
+    </div>
+    {% endraw %}
+  </script>
+
+  <!-- 别名列表模板 -->
+  <script type="text/html" id="aliasDetailListTpl">
+    {% raw %}
+    {{# if (!d.list.length) { }}
+    <div style="padding: 24px; text-align: center; color: #999;">暂无别名记录</div>
+    {{# } else { }}
+    <table class="layui-table" lay-skin="line" style="margin: 0;">
+      <thead>
+        <tr>
+          <th style="width: 56px;">序号</th>
+          <th>别名</th>
+          <th>备注</th>
+          <th style="width: 160px;">创建时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{# layui.each(d.list, function (idx, item) { }}
+        <tr>
+          <td>{{ idx + 1 }}</td>
+          <td>{{ item.part_number_alias }}</td>
+          <td>{{ item.remark || '-' }}</td>
+          <td>{{# if (item.created_at) { }}{{ new Date(item.created_at).toLocaleString('zh-CN') }}{{# } else { }}-{{# } }}</td>
+        </tr>
+        {{# }); }}
+      </tbody>
+    </table>
+    {{# } }}
+    {% endraw %}
+  </script>
+
+  <!-- 别名列表提示模板 -->
+  <script type="text/html" id="aliasDetailMsgTpl">
+    {% raw %}
+    <div style="padding: 24px; text-align: center; color: #999;">{{ d.msg }}</div>
+    {% endraw %}
+  </script>
+
+  <script src="/static/layui/layui.js"></script>
+  <script>
+    layui.use(['jquery', 'table', 'element', 'layer', 'laytpl'], function () {
+      var $ = layui.jquery;
+      var table = layui.table;
+      var layer = layui.layer;
+      var laytpl = layui.laytpl;
+
+      // ==================== Tab1: 奔驰错误OE记录 ====================
+      table.render({
+        elem: '#oeErrorsTable',
+        id: 'oeErrorsTable',
+        url: '/new/api/car-parts/alias-manager/oe-errors',
+        method: 'get',
+        where: { keyword: '' },
+        page: true,
+        limit: 20,
+        limits: [10, 20, 50, 100],
+        height: 560,
+        cols: [[
+          { field: 'id', title: 'ID', width: 80, align: 'center', sort: true },
+          { field: 'oe', title: '错误OE', minWidth: 220 },
+          {
+            field: 'status', title: '状态', width: 130, align: 'center', templet: function (d) {
+              if (d.status === 1) {
+                return '<span style="color:#52c41a;font-weight:600;">已入别名库</span>';
+              }
+              return '<span style="color:#ff9800;font-weight:600;">未入别名库</span>';
+            }
+          },
+          { field: 'remark', title: '备注', minWidth: 160, templet: function (d) { return d.remark || '-'; } },
+          {
+            field: 'created_at', title: '创建时间', width: 180, templet: function (d) {
+              if (!d.created_at) return '-';
+              return new Date(d.created_at).toLocaleString('zh-CN');
+            }
+          },
+          {
+            title: '操作', width: 130, fixed: 'right', align: 'center', templet: function (d) {
+              return '<button class="layui-btn layui-btn-normal layui-btn-xs" lay-event="addAlias">关联标准OE</button>';
+            }
+          }
+        ]],
+        parseData: function (res) {
+          if (res.code === 200 && res.data && res.data.status) {
+            return { code: 0, msg: res.data.msg, count: res.data.count, data: res.data.data || [] };
+          }
+          return { code: 0, msg: (res.data && res.data.msg) || res.msg || '查询成功', count: 0, data: [] };
+        }
+      });
+
+      // 查询
+      $('#oeSearchBtn').on('click', function () {
+        table.reload('oeErrorsTable', {
+          where: { keyword: $('#oeKeyword').val().trim() },
+          page: { curr: 1 }
+        });
+      });
+
+      // 重置
+      $('#oeResetBtn').on('click', function () {
+        $('#oeKeyword').val('');
+        table.reload('oeErrorsTable', {
+          where: { keyword: '' },
+          page: { curr: 1 }
+        });
+      });
+
+      // 添加别名数据（左标准OE + 右别名，多条暂存后批量提交）
+      $('#aliasAddAliasBtn').on('click', function () {
+        var tpl = document.getElementById('addAliasDataDialogTpl').innerHTML;
+        laytpl(tpl).render({}, function (html) {
+          var staging = [];
+
+          // 渲染暂存列表
+          function renderStaging() {
+            var listTpl = document.getElementById('addAliasDataListTpl').innerHTML;
+            laytpl(listTpl).render({ list: staging }, function (h) {
+              $('#addAliasDataTbody').html(h);
+            });
+            $('#addAliasDataCount').text(staging.length);
+          }
+
+          layer.open({
+            type: 1,
+            title: '添加别名数据',
+            area: ['620px', 'auto'],
+            content: html,
+            btn: ['确定添加', '取消'],
+            yes: function (index) {
+              if (!staging.length) {
+                layer.msg('请先添加别名数据', { icon: 0 });
+                return;
+              }
+
+              var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在添加...' });
+              $.ajax({
+                url: '/new/api/car-parts/alias-manager/batch-add-alias',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ records: staging }),
+                success: function (res) {
+                  layer.close(loadingIdx);
+                  if (res.code === 200) {
+                    layer.close(index);
+                    layer.msg(res.msg || '添加成功', { icon: 1 });
+                    table.reload('oeErrorsTable');
+                    table.reload('aliasListTable');
+                  } else {
+                    layer.msg(res.msg || '添加失败', { icon: 2 });
+                  }
+                },
+                error: function (xhr, status, error) {
+                  layer.close(loadingIdx);
+                  layer.msg('请求失败: ' + error, { icon: 2 });
+                }
+              });
+            }
+          });
+
+          // 添加一条到暂存列表
+          $('#addAliasDataAddBtn').on('click', function () {
+            var stdOe = $('#addAliasDataStdOe').val().trim();
+            var aliasName = $('#addAliasDataAlias').val().trim();
+
+            if (!stdOe) {
+              layer.msg('请输入奔驰标准OE', { icon: 0 });
+              return;
+            }
+            if (!aliasName) {
+              layer.msg('请输入别名', { icon: 0 });
+              return;
+            }
+
+            staging.push({ part_number: stdOe, part_number_alias: aliasName, remark: null });
+            $('#addAliasDataStdOe').val('');
+            $('#addAliasDataAlias').val('');
+            renderStaging();
+          });
+
+          // 删除暂存列表中的一条
+          $('#addAliasDataTbody').on('click', 'button', function () {
+            var idx = parseInt($(this).attr('data-index'), 10);
+            staging.splice(idx, 1);
+            renderStaging();
+          });
+        });
+      });
+
+      // 关联标准OE
+      table.on('tool(oeErrorsTable)', function (obj) {
+        var data = obj.data;
+        if (obj.event === 'addAlias') {
+          openAddAliasDialog(data);
+        }
+      });
+
+      // 打开关联标准OE弹窗
+      function openAddAliasDialog(row) {
+        var tpl = document.getElementById('addAliasDialogTpl').innerHTML;
+        laytpl(tpl).render({ wrongOe: row.oe || '' }, function (html) {
+          layer.open({
+            type: 1,
+            title: '关联标准OE',
+            area: ['440px', 'auto'],
+            content: html,
+            btn: ['确定', '取消'],
+            yes: function (index) {
+              var wrongOe = $('#addAliasWrongOe').val().trim();
+              var stdOe = $('#addAliasStdOe').val().trim();
+              var remark = $('#addAliasRemark').val().trim();
+
+              if (!stdOe) {
+                layer.msg('请输入奔驰标准OE', { icon: 0 });
+                return;
+              }
+
+              var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在关联...' });
+              $.ajax({
+                url: '/new/api/car-parts/alias-manager/add-alias',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                  part_number: stdOe,
+                  part_number_alias: wrongOe,
+                  remark: remark || null
+                }),
+                success: function (res) {
+                  layer.close(loadingIdx);
+                  if (res.code === 200) {
+                    layer.close(index);
+                    layer.msg('关联成功', { icon: 1 });
+                    table.reload('oeErrorsTable');
+                  } else {
+                    layer.msg(res.msg || '关联失败', { icon: 2 });
+                  }
+                },
+                error: function (xhr, status, error) {
+                  layer.close(loadingIdx);
+                  layer.msg('请求失败: ' + error, { icon: 2 });
+                }
+              });
+            }
+          });
+        });
+      }
+
+      // ==================== Tab2: 奔驰标准OE列表 ====================
+      table.render({
+        elem: '#aliasListTable',
+        id: 'aliasListTable',
+        url: '/new/api/car-parts/alias-manager/alias-list',
+        method: 'get',
+        where: { keyword: '' },
+        page: true,
+        limit: 20,
+        limits: [10, 20, 50, 100],
+        height: 560,
+        cols: [[
+          { type: 'numbers', title: '序号', width: 80, align: 'center' },
+          { field: 'part_number', title: '奔驰标准OE', minWidth: 200 },
+          {
+            field: 'aliases', title: '别名', minWidth: 320, templet: function (d) {
+              if (!d.aliases || !d.aliases.length) return '-';
+              return d.aliases.join(', ');
+            }
+          },
+          {
+            title: '操作', width: 120, fixed: 'right', align: 'center', templet: function (d) {
+              return '<button class="layui-btn layui-btn-normal layui-btn-xs" lay-event="viewAlias">添加别名</button>';
+            }
+          }
+        ]],
+        parseData: function (res) {
+          if (res.code === 200 && res.data && res.data.status) {
+            return { code: 0, msg: res.data.msg, count: res.data.count, data: res.data.data || [] };
+          }
+          return { code: 0, msg: (res.data && res.data.msg) || res.msg || '查询成功', count: 0, data: [] };
+        }
+      });
+
+      // 查询
+      $('#aliasSearchBtn').on('click', function () {
+        table.reload('aliasListTable', {
+          where: { keyword: $('#aliasKeyword').val().trim() },
+          page: { curr: 1 }
+        });
+      });
+
+      // 重置
+      $('#aliasResetBtn').on('click', function () {
+        $('#aliasKeyword').val('');
+        table.reload('aliasListTable', {
+          where: { keyword: '' },
+          page: { curr: 1 }
+        });
+      });
+
+      // 添加别名（奔驰标准OE下的别名管理）
+      table.on('tool(aliasListTable)', function (obj) {
+        var data = obj.data;
+        if (obj.event === 'viewAlias') {
+          openAliasDetailDialog(data.part_number);
+        }
+      });
+
+      // 打开添加别名弹窗
+      function openAliasDetailDialog(partNumber) {
+        var tpl = document.getElementById('aliasDetailDialogTpl').innerHTML;
+        laytpl(tpl).render({ partNumber: partNumber }, function (html) {
+          layer.open({
+            type: 1,
+            title: '添加别名',
+            area: ['640px', 'auto'],
+            content: html,
+            btn: ['关闭'],
+            yes: function (index) {
+              layer.close(index);
+            }
+          });
+
+          loadAliasDetail(partNumber);
+
+          $('#detailAddAliasBtn').on('click', function () {
+            var aliasName = $('#detailAliasName').val().trim();
+            if (!aliasName) {
+              layer.msg('请输入别名', { icon: 0 });
+              return;
+            }
+
+            var loadingIdx = layer.load(1, { shade: [0.3, '#000'], content: '正在添加...' });
+            $.ajax({
+              url: '/new/api/car-parts/alias-manager/add-alias',
+              method: 'POST',
+              contentType: 'application/json',
+              data: JSON.stringify({
+                part_number: partNumber,
+                part_number_alias: aliasName
+              }),
+              success: function (res) {
+                layer.close(loadingIdx);
+                if (res.code === 200) {
+                  layer.msg(res.msg || '添加别名成功', { icon: 1 });
+                  $('#detailAliasName').val('');
+                  loadAliasDetail(partNumber);
+                } else {
+                  layer.msg(res.msg || '添加别名失败', { icon: 2 });
+                }
+              },
+              error: function (xhr, status, error) {
+                layer.close(loadingIdx);
+                layer.msg('请求失败: ' + error, { icon: 2 });
+              }
+            });
+          });
+        });
+      }
+
+      // 加载奔驰标准OE下的别名列表
+      function loadAliasDetail(partNumber) {
+        $.ajax({
+          url: '/new/api/car-parts/alias-manager/alias-detail',
+          method: 'GET',
+          data: { part_number: partNumber },
+          success: function (res) {
+            if (res.code === 200 && res.data && res.data.status) {
+              renderAliasDetail(res.data.data || []);
+            } else {
+              renderAliasMsg('加载失败');
+            }
+          },
+          error: function () {
+            renderAliasMsg('请求失败');
+          }
+        });
+      }
+
+      // 渲染别名列表
+      function renderAliasDetail(list) {
+        var tpl = document.getElementById('aliasDetailListTpl').innerHTML;
+        laytpl(tpl).render({ list: list || [] }, function (html) {
+          $('#aliasDetailList').html(html);
+        });
+      }
+
+      // 渲染别名列表提示信息
+      function renderAliasMsg(msg) {
+        var tpl = document.getElementById('aliasDetailMsgTpl').innerHTML;
+        laytpl(tpl).render({ msg: msg }, function (html) {
+          $('#aliasDetailList').html(html);
+        });
+      }
+
+      // Tab 切换：切换到奔驰标准OE列表时刷新表格，避免隐藏状态下渲染异常
+      layui.element.on('tab(aliasTab)', function (data) {
+        if (data.index === 1) {
+          table.reload('aliasListTable');
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>

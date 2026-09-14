@@ -23,6 +23,7 @@ from . import bmw_import_api
 from . import mercedes_config_api
 from . import bmw_parts_api
 from . import bmw_config_api
+from . import alias_manager_api
 
 # 注册子蓝图到主蓝图（保持API地址不变）
 car_parts_library_bp.register_blueprint(benz_parts_api.benz_parts_bp)
@@ -32,5 +33,6 @@ car_parts_library_bp.register_blueprint(bmw_import_api.bmw_import_bp)
 car_parts_library_bp.register_blueprint(mercedes_config_api.mercedes_config_bp)
 car_parts_library_bp.register_blueprint(bmw_parts_api.bmw_parts_bp)
 car_parts_library_bp.register_blueprint(bmw_config_api.bmw_config_bp)
+car_parts_library_bp.register_blueprint(alias_manager_api.alias_manager_bp)
 
 __all__ = ['car_parts_library_bp']

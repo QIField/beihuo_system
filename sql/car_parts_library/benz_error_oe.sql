@@ -1,0 +1,10 @@
+-- 奔驰错误OE记录表
+DROP TABLE IF EXISTS `benz_error_oe`;
+CREATE TABLE `benz_error_oe` (
+  `id` INT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `oe` TEXT NOT NULL COMMENT 'OE编号',
+  `status` INT NOT NULL DEFAULT 0 COMMENT '状态：是否已入别名库，0-未入 1-已入',
+  `remark` TEXT DEFAULT NULL COMMENT '备注',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='奔驰错误OE记录表';

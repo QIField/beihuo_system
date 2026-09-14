@@ -1,0 +1,22 @@
+CREATE TABLE `crmapp_users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户名',
+  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密码',
+  `is_admin` tinyint(1) DEFAULT '0' COMMENT '是否为管理员 0-否 1-是',
+  `store` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'fsbbr' COMMENT '所属门店代码',
+  `created_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `can_delete_cart` tinyint(1) DEFAULT '0' COMMENT '是否有权限删除购物车 0-否 1-是',
+  `ip_records` json DEFAULT NULL COMMENT '登录IP记录，最多保留5个最近的IP地址',
+  `allowed_orgs` json DEFAULT NULL COMMENT '允许切换的组织列表，JSON格式，如["fsbbr", "zsbbr"]，null表示所有组织都可切换',
+  `can_process_orders` tinyint(1) DEFAULT '0' COMMENT '是否有权限处理单据 0-否 1-是',
+  `department` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '板块:业务/市场/后勤',
+  `job_level` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '职级:经理/主管/业务员',
+  `can_inquiry_module` tinyint(1) DEFAULT '0' COMMENT '是否有权限访问询价模块 0-否 1-是',
+  `can_compare_module` tinyint(1) DEFAULT '0' COMMENT '是否有权限访问比价模块 0-否 1-是',
+  `can_update_crm` tinyint(1) DEFAULT '0' COMMENT '是否有权限更新CRM产品信息 0-否 1-是',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`),
+  KEY `idx_username` (`username`),
+  KEY `idx_store` (`store`)
+) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';

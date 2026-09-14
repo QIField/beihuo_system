@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `beihuo_system_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `config_key` varchar(100) NOT NULL COMMENT '配置键名（大写+下划线）',
+  `config_value` longtext COMMENT '配置值',
+  `config_type` varchar(20) NOT NULL DEFAULT 'string' COMMENT '类型：string/int/bool/json',
+  `config_group` varchar(50) NOT NULL DEFAULT 'default' COMMENT '分组：base/site/pay/oss等',
+  `label` varchar(100) NOT NULL COMMENT '配置中文名',
+  `remark` varchar(255) DEFAULT NULL COMMENT '备注说明',
+  `sort` int NOT NULL DEFAULT '1' COMMENT '排序顺序',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态：1启用 0禁用',
+  `env` varchar(20) NOT NULL DEFAULT 'prod' COMMENT '环境：dev/test/prod',
+  `created_by` varchar(50) DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(50) DEFAULT NULL COMMENT '修改人',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_key_env` (`config_key`,`env`),
+  KEY `idx_group` (`config_group`),
+  KEY `idx_env` (`env`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统动态配置表';

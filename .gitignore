@@ -62,7 +62,6 @@ docker/logs/
 /scripts
 /demo
 /excel
-/sql
 /.trae
 log.txt
 /static/excel/reconciliation/temp/

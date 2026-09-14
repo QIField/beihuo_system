@@ -54,3 +54,15 @@ def benz_detail_page():
     页面路径: /car_parts_library/bmw_favorites
     """
     return render_template("car_parts_library/benz_parts_detail.html")
+
+
+@car_parts_library_bp.route("/alias_manager")
+@require_page_login()
+def alias_manager_page():
+    """
+    别名管理页面（Tab 结构：
+    - 错误OE记录 Tab（分页查看错误 OE 记录）
+    - 配件编号列表 Tab（分页查看别名库配件编号）
+    页面路径: /car_parts_library/alias_manager
+    """
+    return render_template("car_parts_library/alias_manager.html")

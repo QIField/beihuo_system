@@ -11,6 +11,8 @@ from app.dao.car_parts_library_benz_stock_dao import CarPartsLibraryBenzStockDao
 from app.scripts.spiders.spider_entities.mercedes_login import MercedesLoginService
 from app.utils.orm.session import orm_session
 from config.config_list_manager.config_cache import get_config_value
+from app.services.car_parts_library_service.alias_manager.oe_collect import record_oe_error
+from app.services.car_parts_library_service.alias_manager.alias_replace import alias_replace
 import json
 
 def fetch_mercedes_parts_information(spider, part_number, customer_id, sales_organization_id):
@@ -172,6 +174,8 @@ def fetch_mercedes_data(part_numbers):
 
 
 ##对外接口
+@alias_replace
+@record_oe_error
 def by_part_number_get_data(part_number):
     """
     根据零件编号获取零件信息和库存信息（不入库，返回JSON）
