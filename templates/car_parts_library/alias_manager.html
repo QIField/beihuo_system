@@ -31,6 +31,9 @@
       border-radius: 8px;
       margin-bottom: 20px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .header-title {
@@ -104,8 +107,13 @@
   <div class="container">
     <!-- 头部 -->
     <div class="header">
-      <div class="header-title">别名管理</div>
-      <div class="header-subtitle">奔驰错误OE记录查看与奔驰标准OE别名库管理</div>
+      <div>
+        <div class="header-title">别名管理</div>
+        <div class="header-subtitle">奔驰错误OE记录查看与奔驰标准OE别名库管理</div>
+      </div>
+      <a href="/web/car_parts_library/cart" class="layui-btn layui-btn-primary" id="backBtn">
+        <i class="layui-icon layui-icon-return"></i> 返回列表
+      </a>
     </div>
 
     <!-- Tab 切换 -->
