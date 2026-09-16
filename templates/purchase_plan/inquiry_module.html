@@ -295,6 +295,7 @@
                 </div>
             </div>
             <div id="gzbbrHandsontableContainer" style="margin-top: 10px; flex: 1; min-height: 0;"></div>
+            <div id="gzbbrPaginationBar"></div>
         </div>
     </div>
 
@@ -688,13 +689,48 @@
 
         // data.gzbbr 失效时间调整相关变量和函数
         let gzbbrHot;
-        let gzbbrAllData = [];
+        let gzbbrFilteredData = [];
+        let gzbbrCurrentPageData = [];
+        let gzbbrPagination = null;
+        const GZBBR_DEFAULT_PAGE_SIZE = 100;
 
         function initGzbbrTab() {
-            document.getElementById('gzbbrSearchBtn').addEventListener('click', loadGzbbrQuotes);
+            document.getElementById('gzbbrSearchBtn').addEventListener('click', () => {
+                if (gzbbrPagination) {
+                    gzbbrPagination.update(gzbbrPagination.totalRecords, 1, gzbbrPagination.currentPageSize);
+                }
+                loadGzbbrQuotes();
+            });
             document.getElementById('gzbbrUpdateBtn').addEventListener('click', batchUpdateGzbbrLoseDate);
             document.getElementById('gzbbrSelectAll').addEventListener('change', toggleGzbbrSelectAll);
             initDateRangePicker('gzbbrDateRange', { max: '2099-12-31' });
+            initGzbbrPagination();
+        }
+
+        function initGzbbrPagination() {
+            const container = document.getElementById('gzbbrPaginationBar');
+            if (!container) return;
+            if (gzbbrPagination) {
+                gzbbrPagination.destroy();
+            }
+            gzbbrPagination = new CustomPagination({
+                container: '#gzbbrPaginationBar',
+                pageSizeOptions: [50, 100, 200, 500],
+                defaultPageSize: GZBBR_DEFAULT_PAGE_SIZE,
+                onPageChange: function(page, pageSize) {
+                    renderGzbbrTable(page, pageSize);
+                },
+                onPageSizeChange: function(pageSize) {
+                    renderGzbbrTable(1, pageSize);
+                }
+            });
+        }
+
+        function sliceGzbbrPageData(page, pageSize) {
+            page = page || (gzbbrPagination ? gzbbrPagination.currentPage : 1);
+            pageSize = pageSize || (gzbbrPagination ? gzbbrPagination.currentPageSize : GZBBR_DEFAULT_PAGE_SIZE);
+            const start = (page - 1) * pageSize;
+            return gzbbrFilteredData.slice(start, start + pageSize);
         }
 
         function formatTimestamp(value) {
@@ -722,7 +758,13 @@
                 }
             }
 
-            let url = `/api/purchase_plan/inquiry/gzbbr_quote_search?oe=${encodeURIComponent(oe)}&supplier=${encodeURIComponent(supplier)}`;
+            const loadingMask = document.getElementById('gzbbrLoadingMask');
+            if (loadingMask) {
+                loadingMask.querySelector('div').innerHTML = '<div style="margin-bottom: 15px;">正在加载数据，请稍候...</div><div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #1890ff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>';
+                loadingMask.style.display = 'flex';
+            }
+
+            let url = `/api/purchase_plan/inquiry/gzbbr_quote_search?oe=${encodeURIComponent(oe)}&supplier=${encodeURIComponent(supplier)}&brand=${encodeURIComponent(brand)}`;
             if (createDateStart) {
                 url += `&create_date_start=${createDateStart}`;
             }
@@ -733,26 +775,35 @@
             fetch(url)
                 .then(r => r.json())
                 .then(res => {
+                    if (loadingMask) loadingMask.style.display = 'none';
                     if (res.code !== 0) {
                         alert(res.msg);
                         return;
                     }
-                    gzbbrAllData = res.data || [];
-                    // 前端按品牌过滤
-                    if (brand) {
-                        gzbbrAllData = gzbbrAllData.filter(item =>
-                            (item.brand_name || '').toLowerCase().includes(brand.toLowerCase())
-                        );
+                    const result = res.data || {};
+                    gzbbrFilteredData = result.rows || [];
+                    const total = result.total || 0;
+
+                    renderGzbbrTable(1);
+
+                    if (gzbbrPagination) {
+                        gzbbrPagination.update(total, 1, gzbbrPagination.currentPageSize);
                     }
-                    renderGzbbrTable();
-                    document.getElementById('gzbbrBadge').textContent = gzbbrAllData.length;
+                    document.getElementById('gzbbrBadge').textContent = total;
                 })
-                .catch(err => alert('搜索失败: ' + err));
+                .catch(err => {
+                    if (loadingMask) loadingMask.style.display = 'none';
+                    alert('搜索失败: ' + err);
+                });
         }
 
-        function renderGzbbrTable() {
+        function renderGzbbrTable(page, pageSize) {
+            page = page || (gzbbrPagination ? gzbbrPagination.currentPage : 1);
+            pageSize = pageSize || (gzbbrPagination ? gzbbrPagination.currentPageSize : GZBBR_DEFAULT_PAGE_SIZE);
+            gzbbrCurrentPageData = sliceGzbbrPageData(page, pageSize);
+
             const container = document.getElementById('gzbbrHandsontableContainer');
-            const data = gzbbrAllData.map(item => ({
+            const data = gzbbrCurrentPageData.map(item => ({
                 selected: false,
                 quote_price_id: item.quote_price_id,
                 number: item.number,
@@ -821,7 +872,7 @@
             }
 
             const selectedFlags = gzbbrHot.getDataAtCol(0);
-            const selectedRows = gzbbrAllData.filter((_, index) => selectedFlags[index]);
+            const selectedRows = gzbbrCurrentPageData.filter((_, index) => selectedFlags[index]);
             if (selectedRows.length === 0) {
                 alert('请选择要更新的记录');
                 return;
@@ -835,7 +886,10 @@
             }
 
             const loadingMask = document.getElementById('gzbbrLoadingMask');
-            loadingMask.style.display = 'flex';
+            if (loadingMask) {
+                loadingMask.querySelector('div').innerHTML = '<div style="margin-bottom: 15px;">正在更新，请稍候...</div><div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #1890ff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>';
+                loadingMask.style.display = 'flex';
+            }
 
             fetch('/api/purchase_plan/inquiry/gzbbr_quote_update', {
                 method: 'POST',
