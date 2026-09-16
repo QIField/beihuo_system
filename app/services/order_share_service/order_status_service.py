@@ -27,6 +27,7 @@ from sqlalchemy import text
 from app.dao import order_share_dao
 from app.models.orm_models.order_delivery_info import OrderDeliveryInfo
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
+from app.services.order_share_service.handler_phone_service import resolve_handler_phone
 from app.utils.orm.session import orm_session
 
 logger = logging.getLogger("order_share")
@@ -116,6 +117,7 @@ def _full_flow(spider, orders_no):
             "orders_id": orders_id,
             "orders_no": orders_no,
             "handler": handler,
+            "order_mobile": resolve_handler_phone(handler),
             "create_date": create_date,
             "delivery_id": None,
             "jhdate": None,
@@ -131,6 +133,7 @@ def _full_flow(spider, orders_no):
             "orders_id": orders_id,
             "orders_no": orders_no,
             "handler": handler,
+            "order_mobile": resolve_handler_phone(handler),
             "create_date": create_date,
             "delivery_id": delivery_id,
             "jhdate": None,
@@ -147,6 +150,7 @@ def _full_flow(spider, orders_no):
         "orders_id": orders_id,
         "orders_no": orders_no,
         "handler": handler,
+        "order_mobile": resolve_handler_phone(handler),
         "create_date": create_date,
         "delivery_id": delivery_id,
         "jhdate": jhdate,
@@ -174,6 +178,7 @@ def _advance_from_ordered(spider, cached):
         "orders_id": cached["orders_id"],
         "orders_no": cached["orders_no"],
         "handler": cached.get("handler"),
+        "order_mobile": resolve_handler_phone(cached.get("handler")),
         "create_date": cached["create_date"],
         "delivery_id": cached["delivery_id"],
         "jhdate": jhdate,
@@ -196,6 +201,7 @@ def _advance_from_picked(spider, cached):
                 "orders_id": cached["orders_id"],
                 "orders_no": cached["orders_no"],
                 "handler": cached.get("handler"),
+                "order_mobile": resolve_handler_phone(cached.get("handler")),
                 "create_date": cached["create_date"],
                 "delivery_id": cached["delivery_id"],
                 "jhdate": cached["jhdate"],
@@ -209,6 +215,7 @@ def _advance_from_picked(spider, cached):
         "orders_id": cached["orders_id"],
         "orders_no": cached["orders_no"],
         "handler": cached.get("handler"),
+        "order_mobile": resolve_handler_phone(cached.get("handler")),
         "create_date": cached["create_date"],
         "delivery_id": cached["delivery_id"],
         "jhdate": cached["jhdate"],
@@ -219,10 +226,11 @@ def _advance_from_picked(spider, cached):
 
 
 def _fill_handler(spider, cached):
-    """补全缓存中的 handler 字段（字段新增前生成的旧缓存可能没有）"""
+    """补全缓存中的 handler 与 order_mobile 字段（字段新增前生成的旧缓存可能没有）"""
     _, handler = _fetch_orders_id(spider, cached["orders_no"])
     cached = dict(cached)
     cached["handler"] = handler if handler else "无"
+    cached["order_mobile"] = resolve_handler_phone(handler)
     order_share_dao.upsert(cached)
     return cached
 
@@ -322,11 +330,17 @@ def _build_view(record):
     """将记录（dict 或 ORM 实例）组装为页面展示字段"""
     # 兼容 dict 和 ORM 实例访问
     getter = record.get if isinstance(record, dict) else lambda k, default=None: getattr(record, k, default)
+    handler = getter("handler")
+    order_mobile = getter("order_mobile")
+    # 缓存中未写入时，按经手人实时解析；匹配失败保持为空，字段仍返回
+    if not order_mobile and handler:
+        order_mobile = resolve_handler_phone(handler)
     return {
         "orders_id": getter("orders_id"),
         "orders_no": getter("orders_no"),
         "tracking_no": getter("tracking_no"),
-        "handler": getter("handler"),
+        "handler": handler,
+        "order_mobile": order_mobile,
         "status": getter("status"),
         "create_date": _format_timestamp(getter("create_date")),
         "jhdate": _format_datetime(getter("jhdate")),

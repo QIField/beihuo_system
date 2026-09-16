@@ -1122,6 +1122,7 @@ def update_user(user_id):
     allowed_orgs = data.get('allowed_orgs')  # 新增：允许切换的组织列表
     department = data.get('department')  # 板块:业务/市场/后勤
     job_level = data.get('job_level')    # 职级:经理/主管/业务员
+    order_mobile = data.get('order_mobile')  # 订单分享联系电话
 
     # 验证板块和职级的有效值（如果提供了的话）
     if department is not None:
@@ -1181,7 +1182,10 @@ def update_user(user_id):
         if job_level is not None:
             update_fields.append("job_level = %s")
             params.append(job_level)
-        
+        if order_mobile is not None:
+            update_fields.append("order_mobile = %s")
+            params.append(order_mobile)
+
         if update_fields:
             sql = f"UPDATE crmapp_users SET {', '.join(update_fields)} WHERE id = %s"
             params.append(user_id)
@@ -2423,7 +2427,7 @@ def get_users():
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
     # 获取所有用户信息（不包括密码）
-    cursor.execute("SELECT id, username, is_admin, store, can_delete_cart, can_process_orders, department, job_level, ip_records, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust FROM crmapp_users ORDER BY id")
+    cursor.execute("SELECT id, username, is_admin, store, can_delete_cart, can_process_orders, department, job_level, ip_records, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust, order_mobile FROM crmapp_users ORDER BY id")
     users = cursor.fetchall()
     
     # 添加门店名称和处理权限字段

@@ -1777,7 +1777,7 @@ window.loadStoreInfo = function() {
                             // 只保留编辑和删除按钮，其他功能移到编辑弹窗内
                             if (currentUser.logged_in && currentUser.is_admin && d.username !== currentUser.username) {
                                 return '<div class="user-action-btns">' +
-                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ', \'' + (d.department || '') + '\', \'' + (d.job_level || '') + '\', ' + (d.allowed_orgs ? '\'' + btoa(JSON.stringify(d.allowed_orgs)) + '\'' : 'null') + ', ' + (d.can_inquiry_module || 0) + ', ' + (d.can_compare_module || 0) + ', ' + (d.can_update_crm || 0) + ', ' + (d.can_multi_channel_quote_adjust || 0) + ')">编辑</button>' +
+                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ', \'' + (d.department || '') + '\', \'' + (d.job_level || '') + '\', ' + (d.allowed_orgs ? '\'' + btoa(JSON.stringify(d.allowed_orgs)) + '\'' : 'null') + ', ' + (d.can_inquiry_module || 0) + ', ' + (d.can_compare_module || 0) + ', ' + (d.can_update_crm || 0) + ', ' + (d.can_multi_channel_quote_adjust || 0) + ', \'' + (d.order_mobile || '') + '\')">编辑</button>' +
                                        '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteUser(' + d.id + ', \'' + d.username + '\')">删除</button>' +
                                        '</div>';
                             }
@@ -2308,7 +2308,7 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs, userStore) {
 }
 
 // 编辑用户功能
-function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders, admin_flag, department, job_level, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust) {
+function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders, admin_flag, department, job_level, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust, order_mobile) {
     layui.use(['layer', 'form'], function(){
         var layer = layui.layer;
         var form = layui.form;
@@ -2418,6 +2418,12 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                                 </select>
                             </div>
                         </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">订单分享电话</label>
+                            <div class="layui-input-block">
+                                <input type="text" name="order_mobile" value="` + (order_mobile || '') + `" placeholder="客户扫码页展示的电话" autocomplete="off" class="layui-input">
+                            </div>
+                        </div>
                         <!-- 其他功能按钮区域 -->
                         <div class="layui-form-item">
                             <label class="layui-form-label">其他操作</label>
@@ -2477,7 +2483,8 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                     'can_compare_module': can_compare_module ? 'on' : '', // 添加比价模块权限开关
                     'can_update_crm': can_update_crm ? 'on' : '', // 更新CRM权限开关
                     'can_multi_channel_quote_adjust': can_multi_channel_quote_adjust ? 'on' : '', // 多渠道报价调价权限开关
-                    'store': store
+                    'store': store,
+                    'order_mobile': order_mobile || ''
                 });
                 
                 // 绑定表单提交事件
@@ -2498,7 +2505,8 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                             can_multi_channel_quote_adjust: form_data.field.can_multi_channel_quote_adjust === 'on' ? 1 : 0, // 多渠道报价调价权限字段
                             store: form_data.field.store,
                             department: form_data.field.department || null,  // 板块
-                            job_level: form_data.field.job_level || null     // 职级
+                            job_level: form_data.field.job_level || null,    // 职级
+                            order_mobile: form_data.field.order_mobile || null  // 订单分享联系电话
                             // 注意：这里不包含 allowed_orgs，因为它在单独的对话框中设置
                         })
                     })
