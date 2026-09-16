@@ -186,6 +186,16 @@
             <span class="label">经手人</span>
             <span class="value">{{ order.handler | default('', true) }}</span>
         </div>
+        <div class="row">
+            <span class="label">联系电话</span>
+            <span class="value">
+                {% if order.order_mobile %}
+                <a href="tel:{{ order.order_mobile }}" style="color: #1677ff; text-decoration: none;">{{ order.order_mobile }}</a>
+                {% else %}
+                {{ order.order_mobile | default('', true) }}
+                {% endif %}
+            </span>
+        </div>
     </div>
 
         <!-- 进度时间轴 -->
