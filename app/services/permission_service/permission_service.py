@@ -354,6 +354,11 @@ class PermissionService:
         """
         if not user_id:
             return False
+
+        # 管理员自动拥有所有权限
+        if cls.is_admin(user_id):
+            return True
+
         print(f"[PermissionService] 检查用户 {user_id} 是否有权限 {permission_code}")
         permissions = cls.get_user_permissions(user_id)
         return permission_code in permissions
