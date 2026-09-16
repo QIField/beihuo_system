@@ -26,6 +26,7 @@ def _to_dict(record):
         "orders_id": record.orders_id,
         "orders_no": record.orders_no,
         "handler": record.handler,
+        "order_mobile": record.order_mobile,
         "create_date": record.create_date,
         "delivery_id": record.delivery_id,
         "jhdate": record.jhdate,

@@ -29,6 +29,7 @@ class OrderDeliveryInfo(BaseModels):
         `orders_id`     BIGINT UNSIGNED NOT NULL,
         `orders_no`     VARCHAR(64) NOT NULL,
         `handler`       VARCHAR(64) COMMENT '经手人',
+        `order_mobile`  VARCHAR(20) COMMENT '经手人联系电话',
         `create_date`   BIGINT COMMENT 'CRM 订单创建时间（秒级时间戳）',
         `delivery_id`   BIGINT COMMENT '发货单 ID',
         `jhdate`        DATETIME COMMENT '拣货日期',
@@ -44,6 +45,7 @@ class OrderDeliveryInfo(BaseModels):
 
     已建表需新增字段：
     ALTER TABLE `order_delivery_info` ADD COLUMN `handler` VARCHAR(64) COMMENT '经手人' AFTER `orders_no`;
+    ALTER TABLE `order_delivery_info` ADD COLUMN `order_mobile` VARCHAR(20) COMMENT '经手人联系电话' AFTER `handler`;
     ALTER TABLE `order_delivery_info` ADD COLUMN `photos` TEXT COMMENT 'WMS 照片文件名列表（逗号分隔）' AFTER `ship_date`;
     """
 
@@ -57,6 +59,7 @@ class OrderDeliveryInfo(BaseModels):
     orders_id = Column(BigInteger, nullable=False, comment="CRM 订单 ID")
     orders_no = Column(String(64), nullable=False, comment="CRM 订单号")
     handler = Column(String(64), nullable=True, comment="经手人")
+    order_mobile = Column(String(20), nullable=True, comment="经手人联系电话")
     create_date = Column(BigInteger, nullable=True, comment="CRM 订单创建时间（秒级时间戳）")
     delivery_id = Column(BigInteger, nullable=True, comment="发货单 ID")
     jhdate = Column(DateTime, nullable=True, comment="拣货日期")
@@ -71,6 +74,7 @@ class OrderDeliveryInfo(BaseModels):
             "orders_id": self.orders_id,
             "orders_no": self.orders_no,
             "handler": self.handler,
+            "order_mobile": self.order_mobile,
             "create_date": self.create_date,
             "delivery_id": self.delivery_id,
             "jhdate": self.jhdate.strftime("%Y-%m-%d %H:%M:%S") if self.jhdate else None,

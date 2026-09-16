@@ -58,7 +58,8 @@ def _mock_response(json_data):
 
 
 def _make_record(orders_no, status, orders_id=1001, delivery_id=2001,
-                 create_date=1788754388, jhdate=None, ship_date=None):
+                 create_date=1788754388, jhdate=None, ship_date=None,
+                 order_mobile="13800138000"):
     """构造模拟缓存记录（与 DAO 返回的 plain dict 保持一致）"""
     return {
         "orders_no": orders_no,
@@ -67,23 +68,26 @@ def _make_record(orders_no, status, orders_id=1001, delivery_id=2001,
         "create_date": create_date,
         "jhdate": jhdate,
         "ship_date": ship_date,
+        "order_mobile": order_mobile,
         "status": status,
     }
 
 
+@patch("app.services.order_share_service.order_status_service.resolve_handler_phone")
 @patch("app.services.order_share_service.order_status_service.CrmGzbbrSpider")
 @patch("app.services.order_share_service.order_status_service.order_share_dao")
-@patch("app.services.order_share_service.order_status_service._fetch_ship_date")
-def test_full_flow_shipped(mock_ship, mock_dao, mock_spider_cls):
+@patch("app.services.order_share_service.order_status_service._fetch_wms_info")
+def test_full_flow_shipped(mock_wms, mock_dao, mock_spider_cls, mock_phone):
     """无缓存 + 三个时间齐全 => 已出库"""
     mock_dao.get_by_orders_no.return_value = None
+    mock_phone.return_value = "13800138000"
 
     spider = MagicMock()
     spider.get_mergeOrderList.return_value = _mock_response({
-        "data": {"list": {"data": [{"orders_no": "DD001", "orders_id": 1001}]}}
+        "data": {"list": {"data": [{"orders_no": "DD001", "orders_id": 1001, "handler": "张三"}]}}
     })
     spider.get_orders_view.return_value = _mock_response({
-        "data": {"TableHeader": {"create_date": 1788754388, "delivery_id": 2001}}
+        "data": {"TableHeader": {"create_date": 1788754388}, "delivery_id": 2001}
     })
     spider.get_delivery_view.return_value = _mock_response({
         "data": {"TableHeader": {"pack": {"jhdate": "2026-09-03 10:00:00"}}}
@@ -91,7 +95,7 @@ def test_full_flow_shipped(mock_ship, mock_dao, mock_spider_cls):
     mock_spider_cls.return_value = spider
 
     ship_dt = datetime(2026, 9, 3, 12, 0, 0)
-    mock_ship.return_value = ship_dt
+    mock_wms.return_value = (ship_dt, None)
 
     saved = _make_record("DD001", STATUS_SHIPPED, jhdate=datetime(2026, 9, 3, 10, 0, 0), ship_date=ship_dt)
     mock_dao.upsert.return_value = saved
@@ -99,69 +103,78 @@ def test_full_flow_shipped(mock_ship, mock_dao, mock_spider_cls):
     result = get_order_status_view("DD001")
     check("无缓存-完整流程-已出库：状态正确", result["status"] == STATUS_SHIPPED)
     check("无缓存-完整流程-已出库：发货时间存在", result["ship_date"] == "2026-09-03 12:00")
+    check("无缓存-完整流程-已出库：电话存在", result["order_mobile"] == "13800138000")
 
 
+@patch("app.services.order_share_service.order_status_service.resolve_handler_phone")
 @patch("app.services.order_share_service.order_status_service.CrmGzbbrSpider")
 @patch("app.services.order_share_service.order_status_service.order_share_dao")
-def test_full_flow_ordered(mock_dao, mock_spider_cls):
+def test_full_flow_ordered(mock_dao, mock_spider_cls, mock_phone):
     """无缓存 + jhdate 为空 => 已下单"""
     mock_dao.get_by_orders_no.return_value = None
+    mock_phone.return_value = None
 
     spider = MagicMock()
     spider.get_mergeOrderList.return_value = _mock_response({
-        "data": {"list": {"data": [{"orders_no": "DD002", "orders_id": 1002}]}}
+        "data": {"list": {"data": [{"orders_no": "DD002", "orders_id": 1002, "handler": "李四"}]}}
     })
     spider.get_orders_view.return_value = _mock_response({
-        "data": {"TableHeader": {"create_date": 1788754388, "delivery_id": 2002}}
+        "data": {"TableHeader": {"create_date": 1788754388}, "delivery_id": 2002}
     })
     spider.get_delivery_view.return_value = _mock_response({
         "data": {"TableHeader": {"pack": {"jhdate": None}}}
     })
     mock_spider_cls.return_value = spider
 
-    saved = _make_record("DD002", STATUS_ORDERED, orders_id=1002, delivery_id=2002)
+    saved = _make_record("DD002", STATUS_ORDERED, orders_id=1002, delivery_id=2002, order_mobile=None)
     mock_dao.upsert.return_value = saved
 
     result = get_order_status_view("DD002")
     check("无缓存-jhdate为空-已下单：状态正确", result["status"] == STATUS_ORDERED)
     check("无缓存-jhdate为空-已下单：无发货时间", result["ship_date"] is None)
+    check("无缓存-jhdate为空-已下单：电话字段存在但为空", "order_mobile" in result and result["order_mobile"] is None)
 
 
+@patch("app.services.order_share_service.order_status_service.resolve_handler_phone")
 @patch("app.services.order_share_service.order_status_service.CrmGzbbrSpider")
 @patch("app.services.order_share_service.order_status_service.order_share_dao")
-@patch("app.services.order_share_service.order_status_service._fetch_ship_date")
-def test_full_flow_picked(mock_ship, mock_dao, mock_spider_cls):
+@patch("app.services.order_share_service.order_status_service._fetch_wms_info")
+def test_full_flow_picked(mock_wms, mock_dao, mock_spider_cls, mock_phone):
     """无缓存 + jhdate 有值但 ship_date 为空 => 仓库已接单"""
     mock_dao.get_by_orders_no.return_value = None
+    mock_phone.return_value = "13900139000"
 
     spider = MagicMock()
     spider.get_mergeOrderList.return_value = _mock_response({
-        "data": {"list": {"data": [{"orders_no": "DD003", "orders_id": 1003}]}}
+        "data": {"list": {"data": [{"orders_no": "DD003", "orders_id": 1003, "handler": "王五"}]}}
     })
     spider.get_orders_view.return_value = _mock_response({
-        "data": {"TableHeader": {"create_date": 1788754388, "delivery_id": 2003}}
+        "data": {"TableHeader": {"create_date": 1788754388}, "delivery_id": 2003}
     })
     spider.get_delivery_view.return_value = _mock_response({
         "data": {"TableHeader": {"pack": {"jhdate": "2026-09-03 10:00:00"}}}
     })
     mock_spider_cls.return_value = spider
-    mock_ship.return_value = None
+    mock_wms.return_value = (None, None)
 
     saved = _make_record("DD003", STATUS_PICKED, orders_id=1003, delivery_id=2003,
-                         jhdate=datetime(2026, 9, 3, 10, 0, 0))
+                         jhdate=datetime(2026, 9, 3, 10, 0, 0), order_mobile="13900139000")
     mock_dao.upsert.return_value = saved
 
     result = get_order_status_view("DD003")
     check("无缓存-jhdate有值ship为空-仓库已接单：状态正确", result["status"] == STATUS_PICKED)
+    check("无缓存-jhdate有值ship为空-仓库已接单：电话存在", result["order_mobile"] == "13900139000")
 
 
+@patch("app.services.order_share_service.order_status_service.resolve_handler_phone")
 @patch("app.services.order_share_service.order_status_service.CrmGzbbrSpider")
 @patch("app.services.order_share_service.order_status_service.order_share_dao")
-@patch("app.services.order_share_service.order_status_service._fetch_ship_date")
-def test_advance_ordered_to_shipped(mock_ship, mock_dao, mock_spider_cls):
+@patch("app.services.order_share_service.order_status_service._fetch_wms_info")
+def test_advance_ordered_to_shipped(mock_wms, mock_dao, mock_spider_cls, mock_phone):
     """缓存已下单 + 查到 ship_date => 推进到已出库"""
     cached = _make_record("DD004", STATUS_ORDERED, orders_id=1004, delivery_id=2004)
     mock_dao.get_by_orders_no.return_value = cached
+    mock_phone.return_value = "13800138000"
 
     spider = MagicMock()
     spider.get_delivery_view.return_value = _mock_response({
@@ -170,7 +183,7 @@ def test_advance_ordered_to_shipped(mock_ship, mock_dao, mock_spider_cls):
     mock_spider_cls.return_value = spider
 
     ship_dt = datetime(2026, 9, 3, 12, 0, 0)
-    mock_ship.return_value = ship_dt
+    mock_wms.return_value = (ship_dt, None)
 
     saved = _make_record("DD004", STATUS_SHIPPED, orders_id=1004, delivery_id=2004,
                          jhdate=datetime(2026, 9, 3, 10, 0, 0), ship_date=ship_dt)
@@ -178,18 +191,23 @@ def test_advance_ordered_to_shipped(mock_ship, mock_dao, mock_spider_cls):
 
     result = get_order_status_view("DD004")
     check("缓存已下单-推进到已出库：状态正确", result["status"] == STATUS_SHIPPED)
+    check("缓存已下单-推进到已出库：电话存在", result["order_mobile"] == "13800138000")
 
 
+@patch("app.services.order_share_service.order_status_service.resolve_handler_phone")
+@patch("app.services.order_share_service.order_status_service.CrmGzbbrSpider")
 @patch("app.services.order_share_service.order_status_service.order_share_dao")
-@patch("app.services.order_share_service.order_status_service._fetch_ship_date")
-def test_advance_picked_to_shipped(mock_ship, mock_dao):
+@patch("app.services.order_share_service.order_status_service._fetch_wms_info")
+def test_advance_picked_to_shipped(mock_wms, mock_dao, mock_spider_cls, mock_phone):
     """缓存仓库已接单 + 查到 ship_date => 推进到已出库（不需要 CRM）"""
     cached = _make_record("DD005", STATUS_PICKED, orders_id=1005, delivery_id=2005,
                           jhdate=datetime(2026, 9, 3, 10, 0, 0))
     mock_dao.get_by_orders_no.return_value = cached
+    mock_phone.return_value = "13800138000"
+    mock_spider_cls.return_value = MagicMock()
 
     ship_dt = datetime(2026, 9, 3, 12, 0, 0)
-    mock_ship.return_value = ship_dt
+    mock_wms.return_value = (ship_dt, None)
 
     saved = _make_record("DD005", STATUS_SHIPPED, orders_id=1005, delivery_id=2005,
                          jhdate=datetime(2026, 9, 3, 10, 0, 0), ship_date=ship_dt)
@@ -197,18 +215,22 @@ def test_advance_picked_to_shipped(mock_ship, mock_dao):
 
     result = get_order_status_view("DD005")
     check("缓存仓库已接单-推进到已出库：状态正确", result["status"] == STATUS_SHIPPED)
+    check("缓存仓库已接单-推进到已出库：电话存在", result["order_mobile"] == "13800138000")
 
 
+@patch("app.services.order_share_service.order_status_service.resolve_handler_phone")
 @patch("app.services.order_share_service.order_status_service.order_share_dao")
-def test_shipped_cache_direct_return(mock_dao):
+def test_shipped_cache_direct_return(mock_dao, mock_phone):
     """缓存已出库 => 直接返回，不调任何接口"""
     cached = _make_record("DD006", STATUS_SHIPPED, orders_id=1006, delivery_id=2006,
                           jhdate=datetime(2026, 9, 3, 10, 0, 0),
-                          ship_date=datetime(2026, 9, 3, 12, 0, 0))
+                          ship_date=datetime(2026, 9, 3, 12, 0, 0),
+                          order_mobile="13800138000")
     mock_dao.get_by_orders_no.return_value = cached
 
     result = get_order_status_view("DD006")
     check("缓存已出库-直接返回：状态正确", result["status"] == STATUS_SHIPPED)
+    check("缓存已出库-直接返回：电话存在", result["order_mobile"] == "13800138000")
 
 
 if __name__ == "__main__":
