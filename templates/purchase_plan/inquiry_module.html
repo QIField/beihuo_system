@@ -781,7 +781,10 @@
                         return;
                     }
                     const result = res.data || {};
-                    gzbbrFilteredData = result.rows || [];
+                    gzbbrFilteredData = (result.rows || []).map(item => {
+                        item.selected = false;
+                        return item;
+                    });
                     const total = result.total || 0;
 
                     renderGzbbrTable(1);
@@ -804,7 +807,7 @@
 
             const container = document.getElementById('gzbbrHandsontableContainer');
             const data = gzbbrCurrentPageData.map(item => ({
-                selected: false,
+                selected: item.selected,
                 quote_price_id: item.quote_price_id,
                 number: item.number,
                 brand_name: item.brand_name,
@@ -842,22 +845,33 @@
                 rowHeights: DEFAULT_ROW_HEIGHT,
                 height: 500,
                 stretchH: 'all',
-                licenseKey: 'non-commercial-and-evaluation'
+                licenseKey: 'non-commercial-and-evaluation',
+                afterChange: function(changes, source) {
+                    if (source === 'loadData' || !changes) return;
+                    changes.forEach(([row, prop, oldVal, newVal]) => {
+                        if (prop === 'selected' && gzbbrCurrentPageData[row]) {
+                            gzbbrCurrentPageData[row].selected = newVal;
+                        }
+                    });
+                    const selectAllCheckbox = document.getElementById('gzbbrSelectAll');
+                    selectAllCheckbox.checked = gzbbrFilteredData.length > 0 && gzbbrFilteredData.every(item => item.selected);
+                }
             });
 
-            // 重置全选状态
-            document.getElementById('gzbbrSelectAll').checked = false;
+            // 同步全选复选框状态
+            const selectAllCheckbox = document.getElementById('gzbbrSelectAll');
+            const allSelected = gzbbrFilteredData.length > 0 && gzbbrFilteredData.every(item => item.selected);
+            selectAllCheckbox.checked = allSelected;
         }
 
         function toggleGzbbrSelectAll(e) {
             const checked = e.target.checked;
-            if (!gzbbrHot) return;
-            const rowCount = gzbbrHot.countRows();
-            const changes = [];
-            for (let i = 0; i < rowCount; i++) {
-                changes.push([i, 0, checked]);
+            gzbbrFilteredData.forEach(item => {
+                item.selected = checked;
+            });
+            if (gzbbrHot) {
+                renderGzbbrTable();
             }
-            gzbbrHot.setDataAtCell(changes);
         }
 
         function batchUpdateGzbbrLoseDate() {
@@ -871,8 +885,7 @@
                 return;
             }
 
-            const selectedFlags = gzbbrHot.getDataAtCol(0);
-            const selectedRows = gzbbrCurrentPageData.filter((_, index) => selectedFlags[index]);
+            const selectedRows = gzbbrFilteredData.filter(item => item.selected);
             if (selectedRows.length === 0) {
                 alert('请选择要更新的记录');
                 return;
