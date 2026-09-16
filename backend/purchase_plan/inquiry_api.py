@@ -1595,23 +1595,30 @@ def parse_oe_list():
 @inquiry_bp.route('/gzbbr_quote_search', methods=['GET'])
 @inquiry_permission_required
 def gzbbr_quote_search():
-    """搜索 data.gzbbr.com 报价列表"""
+    """搜索 data.gzbbr.com 报价列表（支持翻页）"""
     oe = request.args.get('oe', '')
     supplier = request.args.get('supplier', '')
-    limit = request.args.get('limit', 500, type=int)
+    brand = request.args.get('brand', '')
     create_date_start = request.args.get('create_date_start', '')
     create_date_end = request.args.get('create_date_end', '')
 
     try:
-        rows = GzbbrQuoteService.search_quote_prices(
+        result = GzbbrQuoteService.search_quote_prices(
             store_code=_get_current_store_code(),
             oe=oe,
             supplier=supplier,
-            limit=limit,
+            brand=brand,
             create_date_start=create_date_start,
             create_date_end=create_date_end
         )
-        return jsonify({'code': 0, 'msg': '查询成功', 'data': rows})
+        return jsonify({
+            'code': 0,
+            'msg': '查询成功',
+            'data': {
+                'rows': result.get('rows', []),
+                'total': result.get('total', 0)
+            }
+        })
     except Exception as e:
         import traceback
         traceback.print_exc()

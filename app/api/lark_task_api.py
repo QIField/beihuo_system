@@ -24,8 +24,16 @@ def webhook():
     事件处理幂等，重复事件自动忽略。
     """
     try:
+        raw_body = request.get_data(as_text=True)
+        logger.info(
+            f"[飞书回调] 收到请求, path={request.path}, "
+            f"method={request.method}, remote_addr={request.remote_addr}, "
+            f"content_type={request.content_type}, "
+            f"headers={dict(request.headers)}, body={raw_body}"
+        )
+
         payload = request.get_json(silent=True) or {}
-        logger.info(f"[飞书回调] 收到原始请求, payload={payload}")
+        logger.info(f"[飞书回调] 解析后 payload={payload}")
         result = handle_lark_webhook(payload)
         logger.info(f"[飞书回调] 处理结果, result={result}")
 
@@ -35,5 +43,6 @@ def webhook():
 
         return jsonify({"code": 0, "msg": "success"})
     except Exception:
+        logger.exception("[飞书回调] 处理异常")
         # 回调接口不要抛 500，避免飞书重试风暴
         return jsonify({"code": 0, "msg": "success"})

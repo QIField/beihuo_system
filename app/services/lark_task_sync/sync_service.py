@@ -139,10 +139,10 @@ def handle_lark_webhook(payload):
     """
     logger.info(f"[飞书回调] 进入处理, payload={payload}")
 
-    # URL 验证在解密之前处理，飞书验证时发送明文 challenge
+    # 明文 URL 验证（未配置 Encrypt Key 时）
     if payload.get('type') == 'url_verification':
         challenge = payload.get('challenge')
-        logger.info(f"[飞书回调] URL验证, challenge={challenge}")
+        logger.info(f"[飞书回调] URL验证(明文), challenge={challenge}")
         return {"challenge": challenge}
 
     if not _is_sync_enabled():
@@ -157,6 +157,12 @@ def handle_lark_webhook(payload):
 
     event = decrypt_lark_event(encrypt_msg)
     logger.info(f"[飞书回调] 解密后事件, event={event}")
+
+    # 加密 URL 验证（配置 Encrypt Key 后）
+    if event.get('type') == 'url_verification':
+        challenge = event.get('challenge')
+        logger.info(f"[飞书回调] URL验证(加密), challenge={challenge}")
+        return {"challenge": challenge}
 
     header = event.get('header', {})
     event_id = header.get('event_id')

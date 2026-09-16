@@ -24,25 +24,63 @@ class GzbbrQuoteService:
     LOCAL_INQUIRY_TABLE = "crmapp_price_inquiry"
 
     @staticmethod
-    def search_quote_prices(store_code, oe='', supplier='', limit=500,
+    def _parse_rows(data):
+        """从响应中解析 rows 和 total"""
+        rows = data.get('rows') or data.get('list') or data.get('data') or []
+        total = data.get('total')
+        return rows, total
+
+    @staticmethod
+    def _fetch_total(spider, oe, supplier, create_date_start, create_date_end):
+        """通过 limit=1 获取远程接口返回的总数"""
+        resp = spider.get_quote_price_index(
+            number=oe,
+            supplier_name=supplier,
+            limit=1,
+            offset=0,
+            create_date_start=create_date_start,
+            create_date_end=create_date_end
+        )
+        resp.raise_for_status()
+        _, total = GzbbrQuoteService._parse_rows(resp.json())
+        return total
+
+    @staticmethod
+    def search_quote_prices(store_code, oe='', supplier='', brand='',
                             create_date_start='', create_date_end=''):
-        """搜索 data.gzbbr.com 报价列表"""
+        """搜索 data.gzbbr.com 报价列表
+        统一循环拉取全部数据，在服务端完成品牌过滤后一次性返回，由前端本地分页。
+        :return: {'rows': [...], 'total': int}
+        """
         spider = DataGzbbrSpider(store_code=store_code)
         try:
-            resp = spider.get_quote_price_index(
-                number=oe,
-                supplier_name=supplier,
-                limit=limit,
-                offset=0,
-                create_date_start=create_date_start,
-                create_date_end=create_date_end
-            )
-            resp.raise_for_status()
-            logger.info(f"【搜索响应状态】{resp.status_code}")
-            logger.info(f"【搜索响应文本】{resp.text[:1000]}")
-            data = resp.json()
-            rows = data.get('rows') or data.get('list') or data.get('data') or []
-            return rows
+            total = GzbbrQuoteService._fetch_total(
+                spider, oe, supplier, create_date_start, create_date_end
+            ) or 0
+
+            all_rows = []
+            batch_size = 1000
+            for batch_offset in range(0, total, batch_size):
+                resp = spider.get_quote_price_index(
+                    number=oe,
+                    supplier_name=supplier,
+                    limit=batch_size,
+                    offset=batch_offset,
+                    create_date_start=create_date_start,
+                    create_date_end=create_date_end
+                )
+                resp.raise_for_status()
+                rows, _ = GzbbrQuoteService._parse_rows(resp.json())
+                all_rows.extend(rows)
+
+            if brand:
+                brand_lower = brand.lower()
+                all_rows = [
+                    r for r in all_rows
+                    if brand_lower in (r.get('brand_name') or '').lower()
+                ]
+
+            return {'rows': all_rows, 'total': len(all_rows)}
         finally:
             spider.close()
 
