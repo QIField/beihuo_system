@@ -12,6 +12,8 @@ from app.utils.logger_config import get_task_logger
 from .auth import get_tenant_access_token
 from .config import (
     CREATE_TASK_URL,
+    GET_TASK_URL,
+    TASK_SUBSCRIPTION_URL,
     BATCH_GET_USER_ID_URL,
     REQUEST_TIMEOUT,
     RETRY_TIMES,
@@ -94,6 +96,58 @@ def create_lark_task(summary, due_time=None, owner_open_id=None):
 
     data = _post_with_retry(CREATE_TASK_URL, body, '飞书创建任务')
     logger.info(f"[飞书创建任务] 成功, guid={data['task']['guid']}")
+    return data
+
+
+def get_lark_task(task_guid):
+    """
+    调用飞书查询任务详情接口。
+
+    :param task_guid: 任务 GUID
+    :return: 飞书响应 data 字段
+    :raises: 重试耗尽后抛出最后一次异常
+    """
+    url = f"{GET_TASK_URL}/{task_guid}"
+    headers = _request_headers()
+    last_exc = None
+
+    for attempt in range(1, RETRY_TIMES + 1):
+        try:
+            logger.info(f"[飞书查询任务] 第{attempt}次请求, url={url}")
+            resp = requests.get(
+                url,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            logger.info(f"[飞书查询任务] 第{attempt}次响应, status={resp.status_code}, result={result}")
+
+            if result.get("code") != 0:
+                raise RuntimeError(f"飞书接口返回错误: {result}")
+
+            return result.get("data")
+        except Exception as e:
+            last_exc = e
+            logger.warning(f"[飞书查询任务] 第{attempt}次失败: {e}")
+            if attempt < RETRY_TIMES:
+                time.sleep(RETRY_INTERVAL)
+
+    logger.exception("[飞书查询任务] 多次重试均失败")
+    raise last_exc
+
+
+def subscribe_task_events():
+    """
+    订阅 Task V2 变更事件。
+
+    飞书 Task V2 需要在控制台添加事件后，额外调用此接口建立应用维度的
+    事件订阅关系，否则任务完成等事件不会推送到回调地址。
+
+    :return: 飞书响应 data 字段
+    """
+    data = _post_with_retry(TASK_SUBSCRIPTION_URL, {}, '飞书TaskV2事件订阅')
+    logger.info(f"[飞书TaskV2事件订阅] 成功, result={data}")
     return data
 
 

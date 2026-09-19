@@ -16,6 +16,17 @@ document.addEventListener('alpine:init', () => {
         init() {
             this.loadUsers();
             this.search();
+            this.setupWebSocketListener();
+        },
+
+        setupWebSocketListener() {
+            window.addEventListener('business_data_update', (e) => {
+                const payload = e.detail || {};
+                if (payload.data_type === 'business_task' && payload.action === 'update') {
+                    console.log('[任务列表] 收到飞书状态同步通知, record_id=', payload.record_id);
+                    this.search();
+                }
+            });
         },
 
         async loadUsers() {
