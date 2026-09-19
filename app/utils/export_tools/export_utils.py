@@ -15,7 +15,7 @@ def parse_purchase_records(records_json):
     """
     解析 purchase_records JSON，提取日期、供应商名称、采购数量和价格。
 
-    与购物车页面 supplier-render.js 解析逻辑保持一致：
+    与前端 supplier-popover-provider.js 解析逻辑保持一致：
     数据格式：'[{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_quantity":2,"purchase_date":"2026-01-12"}]'
 
     Args:

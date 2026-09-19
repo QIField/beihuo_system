@@ -2,7 +2,7 @@
  * 供应商浮窗 Provider
  *
  * 作为 HoverPopover 的 'supplier' 类型内容提供者，收敛原先散落在
- * index.html / date_query_ag.html / supplier-render.js 中的三份重复解析逻辑。
+ * index.html / date_query_ag.html / 购物车 / CRM 搜索中的多份重复解析逻辑。
  *
  * 数据格式：
  * - 主：purchase_records JSON 字符串 [{purchase_date, supplier_name, purchase_quantity, purchase_price}]
