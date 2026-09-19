@@ -30,9 +30,10 @@
     <script src="/static/js/components/custom-pagination/custom-pagination.js"></script>
 
     <!-- HoverPopover 通用悬停浮窗（单例）+ 供应商内容提供者 -->
-    <link rel="stylesheet" href="/static/js/components/hover-popover/hover-popover.css?v=20260919">
+    <link rel="stylesheet" href="/static/js/components/hover-popover/hover-popover.css?v=20260919b">
     <script src="/static/js/components/hover-popover/hover-popover.js?v=20260919"></script>
     <script src="/static/js/components/hover-popover/supplier-popover-provider.js?v=20260919"></script>
+    <script src="/static/js/components/hover-popover/intransit-popover-provider.js?v=20260919"></script>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -457,17 +458,21 @@
                 valueGetter: params => parseFloat(params.data['库存数量']) || 0,
                 comparator: (valueA, valueB) => valueA - valueB
             },
-            { 
-                field: '在途数量', 
-                headerName: '在途数量', 
-                width: 120, 
+            {
+                field: '在途数量',
+                headerName: '在途数量',
+                width: 120,
                 pinned: 'left',
                 filter: 'agNumberColumnFilter',
                 cellClass: function(params) {
                     return params.value === 0 ? 'stock-cell stock-zero' : 'stock-cell';
                 },
                 valueGetter: params => parseFloat(params.data['在途数量']) || 0,
-                comparator: (valueA, valueB) => valueA - valueB
+                comparator: (valueA, valueB) => valueA - valueB,
+                cellRenderer: function(params) {
+                    // 在途数量 > 0 时悬停展示该 frey_no 下的在途明细
+                    return IntransitPopover.createCell(params.data['物料条码'] || '', params.data['在途数量']);
+                }
             },
             { 
                 field: '销量', 

@@ -849,9 +849,10 @@
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script src="{{ url_for('static', filename='js/supplier-render.js') }}"></script>
     <!-- HoverPopover 通用悬停浮窗（单例）+ 供应商内容提供者 -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/hover-popover/hover-popover.css') }}?v=20260919">
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/hover-popover/hover-popover.css') }}?v=20260919b">
     <script src="{{ url_for('static', filename='js/components/hover-popover/hover-popover.js') }}?v=20260919"></script>
     <script src="{{ url_for('static', filename='js/components/hover-popover/supplier-popover-provider.js') }}?v=20260919"></script>
+    <script src="{{ url_for('static', filename='js/components/hover-popover/intransit-popover-provider.js') }}?v=20260919"></script>
     <script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
     <script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
     <script src="{{ url_for('static', filename='js/frequency-module.js') }}"></script>
@@ -2873,7 +2874,10 @@ function renderBeihuoTable(table) {
                     (d.stock || d['库存数量'] || 0) + 
                     '<div class="stock-tooltip" style="display:none;"></div></div>';
             }, style: 'background-color: #d2d2d2;'},
-            {field: '在途数量', title: '在途数量', width: 88, align: 'right', sort: true, fixed: 'left', style: 'background-color: #d2d2d2;'},
+            {field: '在途数量', title: '在途数量', width: 88, align: 'right', sort: true, fixed: 'left', style: 'background-color: #d2d2d2;', templet: function(d) {
+                // 在途数量 > 0 时悬停展示该 frey_no 下的在途明细
+                return IntransitPopover.cellHtml(d['物料条码'] || d.barcode || '', d['在途数量']);
+            }},
             {
                 field: 'sales_data',
                 title: '销量',

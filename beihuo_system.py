@@ -44,6 +44,7 @@ from app.utils.export_tools.providers import (
     fetch_date_query_data,
 )
 from app.services.sales_frequency_service import enrich_data_with_frequency
+from app.services.b2b_intransit_service.query_service import find_intransit_details
 
 
 # 导入轻量级任务管理器（延迟初始化）
@@ -1576,6 +1577,19 @@ def api_beihuo():
         'count': total,
         'data': result
     })
+
+# 在途库存明细（悬停浮窗用，只读）
+@app.route('/api/intransit/detail')
+@login_required
+def api_intransit_detail():
+    barcode = request.args.get('barcode', '').strip()
+    if not barcode:
+        return jsonify({'code': 1, 'msg': '缺少条码参数', 'data': []})
+
+    # 公司维度由服务端会话确定，防止跨店查询
+    company = get_user_store()
+    rows = find_intransit_details(company, barcode)
+    return jsonify({'code': 0, 'msg': '', 'data': rows})
 
 # 获取品牌列表
 @app.route('/api/brands')
