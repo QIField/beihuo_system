@@ -1,0 +1,76 @@
+/* ============================================================
+ * HoverPopover 通用悬停浮窗（单例）
+ * 与业务无关：只定义浮层容器与通用表格外观，业务内容由 Provider 生成
+ * ============================================================ */
+
+/* 触发单元格标记（不改变表格布局，仅提供鼠标手型） */
+.hp-trigger {
+    cursor: pointer;
+}
+
+/* 全局唯一浮层：body 级 fixed 定位，保证 layui/ag-grid/Handsontable 通用 */
+.hp-popover {
+    display: none;
+    position: fixed;
+    z-index: 99999999;
+    min-width: 250px;
+    max-width: 480px;
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    border: 1px solid #e6e6e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 12px;
+    color: #333333;
+}
+
+/* 浮窗内通用明细表 */
+.hp-table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.hp-table thead th {
+    position: sticky;
+    top: 0;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 500;
+    color: #333333;
+    white-space: nowrap;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eeeeee;
+}
+
+.hp-table tbody td {
+    padding: 8px 12px;
+    color: #333333;
+    white-space: nowrap;
+    border-bottom: 1px solid #f6f6f6;
+}
+
+.hp-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.hp-table .hp-num,
+.hp-table th.hp-num {
+    text-align: right;
+}
+
+.hp-table .hp-price {
+    color: #e91e63;
+    font-weight: 500;
+}
+
+/* 空数据 / 加载中 */
+.hp-empty,
+.hp-loading {
+    padding: 12px 16px;
+    color: #999999;
+}
