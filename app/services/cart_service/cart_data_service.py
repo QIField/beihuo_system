@@ -3,11 +3,11 @@
 处理购物车数据的查询和基础处理逻辑
 """
 
-import json
 import re
 from typing import List, Dict, Any, Tuple
 from app.utils.database_connection import get_db_connection, db_cursor
 from app.utils.search import parse_space, parse_comma
+from app.services.cart_service.supplier_expander import expand_items_by_supplier
 
 
 class CartDataService:
@@ -86,8 +86,8 @@ class CartDataService:
                 cursor.execute(sql, tuple(params))
                 all_result = cursor.fetchall()
 
-                # 拆分供应商数据
-                expanded_result = self._expand_by_suppliers(list(all_result))
+                # 拆分供应商数据（共享展开逻辑）
+                expanded_result = expand_items_by_supplier(list(all_result))
 
                 # 计算拆分后的总数量
                 total_count = len(expanded_result)
@@ -138,23 +138,6 @@ class CartDataService:
         # 排除当前列自身的筛选条件，避免自己被自己过滤
         filtered_search_params = {k: v for k, v in (search_params or {}).items()
                                   if k != 'filter_' + column}
-
-        # 供应商维度的 supplier 列需要从展开后的数据中取
-        if dimension == 'supplier' and column == 'supplier':
-            with db_cursor(dict_cursor=True) as cursor:
-                sql = "SELECT supplier FROM crmapp_cart WHERE store = %s"
-                params = [store]
-                sql, params = self._apply_search_conditions(sql, params, filtered_search_params)
-                cursor.execute(sql, tuple(params))
-                rows = cursor.fetchall()
-
-            value_set = set()
-            for row in rows:
-                supplier_raw = row.get('supplier', '')
-                suppliers = self._parse_supplier_string(supplier_raw)
-                for name, price in suppliers:
-                    value_set.add(f"{name}：{price}")
-            return sorted(list(value_set))
 
         # 其他列直接从基础表取去重值
         db_field = self.FIELD_MAPPING.get(column)
@@ -287,62 +270,3 @@ class CartDataService:
         order_direction = "DESC" if sort_order and sort_order.lower() == "desc" else "ASC"
 
         return f" ORDER BY {db_field} {order_direction}"
-
-    def _expand_by_suppliers(self, cart_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        按供应商拆分购物车数据
-        一个产品如果有多个供应商，会拆分成多行，每行只保留对应的单条采购记录，
-        使供应商单元格与悬停浮窗都只展示该供应商一条明细
-        统一从 purchase_records JSON 解析，不再解析 supplier 字符串
-        """
-        expanded_result = []
-
-        for item in cart_items:
-            for record in self._parse_purchase_records(item.get('purchase_records', '')):
-                supplier_item = item.copy()
-
-                name = record.get('supplier_name', '').strip()
-                price_raw = record.get('purchase_price')
-                qty_raw = record.get('purchase_quantity')
-
-                price_text = f"{float(price_raw):.2f}" if price_raw is not None else 'N/A'
-                qty_text = str(int(float(qty_raw))) if qty_raw not in (None, '') else None
-
-                # 使用中文冒号，与前端展示格式保持一致；有数量时追加（×N）
-                supplier_item['supplier'] = (
-                    f"{name}：{price_text}（×{qty_text}）" if qty_text
-                    else f"{name}：{price_text}"
-                )
-                # 收窄为单条：单元格摘要与浮窗均按这一条展示
-                supplier_item['purchase_records'] = json.dumps([record], ensure_ascii=False)
-                expanded_result.append(supplier_item)
-
-        return expanded_result
-
-    def _parse_purchase_records(self, records_json: str) -> List[Dict[str, Any]]:
-        """
-        解析 purchase_records JSON，返回有效采购记录原始 dict 的列表
-        与 crawl_service.py / search_in_crm.py 统一的数据格式
-
-        示例：
-        '[{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_quantity":2,"purchase_date":"2026-01-12"}]'
-        -> [{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_quantity":2,"purchase_date":"2026-01-12"}]
-
-        无法解析或无有效供应商时，返回一条占位记录（未知供应商）
-        """
-        if records_json and isinstance(records_json, str):
-            try:
-                records = json.loads(records_json)
-                if isinstance(records, list) and records:
-                    valid = [r for r in records if r.get('supplier_name', '').strip()]
-                    if valid:
-                        return valid
-            except (json.JSONDecodeError, TypeError, ValueError):
-                pass
-
-        return [{
-            'supplier_name': '未知供应商',
-            'purchase_price': None,
-            'purchase_quantity': None,
-            'purchase_date': ''
-        }]

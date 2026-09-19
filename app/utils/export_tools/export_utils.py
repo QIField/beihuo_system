@@ -4,111 +4,30 @@
 """
 
 import io
-import json
 from datetime import datetime
 from flask import Response, jsonify
 from app.utils.database_connection import get_db_connection
+from app.services.cart_service.supplier_expander import (
+    expand_items_by_supplier,
+    build_export_supplier_text,
+    try_parse_valid_records,
+)
 import pymysql
-
-
-def parse_purchase_records(records_json):
-    """
-    解析 purchase_records JSON，提取日期、供应商名称、采购数量和价格。
-
-    与前端 supplier-popover-provider.js 解析逻辑保持一致：
-    数据格式：'[{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_quantity":2,"purchase_date":"2026-01-12"}]'
-
-    Args:
-        records_json: purchase_records JSON 字符串
-
-    Returns:
-        list: [(日期, 供应商名称, 数量, 价格), ...]；解析失败或为空时返回空列表
-    """
-    if not records_json or not isinstance(records_json, str):
-        return []
-
-    try:
-        records = json.loads(records_json)
-        if isinstance(records, list):
-            suppliers = []
-            for r in records:
-                name = r.get('supplier_name', '').strip()
-                price = r.get('purchase_price', 0.0)
-                quantity = r.get('purchase_quantity')
-                date = r.get('purchase_date', '').strip()
-                quantity_str = str(int(float(quantity))) if quantity not in (None, '') else '-'
-                if name:
-                    suppliers.append((date, name, quantity_str, f"{float(price):.2f}"))
-            return suppliers
-    except (json.JSONDecodeError, TypeError, ValueError):
-        pass
-
-    return []
 
 
 def build_supplier_field(original_supplier, purchase_records):
     """
     构建供应商字段值：优先使用 purchase_records JSON，没有则回退到原始供应商字符串。
 
-    输出格式与购物车页面 tooltip 一致：
+    每条格式（与供应商维度拆出的单行一致）：
       - 有日期："日期 - 供应商 - 数量 - 单价"
       - 无日期："供应商 - 数量 - 单价"
-
-    Args:
-        original_supplier: 原始供应商字段值
-        purchase_records: purchase_records JSON 字符串
-
-    Returns:
-        str: 格式化后的供应商字符串，多个供应商用换行分隔
+    多个供应商用换行分隔
     """
-    records = parse_purchase_records(purchase_records)
-    if records:
-        parts = []
-        for date, name, quantity, price in records:
-            if date:
-                parts.append(f"{date} - {name} - {quantity} - {price}")
-            else:
-                parts.append(f"{name} - {quantity} - {price}")
-        return '\n'.join(parts)
-    return original_supplier or ''
-
-
-def parse_supplier_string(supplier_str):
-    """
-    解析供应商字符串，将多个供应商拆分成列表
-    
-    Args:
-        supplier_str: 供应商字符串，格式如 "供应商A: 100\n供应商B: 200"
-    
-    Returns:
-        list: [(供应商名称, 价格), ...]
-    """
-    if not supplier_str or not isinstance(supplier_str, str):
-        return [(supplier_str or "N/A", "N/A")]
-
-    # 按换行符分割供应商信息
-    supplier_parts = supplier_str.split('\n')
-
-    suppliers = []
-    for part in supplier_parts:
-        part = part.strip()
-        if not part:
-            continue
-
-        # 查找冒号分隔的供应商名称和价格
-        colon_index = part.rfind(':')
-        if colon_index == -1:
-            colon_index = part.rfind('：')  # 尝试中文冒号
-
-        if colon_index != -1:
-            name = part[:colon_index].strip()
-            price = part[colon_index + 1:].strip()
-            suppliers.append((name, price))
-        else:
-            # 如果没有找到冒号，整个部分作为供应商名称
-            suppliers.append((part, "N/A"))
-
-    return suppliers if suppliers else [("N/A", "N/A")]
+    records = try_parse_valid_records(purchase_records)
+    if not records:
+        return original_supplier or ''
+    return '\n'.join(build_export_supplier_text(r) for r in records)
 
 
 def export_data_to_excel(data, headers_config, field_list, filename='export.xlsx', sheet_name='数据'):
@@ -361,18 +280,9 @@ def export_cart(store, search_params=None):
         if not rows:
             return jsonify({'code': 1, 'msg': '没有数据可导出'}), 400
 
-        # 如果是供应商维度，拆分供应商数据
+        # 供应商维度：按 purchase_records 拆行，每行用与产品维度一致的单条格式
         if dimension == 'supplier':
-            expanded_rows = []
-            for row in rows:
-                supplier_str = row.get('supplier', '')
-                suppliers = parse_supplier_string(supplier_str)
-                for supplier_name, price in suppliers:
-                    # 创建新行，复制原行数据
-                    new_row = row.copy()
-                    new_row['supplier'] = f"{supplier_name}: {price}"
-                    expanded_rows.append(new_row)
-            rows = expanded_rows
+            rows = expand_items_by_supplier(rows, build_export_supplier_text)
 
         # 生成文件名（始终包含维度信息）
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

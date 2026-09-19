@@ -345,6 +345,10 @@ var CartPanel = (function() {
                     });
                 }
             },
+            // 供应商列不提供筛选（供应商维度每行已是单条，该筛选无使用场景）
+            isFilterable: function(colId) {
+                return colId !== 'supplier';
+            },
             getFilterValues: function(colId, callback) {
                 // 从后端获取该列全部去重值，和汽配龙页面保持一致
                 var params = {
