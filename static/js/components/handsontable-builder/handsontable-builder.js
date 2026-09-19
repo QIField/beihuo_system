@@ -809,6 +809,7 @@ var HandsontableBuilder = (function() {
             persist: persist,
             pageKey: pageKey,
             gridKey: gridKey,
+            isFilterable: config.isFilterable || null,
             skipInitialLoad: true,
             _originalRows: (config.localData || []).slice()
         };
@@ -842,7 +843,10 @@ var HandsontableBuilder = (function() {
                 var colId = String(col.field || col.colId || col.data || '');
                 col.hide = !visibleSet[colId];
             });
-            renderLocalData(builder);
+            // 远程数据模式下列显隐已由 updateSettings 生效，禁止 renderLocalData（localData 为空会清空表格）
+            if (builder.config.dataUrl === null || builder.config.dataUrl === undefined) {
+                renderLocalData(builder);
+            }
             saveColumnPreference(builder);
         };
 

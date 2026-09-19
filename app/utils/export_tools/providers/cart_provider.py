@@ -7,10 +7,10 @@ import pymysql
 
 from app.utils.database_connection import get_db_connection
 from app.utils.export_tools import ExportConfig
-from app.utils.export_tools.export_utils import (
-    parse_supplier_string,
-    parse_purchase_records,
-    build_supplier_field,
+from app.utils.export_tools.export_utils import build_supplier_field
+from app.services.cart_service.supplier_expander import (
+    expand_items_by_supplier,
+    build_export_supplier_text,
 )
 
 
@@ -113,28 +113,9 @@ def fetch_cart_data(**search_params) -> list:
         cursor.execute(sql, params)
         rows = cursor.fetchall()
 
-        # 供应商维度：优先按 purchase_records 拆分，否则回退原 supplier 字符串
+        # 供应商维度：按 purchase_records 拆行，每行用与产品维度一致的单条格式
         if dimension == 'supplier':
-            expanded_rows = []
-            for row in rows:
-                purchase_records = row.get('purchase_records', '')
-                suppliers = parse_purchase_records(purchase_records)
-                fallback_to_string = not suppliers
-                if fallback_to_string:
-                    supplier_tuples = parse_supplier_string(row.get('supplier', ''))
-                    # 补齐日期、数量占位符，保持统一四元组格式
-                    suppliers = [('', name, '-', price) for name, price in supplier_tuples]
-
-                for date, supplier_name, quantity, price in suppliers:
-                    new_row = row.copy()
-                    if fallback_to_string and price == 'N/A':
-                        new_row['supplier'] = supplier_name
-                    elif date:
-                        new_row['supplier'] = f"{date} - {supplier_name} - {quantity} - {price}"
-                    else:
-                        new_row['supplier'] = f"{supplier_name} - {quantity} - {price}"
-                    expanded_rows.append(new_row)
-            rows = expanded_rows
+            rows = expand_items_by_supplier(rows, build_export_supplier_text)
         else:
             # 产品维度：供应商字段优先使用 purchase_records JSON，否则回退原字段
             for row in rows:

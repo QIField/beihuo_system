@@ -44,6 +44,7 @@ from app.utils.export_tools.providers import (
     fetch_date_query_data,
 )
 from app.services.sales_frequency_service import enrich_data_with_frequency
+from app.services.b2b_intransit_service.query_service import find_intransit_details
 
 
 # 导入轻量级任务管理器（延迟初始化）
@@ -1499,7 +1500,8 @@ def api_beihuo():
                 `库存数量`, `近12个月月均销量`, `近6个月月均销量`, `本月销量`, `近7天销量`,
                 `昨日销量`, `今日销量`, `成品可卖天数`, `预警状态`, `供应商`, `近1个月询价量`,
                 `近3个月月均询价量`, `全国近1个月询价量`, `全国近3个月月均询价量`,
-                `品牌号`, `内部备注`, `company`, `在途数量`, `车型`, `近12个月销量`, `近6个月销量`
+                `品牌号`, `内部备注`, `company`, `在途数量`, `车型`, `近12个月销量`, `近6个月销量`,
+                `purchase_records`
             FROM crmapp_beihuo
             {where_clause}
             ORDER BY `oe`  -- 使用一个稳定排序避免结果顺序变化
@@ -1525,7 +1527,8 @@ def api_beihuo():
                 `库存数量`, `近12个月月均销量`, `近6个月月均销量`, `本月销量`, `近7天销量`,
                 `昨日销量`, `今日销量`, `成品可卖天数`, `预警状态`, `供应商`, `近1个月询价量`,
                 `近3个月月均询价量`, `全国近1个月询价量`, `全国近3个月月均询价量`,
-                `品牌号`, `内部备注`, `company`, `在途数量`, `车型`, `近12个月销量`, `近6个月销量`
+                `品牌号`, `内部备注`, `company`, `在途数量`, `车型`, `近12个月销量`, `近6个月销量`,
+                `purchase_records`
             FROM crmapp_beihuo
             {where_clause}
             {order_clause}
@@ -1574,6 +1577,19 @@ def api_beihuo():
         'count': total,
         'data': result
     })
+
+# 在途库存明细（悬停浮窗用，只读）
+@app.route('/api/intransit/detail')
+@login_required
+def api_intransit_detail():
+    barcode = request.args.get('barcode', '').strip()
+    if not barcode:
+        return jsonify({'code': 1, 'msg': '缺少条码参数', 'data': []})
+
+    # 公司维度由服务端会话确定，防止跨店查询
+    company = get_user_store()
+    rows = find_intransit_details(company, barcode)
+    return jsonify({'code': 0, 'msg': '', 'data': rows})
 
 # 获取品牌列表
 @app.route('/api/brands')

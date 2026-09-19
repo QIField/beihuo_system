@@ -72,35 +72,12 @@ var CartColumns = (function() {
     }
 
     /**
-     * 供应商渲染器（使用公共 SupplierRender 模块，与 search_in_crm 页面统一）
+     * 供应商渲染器（统一使用 HoverPopover 供应商 Provider）
      */
     function supplierRenderer(instance, td, row, col, prop, value, cellProperties) {
-        // 优先使用公共渲染模块（如果已加载）
-        if (typeof SupplierRender !== 'undefined') {
-            return SupplierRender.renderForHandsontable(instance, td, row, col, prop, value, cellProperties);
-        }
-
-        // 降级：只解析 purchase_records JSON，不再支持字符串格式
         Handsontable.renderers.TextRenderer.apply(this, arguments);
         var jsonRecords = instance.getDataAtRowProp(row, 'purchase_records') || '';
-        var displayText = '';
-
-        if (jsonRecords) {
-            try {
-                var records = JSON.parse(jsonRecords);
-                if (Array.isArray(records) && records.length > 0) {
-                    var first = records[0];
-                    var summary = (first.supplier_name || '') + (first.purchase_price !== undefined ? ' ¥' + first.purchase_price : '');
-                    displayText = records.length > 1 ? summary + ' 等' + records.length + '条' : summary;
-                }
-            } catch (e) {
-                // JSON 解析失败，显示空
-            }
-        }
-
-        td.innerHTML = '<div class="supplier-cell" data-purchase-records="' + (jsonRecords ? jsonRecords.replace(/"/g, '&quot;') : '') + '">' +
-            displayText +
-            '</div>';
+        td.innerHTML = SupplierPopover.cellHtml(jsonRecords, '');
         return td;
     }
 

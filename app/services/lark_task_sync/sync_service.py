@@ -13,8 +13,9 @@ from datetime import datetime
 from app.core.task_manager import task_manager
 from app.utils.orm.session import orm_session
 from app.utils.logger_config import get_task_logger
+from app.sockets.notification_manager import notification_manager
 from .config import RETRY_TIMES, RETRY_DELAYS, LARK_TASK_SYNC_ENABLED_KEY, get_current_env
-from .client import create_lark_task
+from .client import create_lark_task, get_lark_task, subscribe_task_events
 from .crypto import decrypt_lark_event
 from .models import LarkTaskSyncModels
 
@@ -74,6 +75,13 @@ def _do_sync_once(business_task_id, attempt=1):
     logger.info(f"[飞书同步] 飞书创建任务响应, business_id={business_task_id}, result={result}")
 
     task_guid = result['task']['guid']
+
+    # 建立 Task V2 事件订阅关系（幂等，失败不影响任务创建）
+    try:
+        subscribe_task_events()
+        logger.info(f"[飞书同步] TaskV2事件订阅成功, business_id={business_task_id}")
+    except Exception as sub_err:
+        logger.warning(f"[飞书同步] TaskV2事件订阅失败（非阻塞）: {sub_err}")
 
     # 重新开启 session 写入映射
     with orm_session() as session:
@@ -178,7 +186,10 @@ def handle_lark_webhook(payload):
         logger.warning("[飞书回调] 缺少 event_id")
         return "success"
 
-    if event_type not in ('task.task.updated_v1', 'task.task.update_tenant_v1'):
+    V1_TYPES = ('task.task.updated_v1', 'task.task.update_tenant_v1')
+    V2_TYPE = 'task.task.update_user_access_v2'
+
+    if event_type not in V1_TYPES and event_type != V2_TYPE:
         logger.info(f"[飞书回调] 非任务更新事件, 忽略, event_type={event_type}")
         return "success"
 
@@ -188,20 +199,17 @@ def handle_lark_webhook(payload):
             logger.info(f"[飞书回调] 事件已处理, event_id={event_id}")
             return "success"
 
-        # 解析任务状态
         event_body = event.get('event', {})
         logger.info(f"[飞书回调] 事件体, event_body={event_body}")
 
-        lark_task_guid = event_body.get('task_id')
-        obj_type = event_body.get('obj_type')
-
-        # obj_type: 1=任务详情变化, 5=任务完成, 6=任务取消完成, 7=任务删除
-        if obj_type not in (5, 6):
-            logger.info(f"[飞书回调] 非完成/取消完成事件, obj_type={obj_type}, 忽略")
+        resolved = _resolve_task_status_change(event)
+        if not resolved:
+            logger.info("[飞书回调] 非完成/取消完成相关变更, 忽略")
             return "success"
 
+        lark_task_guid, new_status = resolved
         if not lark_task_guid:
-            logger.warning("[飞书回调] 缺少任务 task_id")
+            logger.warning("[飞书回调] 缺少任务 GUID")
             return "success"
 
         # 查映射
@@ -213,11 +221,62 @@ def handle_lark_webhook(payload):
         logger.info(f"[飞书回调] 找到映射, business_id={mapping.business_id}, guid={lark_task_guid}")
 
         # 更新业务任务状态
-        new_status = 1 if obj_type == 5 else 0
         LarkTaskSyncModels.update_task_status(session, mapping.business_id, new_status)
 
         # 记录幂等
         LarkTaskSyncModels.mark_event_handled(session, event_id, event_type, event_time)
         logger.info(f"[飞书回调] 状态更新成功, business_id={mapping.business_id}, status={new_status}")
 
+        # 推送 WebSocket 通知，让网页端实时刷新
+        try:
+            notification_manager.send_data_update(
+                data_type='business_task',
+                action='update',
+                record_id=str(mapping.business_id),
+                data={
+                    'status': new_status,
+                    'lark_task_guid': lark_task_guid,
+                },
+            )
+            logger.info(f"[飞书回调] WebSocket通知已发送, business_id={mapping.business_id}")
+        except Exception as notify_err:
+            logger.warning(f"[飞书回调] WebSocket通知发送失败: {notify_err}")
+
     return "success"
+
+
+def _resolve_task_status_change(event):
+    """
+    从 V1/V2 任务事件中解析出任务 GUID 和新的完成状态。
+
+    :return: (task_guid, status) 元组；status=1 已完成, status=0 未完成。
+             如果与完成状态无关，返回 None。
+    """
+    header = event.get('header', {})
+    event_type = header.get('event_type')
+    event_body = event.get('event', {})
+
+    # V1 事件：obj_type 5=完成, 6=取消完成
+    if event_type in ('task.task.updated_v1', 'task.task.update_tenant_v1'):
+        obj_type = event_body.get('obj_type')
+        if obj_type not in (5, 6):
+            return None
+        return event_body.get('task_id'), 1 if obj_type == 5 else 0
+
+    # V2 事件：task.task.update_user_access_v2
+    if event_type == 'task.task.update_user_access_v2':
+        event_types = event_body.get('event_types') or []
+        if 'task_completed_update' not in event_types and 'task_todo_update' not in event_types:
+            return None
+
+        task_guid = event_body.get('task_guid')
+        if not task_guid:
+            return None
+
+        # V2 事件本身不携带完成状态，需要反查任务详情
+        task_data = get_lark_task(task_guid)
+        completed_at = task_data.get('task', {}).get('completed_at')
+        is_completed = bool(completed_at and str(completed_at) not in ('0', ''))
+        return task_guid, 1 if is_completed else 0
+
+    return None

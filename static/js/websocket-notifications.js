@@ -137,10 +137,15 @@
         handleNotification(data) {
             // 显示视觉通知
             this.showVisualNotification(data);
-            
+
             // 播放音频提示
             if (data.data && data.data.sound_type) {
                 this.playNotificationSound(data.data.sound_type);
+            }
+
+            // 业务数据变更时触发自定义事件，供具体页面刷新
+            if (data.data && data.data.data_type) {
+                window.dispatchEvent(new CustomEvent('business_data_update', { detail: data.data }));
             }
         }
         

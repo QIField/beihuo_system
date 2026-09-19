@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>搜索产品</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/hover-popover/hover-popover.css') }}?v=20260919b">
 <style>
         body {
             padding: 10px;
@@ -140,7 +141,8 @@
     </div>
 
 <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
-<script src="{{ url_for('static', filename='js/supplier-render.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/hover-popover/hover-popover.js') }}?v=20260919"></script>
+<script src="{{ url_for('static', filename='js/components/hover-popover/supplier-popover-provider.js') }}?v=20260919"></script>
 <script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
 <script>
     // 创建独立的命名空间
@@ -223,8 +225,8 @@
                         {field: '成品可卖天数', title: '成品可卖天数', width: 100, sort: true, align: 'right', fieldAlias: 'sellable_days'},
                         {field: '预警状态', title: '预警状态', width: 100, sort: true, unresize: false, fieldAlias: 'warning_status'},
                         {field: '供应商', title: '供应商', width: 120, sort: true, unresize: false, fieldAlias: 'supplier', templet: function(d) {
-                            // 使用公共供应商渲染模块（与购物车页面统一）
-                            return SupplierRender.renderForLayui(d, { width: 120, maxWidth: 500, minWidth: 350 });
+                            // 统一使用 HoverPopover 供应商 Provider
+                            return SupplierPopover.cellHtml(d.purchase_records, d['供应商'] || '');
                         }},
                         {field: '近1个月询价量', title: '近1个月询价量', width: 120, sort: true, align: 'right', fieldAlias: 'inquiry_1m'},
                         {field: '近3个月月均询价量', title: '近3个月月均询价量', width: 130, sort: true, align: 'right', fieldAlias: 'inquiry_3m'},
@@ -295,11 +297,6 @@
                         setTimeout(function() {
                             loadCartCacheAndHighlight();
                         }, 150);
-
-                        // 初始化供应商 tooltip 事件（使用公共渲染模块）
-                        setTimeout(function() {
-                            SupplierRender.initTooltipEvents('#searchInCrmTable');
-                        }, 200);
                     },
                     error: function(res, msg) {
                     }

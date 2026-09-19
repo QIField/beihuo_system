@@ -145,6 +145,7 @@ var GridColumnMenu = (function() {
             onSort: options.onSort || null,
             onDataRefresh: options.onDataRefresh || null,
             getFilterValues: options.getFilterValues || null,
+            isFilterable: options.isFilterable || null,
             onColumnVisibilityChange: options.onColumnVisibilityChange || null,
             persist: !!options.persist,
             pageKey: options.pageKey || '',
@@ -497,6 +498,12 @@ var GridColumnMenu = (function() {
         var sortAscStyle = isAsc ? activeBg : '';
         var sortDescStyle = isDesc ? activeBg : '';
 
+        var filterEnabled = !gridInfo.isFilterable || gridInfo.isFilterable(colId);
+        var filterItemHtml = filterEnabled ?
+            '<div class="col-menu-item" data-action="filter" style="padding: 8px 16px; cursor: pointer; font-size: 13px; color: #333; display: flex; justify-content: space-between; align-items: center;">' +
+                '<span>筛选</span><span style="color: #999; font-size: 10px;">▸</span>' +
+            '</div>' : '';
+
         menu.innerHTML =
             '<div class="col-menu-item" data-action="sortAsc" style="padding: 8px 16px; cursor: pointer; font-size: 13px; color: #333; display: flex; align-items: center;' + sortAscStyle + '">' +
                 '<span style="margin-right: 8px;">↑</span><span>升序</span>' +
@@ -508,9 +515,7 @@ var GridColumnMenu = (function() {
             '<div class="col-menu-item" data-action="columns" style="padding: 8px 16px; cursor: pointer; font-size: 13px; color: #333; display: flex; justify-content: space-between; align-items: center;">' +
                 '<span>表格列</span><span style="color: #999; font-size: 10px;">▸</span>' +
             '</div>' +
-            '<div class="col-menu-item" data-action="filter" style="padding: 8px 16px; cursor: pointer; font-size: 13px; color: #333; display: flex; justify-content: space-between; align-items: center;">' +
-                '<span>筛选</span><span style="color: #999; font-size: 10px;">▸</span>' +
-            '</div>';
+            filterItemHtml;
 
         var rect = anchor.getBoundingClientRect();
         // 初始位置左对齐按钮并保留原有 20px 偏移，左侧不超出视口
