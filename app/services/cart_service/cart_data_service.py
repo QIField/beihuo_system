@@ -3,6 +3,7 @@
 处理购物车数据的查询和基础处理逻辑
 """
 
+import json
 import re
 from typing import List, Dict, Any, Tuple
 from app.utils.database_connection import get_db_connection, db_cursor
@@ -290,53 +291,58 @@ class CartDataService:
     def _expand_by_suppliers(self, cart_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         按供应商拆分购物车数据
-        一个产品如果有多个供应商，会拆分成多行
+        一个产品如果有多个供应商，会拆分成多行，每行只保留对应的单条采购记录，
+        使供应商单元格与悬停浮窗都只展示该供应商一条明细
         统一从 purchase_records JSON 解析，不再解析 supplier 字符串
         """
         expanded_result = []
 
         for item in cart_items:
-            purchase_records = item.get('purchase_records', '')
-            suppliers = self._parse_purchase_records(purchase_records)
-
-            for supplier_name, quantity, price in suppliers:
+            for record in self._parse_purchase_records(item.get('purchase_records', '')):
                 supplier_item = item.copy()
+
+                name = record.get('supplier_name', '').strip()
+                price_raw = record.get('purchase_price')
+                qty_raw = record.get('purchase_quantity')
+
+                price_text = f"{float(price_raw):.2f}" if price_raw is not None else 'N/A'
+                qty_text = str(int(float(qty_raw))) if qty_raw not in (None, '') else None
+
                 # 使用中文冒号，与前端展示格式保持一致；有数量时追加（×N）
-                if quantity and quantity != '-':
-                    supplier_item['supplier'] = f"{supplier_name}：{price}（×{quantity}）"
-                else:
-                    supplier_item['supplier'] = f"{supplier_name}：{price}"
+                supplier_item['supplier'] = (
+                    f"{name}：{price_text}（×{qty_text}）" if qty_text
+                    else f"{name}：{price_text}"
+                )
+                # 收窄为单条：单元格摘要与浮窗均按这一条展示
+                supplier_item['purchase_records'] = json.dumps([record], ensure_ascii=False)
                 expanded_result.append(supplier_item)
 
         return expanded_result
 
-    def _parse_purchase_records(self, records_json: str) -> List[tuple]:
+    def _parse_purchase_records(self, records_json: str) -> List[Dict[str, Any]]:
         """
-        解析 purchase_records JSON，提取供应商名称、采购数量和价格
+        解析 purchase_records JSON，返回有效采购记录原始 dict 的列表
         与 crawl_service.py / search_in_crm.py 统一的数据格式
 
         示例：
         '[{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_quantity":2,"purchase_date":"2026-01-12"}]'
-        -> [("佛山德孚", "2", "15.00")]
+        -> [{"supplier_name":"佛山德孚","purchase_price":15.0,"purchase_quantity":2,"purchase_date":"2026-01-12"}]
+
+        无法解析或无有效供应商时，返回一条占位记录（未知供应商）
         """
-        import json
+        if records_json and isinstance(records_json, str):
+            try:
+                records = json.loads(records_json)
+                if isinstance(records, list) and records:
+                    valid = [r for r in records if r.get('supplier_name', '').strip()]
+                    if valid:
+                        return valid
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
 
-        if not records_json or not isinstance(records_json, str):
-            return [("未知供应商", "-", "N/A")]
-
-        try:
-            records = json.loads(records_json)
-            if isinstance(records, list) and records:
-                suppliers = []
-                for r in records:
-                    name = r.get('supplier_name', '').strip()
-                    price = r.get('purchase_price', 0.0)
-                    quantity = r.get('purchase_quantity')
-                    quantity_str = str(int(float(quantity))) if quantity not in (None, '') else '-'
-                    if name:
-                        suppliers.append((name, quantity_str, f"{float(price):.2f}"))
-                return suppliers if suppliers else [("未知供应商", "-", "N/A")]
-        except (json.JSONDecodeError, TypeError, ValueError):
-            pass
-
-        return [("未知供应商", "-", "N/A")]
+        return [{
+            'supplier_name': '未知供应商',
+            'purchase_price': None,
+            'purchase_quantity': None,
+            'purchase_date': ''
+        }]
