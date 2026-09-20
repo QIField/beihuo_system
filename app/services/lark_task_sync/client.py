@@ -9,11 +9,10 @@ import time
 import requests
 
 from app.utils.logger_config import get_task_logger
-from .auth import get_tenant_access_token
+from .auth import get_tenant_access_token, get_app_id
 from .config import (
     CREATE_TASK_URL,
     GET_TASK_URL,
-    TASK_SUBSCRIPTION_URL,
     BATCH_GET_USER_ID_URL,
     REQUEST_TIMEOUT,
     RETRY_TIMES,
@@ -78,21 +77,38 @@ def _post_with_retry(url, body, action_name):
     raise last_exc
 
 
-def create_lark_task(summary, due_time=None, owner_open_id=None):
+def create_lark_task(summary, description=None, due_time=None, owner_open_id=None):
     """
     调用飞书创建任务接口。
 
     :param summary: 任务标题
-    :param due_time: 截止时间，ISO8601 格式字符串，可选
+    :param description: 任务内容/描述，可选
+    :param due_time: 截止时间，datetime 对象，可选
     :param owner_open_id: 负责人飞书 open_id，可选
     :return: 飞书响应 data 字段
     :raises: 重试耗尽后抛出最后一次异常
     """
     body = {"summary": summary}
+    if description:
+        body["description"] = description
     if due_time:
-        body["due_time"] = {"timestamp": due_time, "is_all_day": False}
+        body["due"] = {
+            "timestamp": str(int(due_time.timestamp() * 1000)),
+            "is_all_day": False,
+        }
+
+    members = []
     if owner_open_id:
-        body["members"] = [{"id": owner_open_id, "type": "user", "role": "assignee"}]
+        members.append({"id": owner_open_id, "type": "user", "role": "assignee"})
+    # 把应用自己加为关注者，确保能收到任务状态变更事件
+    try:
+        app_id = get_app_id()
+        members.append({"id": app_id, "type": "app", "role": "follower"})
+    except Exception as e:
+        logger.warning(f"[飞书创建任务] 获取 app_id 失败，跳过添加应用关注者: {e}")
+
+    if members:
+        body["members"] = members
 
     data = _post_with_retry(CREATE_TASK_URL, body, '飞书创建任务')
     logger.info(f"[飞书创建任务] 成功, guid={data['task']['guid']}")
@@ -135,20 +151,6 @@ def get_lark_task(task_guid):
 
     logger.exception("[飞书查询任务] 多次重试均失败")
     raise last_exc
-
-
-def subscribe_task_events():
-    """
-    订阅 Task V2 变更事件。
-
-    飞书 Task V2 需要在控制台添加事件后，额外调用此接口建立应用维度的
-    事件订阅关系，否则任务完成等事件不会推送到回调地址。
-
-    :return: 飞书响应 data 字段
-    """
-    data = _post_with_retry(TASK_SUBSCRIPTION_URL, {}, '飞书TaskV2事件订阅')
-    logger.info(f"[飞书TaskV2事件订阅] 成功, result={data}")
-    return data
 
 
 def _chunk_list(items, size):

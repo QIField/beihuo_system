@@ -15,9 +15,6 @@ CREATE_TASK_URL = f"{LARK_OPEN_API_HOST}/open-apis/task/v2/tasks"
 # 查询任务详情接口
 GET_TASK_URL = f"{LARK_OPEN_API_HOST}/open-apis/task/v2/tasks"
 
-# Task V2 事件订阅接口（应用维度订阅变更事件）
-TASK_SUBSCRIPTION_URL = f"{LARK_OPEN_API_HOST}/open-apis/task/v2/task_v2/task_subscription"
-
 # 批量通过手机号/邮箱获取用户 ID 接口
 BATCH_GET_USER_ID_URL = f"{LARK_OPEN_API_HOST}/open-apis/contact/v3/users/batch_get_id"
 

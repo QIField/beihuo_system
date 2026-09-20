@@ -35,6 +35,20 @@ def _get_config_value(session, key):
     return config.config_value if config else None
 
 
+def get_app_id():
+    """
+    获取当前环境配置的飞书应用 app_id。
+
+    :return: app_id 字符串
+    :raises: 配置缺失时抛出异常
+    """
+    with orm_session() as session:
+        app_id = _get_config_value(session, LARK_APP_ID_KEY)
+    if not app_id:
+        raise ValueError("缺少飞书应用配置: lark_app_id")
+    return app_id
+
+
 def get_tenant_access_token():
     """
     获取 tenant_access_token，使用内存缓存，有效期约 2 小时。

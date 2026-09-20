@@ -15,7 +15,7 @@ from app.utils.orm.session import orm_session
 from app.utils.logger_config import get_task_logger
 from app.sockets.notification_manager import notification_manager
 from .config import RETRY_TIMES, RETRY_DELAYS, LARK_TASK_SYNC_ENABLED_KEY, get_current_env
-from .client import create_lark_task, get_lark_task, subscribe_task_events
+from .client import create_lark_task, get_lark_task
 from .crypto import decrypt_lark_event
 from .models import LarkTaskSyncModels
 
@@ -59,29 +59,23 @@ def _do_sync_once(business_task_id, attempt=1):
         # 在 session 内读取所有需要字段，避免调用飞书期间 session 过期导致 detached
         task_id = task.id
         task_title = task.title
+        task_content = task.content
         task_deadline = task.deadline
 
     # 调飞书创建任务（网络请求，耗时较长，不在 orm_session 内执行）
-    due_time = task_deadline.strftime('%Y-%m-%dT%H:%M:%S+08:00') if task_deadline else None
     logger.info(
         f"[飞书同步] 开始调用创建任务, business_id={business_task_id}, "
-        f"summary={task_title}, owner_open_id={owner_open_id}, due_time={due_time}"
+        f"summary={task_title}, owner_open_id={owner_open_id}, due_time={task_deadline}"
     )
     result = create_lark_task(
         summary=task_title,
-        due_time=due_time,
+        description=task_content,
+        due_time=task_deadline,
         owner_open_id=owner_open_id,
     )
     logger.info(f"[飞书同步] 飞书创建任务响应, business_id={business_task_id}, result={result}")
 
     task_guid = result['task']['guid']
-
-    # 建立 Task V2 事件订阅关系（幂等，失败不影响任务创建）
-    try:
-        subscribe_task_events()
-        logger.info(f"[飞书同步] TaskV2事件订阅成功, business_id={business_task_id}")
-    except Exception as sub_err:
-        logger.warning(f"[飞书同步] TaskV2事件订阅失败（非阻塞）: {sub_err}")
 
     # 重新开启 session 写入映射
     with orm_session() as session:
@@ -187,9 +181,8 @@ def handle_lark_webhook(payload):
         return "success"
 
     V1_TYPES = ('task.task.updated_v1', 'task.task.update_tenant_v1')
-    V2_TYPE = 'task.task.update_user_access_v2'
 
-    if event_type not in V1_TYPES and event_type != V2_TYPE:
+    if event_type not in V1_TYPES:
         logger.info(f"[飞书回调] 非任务更新事件, 忽略, event_type={event_type}")
         return "success"
 
@@ -247,7 +240,7 @@ def handle_lark_webhook(payload):
 
 def _resolve_task_status_change(event):
     """
-    从 V1/V2 任务事件中解析出任务 GUID 和新的完成状态。
+    从 V1 任务事件中解析出任务 GUID 和新的完成状态。
 
     :return: (task_guid, status) 元组；status=1 已完成, status=0 未完成。
              如果与完成状态无关，返回 None。
@@ -263,20 +256,96 @@ def _resolve_task_status_change(event):
             return None
         return event_body.get('task_id'), 1 if obj_type == 5 else 0
 
-    # V2 事件：task.task.update_user_access_v2
-    if event_type == 'task.task.update_user_access_v2':
-        event_types = event_body.get('event_types') or []
-        if 'task_completed_update' not in event_types and 'task_todo_update' not in event_types:
-            return None
-
-        task_guid = event_body.get('task_guid')
-        if not task_guid:
-            return None
-
-        # V2 事件本身不携带完成状态，需要反查任务详情
-        task_data = get_lark_task(task_guid)
-        completed_at = task_data.get('task', {}).get('completed_at')
-        is_completed = bool(completed_at and str(completed_at) not in ('0', ''))
-        return task_guid, 1 if is_completed else 0
-
     return None
+
+
+def _is_lark_task_completed(task_guid):
+    """反查飞书任务详情，返回是否已完成。"""
+    task_data = get_lark_task(task_guid)
+    completed_at = task_data.get('task', {}).get('completed_at')
+    return bool(completed_at and str(completed_at) not in ('0', ''))
+
+
+def sync_task_status_from_lark(business_id=None):
+    """
+    主动从飞书同步任务状态到本地数据库（手动兜底）。
+
+    :param business_id: 指定业务任务ID时只同步该任务；为 None 时同步所有未完成任务。
+    :return: 同步结果字典
+    """
+    if business_id:
+        logger.info(f"[飞书状态同步] 同步单个任务, business_id={business_id}")
+        with orm_session() as session:
+            mapping = LarkTaskSyncModels.get_mapping_by_business_id(session, business_id)
+            if not mapping:
+                return {"code": 404, "msg": "未找到飞书任务映射"}
+
+            try:
+                is_completed = _is_lark_task_completed(mapping.lark_task_guid)
+                new_status = 1 if is_completed else 0
+                if new_status != 0:
+                    LarkTaskSyncModels.update_task_status(session, mapping.business_id, new_status)
+                    logger.info(f"[飞书状态同步] 更新状态, business_id={mapping.business_id}, status={new_status}")
+                    try:
+                        notification_manager.send_data_update(
+                            data_type='business_task',
+                            action='update',
+                            record_id=str(mapping.business_id),
+                            data={
+                                'status': new_status,
+                                'lark_task_guid': mapping.lark_task_guid,
+                            },
+                        )
+                    except Exception as notify_err:
+                        logger.warning(f"[飞书状态同步] WebSocket通知失败: {notify_err}")
+                return {
+                    "code": 0,
+                    "msg": "success",
+                    "data": {
+                        "business_id": mapping.business_id,
+                        "lark_task_guid": mapping.lark_task_guid,
+                        "status": new_status,
+                    },
+                }
+            except Exception as e:
+                logger.exception(f"[飞书状态同步] 同步失败, business_id={business_id}")
+                return {"code": 500, "msg": f"同步失败: {str(e)}"}
+
+    logger.info("[飞书状态同步] 同步所有未完成任务")
+    with orm_session() as session:
+        mappings = LarkTaskSyncModels.get_pending_mappings(session)
+        if not mappings:
+            return {"code": 0, "msg": "success", "data": {"total": 0, "updated": 0}}
+
+        updated_count = 0
+        for mapping in mappings:
+            try:
+                is_completed = _is_lark_task_completed(mapping.lark_task_guid)
+                new_status = 1 if is_completed else 0
+                if new_status != 0:
+                    LarkTaskSyncModels.update_task_status(session, mapping.business_id, new_status)
+                    updated_count += 1
+                    logger.info(f"[飞书状态同步] 更新状态, business_id={mapping.business_id}, status={new_status}")
+                    try:
+                        notification_manager.send_data_update(
+                            data_type='business_task',
+                            action='update',
+                            record_id=str(mapping.business_id),
+                            data={
+                                'status': new_status,
+                                'lark_task_guid': mapping.lark_task_guid,
+                            },
+                        )
+                    except Exception as notify_err:
+                        logger.warning(f"[飞书状态同步] WebSocket通知失败: {notify_err}")
+            except Exception as e:
+                logger.warning(f"[飞书状态同步] 同步失败, business_id={mapping.business_id}: {e}")
+
+        return {
+            "code": 0,
+            "msg": "success",
+            "data": {
+                "total": len(mappings),
+                "updated": updated_count,
+            },
+        }

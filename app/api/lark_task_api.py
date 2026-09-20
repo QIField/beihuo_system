@@ -8,8 +8,7 @@
 from flask import Blueprint, request, jsonify
 
 from app.utils.logger_config import get_task_logger
-from app.services.lark_task_sync.sync_service import handle_lark_webhook
-from app.services.lark_task_sync.client import subscribe_task_events
+from app.services.lark_task_sync.sync_service import handle_lark_webhook, sync_task_status_from_lark
 
 logger = get_task_logger('lark_task_sync')
 
@@ -49,17 +48,18 @@ def webhook():
         return jsonify({"code": 0, "msg": "success"})
 
 
-@lark_task_bp.route("/subscribe", methods=["POST"])
-def manual_subscribe():
+@lark_task_bp.route("/sync-status", methods=["POST"])
+def sync_status():
     """
-    手动触发 Task V2 事件订阅。
+    主动从飞书同步任务状态。
 
-    应用首次启用或重新授权后，可调用此接口建立飞书事件订阅关系。
-    该接口幂等，多次调用无影响。
+    请求体为空时同步所有未完成任务；传入 {"business_id": 1} 时只同步指定任务。
     """
     try:
-        result = subscribe_task_events()
-        return jsonify({"code": 0, "msg": "success", "data": result})
+        data = request.get_json(silent=True) or {}
+        business_id = data.get("business_id")
+        result = sync_task_status_from_lark(business_id=business_id)
+        return jsonify(result)
     except Exception as e:
-        logger.exception("[飞书订阅] 手动订阅失败")
-        return jsonify({"code": 500, "msg": f"订阅失败: {str(e)}"}), 500
+        logger.exception("[飞书状态同步] 接口异常")
+        return jsonify({"code": 500, "msg": f"同步失败: {str(e)}"}), 500

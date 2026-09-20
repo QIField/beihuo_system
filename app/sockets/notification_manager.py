@@ -161,7 +161,7 @@ class NotificationManager:
             config['data'].update(data)
             
         # 发送通知
-        return NotificationManager.send_notification(
+        return notification_manager.send_notification(
             notification_type=config['type'],
             message=config['message'],
             data=config['data']
@@ -196,7 +196,7 @@ class NotificationManager:
         if data:
             progress_data.update(data)
             
-        return NotificationManager.send_notification(
+        return notification_manager.send_notification(
             notification_type='info',
             message=f'任务进度: {progress}%',
             data=progress_data,
@@ -236,7 +236,7 @@ class NotificationManager:
         if record_id:
             message += f' (ID: {record_id})'
             
-        return NotificationManager.send_notification(
+        return notification_manager.send_notification(
             notification_type='info',
             message=message,
             data=update_data

@@ -41,6 +41,18 @@ class LarkTaskSyncModels:
         ).first()
 
     @staticmethod
+    def get_pending_mappings(session, business_type='business_task'):
+        """获取所有未完成的业务任务映射（用于主动同步飞书状态）。"""
+        return session.query(LarkTaskMapping).join(
+            BusinessTask,
+            LarkTaskMapping.business_id == BusinessTask.id,
+        ).filter(
+            LarkTaskMapping.business_type == business_type,
+            LarkTaskMapping.status == 1,
+            BusinessTask.status == 0,
+        ).all()
+
+    @staticmethod
     def create_mapping(session, business_id, business_type, lark_task_guid, lark_summary, owner_open_id):
         mapping = LarkTaskMapping(
             business_id=business_id,
