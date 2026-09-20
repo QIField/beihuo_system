@@ -60,16 +60,19 @@ def _do_sync_once(business_task_id, attempt=1):
         task_id = task.id
         task_title = task.title
         task_content = task.content
+        task_start_time = task.start_time
         task_deadline = task.deadline
 
     # 调飞书创建任务（网络请求，耗时较长，不在 orm_session 内执行）
     logger.info(
         f"[飞书同步] 开始调用创建任务, business_id={business_task_id}, "
-        f"summary={task_title}, owner_open_id={owner_open_id}, due_time={task_deadline}"
+        f"summary={task_title}, owner_open_id={owner_open_id}, "
+        f"start_time={task_start_time}, due_time={task_deadline}"
     )
     result = create_lark_task(
         summary=task_title,
         description=task_content,
+        start_time=task_start_time,
         due_time=task_deadline,
         owner_open_id=owner_open_id,
     )

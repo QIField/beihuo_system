@@ -97,7 +97,14 @@ document.addEventListener('alpine:init', () => {
             try {
                 const res = await apiGet('/business-tasks/statistics');
                 if (res.code === 200) {
-                    this.stats = res.data;
+                    const data = res.data || {};
+                    const total = data.total || 0;
+                    const completed = data.completed || 0;
+                    const boundUsers = data.bound_users || 0;
+                    const totalUsers = data.total_users || 0;
+                    data.completion_rate = total > 0 ? (completed / total * 100).toFixed(1) + '%' : '0%';
+                    data.binding_rate = totalUsers > 0 ? (boundUsers / totalUsers * 100).toFixed(1) + '%' : '0%';
+                    this.stats = data;
                 }
             } catch (e) {
                 console.error('loadStats error', e);

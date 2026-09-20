@@ -77,12 +77,18 @@ def _post_with_retry(url, body, action_name):
     raise last_exc
 
 
-def create_lark_task(summary, description=None, due_time=None, owner_open_id=None):
+def _format_time_field(dt):
+    """将 datetime 转为飞书任务接口需要的毫秒时间戳字符串"""
+    return {"timestamp": str(int(dt.timestamp() * 1000)), "is_all_day": False}
+
+
+def create_lark_task(summary, description=None, start_time=None, due_time=None, owner_open_id=None):
     """
     调用飞书创建任务接口。
 
     :param summary: 任务标题
     :param description: 任务内容/描述，可选
+    :param start_time: 开始时间，datetime 对象，可选
     :param due_time: 截止时间，datetime 对象，可选
     :param owner_open_id: 负责人飞书 open_id，可选
     :return: 飞书响应 data 字段
@@ -91,11 +97,10 @@ def create_lark_task(summary, description=None, due_time=None, owner_open_id=Non
     body = {"summary": summary}
     if description:
         body["description"] = description
+    if start_time:
+        body["start"] = _format_time_field(start_time)
     if due_time:
-        body["due"] = {
-            "timestamp": str(int(due_time.timestamp() * 1000)),
-            "is_all_day": False,
-        }
+        body["due"] = _format_time_field(due_time)
 
     members = []
     if owner_open_id:

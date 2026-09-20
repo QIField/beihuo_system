@@ -7,7 +7,7 @@
 
 from datetime import datetime
 
-from app.models.orm_models import LarkTaskMapping
+from app.models.orm_models import LarkTaskMapping, UserLarkMapping
 from app.models.orm_models.system_models import CrmappUsers
 from app.services.lark_task_sync.sync_service import submit_create_lark_task
 from app.services.lark_task_sync.models import LarkTaskSyncModels
@@ -28,8 +28,9 @@ class TaskServiceError(Exception):
 class TaskService:
 
     @staticmethod
-    def create_task(title, content=None, assignee_id=None, deadline=None, created_by=None):
+    def create_task(title, content=None, assignee_id=None, start_time=None, deadline=None, created_by=None):
         TaskService._validate_create(title, assignee_id)
+        start_time_dt = TaskService._parse_start_time(start_time)
         deadline_dt = TaskService._parse_deadline(deadline)
 
         with orm_session() as session:
@@ -38,6 +39,7 @@ class TaskService:
                 title=title,
                 content=content,
                 assignee_id=assignee_id,
+                start_time=start_time_dt,
                 deadline=deadline_dt,
                 created_by=created_by,
             )
@@ -55,12 +57,14 @@ class TaskService:
         with orm_session() as session:
             for item in tasks:
                 TaskService._validate_create(item.get('title'), item.get('assignee_id'))
+                start_time_dt = TaskService._parse_start_time(item.get('start_time'))
                 deadline_dt = TaskService._parse_deadline(item.get('deadline'))
                 task = TaskRepository.create(
                     session=session,
                     title=item['title'],
                     content=item.get('content'),
                     assignee_id=item['assignee_id'],
+                    start_time=start_time_dt,
                     deadline=deadline_dt,
                     created_by=created_by,
                 )
@@ -129,10 +133,12 @@ class TaskService:
     def get_statistics():
         with orm_session() as session:
             stats = TaskRepository.get_statistics(session)
-            synced_count = session.query(LarkTaskMapping).filter(
-                LarkTaskMapping.status == 1
+            total_users = session.query(CrmappUsers).count()
+            bound_users = session.query(UserLarkMapping).filter(
+                UserLarkMapping.status == 1
             ).count()
-        stats['synced'] = synced_count
+        stats['total_users'] = total_users
+        stats['bound_users'] = bound_users
         return stats
 
     @staticmethod
@@ -141,6 +147,17 @@ class TaskService:
             raise TaskServiceError('任务标题不能为空')
         if not assignee_id:
             raise TaskServiceError('负责人ID不能为空')
+
+    @staticmethod
+    def _parse_start_time(start_time):
+        if not start_time:
+            return datetime.now()
+        for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(str(start_time), fmt)
+            except ValueError:
+                continue
+        raise TaskServiceError('开始时间格式不合法')
 
     @staticmethod
     def _parse_deadline(deadline):
@@ -155,11 +172,13 @@ class TaskService:
 
     @staticmethod
     def _filter_update_fields(fields):
-        allowed = {'title', 'content', 'assignee_id', 'deadline', 'status'}
+        allowed = {'title', 'content', 'assignee_id', 'start_time', 'deadline', 'status'}
         result = {}
         for key in allowed:
             if key in fields:
                 result[key] = fields[key]
+        if 'start_time' in result:
+            result['start_time'] = TaskService._parse_start_time(result['start_time'])
         if 'deadline' in result:
             result['deadline'] = TaskService._parse_deadline(result['deadline'])
         if 'status' in result and result['status'] not in ALLOWED_STATUSES:

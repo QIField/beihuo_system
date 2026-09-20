@@ -5,7 +5,8 @@ document.addEventListener('alpine:init', () => {
         openModal: false,
         loading: false,
         filters: { keyword: '', status: '' },
-        form: { title: '', content: '', selected: [], deadline: '' },
+        form: { title: '', content: '', selected: [], start_time: '', deadline: '' },
+        detailTask: null,
         users: [],
         tasks: [],
         page: 1,
@@ -65,6 +66,7 @@ document.addEventListener('alpine:init', () => {
                         title: t.title,
                         content: t.content || '',
                         assignee: t.assignee_name || '',
+                        start_time: formatDateTime(t.start_time),
                         deadline: formatDateTime(t.deadline),
                         status: formatTaskStatus(t.status),
                         sync: formatSyncStatus(t.lark_sync_status),
@@ -97,6 +99,11 @@ document.addEventListener('alpine:init', () => {
             this.search();
         },
 
+        searchWithReset() {
+            this.page = 1;
+            this.search();
+        },
+
         goPage(p) {
             if (p < 1 || p > this.totalPages) return;
             this.page = p;
@@ -106,6 +113,25 @@ document.addEventListener('alpine:init', () => {
         formatDeadlineForBackend(value) {
             if (!value) return null;
             return value.replace('T', ' ') + ':00';
+        },
+
+        getDefaultStartTime() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            return now.toISOString().slice(0, 16);
+        },
+
+        openCreateModal() {
+            this.form = { title: '', content: '', selected: [], start_time: this.getDefaultStartTime(), deadline: '' };
+            this.openModal = true;
+        },
+
+        openDetail(task) {
+            this.detailTask = task;
+        },
+
+        closeDetail() {
+            this.detailTask = null;
         },
 
         async saveTask() {
@@ -120,6 +146,7 @@ document.addEventListener('alpine:init', () => {
                         title: this.form.title,
                         content: this.form.content,
                         assignee_id: Number(this.form.selected[0]),
+                        start_time: this.formatDeadlineForBackend(this.form.start_time),
                         deadline: this.formatDeadlineForBackend(this.form.deadline),
                     });
                 } else {
@@ -127,13 +154,14 @@ document.addEventListener('alpine:init', () => {
                         title: this.form.title,
                         content: this.form.content,
                         assignee_id: Number(uid),
+                        start_time: this.formatDeadlineForBackend(this.form.start_time),
                         deadline: this.formatDeadlineForBackend(this.form.deadline),
                     }));
                     res = await apiPost('/business-tasks/batch-create', { tasks });
                 }
                 if (res.code === 200) {
                     this.openModal = false;
-                    this.form = { title: '', content: '', selected: [], deadline: '' };
+                    this.form = { title: '', content: '', selected: [], start_time: '', deadline: '' };
                     this.page = 1;
                     await this.search();
                     this.pollSync(3);
