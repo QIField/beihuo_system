@@ -29,7 +29,7 @@ niche_web_bp = Blueprint(
 # 页面路由
 # =============================================================================
 
-@niche_web_bp.route("/")
+@niche_web_bp.route("/niche")
 @require_page_login()
 def niche_index_page():
     """商机看板页面"""

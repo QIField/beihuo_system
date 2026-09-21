@@ -150,12 +150,18 @@ def clean_purchase_order_items(data_dict: Dict, store: str) -> List[Dict]:
     amount_cols = [
         'purchase_quantity', 'price', 'amount_money', 'unit_cost',
         'received_quantity', 'shipping_fee', 'unit_shipping_fee',
-        'packing_fee', 'unit_packing_fee', 'ks_price'
+        'packing_fee', 'unit_packing_fee'
     ]
     available_amount_cols = [col for col in amount_cols if col in df.columns]
 
     for col in available_amount_cols:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)  # pyright: ignore[reportAttributeAccessIssue]
+
+    # delivery_date 统一转成字符串，避免接口返回 float 时间戳时 SQLAlchemy 绑定 String 列失败
+    if 'delivery_date' in df.columns:
+        df['delivery_date'] = df['delivery_date'].apply(
+            lambda x: None if pd.isna(x) or x == '' or x == 0 else str(int(x)) if isinstance(x, (int, float)) else str(x)
+        )
 
     # 将清洗后的 DataFrame 转换为字典列表
     clean_data_list = df.to_dict('records')  # pyright: ignore[reportArgumentType]

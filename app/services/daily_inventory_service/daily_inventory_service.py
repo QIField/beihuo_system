@@ -16,6 +16,7 @@ from app.models.orm_models.system_models.crmapp_users import CrmappUsers
 from app.utils.orm.session import orm_session
 from sqlalchemy import func
 from typing import Dict, Optional, List
+from datetime import datetime, timedelta
 
 
 def mark_order_detail_viewed(purchase_order_line_id: int, user_id: int) -> Optional[Dict]:
@@ -139,7 +140,7 @@ def batch_mark_order_detail_viewed(purchase_order_line_ids: List[int], user_id: 
         return {'status': False, 'msg': error_msg, 'data': None}
 
 
-def get_purchase_order_list_with_details(page: int = 1, page_size: int = 10, date: str = '', keyword: str = '', order_type: str = '', business_type: str = '') -> Optional[Dict]:
+def get_purchase_order_list_with_details(page: int = 1, page_size: int = 10, start_date: str = '', end_date: str = '', keyword: str = '', order_type: str = '', business_type: str = '') -> Optional[Dict]:
     """
     获取采购订单列表及其明细（一对多分页查询，按订单分页）
     
@@ -149,7 +150,8 @@ def get_purchase_order_list_with_details(page: int = 1, page_size: int = 10, dat
     
     :param page: 页码，默认1
     :param page_size: 每页条数（订单数），默认10
-    :param date: 日期筛选，格式 yyyy-MM-dd，可选
+    :param start_date: 开始日期筛选，格式 yyyy-MM-dd，可选
+    :param end_date: 结束日期筛选，格式 yyyy-MM-dd，可选
     :param keyword: 搜索关键词，用于搜索采购单号
     :param order_type: 订单类型筛选（1:采购入库单，2:采购退货单）
     :param business_type: 业务类型筛选（1:外购，2:普通，3:调货）
@@ -165,10 +167,19 @@ def get_purchase_order_list_with_details(page: int = 1, page_size: int = 10, dat
             order_query = session.query(CrmPurchaseOrderList.purchase_order_id)
             
             # 添加日期筛选条件（只针对订单表）
-            if date:
+            if start_date:
                 order_query = order_query.filter(
-                    CrmPurchaseOrderList.create_date.like(f'{date}%')
+                    CrmPurchaseOrderList.create_date >= start_date
                 )
+            if end_date:
+                try:
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                    end_next = end_dt.strftime('%Y-%m-%d')
+                    order_query = order_query.filter(
+                        CrmPurchaseOrderList.create_date < end_next
+                    )
+                except ValueError:
+                    pass
             
             # 添加搜索条件（只针对订单表：采购单号和供应商名称）
             if keyword:
@@ -196,10 +207,19 @@ def get_purchase_order_list_with_details(page: int = 1, page_size: int = 10, dat
             
             # 获取总数
             total_query = session.query(func.count(CrmPurchaseOrderList.purchase_order_id))
-            if date:
+            if start_date:
                 total_query = total_query.filter(
-                    CrmPurchaseOrderList.create_date.like(f'{date}%')
+                    CrmPurchaseOrderList.create_date >= start_date
                 )
+            if end_date:
+                try:
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+                    end_next = end_dt.strftime('%Y-%m-%d')
+                    total_query = total_query.filter(
+                        CrmPurchaseOrderList.create_date < end_next
+                    )
+                except ValueError:
+                    pass
             if keyword:
                 total_query = total_query.filter(
                     (CrmPurchaseOrderList.pono.like(f'%{keyword}%'))

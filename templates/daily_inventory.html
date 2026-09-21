@@ -200,7 +200,7 @@
             <div class="search-row">
                 <div class="search-item">
                     <label>日期：</label>
-                    <input type="text" id="datePicker" placeholder="请选择日期" autocomplete="off">
+                    <input type="text" id="datePicker" placeholder="请选择日期范围" autocomplete="off">
                 </div>
                 <div class="search-item">
                     <label>采购单号：</label>
@@ -240,6 +240,8 @@
         <!-- 主内容区 -->
         <div class="main-content">
             <table id="dailyInventoryTable" lay-filter="dailyInventoryTable"></table>
+            <!-- 独立分页容器，无数据时也显示 -->
+            <div id="dailyInventoryPage" class="layui-table-page" style="text-align: right; padding: 10px 15px; border-top: 1px solid #e8e8e8;"></div>
         </div>
     </div>
     
@@ -269,11 +271,12 @@
             tableChild: '/static/soulTable/tableChild'
         });
 
-        layui.use(['table', 'soulTable', 'tableChild', 'laydate', 'jquery', 'layer'], function() {
+        layui.use(['table', 'soulTable', 'tableChild', 'laydate', 'laypage', 'jquery', 'layer'], function() {
             var table = layui.table;
             var soulTable = layui.soulTable;
             var tableChild = layui.tableChild;
             var laydate = layui.laydate;
+            var laypage = layui.laypage;
             var $ = layui.jquery;
             var layer = layui.layer;
             
@@ -282,12 +285,61 @@
             var todayStr = today.getFullYear() + '-' + 
                           String(today.getMonth() + 1).padStart(2, '0') + '-' + 
                           String(today.getDate()).padStart(2, '0');
+            var todayRangeStr = todayStr + ' - ' + todayStr;
             laydate.render({
                 elem: '#datePicker',
                 type: 'date',
-                value: todayStr,
+                range: true,
+                value: todayRangeStr,
                 format: 'yyyy-MM-dd'
             });
+
+            // 当前分页状态（因为 table 自带分页已关闭，用独立 laypage 控制）
+            var currentPage = 1;
+            var currentLimit = 10;
+            var pageLimits = [10, 20, 50, 100];
+            // 当前查询条件（搜索/筛选参数，不含 page/limit）
+            var currentWhere = {
+              start_date: todayStr,
+              end_date: todayStr,
+              keyword: '',
+              order_type: '',
+              business_type: ''
+            };
+
+            // 重新加载表格（合并分页参数与查询条件）
+            function reloadTable(resetPage) {
+              if (resetPage) {
+                currentPage = 1;
+              }
+              var where = $.extend({}, currentWhere, {
+                page: currentPage,
+                limit: currentLimit
+              });
+              tableIns.reload({
+                where: where
+              });
+            }
+
+            // 独立分页渲染函数
+            function renderPage(totalCount, curr) {
+              laypage.render({
+                elem: 'dailyInventoryPage',
+                count: totalCount,
+                curr: curr || 1,
+                limit: currentLimit,
+                limits: pageLimits,
+                layout: ['count', 'prev', 'page', 'next', 'limit', 'skip'],
+                jump: function(obj, first) {
+                  currentPage = obj.curr;
+                  currentLimit = obj.limit;
+                  if (!first) {
+                    // 非首次触发，重新加载表格数据（保留查询条件）
+                    reloadTable(false);
+                  }
+                }
+              });
+            }
             
             // 渲染表格
             var tableIns = table.render({
@@ -295,15 +347,19 @@
                 id: 'dailyInventoryTable',
                 url: '/new/api/daily_inventory/purchase-orders',
                 method: 'GET',
-                page: true,
+                page: false, // 使用独立的 laypage 组件，确保无数据时也显示分页栏
                 limit: 10,
-                limits: [10, 20, 50, 100],
                 height: 'full-260',
                 toolbar: '#toolbarTemplate',
                 defaultToolbar: ['filter', 'exports'],
                 where: {
-                  date: todayStr,
-                  keyword: ''
+                  page: currentPage,
+                  limit: currentLimit,
+                  start_date: todayStr,
+                  end_date: todayStr,
+                  keyword: '',
+                  order_type: '',
+                  business_type: ''
                 },
                 parseData: function(res) { // 将返回的数据解析成 table 组件所要求的格式
                   // 将200转换为0，因为layui table期望code:0表示成功
@@ -447,7 +503,11 @@
                       }},
                     { title: '操作', width: 130, fixed: 'right', align: 'center', templet: '#orderToolBar' }
                 ]],
-                done: function() {
+                done: function(res, curr, count) {
+          // 从返回数据中获取总条数（page:false 时 done 的 count 参数可能不准确，直接从响应中取）
+          var totalCount = res.data && res.data.total !== undefined ? res.data.total : (count || 0);
+          // 使用独立的 laypage 组件渲染分页，确保无数据时也显示分页栏
+          renderPage(totalCount, currentPage);
           // 表格渲染完成后，调用 tableChild.render() 初始化子表格展开/收起
           tableChild.render(this);
           // 调用 soulTable.render() 实现列拖拽功能，soulTable会自动禁止固定列与非固定列之间交换
@@ -558,47 +618,56 @@
                 }
             });
 
+            // 解析日期范围字符串为起始和结束日期
+            function parseDateRange(rangeStr) {
+                if (!rangeStr) return { start_date: '', end_date: '' };
+                var parts = rangeStr.split(' - ');
+                return {
+                    start_date: parts[0] ? parts[0].trim() : '',
+                    end_date: parts[1] ? parts[1].trim() : ''
+                };
+            }
+
             // 搜索按钮点击事件
             $('#searchBtn').on('click', function() {
-                var date = $('#datePicker').val();
+                var dateRange = parseDateRange($('#datePicker').val());
                 var keyword = $('#searchInput').val();
                 var orderType = $('#orderTypeSelect').val();
                 var businessType = $('#businessTypeSelect').val();
-                tableIns.reload({
-                    where: {
-                        date: date,
-                        keyword: keyword,
-                        order_type: orderType,
-                        business_type: businessType
-                    },
-                    page: {
-                        curr: 1
-                    }
-                });
+                // 更新查询条件
+                currentWhere = {
+                    start_date: dateRange.start_date,
+                    end_date: dateRange.end_date,
+                    keyword: keyword,
+                    order_type: orderType,
+                    business_type: businessType
+                };
+                // 搜索重置到第一页并刷新
+                reloadTable(true);
             });
             
             // 重置按钮点击事件
             $('#resetBtn').on('click', function() {
-              $('#datePicker').val(todayStr);
+              $('#datePicker').val(todayRangeStr);
               $('#searchInput').val('');
               $('#orderTypeSelect').val('');
               $('#businessTypeSelect').val('');
-              tableIns.reload({
-                where: {
-                  date: todayStr,
-                  keyword: '',
-                  order_type: '',
-                  business_type: ''
-                },
-                page: {
-                  curr: 1
-                }
-              });
+              // 重置查询条件
+              currentWhere = {
+                start_date: todayStr,
+                end_date: todayStr,
+                keyword: '',
+                order_type: '',
+                business_type: ''
+              };
+              currentPage = 1;
+              currentLimit = 10;
+              reloadTable(true);
             });
             
             // 更新数据按钮点击事件
             $('#updateBtn').on('click', function() {
-              var date = $('#datePicker').val();
+              var dateRange = parseDateRange($('#datePicker').val());
               var updateBtn = $(this);
               
               // 禁用按钮防止重复点击
@@ -610,7 +679,8 @@
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
-                  date: date
+                  start_date: dateRange.start_date,
+                  end_date: dateRange.end_date
                 }),
                 success: function(res) {
                   if (res.code === 200) {

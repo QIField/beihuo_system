@@ -161,6 +161,7 @@ def crawl_purchase_order_details(purchase_order_ids: List[int], cookies_key: str
     # 最后处理剩余的数据
     if all_filtered_data:
         _batch_insert_purchase_order_details(all_filtered_data)
+        pass
 
     return data_total_count
 
@@ -232,7 +233,7 @@ def daily_inventory_crawler_service(cookies_key: str = 'fs',
     purchase_count = crawl_purchase_orders(
         orderdate_start=orderdate_start*1000,   # pyright: ignore[reportArgumentType]
         orderdate_end=orderdate_end*1000,  # pyright: ignore[reportArgumentType]
-        page_num=10, cookies_key=cookies_key)
+        page_num=None, cookies_key=cookies_key)
     print(f"共爬取到 {purchase_count} 条采购订单数据")
 
     # 爬取采购订单明细
@@ -245,5 +246,5 @@ def daily_inventory_crawler_service(cookies_key: str = 'fs',
     print("=" * 100)
 
 
-if __name__ == "__main__":
-    daily_inventory_crawler_service(cookies_key='fs', create_date_start="2026-06-06", create_date_end="2026-06-06")
+# if __name__ == "__main__":
+#     daily_inventory_crawler_service(cookies_key='fs', create_date_start="2026-08-01", create_date_end="2026-08-31")
