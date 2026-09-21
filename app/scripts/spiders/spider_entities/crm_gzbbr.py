@@ -486,6 +486,31 @@ class CrmGzbbrSpider:
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
 
 
+    # https://crm.gzbbr.com/api/Product.Product/oeSearchLog
+    # page 分页页码
+    # limit 分页每页数量
+    # search_time 搜索时间范围 格式：[开始时间, 结束时间] 如 [1789488000000, 1789574399000]
+    def get_oe_search_log(self, page=1, limit=2000, search_time_start=None, search_time_end=None):
+        """
+        获取OE搜索日志记录
+
+        :param page: 分页页码，默认1
+        :param limit: 分页每页数量，默认1000
+        :param search_time_start: 搜索开始时间戳（毫秒）
+        :param search_time_end: 搜索结束时间戳（毫秒）
+        :return: 请求响应对象
+        """
+        url = f"{self.BASE_URL}/api/Product.Product/oeSearchLog"
+        params = {
+            "page": page,
+            "limit": limit,
+        }
+        if search_time_start and search_time_end:
+            params["search_time[]"] = [search_time_start, search_time_end]  # pyright: ignore[reportArgumentType]
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{params}")
+        return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
+
     def close(self):
         """
         关闭会话连接，释放资源

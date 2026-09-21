@@ -27,5 +27,6 @@ from .business_task import BusinessTask
 from .user_lark_mapping import UserLarkMapping
 from .lark_task_mapping import LarkTaskMapping
 from .lark_event_log import LarkEventLog
+from .niche.niche_opportunity import NicheOpportunity
 
-__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "WeixinDecodingVin", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog", "CrmPpAliasPool", "CrmPpAliasPoolLog", "BrandQplMapping", "VinVehicleFullInfo", "KsInquiryOeMonthlySummary", "KsInquiryCustomerByOeMonthlySummary", "BusinessTask", "UserLarkMapping", "LarkTaskMapping", "LarkEventLog"]
+__all__ = ["WmsOrders", "MergeOrderList", "PartnerList", "BeihuoSystemConfig", "AccountReceivableList","CustomerQuota", "KsSuyuanma", "WechatDailyQuoteDetail", "WeixinDecodingVin", "CrmappSalesHistoryDetail", "CarPartsLibraryBenz", "CarPartsLibraryBenzStock", "CarPartsLibraryBmw", "CarPartsLibraryBmwStock", "CrmPurchaseOrderList", "CrmPurchaseOrderDetails", "WarehouseInventoryLatest", "InventoryRecordLatest", "CrmPpName", "CrmPpNameLog", "CrmPpAliasPool", "CrmPpAliasPoolLog", "BrandQplMapping", "VinVehicleFullInfo", "KsInquiryOeMonthlySummary", "KsInquiryCustomerByOeMonthlySummary", "BusinessTask", "UserLarkMapping", "LarkTaskMapping", "LarkEventLog", "NicheOpportunity"]

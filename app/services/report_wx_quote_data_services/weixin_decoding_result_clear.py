@@ -282,3 +282,5 @@ def fetch_data_and_save_to_database(start_date, end_date):
     backfill_deal_info(start_date, end_date)
     print("\n" + "="*70)
     print("backfill_deal_info处理完成！")
+
+
