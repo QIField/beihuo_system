@@ -62,8 +62,10 @@ def create_task():
             title=payload.get('title'),
             content=payload.get('content'),
             assignee_id=payload.get('assignee_id'),
+            start_time=payload.get('start_time'),
             deadline=payload.get('deadline'),
             created_by=_get_current_user_id(),
+            subtasks=payload.get('subtasks'),
         )
         return _success(data, '创建成功')
     except TaskServiceError as e:

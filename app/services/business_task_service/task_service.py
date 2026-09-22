@@ -7,13 +7,14 @@
 
 from datetime import datetime
 
-from app.models.orm_models import LarkTaskMapping
+from app.models.orm_models import LarkTaskMapping, UserLarkMapping
 from app.models.orm_models.system_models import CrmappUsers
 from app.services.lark_task_sync.sync_service import submit_create_lark_task
 from app.services.lark_task_sync.models import LarkTaskSyncModels
 from app.utils.orm.session import orm_session
 
 from .repository import TaskRepository
+from .subtask_service import SubtaskService
 
 
 STATUS_PENDING = 0
@@ -28,9 +29,12 @@ class TaskServiceError(Exception):
 class TaskService:
 
     @staticmethod
-    def create_task(title, content=None, assignee_id=None, deadline=None, created_by=None):
+    def create_task(title, content=None, assignee_id=None, start_time=None, deadline=None,
+                    created_by=None, subtasks=None):
         TaskService._validate_create(title, assignee_id)
+        start_time_dt = TaskService._parse_start_time(start_time)
         deadline_dt = TaskService._parse_deadline(deadline)
+        subtask_titles = TaskService._normalize_subtasks(subtasks)
 
         with orm_session() as session:
             task = TaskRepository.create(
@@ -38,12 +42,22 @@ class TaskService:
                 title=title,
                 content=content,
                 assignee_id=assignee_id,
+                start_time=start_time_dt,
                 deadline=deadline_dt,
                 created_by=created_by,
             )
             task_id = task.id
 
-        TaskService._submit_lark_sync(task_id)
+        # 带子任务：同步先建飞书父任务再建子任务；不带：保持原异步同步
+        if subtask_titles:
+            SubtaskService.create_many_for_new_task(
+                task_id=task_id,
+                titles=subtask_titles,
+                assignee_id=assignee_id,
+                created_by=created_by,
+            )
+        else:
+            TaskService._submit_lark_sync(task_id)
         return TaskService.get_detail(task_id)
 
     @staticmethod
@@ -51,25 +65,41 @@ class TaskService:
         if not isinstance(tasks, list) or not tasks:
             raise TaskServiceError('tasks 必须是非空数组')
 
-        created_ids = []
+        created_records = []
         with orm_session() as session:
             for item in tasks:
                 TaskService._validate_create(item.get('title'), item.get('assignee_id'))
+                start_time_dt = TaskService._parse_start_time(item.get('start_time'))
                 deadline_dt = TaskService._parse_deadline(item.get('deadline'))
                 task = TaskRepository.create(
                     session=session,
                     title=item['title'],
                     content=item.get('content'),
                     assignee_id=item['assignee_id'],
+                    start_time=start_time_dt,
                     deadline=deadline_dt,
                     created_by=created_by,
                 )
-                created_ids.append(task.id)
+                created_records.append({
+                    'task_id': task.id,
+                    'assignee_id': item['assignee_id'],
+                    'subtask_titles': TaskService._normalize_subtasks(item.get('subtasks')),
+                })
 
-        for task_id in created_ids:
-            TaskService._submit_lark_sync(task_id)
+        # 每个父任务各自复制一份子任务清单：先父后子
+        for record in created_records:
+            task_id = record['task_id']
+            if record['subtask_titles']:
+                SubtaskService.create_many_for_new_task(
+                    task_id=task_id,
+                    titles=record['subtask_titles'],
+                    assignee_id=record['assignee_id'],
+                    created_by=created_by,
+                )
+            else:
+                TaskService._submit_lark_sync(task_id)
 
-        return [TaskService.get_detail(tid) for tid in created_ids]
+        return [TaskService.get_detail(r['task_id']) for r in created_records]
 
     @staticmethod
     def update_task(task_id, fields):
@@ -123,16 +153,20 @@ class TaskService:
             task_list = [data]
             TaskService._attach_sync_status(task_list)
             TaskService._attach_assignee_names(task_list)
-            return task_list[0]
+
+        data['subtasks'] = SubtaskService.list_for_task(task_id)
+        return data
 
     @staticmethod
     def get_statistics():
         with orm_session() as session:
             stats = TaskRepository.get_statistics(session)
-            synced_count = session.query(LarkTaskMapping).filter(
-                LarkTaskMapping.status == 1
+            total_users = session.query(CrmappUsers).count()
+            bound_users = session.query(UserLarkMapping).filter(
+                UserLarkMapping.status == 1
             ).count()
-        stats['synced'] = synced_count
+        stats['total_users'] = total_users
+        stats['bound_users'] = bound_users
         return stats
 
     @staticmethod
@@ -141,6 +175,35 @@ class TaskService:
             raise TaskServiceError('任务标题不能为空')
         if not assignee_id:
             raise TaskServiceError('负责人ID不能为空')
+
+    @staticmethod
+    def _normalize_subtasks(raw):
+        """
+        清洗前端提交的子任务清单。
+
+        兼容两种元素格式：字符串标题，或 {"title": "xxx"}。
+        去空白、去空项、保持前端填写顺序。
+        """
+        if not raw:
+            return []
+        titles = []
+        for item in raw:
+            title = item.get('title') if isinstance(item, dict) else item
+            title = (str(title).strip() if title is not None else '')
+            if title:
+                titles.append(title)
+        return titles
+
+    @staticmethod
+    def _parse_start_time(start_time):
+        if not start_time:
+            return datetime.now()
+        for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(str(start_time), fmt)
+            except ValueError:
+                continue
+        raise TaskServiceError('开始时间格式不合法')
 
     @staticmethod
     def _parse_deadline(deadline):
@@ -155,11 +218,13 @@ class TaskService:
 
     @staticmethod
     def _filter_update_fields(fields):
-        allowed = {'title', 'content', 'assignee_id', 'deadline', 'status'}
+        allowed = {'title', 'content', 'assignee_id', 'start_time', 'deadline', 'status'}
         result = {}
         for key in allowed:
             if key in fields:
                 result[key] = fields[key]
+        if 'start_time' in result:
+            result['start_time'] = TaskService._parse_start_time(result['start_time'])
         if 'deadline' in result:
             result['deadline'] = TaskService._parse_deadline(result['deadline'])
         if 'status' in result and result['status'] not in ALLOWED_STATUSES:

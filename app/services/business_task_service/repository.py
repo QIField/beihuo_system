@@ -14,11 +14,12 @@ from app.utils.orm.session import orm_session
 class TaskRepository:
 
     @staticmethod
-    def create(session, title, content, assignee_id, deadline, created_by):
+    def create(session, title, content, assignee_id, start_time, deadline, created_by):
         task = BusinessTask(
             title=title,
             content=content,
             assignee_id=assignee_id,
+            start_time=start_time,
             deadline=deadline,
             created_by=created_by,
         )
@@ -32,7 +33,7 @@ class TaskRepository:
 
     @staticmethod
     def update(session, task, fields):
-        allowed = {'title', 'content', 'assignee_id', 'deadline', 'status'}
+        allowed = {'title', 'content', 'assignee_id', 'start_time', 'deadline', 'status'}
         for key, value in fields.items():
             if key in allowed and value is not None:
                 setattr(task, key, value)

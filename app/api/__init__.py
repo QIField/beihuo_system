@@ -84,6 +84,10 @@ api_bp.register_blueprint(lark_task_bp)
 from .business_task_api import business_task_bp
 api_bp.register_blueprint(business_task_bp)
 
+# 注册业务子任务管理 API
+from .business_subtask_api import business_subtask_bp
+api_bp.register_blueprint(business_subtask_bp)
+
 # 注册用户飞书绑定管理 API
 from .user_lark_mapping_api import user_lark_mapping_bp
 api_bp.register_blueprint(user_lark_mapping_bp)
