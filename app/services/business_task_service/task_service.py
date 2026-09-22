@@ -14,6 +14,7 @@ from app.services.lark_task_sync.models import LarkTaskSyncModels
 from app.utils.orm.session import orm_session
 
 from .repository import TaskRepository
+from .subtask_service import SubtaskService
 
 
 STATUS_PENDING = 0
@@ -28,10 +29,12 @@ class TaskServiceError(Exception):
 class TaskService:
 
     @staticmethod
-    def create_task(title, content=None, assignee_id=None, start_time=None, deadline=None, created_by=None):
+    def create_task(title, content=None, assignee_id=None, start_time=None, deadline=None,
+                    created_by=None, subtasks=None):
         TaskService._validate_create(title, assignee_id)
         start_time_dt = TaskService._parse_start_time(start_time)
         deadline_dt = TaskService._parse_deadline(deadline)
+        subtask_titles = TaskService._normalize_subtasks(subtasks)
 
         with orm_session() as session:
             task = TaskRepository.create(
@@ -45,7 +48,16 @@ class TaskService:
             )
             task_id = task.id
 
-        TaskService._submit_lark_sync(task_id)
+        # 带子任务：同步先建飞书父任务再建子任务；不带：保持原异步同步
+        if subtask_titles:
+            SubtaskService.create_many_for_new_task(
+                task_id=task_id,
+                titles=subtask_titles,
+                assignee_id=assignee_id,
+                created_by=created_by,
+            )
+        else:
+            TaskService._submit_lark_sync(task_id)
         return TaskService.get_detail(task_id)
 
     @staticmethod
@@ -53,7 +65,7 @@ class TaskService:
         if not isinstance(tasks, list) or not tasks:
             raise TaskServiceError('tasks 必须是非空数组')
 
-        created_ids = []
+        created_records = []
         with orm_session() as session:
             for item in tasks:
                 TaskService._validate_create(item.get('title'), item.get('assignee_id'))
@@ -68,12 +80,26 @@ class TaskService:
                     deadline=deadline_dt,
                     created_by=created_by,
                 )
-                created_ids.append(task.id)
+                created_records.append({
+                    'task_id': task.id,
+                    'assignee_id': item['assignee_id'],
+                    'subtask_titles': TaskService._normalize_subtasks(item.get('subtasks')),
+                })
 
-        for task_id in created_ids:
-            TaskService._submit_lark_sync(task_id)
+        # 每个父任务各自复制一份子任务清单：先父后子
+        for record in created_records:
+            task_id = record['task_id']
+            if record['subtask_titles']:
+                SubtaskService.create_many_for_new_task(
+                    task_id=task_id,
+                    titles=record['subtask_titles'],
+                    assignee_id=record['assignee_id'],
+                    created_by=created_by,
+                )
+            else:
+                TaskService._submit_lark_sync(task_id)
 
-        return [TaskService.get_detail(tid) for tid in created_ids]
+        return [TaskService.get_detail(r['task_id']) for r in created_records]
 
     @staticmethod
     def update_task(task_id, fields):
@@ -127,7 +153,9 @@ class TaskService:
             task_list = [data]
             TaskService._attach_sync_status(task_list)
             TaskService._attach_assignee_names(task_list)
-            return task_list[0]
+
+        data['subtasks'] = SubtaskService.list_for_task(task_id)
+        return data
 
     @staticmethod
     def get_statistics():
@@ -147,6 +175,24 @@ class TaskService:
             raise TaskServiceError('任务标题不能为空')
         if not assignee_id:
             raise TaskServiceError('负责人ID不能为空')
+
+    @staticmethod
+    def _normalize_subtasks(raw):
+        """
+        清洗前端提交的子任务清单。
+
+        兼容两种元素格式：字符串标题，或 {"title": "xxx"}。
+        去空白、去空项、保持前端填写顺序。
+        """
+        if not raw:
+            return []
+        titles = []
+        for item in raw:
+            title = item.get('title') if isinstance(item, dict) else item
+            title = (str(title).strip() if title is not None else '')
+            if title:
+                titles.append(title)
+        return titles
 
     @staticmethod
     def _parse_start_time(start_time):

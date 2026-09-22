@@ -34,27 +34,37 @@ def _is_sync_enabled():
         return bool(config and config.config_value == '1')
 
 
-def _do_sync_once(business_task_id, attempt=1):
-    """单次同步执行，成功后返回 True"""
+def ensure_parent_task_guid(business_task_id):
+    """
+    确保业务任务在飞书侧已存在父任务，返回父任务 GUID。
+
+    - 已有映射：直接返回 GUID；
+    - 无映射：同步调用飞书创建父任务并写入映射（供"创建时带子任务"场景使用）；
+    - 同步开关关闭 / 负责人未绑定飞书：返回 None（子任务仅保留本地）；
+    - 业务任务不存在：抛出 ValueError。
+
+    :param business_task_id: 业务任务ID
+    :return: 飞书父任务 GUID，或 None
+    """
+    if not _is_sync_enabled():
+        logger.info(f"[飞书同步] 开关关闭, business_id={business_task_id}")
+        return None
+
     with orm_session() as session:
         task = LarkTaskSyncModels.get_task_by_id(session, business_task_id)
         if not task:
-            logger.warning(f"[飞书同步] 业务任务不存在, id={business_task_id}")
-            return True
+            raise ValueError(f'业务任务不存在: {business_task_id}')
 
-        # 已同步则跳过
         existing = LarkTaskSyncModels.get_mapping_by_business_id(session, business_task_id)
         if existing:
             logger.info(f"[飞书同步] 已存在映射, business_id={business_task_id}")
-            return True
+            return existing.lark_task_guid
 
-        # 查用户映射
         user_mapping = LarkTaskSyncModels.get_user_lark_mapping(session, task.assignee_id)
         owner_open_id = user_mapping.lark_open_id if user_mapping else None
         if not owner_open_id:
             logger.warning(f"[飞书同步] 负责人未绑定飞书, user_id={task.assignee_id}")
-            # 无映射不算失败，停止重试
-            return True
+            return None
 
         # 在 session 内读取所有需要字段，避免调用飞书期间 session 过期导致 detached
         task_id = task.id
@@ -91,6 +101,15 @@ def _do_sync_once(business_task_id, attempt=1):
             owner_open_id=owner_open_id,
         )
     logger.info(f"[飞书同步] 成功, business_id={business_task_id}, guid={task_guid}")
+    return task_guid
+
+
+def _do_sync_once(business_task_id, attempt=1):
+    """单次同步执行，成功后返回 True"""
+    try:
+        ensure_parent_task_guid(business_task_id)
+    except ValueError:
+        logger.warning(f"[飞书同步] 业务任务不存在, id={business_task_id}")
     return True
 
 
@@ -208,35 +227,68 @@ def handle_lark_webhook(payload):
             logger.warning("[飞书回调] 缺少任务 GUID")
             return "success"
 
-        # 查映射
+        # 先查父任务映射
         mapping = LarkTaskSyncModels.get_mapping_by_lark_guid(session, lark_task_guid)
-        if not mapping:
-            logger.warning(f"[飞书回调] 未找到映射, guid={lark_task_guid}")
+        if mapping:
+            logger.info(f"[飞书回调] 找到父任务映射, business_id={mapping.business_id}, guid={lark_task_guid}")
+
+            # 更新业务任务状态
+            LarkTaskSyncModels.update_task_status(session, mapping.business_id, new_status)
+
+            # 记录幂等
+            LarkTaskSyncModels.mark_event_handled(session, event_id, event_type, event_time)
+            logger.info(f"[飞书回调] 父任务状态更新成功, business_id={mapping.business_id}, status={new_status}")
+
+            # 推送 WebSocket 通知，让网页端实时刷新
+            try:
+                notification_manager.send_data_update(
+                    data_type='business_task',
+                    action='update',
+                    record_id=str(mapping.business_id),
+                    data={
+                        'status': new_status,
+                        'lark_task_guid': lark_task_guid,
+                    },
+                )
+                logger.info(f"[飞书回调] WebSocket通知已发送, business_id={mapping.business_id}")
+            except Exception as notify_err:
+                logger.warning(f"[飞书回调] WebSocket通知发送失败: {notify_err}")
+
             return "success"
 
-        logger.info(f"[飞书回调] 找到映射, business_id={mapping.business_id}, guid={lark_task_guid}")
+        # 父任务映射未命中，再按子任务 GUID 查找
+        from app.services.business_task_service.subtask_repository import SubtaskRepository
+        SubtaskRepository.ensure_table()
+        subtask = SubtaskRepository.get_by_lark_guid(session, lark_task_guid)
+        if not subtask:
+            logger.warning(f"[飞书回调] 未找到父任务/子任务映射, guid={lark_task_guid}")
+            return "success"
 
-        # 更新业务任务状态
-        LarkTaskSyncModels.update_task_status(session, mapping.business_id, new_status)
+        logger.info(
+            f"[飞书回调] 找到子任务映射, subtask_id={subtask.id}, "
+            f"task_id={subtask.task_id}, guid={lark_task_guid}"
+        )
+        completed_at = datetime.now() if new_status == 1 else None
+        SubtaskRepository.set_status(session, subtask, new_status, completed_at)
 
-        # 记录幂等
         LarkTaskSyncModels.mark_event_handled(session, event_id, event_type, event_time)
-        logger.info(f"[飞书回调] 状态更新成功, business_id={mapping.business_id}, status={new_status}")
+        logger.info(f"[飞书回调] 子任务状态更新成功, subtask_id={subtask.id}, status={new_status}")
 
-        # 推送 WebSocket 通知，让网页端实时刷新
         try:
             notification_manager.send_data_update(
-                data_type='business_task',
+                data_type='business_subtask',
                 action='update',
-                record_id=str(mapping.business_id),
+                record_id=str(subtask.task_id),
                 data={
+                    'task_id': subtask.task_id,
+                    'subtask_id': subtask.id,
                     'status': new_status,
-                    'lark_task_guid': lark_task_guid,
+                    'lark_subtask_guid': lark_task_guid,
                 },
             )
-            logger.info(f"[飞书回调] WebSocket通知已发送, business_id={mapping.business_id}")
+            logger.info(f"[飞书回调] 子任务WebSocket通知已发送, task_id={subtask.task_id}")
         except Exception as notify_err:
-            logger.warning(f"[飞书回调] WebSocket通知发送失败: {notify_err}")
+            logger.warning(f"[飞书回调] 子任务WebSocket通知发送失败: {notify_err}")
 
     return "success"
 
@@ -301,6 +353,15 @@ def sync_task_status_from_lark(business_id=None):
                         )
                     except Exception as notify_err:
                         logger.warning(f"[飞书状态同步] WebSocket通知失败: {notify_err}")
+
+                # 顺带对账该父任务下的子任务清单（失败不影响父任务状态同步结果）
+                subtask_result = None
+                try:
+                    from .subtask_sync_service import reconcile_subtasks
+                    subtask_result = reconcile_subtasks(business_id)
+                except Exception as sub_err:
+                    logger.warning(f"[飞书状态同步] 子任务对账失败, business_id={business_id}: {sub_err}")
+
                 return {
                     "code": 0,
                     "msg": "success",
@@ -308,6 +369,7 @@ def sync_task_status_from_lark(business_id=None):
                         "business_id": mapping.business_id,
                         "lark_task_guid": mapping.lark_task_guid,
                         "status": new_status,
+                        "subtasks": subtask_result,
                     },
                 }
             except Exception as e:
