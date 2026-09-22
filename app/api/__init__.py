@@ -72,6 +72,10 @@ api_bp.register_blueprint(reconciliation_bp)
 from .wms_inventory_operation_api import wms_inventory_operation_bp
 api_bp.register_blueprint(wms_inventory_operation_bp)
 
+# 注册商机（niche）API
+from .niche_api import niche_bp
+api_bp.register_blueprint(niche_bp)
+
 # 注册飞书任务同步回调 API
 from .lark_task_api import lark_task_bp
 api_bp.register_blueprint(lark_task_bp)

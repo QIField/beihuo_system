@@ -95,6 +95,7 @@ TASK_LOGGERS = [
     'b2b_intransit_sync',           # B2B 在途库存同步
     'order_share',                  # 订单分享公开页面（扫码查询）
     'lark_task_sync',               # 飞书任务双向同步
+    'niche',                        # 商机模块
 ]
 
 

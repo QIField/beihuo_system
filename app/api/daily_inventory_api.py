@@ -31,7 +31,8 @@ def api_get_purchase_orders():
     请求参数:
         - page: 页码（可选，默认1）
         - page_size: 每页条数（可选，默认10）
-        - date: 日期（可选，格式：yyyy-MM-dd）
+        - start_date: 开始日期（可选，格式：yyyy-MM-dd）
+        - end_date: 结束日期（可选，格式：yyyy-MM-dd）
         - keyword: 搜索关键词（可选，用于搜索采购单号）
         - order_type: 订单类型（可选，1:采购入库单，2:采购退货单）
         - business_type: 业务类型（可选，1:外购，2:普通，3:调货）
@@ -52,7 +53,8 @@ def api_get_purchase_orders():
         # 获取请求参数
         page = request.args.get('page', '1').strip()
         page_size = request.args.get('limit', '10').strip()
-        date = request.args.get('date', '').strip()
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
         keyword = request.args.get('keyword', '').strip()
         order_type = request.args.get('order_type', '').strip()
         business_type = request.args.get('business_type', '').strip()
@@ -77,7 +79,8 @@ def api_get_purchase_orders():
         result = get_purchase_order_list_with_details(
             page=page,
             page_size=page_size,
-            date=date,
+            start_date=start_date,
+            end_date=end_date,
             keyword=keyword,
             order_type=order_type,
             business_type=business_type
@@ -117,7 +120,8 @@ def api_update_daily_inventory():
     触发每日库存数据更新（同步执行）
     
     请求参数:
-        - date: 日期（可选，格式：yyyy-MM-dd）
+        - start_date: 开始日期（可选，格式：yyyy-MM-dd）
+        - end_date: 结束日期（可选，格式：yyyy-MM-dd）
         - cookies_key: cookies的key（可选，默认'fs'）
     
     返回:
@@ -129,15 +133,17 @@ def api_update_daily_inventory():
     """
     try:
         # 获取请求参数
-        date = request.json.get('date', '').strip() if request.json else request.form.get('date', '').strip()
-        cookies_key = request.json.get('cookies_key', 'fs') if request.json else request.form.get('cookies_key', 'fs')
+        data = request.json if request.json else request.form
+        start_date = data.get('start_date', '').strip() if data.get('start_date') else ''
+        end_date = data.get('end_date', '').strip() if data.get('end_date') else ''
+        cookies_key = data.get('cookies_key', 'fs')
         
         # 同步执行数据更新任务
-        if date:
+        if start_date or end_date:
             daily_inventory_crawler_service(
                 cookies_key=cookies_key,
-                create_date_start=date,
-                create_date_end=date
+                create_date_start=start_date or end_date,
+                create_date_end=end_date or start_date
             )
         else:
             daily_inventory_crawler_service(cookies_key=cookies_key)

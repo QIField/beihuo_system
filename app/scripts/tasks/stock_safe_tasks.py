@@ -134,7 +134,7 @@ def _stock_safe_crawl_replenish_pipeline() -> None:
         r2 = _generate_replenish_download_link()
         if r2.get('status') == 'completed':
             download_url = r2.get('download_url')
-            step_results.append(f"Step3 补货清单链接：成功({download_url})")
+            step_results.append(f"Step3 补货清单链接：成功  {download_url} ")
             logger.info("[Step 3/3] 完成: %s", download_url)
         else:
             error = r2.get('error')
@@ -167,7 +167,7 @@ def _push_replenish_pipeline_result(step_results: list, total_start: float) -> N
         time_data = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cost = round(time.time() - total_start, 2)
         message = (
-            f"===【库存智能补货任务】测试===\n"
+            f"===【库存智能补货任务】===\n"
             f"提醒时间：{time_data}\n"
             f"总耗时：{cost}s\n"
             + "\n".join(step_results)

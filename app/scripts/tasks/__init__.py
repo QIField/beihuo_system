@@ -72,3 +72,11 @@ def expansion_tasks(task_manager):
     # 注册每日销售爬取 + 补货清单下载链接生成（每天凌晨3:00，爬虫最先执行）
     from app.scripts.tasks.stock_safe_tasks import stock_safe_crawl_replenish_register
     stock_safe_crawl_replenish_register(task_manager)
+
+    # 注册商机体系每日全流程定时任务（每天凌晨2:00执行）
+    from app.scripts.tasks.niche_task import niche_daily_register
+    niche_daily_register(task_manager)
+
+    # 注册微信日报报价明细每日刷新定时任务（每天凌晨1:00执行）
+    from app.scripts.tasks.wx_task import wx_daily_quote_detail_register
+    wx_daily_quote_detail_register(task_manager)

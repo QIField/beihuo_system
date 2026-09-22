@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商机看板</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='ag-grid/ag-grid.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='ag-grid/ag-theme-alpine.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1800px; margin: 0 auto; }
+
+        /* ===== 头部 ===== */
+        .header {
+            background: #fff;
+            padding: 24px 28px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border: 1px solid #f5f5f5;
+        }
+        .header-title { font-size: 26px; font-weight: 600; color: #262626; letter-spacing: 0.5px; }
+        .header-subtitle { font-size: 14px; color: #8c8c8c; margin-top: 6px; }
+        .header-actions { display: flex; gap: 12px; }
+
+        /* ===== 统计卡片 ===== */
+        .stat-cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 16px; }
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 12px 14px;
+            transition: all 0.25s ease;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+            border: 1px solid #f5f5f5;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 4px;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+        }
+        .stat-card.s::before { background: #cf1322; }
+        .stat-card.a::before { background: #fa541c; }
+        .stat-card.b::before { background: #faad14; }
+        .stat-card.c::before { background: #1890ff; }
+        .stat-card.d::before { background: #8c8c8c; }
+        .stat-card.replenish::before { background: #52c41a; }
+
+        .stat-card-value { font-size: 22px; font-weight: 700; line-height: 1.1; margin-bottom: 2px; color: #262626; font-family: 'Roboto Mono', 'Consolas', monospace; }
+        .stat-card-label { font-size: 13px; color: #8c8c8c; font-weight: 500; }
+
+        /* ===== 工具栏 ===== */
+        .toolbar {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            border: 1px solid #f5f5f5;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+        }
+        .toolbar-left {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            flex: 1 1 auto;
+        }
+        .filter-item { display: flex; align-items: center; gap: 6px; }
+        .filter-item label { font-size: 14px; color: #595959; white-space: nowrap; }
+        .filter-item input,
+        .filter-item select {
+            width: 150px;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: #fff;
+        }
+        .filter-item input:focus,
+        .filter-item select:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24,144,255,0.2);
+        }
+
+        .toolbar-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .toolbar-right .total-badge {
+            background: #e6f7ff;
+            color: #1890ff;
+            padding: 6px 14px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 13px;
+            margin-right: 4px;
+        }
+
+        .btn {
+            padding: 9px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+        }
+        .btn-primary { background: #1890ff; color: #fff; }
+        .btn-primary:hover { background: #40a9ff; box-shadow: 0 4px 10px rgba(24,144,255,0.3); }
+        .btn-success { background: #52c41a; color: #fff; }
+        .btn-success:hover { background: #73d13d; box-shadow: 0 4px 10px rgba(82,196,26,0.3); }
+        .btn-default { background: #fff; color: #595959; border: 1px solid #d9d9d9; }
+        .btn-default:hover { color: #1890ff; border-color: #1890ff; }
+        .btn-warning { background: #faad14; color: #fff; }
+        .btn-warning:hover { background: #ffc53d; box-shadow: 0 4px 10px rgba(250,173,20,0.3); }
+
+        /* ===== AG Grid ===== */
+        .grid-wrapper {
+            background: #fff;
+            border-radius: 10px;
+            padding: 0;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            border: 1px solid #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .grid-container { height: 620px; width: 100%; padding: 14px 14px 0 14px; }
+        #nicheGrid { height: 100%; width: 100%; }
+        .ag-theme-alpine {
+            --ag-background-color: #fff;
+            --ag-header-background-color: #fafafa;
+            --ag-odd-row-background-color: #fcfcfc;
+            --ag-header-foreground-color: #262626;
+            --ag-foreground-color: #434343;
+            --ag-border-color: #f0f0f0;
+            --ag-row-hover-color: #e6f7ff;
+            --ag-selected-row-background-color: #e6f7ff;
+            --ag-header-height: 44px;
+            --ag-row-height: 42px;
+            --ag-header-column-separator-display: block;
+            --ag-header-column-separator-height: 40%;
+            --ag-header-column-separator-color: #e8e8e8;
+        }
+        .ag-theme-alpine .ag-header-cell { font-weight: 600; font-size: 13px; }
+        .ag-theme-alpine .ag-cell { font-size: 13px; padding-right: 14px; }
+        .ag-theme-alpine .ag-cell-focus, .ag-theme-alpine .ag-cell:focus { outline: none; }
+
+        /* ===== 单元格样式 ===== */
+        .level-tag { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 24px; border-radius: 4px; font-size: 12px; font-weight: 700; color: #fff; }
+        .level-s { background: #cf1322; }
+        .level-a { background: #fa541c; }
+        .level-b { background: #faad14; }
+        .level-c { background: #1890ff; }
+        .level-d { background: #8c8c8c; }
+
+        .cell-number { font-family: 'Roboto Mono', 'Consolas', monospace; font-weight: 500; text-align: right; }
+
+        /* ===== 分页 ===== */
+        .pagination-container {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 10px;
+            font-size: 13px;
+            color: #595959;
+        }
+        .pagination-container button {
+            padding: 6px 12px;
+            border: 1px solid #d9d9d9;
+            background: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-container button:disabled { color: #bfbfbf; cursor: not-allowed; }
+        .pagination-container button:hover:not(:disabled) { color: #1890ff; border-color: #1890ff; }
+        .page-info { font-weight: 600; color: #262626; }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 1200px) {
+            .stat-cards { grid-template-columns: repeat(3, 1fr); }
+            .toolbar { flex-direction: column; gap: 14px; align-items: stretch; }
+            .toolbar-right { margin-left: 0; justify-content: space-between; }
+            .header { flex-direction: column; gap: 14px; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <div>
+                <div class="header-title">商机看板</div>
+                <div class="header-subtitle">基于微信询价热度、OE 搜索热度与缺货信号的需求侧商机识别 · 数据每日自动刷新</div>
+            </div>
+            <div class="header-actions">
+                <!-- 导出/手动刷新按钮已移除：商机数据由每日凌晨 2:00 定时任务自动刷新 -->
+            </div>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stat-cards">
+            <div class="stat-card s">
+                <div class="stat-card-label">S 级商机</div>
+                <div class="stat-card-value" id="count_S">0</div>
+            </div>
+            <div class="stat-card a">
+                <div class="stat-card-label">A 级商机</div>
+                <div class="stat-card-value" id="count_A">0</div>
+            </div>
+            <div class="stat-card b">
+                <div class="stat-card-label">B 级商机</div>
+                <div class="stat-card-value" id="count_B">0</div>
+            </div>
+            <div class="stat-card c">
+                <div class="stat-card-label">C 级商机</div>
+                <div class="stat-card-value" id="count_C">0</div>
+            </div>
+            <div class="stat-card d">
+                <div class="stat-card-label">D 级商机</div>
+                <div class="stat-card-value" id="count_D">0</div>
+            </div>
+            <div class="stat-card replenish">
+                <div class="stat-card-label">补货建议</div>
+                <div class="stat-card-value" id="count_replenish">0</div>
+            </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <div class="filter-item">
+                    <label>关键词：</label>
+                    <input type="text" id="filterKeyword" placeholder="OE号/品牌/配件名称">
+                </div>
+                <div class="filter-item">
+                    <label>商机等级：</label>
+                    <select id="filterLevel">
+                        <option value="">全部</option>
+                        <option value="S">S 级</option>
+                        <option value="A">A 级</option>
+                        <option value="B">B 级</option>
+                        <option value="C">C 级</option>
+                        <option value="D">D 级</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>最低评分：</label>
+                    <input type="number" id="filterMinScore" placeholder="0~100" min="0" max="100">
+                </div>
+                <div class="filter-item">
+                    <label>最低缺货率：</label>
+                    <input type="number" id="filterMinOosRate" placeholder="0~1" min="0" max="1" step="0.1">
+                </div>
+                <div class="filter-item">
+                    <label>补货建议：</label>
+                    <select id="filterHasReplenish">
+                        <option value="0">全部</option>
+                        <option value="1">有补货建议</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" id="btnSearch">
+                    <i class="layui-icon">&#xe615;</i> 查询
+                </button>
+                <button class="btn btn-default" id="btnReset">
+                    <i class="layui-icon">&#x1006;</i> 重置
+                </button>
+            </div>
+            <div class="toolbar-right">
+                <span class="total-badge" id="totalBadge">共 0 条记录</span>
+                <button class="btn btn-default" id="btnRefresh">
+                    <i class="layui-icon">&#xe669;</i> 刷新
+                </button>
+            </div>
+        </div>
+
+        <!-- AG Grid 表格 -->
+        <div class="grid-wrapper">
+            <div class="grid-container">
+                <div id="nicheGrid" class="ag-theme-alpine"></div>
+            </div>
+            <div class="pagination-container" id="pagination">
+                <button id="btnPrev" disabled>上一页</button>
+                <span class="page-info">第 <span id="currentPage">1</span> 页 / 共 <span id="totalPage">1</span> 页</span>
+                <button id="btnNext" disabled>下一页</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script src="{{ url_for('static', filename='ag-grid/ag-grid-community.min.js') }}"></script>
+    <script>
+        const API_BASE = '/new/api/niche';
+
+        let gridApi = null;
+        let currentPage = 1;
+        let totalPage = 1;
+        let currentLimit = 50;
+
+        // ===== 列定义 =====
+        const columnDefs = [
+            { field: 'oe_code', headerName: 'OE号', width: 180, sortable: true },
+            { field: 'part_name', headerName: '配件名称', width: 180, sortable: true },
+            {
+                field: 'opportunity_level',
+                headerName: '商机等级',
+                width: 100,
+                sortable: true,
+                cellRenderer: params => {
+                    const level = params.value || 'D';
+                    return `<span class="level-tag level-${level.toLowerCase()}">${level}</span>`;
+                }
+            },
+            { field: 'opportunity_score', headerName: '商机评分', width: 110, sortable: true, cellClass: 'cell-number' },
+            { field: 'inquiry_count_30d', headerName: '30天询价', width: 110, sortable: true, cellClass: 'cell-number' },
+            { field: 'out_of_stock_rate_30d', headerName: '缺货率', width: 100, sortable: true, cellClass: 'cell-number', valueFormatter: p => p.value ? (p.value * 100).toFixed(1) + '%' : '0.0%' },
+            { field: 'customer_count_30d', headerName: '询价客户数', width: 120, sortable: true, cellClass: 'cell-number' },
+            { field: 'inquiry_trend_rate', headerName: '趋势', width: 100, sortable: true, cellClass: 'cell-number', valueFormatter: p => p.value ? (p.value * 100).toFixed(1) + '%' : '0.0%' },
+            { field: 'search_count_30d', headerName: '30天搜索', width: 110, sortable: true, cellClass: 'cell-number' },
+            { field: 'search_score', headerName: '搜索热度分', width: 110, sortable: true, cellClass: 'cell-number' },
+            { field: 'available_stock', headerName: '可用库存', width: 110, sortable: true, cellClass: 'cell-number' },
+            { field: 'transit_quantity', headerName: '在途数量', width: 110, sortable: true, cellClass: 'cell-number' },
+            // { field: 'suggested_stock_qty', headerName: '建议备货量', width: 120, sortable: true, cellClass: 'cell-number' },
+            // { field: 'replenish_suggestion', headerName: '建议补货', width: 110, sortable: true, cellClass: 'cell-number' },
+        ];
+
+        // ===== 初始化表格 =====
+        const gridOptions = {
+            columnDefs: columnDefs,
+            rowData: [],
+            defaultColDef: {
+                resizable: true,
+                filter: false,
+            },
+            pagination: false,
+            rowHeight: 42,
+            headerHeight: 44,
+            domLayout: 'normal',
+            suppressMovableColumns: false,
+            onSortChanged: onSortChanged,
+        };
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const gridDiv = document.getElementById('nicheGrid');
+            new agGrid.Grid(gridDiv, gridOptions);
+            gridApi = gridOptions.api;
+
+            loadSummary();
+            loadData();
+
+            // 绑定事件
+            document.getElementById('btnSearch').addEventListener('click', () => {
+                currentPage = 1;
+                loadData();
+            });
+            document.getElementById('btnReset').addEventListener('click', () => {
+                document.getElementById('filterKeyword').value = '';
+                document.getElementById('filterLevel').value = '';
+                document.getElementById('filterMinScore').value = '';
+                document.getElementById('filterMinOosRate').value = '';
+                document.getElementById('filterHasReplenish').value = '0';
+                currentPage = 1;
+                loadData();
+            });
+            document.getElementById('btnRefresh').addEventListener('click', () => {
+                loadData();
+            });
+            document.getElementById('btnPrev').addEventListener('click', () => {
+                if (currentPage > 1) { currentPage--; loadData(); }
+            });
+            document.getElementById('btnNext').addEventListener('click', () => {
+                if (currentPage < totalPage) { currentPage++; loadData(); }
+            });
+        });
+
+        // ===== 加载统计 =====
+        function loadSummary() {
+            fetch(`${API_BASE}/summary`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.data) {
+                        const d = data.data;
+                        document.getElementById('count_S').textContent = d.S || 0;
+                        document.getElementById('count_A').textContent = d.A || 0;
+                        document.getElementById('count_B').textContent = d.B || 0;
+                        document.getElementById('count_C').textContent = d.C || 0;
+                        document.getElementById('count_D').textContent = d.D || 0;
+                        document.getElementById('count_replenish').textContent = d.replenish || 0;
+                    }
+                })
+                .catch(err => console.error('加载统计失败', err));
+        }
+
+        // ===== 加载列表 =====
+        let lastSortField = '';
+        let lastSortOrder = 'desc';
+
+        function loadData() {
+            const params = new URLSearchParams();
+            params.append('page', currentPage);
+            params.append('limit', currentLimit);
+
+            const keyword = document.getElementById('filterKeyword').value.trim();
+            const level = document.getElementById('filterLevel').value;
+            const minScore = document.getElementById('filterMinScore').value;
+            const minOosRate = document.getElementById('filterMinOosRate').value;
+            const hasReplenish = document.getElementById('filterHasReplenish').value;
+
+            if (keyword) params.append('keyword', keyword);
+            if (level) params.append('opportunity_level', level);
+            if (minScore) params.append('min_score', minScore);
+            if (minOosRate) params.append('min_oos_rate', minOosRate);
+            if (hasReplenish) params.append('has_replenish', hasReplenish);
+            if (lastSortField) {
+                params.append('sort_field', lastSortField);
+                params.append('sort_order', lastSortOrder);
+            }
+
+            fetch(`${API_BASE}/list?${params.toString()}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.data) {
+                        const d = data.data;
+                        gridApi.setRowData(d.list || []);
+                        totalPage = Math.max(1, Math.ceil(d.total / d.limit));
+                        currentPage = d.page;
+                        updatePagination();
+                        document.getElementById('totalBadge').textContent = `共 ${d.total} 条记录`;
+                    }
+                })
+                .catch(err => console.error('加载列表失败', err));
+        }
+
+        function updatePagination() {
+            document.getElementById('currentPage').textContent = currentPage;
+            document.getElementById('totalPage').textContent = totalPage;
+            document.getElementById('btnPrev').disabled = currentPage <= 1;
+            document.getElementById('btnNext').disabled = currentPage >= totalPage;
+        }
+
+        function onSortChanged() {
+            const columns = gridApi.getColumnState();
+            const sorted = columns.find(c => c.sort);
+            if (sorted) {
+                lastSortField = sorted.colId;
+                lastSortOrder = sorted.sort;
+            } else {
+                lastSortField = '';
+                lastSortOrder = 'desc';
+            }
+            loadData();
+        }
+
+    </script>
+</body>
+</html>
