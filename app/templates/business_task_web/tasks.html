@@ -164,7 +164,7 @@
     <!-- 新建任务弹窗 -->
     <div x-show="openModal" class="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto" x-cloak>
         <div class="absolute inset-0 bg-black/40" @click="openModal = false" x-transition.opacity></div>
-        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg my-4 sm:my-8 transform transition-all"
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-4xl my-4 sm:my-8 transform transition-all"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100">
@@ -174,63 +174,72 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <div class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1.5">任务标题</label>
-                    <input type="text" x-model="form.title" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="请输入任务标题">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1.5">任务内容</label>
-                    <textarea x-model="form.content" rows="3" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="请输入任务内容"></textarea>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
+            <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1.5">开始时间</label>
-                        <input type="datetime-local" x-model="form.start_time" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5">任务标题</label>
+                        <input type="text" x-model="form.title" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="请输入任务标题">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1.5">截止时间</label>
-                        <input type="datetime-local" x-model="form.deadline" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5">任务内容</label>
+                        <textarea x-model="form.content" rows="4" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="请输入任务内容"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">开始时间</label>
+                            <input type="datetime-local" x-model="form.start_time" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">截止时间</label>
+                            <input type="datetime-local" x-model="form.deadline" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5">
+                            负责人 <span class="text-xs text-slate-400 font-normal">（可多选，选多个则批量发放）</span>
+                        </label>
+                        <div class="border border-slate-200 rounded-lg p-3 space-y-2">
+                            <template x-for="user in users" :key="user.id">
+                                <label class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 cursor-pointer">
+                                    <input type="checkbox" x-model="form.selected" :value="user.id" class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500">
+                                    <span class="text-sm text-slate-700" x-text="user.username"></span>
+                                </label>
+                            </template>
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1.5">
-                        负责人 <span class="text-xs text-slate-400 font-normal">（可多选，选多个则批量发放）</span>
-                    </label>
-                    <div class="border border-slate-200 rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-                        <template x-for="user in users" :key="user.id">
-                            <label class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 cursor-pointer">
-                                <input type="checkbox" x-model="form.selected" :value="user.id" class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500">
-                                <span class="text-sm text-slate-700" x-text="user.username"></span>
-                            </label>
-                        </template>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1.5">
-                        子任务清单 <span class="text-xs text-slate-400 font-normal">（可选，需要多少添加多少；保存时先建父任务再建子任务）</span>
-                    </label>
-                    <div class="space-y-2">
-                        <template x-for="(st, idx) in form.subtasks" :key="idx">
-                            <div class="flex items-center gap-2">
-                                <input type="text" x-model="form.subtasks[idx].title" placeholder="请输入子任务标题"
-                                       class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                                <button type="button" @click="removeSubtaskRow(idx)" title="删除该行"
-                                        class="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                </button>
-                            </div>
-                        </template>
-                        <button type="button" @click="addSubtaskRow()"
-                                class="w-full px-3 py-2 border border-dashed border-slate-300 text-slate-500 rounded-lg text-sm hover:border-primary-400 hover:text-primary-600 transition-colors">
-                            + 添加子任务
-                        </button>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1.5">
+                            子任务清单 <span class="text-xs text-slate-400 font-normal">（可选，需要多少添加多少；保存时先建父任务再建子任务）</span>
+                        </label>
+                        <div class="space-y-2">
+                            <template x-for="(st, idx) in form.subtasks" :key="idx">
+                                <div class="flex items-center gap-2">
+                                    <input type="text" x-model="form.subtasks[idx].title" placeholder="请输入子任务标题"
+                                           class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                    <button type="button" @click="removeSubtaskRow(idx)" title="删除该行"
+                                            class="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                            </template>
+                            <button type="button" @click="addSubtaskRow()"
+                                    class="w-full px-3 py-2 border border-dashed border-slate-300 text-slate-500 rounded-lg text-sm hover:border-primary-400 hover:text-primary-600 transition-colors">
+                                + 添加子任务
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
                 <button @click="openModal = false" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">取消</button>
-                <button @click="saveTask()" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors active:scale-95">确定创建</button>
+                <button @click="saveTask()" :disabled="saveTaskLoading"
+                        class="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        :class="saveTaskLoading ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-primary-600 text-white hover:bg-primary-700 active:scale-95'">
+                    <svg x-show="saveTaskLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <span x-text="saveTaskLoading ? '创建中...' : '确定创建'"></span>
+                </button>
             </div>
         </div>
     </div>

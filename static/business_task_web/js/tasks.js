@@ -4,6 +4,7 @@ document.addEventListener('alpine:init', () => {
         menu: menuItems,
         openModal: false,
         loading: false,
+        saveTaskLoading: false,
         filters: { keyword: '', status: '' },
         form: { title: '', content: '', selected: [], start_time: '', deadline: '', subtasks: [] },
         detailTask: null,
@@ -262,6 +263,7 @@ document.addEventListener('alpine:init', () => {
                 alert('请填写任务标题并选择负责人');
                 return;
             }
+            this.saveTaskLoading = true;
             const subtaskTitles = this.collectSubtaskTitles();
             try {
                 let res;
@@ -299,6 +301,8 @@ document.addEventListener('alpine:init', () => {
                 }
             } catch (e) {
                 console.error('saveTask error', e);
+            } finally {
+                this.saveTaskLoading = false;
             }
         },
 
