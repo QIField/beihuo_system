@@ -27,10 +27,11 @@ class SubtaskRepository:
 
     @staticmethod
     def create(session, task_id, title, sort_order, created_by=None,
-               status=0, lark_subtask_guid=None, completed_at=None):
+               status=0, lark_subtask_guid=None, completed_at=None, assignee_id=None):
         subtask = BusinessSubtask(
             task_id=task_id,
             title=title,
+            assignee_id=assignee_id,
             sort_order=sort_order,
             created_by=created_by,
             status=status,
@@ -70,6 +71,12 @@ class SubtaskRepository:
     @staticmethod
     def update_title(session, subtask, title):
         subtask.title = title
+        session.flush()
+        return subtask
+
+    @staticmethod
+    def update_assignee(session, subtask, assignee_id):
+        subtask.assignee_id = assignee_id
         session.flush()
         return subtask
 

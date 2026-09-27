@@ -6,10 +6,11 @@ document.addEventListener('alpine:init', () => {
         loading: false,
         saveTaskLoading: false,
         filters: { keyword: '', status: '' },
-        form: { title: '', content: '', selected: [], start_time: '', deadline: '', subtasks: [] },
+        form: { title: '', content: '', selected: '', start_time: '', deadline: '', subtasks: [] },
         detailTask: null,
         subtasks: [],
         newSubtaskTitle: '',
+        newSubtaskAssigneeId: '',
         subtaskLoading: false,
         users: [],
         tasks: [],
@@ -134,24 +135,28 @@ document.addEventListener('alpine:init', () => {
 
         openCreateModal() {
             this.form = {
-                title: '', content: '', selected: [],
+                title: '', content: '', selected: '',
                 start_time: this.getDefaultStartTime(), deadline: '', subtasks: [],
             };
             this.openModal = true;
         },
 
         addSubtaskRow() {
-            this.form.subtasks.push({ title: '' });
+            const defaultAssigneeId = this.form.selected || '';
+            this.form.subtasks.push({ title: '', assignee_id: defaultAssigneeId });
         },
 
         removeSubtaskRow(index) {
             this.form.subtasks.splice(index, 1);
         },
 
-        collectSubtaskTitles() {
+        collectSubtasks() {
             return this.form.subtasks
-                .map(st => (st.title || '').trim())
-                .filter(Boolean);
+                .map(st => ({
+                    title: (st.title || '').trim(),
+                    assignee_id: st.assignee_id ? Number(st.assignee_id) : null,
+                }))
+                .filter(st => st.title);
         },
 
         async openDetail(task) {
@@ -210,12 +215,17 @@ document.addEventListener('alpine:init', () => {
             }
             this.subtaskLoading = true;
             try {
-                const res = await apiPost('/business-tasks/subtasks/create', {
+                const payload = {
                     task_id: Number(this.detailTask.id),
                     title: title,
-                });
+                };
+                if (this.newSubtaskAssigneeId) {
+                    payload.assignee_id = Number(this.newSubtaskAssigneeId);
+                }
+                const res = await apiPost('/business-tasks/subtasks/create', payload);
                 if (res.code === 200) {
                     this.newSubtaskTitle = '';
+                    this.newSubtaskAssigneeId = '';
                     await this.loadSubtasks(this.detailTask.id);
                 } else {
                     alert(res.msg || '添加失败');
@@ -259,38 +269,25 @@ document.addEventListener('alpine:init', () => {
         },
 
         async saveTask() {
-            if (!this.form.title || this.form.selected.length === 0) {
+            if (!this.form.title || !this.form.selected) {
                 alert('请填写任务标题并选择负责人');
                 return;
             }
             this.saveTaskLoading = true;
-            const subtaskTitles = this.collectSubtaskTitles();
+            const subtaskItems = this.collectSubtasks();
             try {
-                let res;
-                if (this.form.selected.length === 1) {
-                    res = await apiPost('/business-tasks/create', {
-                        title: this.form.title,
-                        content: this.form.content,
-                        assignee_id: Number(this.form.selected[0]),
-                        start_time: this.formatDeadlineForBackend(this.form.start_time),
-                        deadline: this.formatDeadlineForBackend(this.form.deadline),
-                        subtasks: subtaskTitles,
-                    });
-                } else {
-                    const tasks = this.form.selected.map(uid => ({
-                        title: this.form.title,
-                        content: this.form.content,
-                        assignee_id: Number(uid),
-                        start_time: this.formatDeadlineForBackend(this.form.start_time),
-                        deadline: this.formatDeadlineForBackend(this.form.deadline),
-                        subtasks: subtaskTitles,
-                    }));
-                    res = await apiPost('/business-tasks/batch-create', { tasks });
-                }
+                const res = await apiPost('/business-tasks/create', {
+                    title: this.form.title,
+                    content: this.form.content,
+                    assignee_id: Number(this.form.selected),
+                    start_time: this.formatDeadlineForBackend(this.form.start_time),
+                    deadline: this.formatDeadlineForBackend(this.form.deadline),
+                    subtasks: subtaskItems,
+                });
                 if (res.code === 200) {
                     this.openModal = false;
                     this.form = {
-                        title: '', content: '', selected: [],
+                        title: '', content: '', selected: '',
                         start_time: '', deadline: '', subtasks: [],
                     };
                     this.page = 1;

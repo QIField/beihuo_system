@@ -15,6 +15,7 @@ class BusinessSubtask(BaseModels):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     task_id = Column(BigInteger, nullable=False, index=True, comment='父业务任务ID')
     title = Column(String(255), nullable=False, comment='子任务标题（飞书summary）')
+    assignee_id = Column(BigInteger, nullable=True, comment='子任务负责人ID')
     status = Column(Integer, nullable=False, default=0, comment='0未完成 1已完成')
     sort_order = Column(Integer, nullable=False, default=0, comment='清单内排序')
     lark_subtask_guid = Column(String(64), nullable=True, unique=True, comment='飞书子任务GUID')
@@ -28,6 +29,7 @@ class BusinessSubtask(BaseModels):
             'id': self.id,
             'task_id': self.task_id,
             'title': self.title,
+            'assignee_id': self.assignee_id,
             'status': self.status,
             'sort_order': self.sort_order,
             'lark_subtask_guid': self.lark_subtask_guid,
