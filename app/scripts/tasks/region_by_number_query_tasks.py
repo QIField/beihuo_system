@@ -55,11 +55,11 @@ def query_suyuan_data_task():
         try:
             data = query_suyuan_data(md, '', '')
             if not data or data['success']:
-                information_push(name)
+                # information_push(name)
                 continue
              
         except Exception as e:
-            information_push(name,e)
+            # information_push(name,e)
             continue
      
 
