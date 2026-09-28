@@ -196,12 +196,12 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">
-                            负责人 <span class="text-xs text-slate-400 font-normal">（可多选，选多个则批量发放）</span>
+                            负责人 <span class="text-xs text-slate-400 font-normal">（仅可选一人）</span>
                         </label>
                         <div class="border border-slate-200 rounded-lg p-3 space-y-2">
                             <template x-for="user in users" :key="user.id">
                                 <label class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 cursor-pointer">
-                                    <input type="checkbox" x-model="form.selected" :value="user.id" class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500">
+                                    <input type="radio" x-model="form.selected" :value="user.id" class="w-4 h-4 text-primary-600 border-slate-300 focus:ring-primary-500">
                                     <span class="text-sm text-slate-700" x-text="user.username"></span>
                                 </label>
                             </template>
@@ -218,6 +218,13 @@
                                 <div class="flex items-center gap-2">
                                     <input type="text" x-model="form.subtasks[idx].title" placeholder="请输入子任务标题"
                                            class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                    <select x-model="form.subtasks[idx].assignee_id"
+                                            class="w-28 px-2 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white">
+                                        <option value="">负责人</option>
+                                        <template x-for="user in users" :key="user.id">
+                                            <option :value="user.id" x-text="user.username"></option>
+                                        </template>
+                                    </select>
                                     <button type="button" @click="removeSubtaskRow(idx)" title="删除该行"
                                             class="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -247,7 +254,7 @@
     <!-- 任务详情弹窗 -->
     <div x-show="detailTask" class="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto" x-cloak>
         <div class="absolute inset-0 bg-black/40" @click="closeDetail()" x-transition.opacity></div>
-        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg my-4 sm:my-8 transform transition-all"
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-4xl my-4 sm:my-8 transform transition-all"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100">
@@ -257,73 +264,89 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <div class="p-6 space-y-4" x-show="detailTask">
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">任务标题</label>
-                    <p class="text-sm text-slate-900 font-medium" x-text="detailTask ? detailTask.title : ''"></p>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">任务内容</label>
-                    <p class="text-sm text-slate-700 whitespace-pre-wrap" x-text="detailTask && detailTask.content ? detailTask.content : '无'"></p>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">负责人</label>
-                        <p class="text-sm text-slate-700" x-text="detailTask ? detailTask.assignee : ''"></p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">业务状态</label>
-                        <span class="inline-flex items-center justify-center w-16 px-2 py-0.5 rounded-full text-xs font-medium"
-                              :class="detailTask && detailTask.status === '已完成' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
-                              x-text="detailTask ? detailTask.status : ''"></span>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">开始时间</label>
-                        <p class="text-sm text-slate-700" x-text="detailTask ? detailTask.start_time : ''"></p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">截止时间</label>
-                        <p class="text-sm text-slate-700" x-text="detailTask ? detailTask.deadline : ''"></p>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">飞书同步</label>
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
-                          :class="detailTask && detailTask.sync === '已同步' ? 'bg-blue-50 text-blue-700' : detailTask && detailTask.sync === '失败' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'">
-                        <span class="w-1.5 h-1.5 rounded-full" :class="detailTask && detailTask.sync === '已同步' ? 'bg-blue-500' : detailTask && detailTask.sync === '失败' ? 'bg-red-500' : 'bg-slate-400'"></span>
-                        <span x-text="detailTask ? detailTask.sync : ''"></span>
-                    </span>
-                </div>
-                <div class="border-t border-slate-100 pt-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <label class="text-xs font-medium text-slate-500">子任务清单</label>
-                        <span class="text-xs text-slate-400" x-text="subtaskProgressText()"></span>
-                    </div>
-                    <div class="space-y-1.5">
-                        <template x-for="st in subtasks" :key="st.id">
-                            <div class="flex items-center gap-2 group">
-                                <input type="checkbox" :checked="st.status === 1" @change="toggleSubtask(st)"
-                                       class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500">
-                                <span class="flex-1 text-sm"
-                                      :class="st.status === 1 ? 'line-through text-slate-400' : 'text-slate-700'"
-                                      x-text="st.title"></span>
-                                <button type="button" @click="removeSubtask(st)" title="删除子任务"
-                                        class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-opacity">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                </button>
+            <div class="p-6" x-show="detailTask">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- 左侧面板：任务基本信息 -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">任务标题</label>
+                            <p class="text-sm text-slate-900 font-medium" x-text="detailTask ? detailTask.title : ''"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">任务内容</label>
+                            <p class="text-sm text-slate-700 whitespace-pre-wrap" x-text="detailTask && detailTask.content ? detailTask.content : '无'"></p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">负责人</label>
+                                <p class="text-sm text-slate-700" x-text="detailTask ? detailTask.assignee : ''"></p>
                             </div>
-                        </template>
-                        <p x-show="subtasks.length === 0" class="text-xs text-slate-400 py-1">暂无子任务</p>
-                        <div class="flex items-center gap-2 pt-1">
-                            <input type="text" x-model="newSubtaskTitle" @keyup.enter="addSubtask()"
-                                   placeholder="输入子任务标题，回车添加"
-                                   class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                            <button type="button" @click="addSubtask()" :disabled="subtaskLoading"
-                                    class="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors active:scale-95 disabled:opacity-50">
-                                添加
-                            </button>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">业务状态</label>
+                                <span class="inline-flex items-center justify-center w-16 px-2 py-0.5 rounded-full text-xs font-medium"
+                                      :class="detailTask && detailTask.status === '已完成' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+                                      x-text="detailTask ? detailTask.status : ''"></span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">开始时间</label>
+                                <p class="text-sm text-slate-700" x-text="detailTask ? detailTask.start_time : ''"></p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">截止时间</label>
+                                <p class="text-sm text-slate-700" x-text="detailTask ? detailTask.deadline : ''"></p>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">飞书同步</label>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                  :class="detailTask && detailTask.sync === '已同步' ? 'bg-blue-50 text-blue-700' : detailTask && detailTask.sync === '失败' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'">
+                                <span class="w-1.5 h-1.5 rounded-full" :class="detailTask && detailTask.sync === '已同步' ? 'bg-blue-500' : detailTask && detailTask.sync === '失败' ? 'bg-red-500' : 'bg-slate-400'"></span>
+                                <span x-text="detailTask ? detailTask.sync : ''"></span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 右侧面板：子任务清单 -->
+                    <div class="space-y-3 lg:border-l lg:border-slate-100 lg:pl-6">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-medium text-slate-500">子任务清单</label>
+                            <span class="text-xs text-slate-400" x-text="subtaskProgressText()"></span>
+                        </div>
+                        <div class="space-y-2">
+                            <template x-for="st in subtasks" :key="st.id">
+                                <div class="flex items-center gap-2 group">
+                                    <input type="checkbox" :checked="st.status === 1" @change="toggleSubtask(st)"
+                                           class="w-4 h-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500">
+                                    <span class="flex-1 text-sm"
+                                          :class="st.status === 1 ? 'line-through text-slate-400' : 'text-slate-700'"
+                                          x-text="st.title"></span>
+                                    <span class="text-xs text-slate-500"
+                                          x-text="st.assignee_name || '未分配'"></span>
+                                    <button type="button" @click="removeSubtask(st)" title="删除子任务"
+                                            class="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-opacity">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                            </template>
+                            <p x-show="subtasks.length === 0" class="text-xs text-slate-400 py-1">暂无子任务</p>
+                            <div class="flex items-center gap-2 pt-1">
+                                <input type="text" x-model="newSubtaskTitle" @keyup.enter="addSubtask()"
+                                       placeholder="输入子任务标题，回车添加"
+                                       class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <select x-model="newSubtaskAssigneeId"
+                                        class="w-24 px-2 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white">
+                                    <option value="">负责人</option>
+                                    <template x-for="user in users" :key="user.id">
+                                        <option :value="user.id" x-text="user.username"></option>
+                                    </template>
+                                </select>
+                                <button type="button" @click="addSubtask()" :disabled="subtaskLoading"
+                                        class="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors active:scale-95 disabled:opacity-50">
+                                    添加
+                                ></button>
+                            </div
                         </div>
                     </div>
                 </div>

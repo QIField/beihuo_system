@@ -11,6 +11,7 @@ from datetime import datetime
 
 from app.utils.orm.session import orm_session
 from app.utils.logger_config import get_task_logger
+from app.models.orm_models.system_models import CrmappUsers
 from app.services.lark_task_sync.sync_service import ensure_parent_task_guid
 from app.services.lark_task_sync.models import LarkTaskSyncModels
 from app.services.lark_task_sync import client as lark_client
@@ -34,44 +35,51 @@ class SubtaskService:
         SubtaskRepository.ensure_table()
         with orm_session() as session:
             rows = SubtaskRepository.list_by_task(session, task_id)
-            return [row.to_dict() for row in rows]
+            result = [row.to_dict() for row in rows]
+            SubtaskService._attach_assignee_names(session, result)
+            return result
 
     @staticmethod
-    def create_many_for_new_task(task_id, titles, assignee_id, created_by=None):
+    def create_many_for_new_task(task_id, subtasks, default_assignee_id=None, created_by=None):
         """
         父任务本地记录已创建后调用（新建任务表单随单子任务）。
 
         先同步确保飞书父任务存在，再逐条本地入库 + 推送飞书子任务。
 
         :param task_id: 父业务任务ID
-        :param titles: 已清洗的子任务标题列表
-        :param assignee_id: 父任务负责人ID（用于取飞书 open_id）
+        :param subtasks: 已清洗的子任务对象列表，每项包含 title 和可选 assignee_id
+        :param default_assignee_id: 子任务未指定负责人时的默认值（通常为父任务负责人）
         :param created_by: 创建人ID
         :return: 本地子任务ID列表
         """
         SubtaskRepository.ensure_table()
         parent_guid = SubtaskService._safe_ensure_parent_guid(task_id)
-        owner_open_id = SubtaskService._owner_open_id(assignee_id) if parent_guid else None
 
         subtask_ids = []
         with orm_session() as session:
-            for index, title in enumerate(titles):
+            for index, item in enumerate(subtasks):
+                title = item.get('title') if isinstance(item, dict) else item
+                assignee_id = item.get('assignee_id') if isinstance(item, dict) else None
+                if not assignee_id:
+                    assignee_id = default_assignee_id
                 row = SubtaskRepository.create(
                     session=session,
                     task_id=task_id,
                     title=title,
+                    assignee_id=assignee_id,
                     sort_order=index,
                     created_by=created_by,
                 )
-                subtask_ids.append(row.id)
+                subtask_ids.append((row.id, title, assignee_id))
 
         if parent_guid:
-            for subtask_id, title in zip(subtask_ids, titles):
+            for subtask_id, title, assignee_id in subtask_ids:
+                owner_open_id = SubtaskService._owner_open_id(assignee_id)
                 SubtaskService._push_created(subtask_id, parent_guid, title, owner_open_id)
-        return subtask_ids
+        return [sid for sid, _, _ in subtask_ids]
 
     @staticmethod
-    def add(task_id, title, created_by=None):
+    def add(task_id, title, assignee_id=None, created_by=None):
         """任务详情中追加子任务（父任务必然已存在，直接复用）。"""
         SubtaskRepository.ensure_table()
         title = SubtaskService._validate_title(title)
@@ -80,12 +88,14 @@ class SubtaskService:
             parent = TaskRepository.get_by_id(session, task_id)
             if not parent:
                 raise SubtaskServiceError('父任务不存在')
-            assignee_id = parent.assignee_id
+            if not assignee_id:
+                assignee_id = parent.assignee_id
             sort_order = SubtaskRepository.next_sort_order(session, task_id)
             row = SubtaskRepository.create(
                 session=session,
                 task_id=task_id,
                 title=title,
+                assignee_id=assignee_id,
                 sort_order=sort_order,
                 created_by=created_by,
             )
@@ -118,6 +128,38 @@ class SubtaskService:
                 )
             except Exception:
                 logger.exception(f"[子任务] 飞书标题同步失败, subtask_id={subtask_id}")
+        return SubtaskService._get_dict(subtask_id)
+
+    @staticmethod
+    def update_assignee(subtask_id, assignee_id):
+        with orm_session() as session:
+            row = SubtaskRepository.get_by_id(session, subtask_id)
+            if not row:
+                raise SubtaskServiceError('子任务不存在')
+            task_id = row.task_id
+            old_guid = row.lark_subtask_guid
+            title = row.title
+            SubtaskRepository.update_assignee(session, row, assignee_id)
+
+        # 飞书子任务不支持直接修改负责人，先确保父任务存在，再删除旧子任务并重建
+        if old_guid:
+            try:
+                parent_guid = SubtaskService._safe_ensure_parent_guid(task_id)
+                if not parent_guid:
+                    return SubtaskService._get_dict(subtask_id)
+                owner_open_id = SubtaskService._owner_open_id(assignee_id)
+                lark_client.delete_lark_task(old_guid, action_name='飞书删除旧子任务')
+                subtask = lark_client.create_lark_subtask(
+                    parent_guid=parent_guid,
+                    summary=title,
+                    owner_open_id=owner_open_id,
+                )
+                with orm_session() as session:
+                    fresh_row = SubtaskRepository.get_by_id(session, subtask_id)
+                    if fresh_row:
+                        SubtaskRepository.update_guid(session, fresh_row, subtask['guid'])
+            except Exception:
+                logger.exception(f"[子任务] 飞书负责人同步失败, subtask_id={subtask_id}")
         return SubtaskService._get_dict(subtask_id)
 
     @staticmethod
@@ -208,4 +250,20 @@ class SubtaskService:
     def _get_dict(subtask_id):
         with orm_session() as session:
             row = SubtaskRepository.get_by_id(session, subtask_id)
-            return row.to_dict() if row else None
+            if not row:
+                return None
+            result = row.to_dict()
+            SubtaskService._attach_assignee_names(session, [result])
+            return result
+
+    @staticmethod
+    def _attach_assignee_names(session, subtask_list):
+        if not subtask_list:
+            return
+        assignee_ids = list({st['assignee_id'] for st in subtask_list if st.get('assignee_id')})
+        if not assignee_ids:
+            return
+        users = session.query(CrmappUsers).filter(CrmappUsers.id.in_(assignee_ids)).all()
+        user_map = {u.id: u.username for u in users}
+        for st in subtask_list:
+            st['assignee_name'] = user_map.get(st.get('assignee_id'), '')

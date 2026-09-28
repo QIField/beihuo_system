@@ -56,6 +56,7 @@ def create_subtask():
         data = SubtaskService.add(
             task_id=task_id,
             title=payload.get('title'),
+            assignee_id=_parse_int(payload.get('assignee_id'), None),
             created_by=_get_current_user_id(),
         )
         return _success(data, '添加成功')
@@ -73,7 +74,16 @@ def update_subtask():
         subtask_id = _parse_int(payload.get('id'), None)
         if not subtask_id:
             return _error('子任务ID不能为空', 400)
-        data = SubtaskService.update_title(subtask_id, payload.get('title'))
+
+        if 'title' in payload:
+            data = SubtaskService.update_title(subtask_id, payload.get('title'))
+        else:
+            data = SubtaskService._get_dict(subtask_id)
+
+        if 'assignee_id' in payload:
+            data = SubtaskService.update_assignee(
+                subtask_id, _parse_int(payload.get('assignee_id'), None)
+            )
         return _success(data, '更新成功')
     except SubtaskServiceError as e:
         return _error(str(e), 400)

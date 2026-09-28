@@ -78,14 +78,20 @@ def ggg2():
 
             # 保存原始记录到 jiapei_data
             for record in file_data:
+                price = record.get('价格', None)
+                stock = record.get('库存', None)
+                if pd.isna(price):
+                    price = None
+                if pd.isna(stock):
+                    stock = None
                 raw_records.append((
                     record.get('供应商名称', ''),
                     record.get('原厂oe码', ''),
                     record.get('品牌', ''),
-                    record.get('价格', None),
+                    price,
                     record.get('失效时间', None),
                     record.get('仓库名称', ''),
-                    record.get('库存', None),
+                    stock,
                     record.get('备注', ''),
                     file['filename'],
                     fetch_time,

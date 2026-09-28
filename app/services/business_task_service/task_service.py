@@ -34,7 +34,7 @@ class TaskService:
         TaskService._validate_create(title, assignee_id)
         start_time_dt = TaskService._parse_start_time(start_time)
         deadline_dt = TaskService._parse_deadline(deadline)
-        subtask_titles = TaskService._normalize_subtasks(subtasks)
+        subtask_items = TaskService._normalize_subtasks(subtasks)
 
         with orm_session() as session:
             task = TaskRepository.create(
@@ -49,11 +49,11 @@ class TaskService:
             task_id = task.id
 
         # 带子任务：同步先建飞书父任务再建子任务；不带：保持原异步同步
-        if subtask_titles:
+        if subtask_items:
             SubtaskService.create_many_for_new_task(
                 task_id=task_id,
-                titles=subtask_titles,
-                assignee_id=assignee_id,
+                subtasks=subtask_items,
+                default_assignee_id=assignee_id,
                 created_by=created_by,
             )
         else:
@@ -83,17 +83,17 @@ class TaskService:
                 created_records.append({
                     'task_id': task.id,
                     'assignee_id': item['assignee_id'],
-                    'subtask_titles': TaskService._normalize_subtasks(item.get('subtasks')),
+                    'subtask_items': TaskService._normalize_subtasks(item.get('subtasks')),
                 })
 
         # 每个父任务各自复制一份子任务清单：先父后子
         for record in created_records:
             task_id = record['task_id']
-            if record['subtask_titles']:
+            if record['subtask_items']:
                 SubtaskService.create_many_for_new_task(
                     task_id=task_id,
-                    titles=record['subtask_titles'],
-                    assignee_id=record['assignee_id'],
+                    subtasks=record['subtask_items'],
+                    default_assignee_id=record['assignee_id'],
                     created_by=created_by,
                 )
             else:
@@ -181,18 +181,23 @@ class TaskService:
         """
         清洗前端提交的子任务清单。
 
-        兼容两种元素格式：字符串标题，或 {"title": "xxx"}。
-        去空白、去空项、保持前端填写顺序。
+        兼容元素格式：字符串标题，或 {"title": "xxx", "assignee_id": 1}。
+        去空白、去空项、保持前端填写顺序；未指定负责人时 assignee_id 为 None。
         """
         if not raw:
             return []
-        titles = []
+        items = []
         for item in raw:
-            title = item.get('title') if isinstance(item, dict) else item
+            if isinstance(item, dict):
+                title = item.get('title')
+                assignee_id = item.get('assignee_id')
+            else:
+                title = item
+                assignee_id = None
             title = (str(title).strip() if title is not None else '')
             if title:
-                titles.append(title)
-        return titles
+                items.append({'title': title, 'assignee_id': assignee_id})
+        return items
 
     @staticmethod
     def _parse_start_time(start_time):
