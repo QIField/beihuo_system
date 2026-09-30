@@ -3547,7 +3547,7 @@ function bindEventHandlers(myTable, form, table) {
                     content: `
                         <style>
                             .ep-modal { display: flex; flex-direction: column; height: 100%; font-size: 14px; color: #262626; background: #fff; border-radius: 6px; overflow: hidden; }
-                            .ep-header { padding: 16px 24px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+                            .ep-header { padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
                             .ep-header-title { font-size: 16px; font-weight: 500; color: #262626; }
                             .ep-header-close { font-size: 20px; color: #8c8c8c; cursor: pointer; line-height: 1; }
                             .ep-header-close:hover { color: #262626; }
@@ -3590,7 +3590,6 @@ function bindEventHandlers(myTable, form, table) {
                             <div class="ep-body">
                                 <!-- 对账 -->
                                 <div class="ep-panel active" data-panel="bill">
-                                    <div class="ep-desc">上传对账单 Excel/CSV 文件，系统会自动解析并处理。</div>
                                     <div class="ep-upload-zone">
                                         <input type="file" id="billFileSelect" accept=".xlsx,.xls,.csv" multiple>
                                         <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
@@ -3600,7 +3599,6 @@ function bindEventHandlers(myTable, form, table) {
 
                                 <!-- 单据 -->
                                 <div class="ep-panel" data-panel="order">
-                                    <div class="ep-desc">选择单据类型并上传对应 Excel/CSV 文件。</div>
                                     <div class="ep-option">
                                         <label>单据类型</label>
                                         <select id="orderTypeSelect">
@@ -3619,8 +3617,6 @@ function bindEventHandlers(myTable, form, table) {
 
                                 <!-- 新建产品 -->
                                 <div class="ep-panel" data-panel="crm">
-                                    <div class="ep-desc">上传包含 OE 和品牌的 Excel，系统自动在 CRM 中创建产品档案。处理完成后可查看替换号差异。</div>
-                                    <div class="ep-info">Excel 只需包含 “oe”、“brand” 两个表头；仅在选择有品牌编码的情况，才需要填写模板的 brand_code 列信息。</div>
                                     <div class="ep-option">
                                         <label>品牌编码</label>
                                         <select id="crmModeSelect">
@@ -3646,20 +3642,18 @@ function bindEventHandlers(myTable, form, table) {
 
                                 <!-- 更新产品 -->
                                 <div class="ep-panel" data-panel="update_crm">
-                                    <div class="ep-desc">更新产品的开思描述、开思价、同行价、汽配龙价格等信息，需要包含“配件编码”、“品牌”表头。</div>
+                                    <div class="ep-option">
+                                        <a href="javascript:;" id="updateCrmTemplateLink" style="font-size: 12px; color: #1890ff;">下载模板</a>
+                                    </div>
                                     <div class="ep-upload-zone">
                                         <input type="file" id="updateCrmFileSelect" accept=".xlsx,.xls,.csv">
                                         <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
                                         <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，仅单个文件</div>
                                     </div>
-                                    <div style="margin-top: 8px;">
-                                        <a href="javascript:;" id="updateCrmTemplateLink" style="font-size: 12px; color: #1890ff;">下载更新模板</a>
-                                    </div>
                                 </div>
 
                                 <!-- 更新替换号 -->
                                 <div class="ep-panel" data-panel="replace_number">
-                                    <div class="ep-desc">上传包含 OE、品牌的 Excel，选择处理方式更新产品替换号。直接添加需填写“替换号”列，对比添加只需 OE 和品牌。</div>
                                     <div class="ep-option">
                                         <label>处理方式</label>
                                         <select id="replaceNumberModeSelect">
