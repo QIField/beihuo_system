@@ -97,14 +97,14 @@ class UserLarkMappingService:
             return mapping.to_dict()
 
     @staticmethod
-    def list_mappings(keyword=None, page=1, page_size=10):
+    def list_mappings(keyword=None, page=1, page_size=10, store=None):
         page = max(1, page)
         page_size = min(max(1, page_size), 100)
         offset = (page - 1) * page_size
 
         with orm_session() as session:
-            rows = UserLarkMappingRepository.list_mappings(session, keyword, offset, page_size)
-            total = UserLarkMappingRepository.count_mappings(session, keyword)
+            rows = UserLarkMappingRepository.list_mappings(session, keyword, offset, page_size, store)
+            total = UserLarkMappingRepository.count_mappings(session, keyword, store)
             data_list = [UserLarkMappingService._format_mapping(row) for row in rows]
 
         return {
@@ -115,15 +115,15 @@ class UserLarkMappingService:
         }
 
     @staticmethod
-    def list_candidates(keyword=None, limit=50):
+    def list_candidates(keyword=None, limit=50, store=None):
         with orm_session() as session:
-            users = UserLarkMappingRepository.list_candidates(session, keyword, limit)
+            users = UserLarkMappingRepository.list_candidates(session, keyword, limit, store)
             return [u.to_dict() for u in users]
 
     @staticmethod
-    def list_all_users(keyword=None, limit=200):
+    def list_all_users(keyword=None, limit=200, store=None):
         with orm_session() as session:
-            users = UserLarkMappingRepository.list_all_users(session, keyword, limit)
+            users = UserLarkMappingRepository.list_all_users(session, keyword, limit, store)
             return [u.to_dict() for u in users]
 
     @staticmethod

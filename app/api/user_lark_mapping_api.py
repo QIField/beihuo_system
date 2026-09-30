@@ -3,13 +3,20 @@
 用户飞书绑定管理 API
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 
 from app.core.permission.decorators import require_authentication
 from app.services.user_lark_mapping_service import UserLarkMappingService
 from app.services.user_lark_mapping_service.mapping_service import UserLarkMappingServiceError
 
 user_lark_mapping_bp = Blueprint('user_lark_mapping', __name__, url_prefix='/user-lark-mappings')
+
+
+def _get_current_store():
+    """获取当前登录用户的门店代码，默认佛山。"""
+    user_store = session.get('store', 'fsbbr')
+    current_org = session.get('current_org', user_store)
+    return current_org or user_store or 'fsbbr'
 
 
 def _success(data=None, msg='success'):
@@ -39,6 +46,7 @@ def list_mappings():
             keyword=keyword or None,
             page=page,
             page_size=page_size,
+            store=_get_current_store(),
         )
         return _success(data)
     except Exception as e:
@@ -118,7 +126,10 @@ def toggle_mapping():
 def list_candidates():
     try:
         keyword = (request.args.get('keyword') or '').strip()
-        data = UserLarkMappingService.list_candidates(keyword=keyword or None)
+        data = UserLarkMappingService.list_candidates(
+            keyword=keyword or None,
+            store=_get_current_store(),
+        )
         return _success(data)
     except Exception as e:
         return _error(f'获取候选用户失败: {e}')
@@ -129,7 +140,10 @@ def list_candidates():
 def list_all_users():
     try:
         keyword = (request.args.get('keyword') or '').strip()
-        data = UserLarkMappingService.list_all_users(keyword=keyword or None)
+        data = UserLarkMappingService.list_all_users(
+            keyword=keyword or None,
+            store=_get_current_store(),
+        )
         return _success(data)
     except Exception as e:
         return _error(f'获取用户列表失败: {e}')
