@@ -145,7 +145,7 @@ def register_updateview_routes(app):
                     'name': '更新CRM产品信息',
                     'description': '批量更新CRM产品视图信息（开思描述、价格等）',
                     'required_columns': ['配件编码', '品牌'],
-                    'optional_columns': ['品牌号', '开思描述', '开思价', '同行价', '汽配龙价格'],
+                    'optional_columns': ['品牌号', '开思描述', '开思价', '同行价', '汽配龙价格', '成本价'],
                     'template_url': '/api/excel/template/updateview'
                 }
             ]

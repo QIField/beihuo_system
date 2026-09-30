@@ -128,48 +128,64 @@ def get_product_list_by_aikeyword(session, brand_code):
 
 
 def find_product_id_by_brand_code(api_response, brand_code):
-    """方式一：根据brand_code查找所有匹配的product_id"""
+    """方式一：根据brand_code查找所有匹配项，返回包含product_id和stock的列表"""
     if not api_response or 'data' not in api_response:
         return []
 
     target_code = str(brand_code).strip()
-    matched_ids = []
+    matched = []
     for item in api_response.get('data', []):
         for child in item.get('child', []):
             child_brand_code = str(child.get('brand_code') or '').strip()
             child_frey_no = str(child.get('frey_no') or '').strip()
             if child_brand_code == target_code or child_frey_no == target_code:
-                matched_ids.append(child.get('product_id'))
+                matched.append({
+                    'product_id': child.get('product_id'),
+                    'stock': child.get('stock'),
+                })
 
-    return matched_ids
+    return matched
 
 
 def find_product_id_by_number_and_brand(api_response, number, brand_name):
-    """方式二：根据number和brand_name查找所有匹配的product_id"""
+    """方式二：根据number和brand_name查找所有匹配项，返回包含product_id和stock的列表"""
     if not api_response or 'data' not in api_response:
         return []
-    
-    matched_ids = []
-    
+
+    matched = []
+
     target_brands = [brand_name]
     for group in SPECIAL_BRAND_GROUPS:
         if brand_name in group:
             target_brands = group
             break
-    
+
     for item in api_response.get('data', []):
         for child in item.get('child', []):
             child_number = child.get('number', '')
             child_brand = child.get('brand_name', '')
             child_original_number = child.get('original_number', '')
-            
+
             if (child_number == number or child_original_number == number) and child_brand in target_brands:
-                matched_ids.append(child.get('product_id'))
-    
-    return matched_ids
+                matched.append({
+                    'product_id': child.get('product_id'),
+                    'stock': child.get('stock'),
+                })
+
+    return matched
 
 
-def update_product_view(session, product_id, cass_desc, store_cass_price, store_peer_price, qpl_price):
+def _is_valid_update_value(val):
+    """辅助函数：检查值是否有效（不是空、不是nan、不是null字符串）"""
+    if not val:
+        return False
+    val_str = str(val).strip().lower()
+    if val_str in ['', 'nan', 'null', 'none']:
+        return False
+    return True
+
+
+def update_product_view(session, product_id, cass_desc, store_cass_price, store_peer_price, qpl_price, cost_price):
     """
     调用API: POST /api/Product.Product/updateView
     更新产品视图信息（先查view再回传完整字段）
@@ -193,17 +209,8 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
     if cass_desc and str(cass_desc).strip():
         new_values["cass_desc"] = str(cass_desc).strip()
 
-    # 辅助函数：检查值是否有效（不是空、不是nan、不是null字符串）
-    def is_valid_value(val):
-        if not val:
-            return False
-        val_str = str(val).strip().lower()
-        if val_str in ['', 'nan', 'null', 'none']:
-            return False
-        return True
-
     # 开思价：有值才添加，转为float
-    if is_valid_value(store_cass_price):
+    if _is_valid_update_value(store_cass_price):
         try:
             val = float(store_cass_price)
             if not math.isnan(val):
@@ -212,7 +219,7 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
             pass
 
     # 同行价：有值才添加，转为float
-    if is_valid_value(store_peer_price):
+    if _is_valid_update_value(store_peer_price):
         try:
             val = float(store_peer_price)
             if not math.isnan(val):
@@ -221,11 +228,20 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
             pass
 
     # 汽配龙价格：有值才添加，转为float
-    if is_valid_value(qpl_price):
+    if _is_valid_update_value(qpl_price):
         try:
             val = float(qpl_price)
             if not math.isnan(val):
                 new_values["qpl_price"] = val
+        except (ValueError, TypeError):
+            pass
+
+    # 成本价：有值才添加，转为float
+    if _is_valid_update_value(cost_price):
+        try:
+            val = float(cost_price)
+            if not math.isnan(val):
+                new_values["cost_price"] = val
         except (ValueError, TypeError):
             pass
 
@@ -371,15 +387,28 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
                 store_cass_price = row.get('开思价', '')
                 store_peer_price = row.get('同行价', '')
                 qpl_price = row.get('汽配龙价格', '')
+                cost_price = row.get('成本价', '')
                 cass_desc = str(cass_desc) if not pd.isna(cass_desc) else ''
-                
+
                 success_count = 0
-                for pid in product_ids:
+                skip_cost_price_count = 0
+                for item in product_ids:
+                    pid = item['product_id']
+                    stock = item.get('stock')
+                    effective_cost_price = cost_price
+                    # 库存大于0时，即使成本价有值也不更新成本价
+                    if _is_valid_update_value(cost_price) and stock is not None and float(stock) > 0:
+                        effective_cost_price = ''
+                        skip_cost_price_count += 1
+                        print(f"  [跳过成本价] product_id={pid}, stock={stock}")
                     time.sleep(0.5)
-                    success, msg = update_product_view(session, pid, cass_desc, store_cass_price, store_peer_price, qpl_price)
+                    success, msg = update_product_view(session, pid, cass_desc, store_cass_price, store_peer_price, qpl_price, effective_cost_price)
                     success_count += 1 if success else 0
                     print(f"  {'[成功]' if success else '[失败]'} {pid}")
-                df.at[idx, '更新状态'] = f'成功{success_count}/{len(product_ids)}'
+                status_text = f'成功{success_count}/{len(product_ids)}'
+                if skip_cost_price_count > 0:
+                    status_text += f'（跳过{skip_cost_price_count}条成本价）'
+                df.at[idx, '更新状态'] = status_text
                 
     finally:
         conn.close()
