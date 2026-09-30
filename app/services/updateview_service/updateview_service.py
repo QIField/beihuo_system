@@ -91,21 +91,56 @@ def get_product_list_by_numberlist(session, numberlist):
         return None
 
 
+def get_product_list_by_aikeyword(session, brand_code):
+    """
+    调用API-1: POST /api/Product.Product/list
+    根据品牌号直接搜索产品列表
+    """
+    url = "https://crm.gzbbr.com/api/Product.Product/list"
+    headers = {
+        'accept': 'application/json, text/plain, */*',
+        'content-type': 'application/json;charset=UTF-8',
+        'origin': 'https://crm.gzbbr.com',
+        'referer': 'https://crm.gzbbr.com/',
+    }
+
+    auth_token = session.headers.get('authorization')
+    if auth_token:
+        headers['authorization'] = auth_token
+
+    payload = {
+        "aikeyword": brand_code,
+        "page": 1,
+        "limit": 200
+    }
+
+    try:
+        response = session.post(url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get('status') == 200 and data.get('data'):
+            return data['data']
+        return None
+    except Exception as e:
+        print(f"  API-1(aikeyword)调用失败: {e}")
+        return None
+
+
 def find_product_id_by_brand_code(api_response, brand_code):
     """方式一：根据brand_code查找所有匹配的product_id"""
     if not api_response or 'data' not in api_response:
         return []
-    
+
+    target_code = str(brand_code).strip()
     matched_ids = []
     for item in api_response.get('data', []):
         for child in item.get('child', []):
-            if child.get('brand_code') == brand_code:
+            child_brand_code = str(child.get('brand_code') or '').strip()
+            child_frey_no = str(child.get('frey_no') or '').strip()
+            if child_brand_code == target_code or child_frey_no == target_code:
                 matched_ids.append(child.get('product_id'))
-            if child.get('number') == brand_code:
-                matched_ids.append(child.get('product_id'))
-            if child.get('original_number') == brand_code:
-                matched_ids.append(child.get('product_id'))
-    
+
     return matched_ids
 
 
@@ -299,26 +334,19 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
                 
                 # 方式一：优先使用品牌号获取product_id
                 if not pd.isna(brand_code) and str(brand_code).strip():
+                    brand_code = str(brand_code).strip()
                     print(f"  方式一：使用品牌号 {brand_code} 获取product_id")
-                    
-                    # 从数据库获取oe
-                    db_result = get_oe_by_brand_code(brand_code, cursor)
-                    if db_result and db_result.get('oe'):
-                        oe = db_result['oe']
-                        print(f"    数据库匹配成功: OE={oe}")
-                        
-                        # 调用API-1
-                        time.sleep(0.5)
-                        api1_response = get_product_list_by_numberlist(session, oe)
-                        
-                        if api1_response:
-                            product_ids = find_product_id_by_brand_code(api1_response, brand_code)
-                            if product_ids:
-                                print(f"  方式一匹配到 {len(product_ids)} 个: {product_ids}")
-                        else:
-                            print(f"    API-1调用失败")
+
+                    # 调用API-1，aikeyword直接传品牌号
+                    time.sleep(0.5)
+                    api1_response = get_product_list_by_aikeyword(session, brand_code)
+
+                    if api1_response:
+                        product_ids = find_product_id_by_brand_code(api1_response, brand_code)
+                        if product_ids:
+                            print(f"  方式一匹配到 {len(product_ids)} 个: {product_ids}")
                     else:
-                        print(f"    数据库未找到品牌号 {brand_code} 的OE")
+                        print(f"    API-1调用失败")
                 
                 # 方式二：使用配件编码+品牌获取product_id
                 if not product_ids and has_peijian_code:
