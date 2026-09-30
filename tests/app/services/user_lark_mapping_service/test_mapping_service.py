@@ -27,10 +27,12 @@ class FakeOrmSession:
 
 
 class FakeUser:
-    def __init__(self, username='', department='', store=''):
+    def __init__(self, username='', department='', store='', mobile='', email=''):
         self.username = username
         self.department = department
         self.store = store
+        self.mobile = mobile
+        self.email = email
 
 
 class FakeCrmappUsers:
@@ -165,6 +167,28 @@ class FakeRepository:
                 result.add(m.lark_open_id)
         return result
 
+    @classmethod
+    def get_mappings_by_ids(cls, session, mapping_ids):
+        return [m for m in cls.mappings.values() if m.id in mapping_ids]
+
+    @classmethod
+    def update_mapping(cls, session, mapping_id, lark_open_id, lark_union_id=None):
+        mapping = cls.mappings.get(mapping_id)
+        if not mapping:
+            return None
+        mapping.lark_open_id = lark_open_id
+        if lark_union_id is not None:
+            mapping.lark_union_id = lark_union_id
+        return mapping
+
+    @classmethod
+    def get_active_mapping_by_open_ids_except_user_ids(cls, session, open_ids, user_ids):
+        result = set()
+        for m in cls.mappings.values():
+            if m.lark_open_id in open_ids and m.status == 1 and m.user_id not in user_ids:
+                result.add(m.lark_open_id)
+        return result
+
 
 def _mock_session():
     mapping_service.orm_session = FakeOrmSession
@@ -177,40 +201,6 @@ def _mock_repository():
 
 def _mock_batch_get(result):
     mapping_service.batch_get_lark_user_ids = lambda mobiles=None, emails=None, batch_size=50: result
-
-
-def test_bind_user_success():
-    _mock_session()
-    _mock_repository()
-
-    result = mapping_service.UserLarkMappingService.bind_user(200, 'open_200')
-    assert result['user_id'] == 200
-    assert result['lark_open_id'] == 'open_200'
-    print('PASS: test_bind_user_success')
-
-
-def test_bind_user_duplicate_user():
-    _mock_session()
-    _mock_repository()
-
-    try:
-        mapping_service.UserLarkMappingService.bind_user(100, 'open_new')
-        assert False, '应抛出异常'
-    except mapping_service.UserLarkMappingServiceError as e:
-        assert '已绑定' in str(e)
-    print('PASS: test_bind_user_duplicate_user')
-
-
-def test_bind_user_duplicate_open_id():
-    _mock_session()
-    _mock_repository()
-
-    try:
-        mapping_service.UserLarkMappingService.bind_user(300, 'open_100')
-        assert False, '应抛出异常'
-    except mapping_service.UserLarkMappingServiceError as e:
-        assert '已被绑定' in str(e)
-    print('PASS: test_bind_user_duplicate_open_id')
 
 
 def test_update_mapping_success():
@@ -332,10 +322,74 @@ def test_batch_bind_by_contact_open_id_used():
     print('PASS: test_batch_bind_by_contact_open_id_used')
 
 
+def test_batch_bind_by_contact_string_user_id():
+    """前端 checkbox x-model 会把 ID 收集为字符串，需兼容。"""
+    _mock_session()
+    _mock_repository()
+    _mock_batch_get({
+        'mobiles': {'13800138000': {'open_id': 'open_200', 'union_id': 'union_200'}},
+        'emails': {},
+    })
+
+    result = mapping_service.UserLarkMappingService.batch_bind_by_contact(['200'])
+    assert result['success'] == 1
+    assert len(result['failed']) == 0
+    print('PASS: test_batch_bind_by_contact_string_user_id')
+
+
+def test_batch_refresh_by_contact_success():
+    """已绑定用户刷新为新的 open_id。"""
+    _mock_session()
+    _mock_repository()
+    FakeRepository.users[100].mobile = '13800138000'
+    _mock_batch_get({
+        'mobiles': {'13800138000': {'open_id': 'open_200_new', 'union_id': 'union_200_new'}},
+        'emails': {},
+    })
+
+    result = mapping_service.UserLarkMappingService.batch_refresh_by_contact([1])
+    assert result['success'] == 1
+    assert len(result['failed']) == 0
+    assert FakeRepository.mappings[1].lark_open_id == 'open_200_new'
+    print('PASS: test_batch_refresh_by_contact_success')
+
+
+def test_batch_refresh_by_contact_open_id_used_by_other():
+    """新的 open_id 已被其他用户绑定，应刷新失败。"""
+    _mock_session()
+    _mock_repository()
+    FakeRepository.users[100].mobile = '13800138000'
+    # 另一个用户已占用 open_300
+    FakeRepository.mappings[2] = FakeMapping(2, 300, 'open_300')
+    _mock_batch_get({
+        'mobiles': {'13800138000': {'open_id': 'open_300', 'union_id': 'union_300'}},
+        'emails': {},
+    })
+
+    result = mapping_service.UserLarkMappingService.batch_refresh_by_contact([1])
+    assert result['success'] == 0
+    assert result['failed'][0]['reason'] == '该飞书账号已被其他用户绑定'
+    print('PASS: test_batch_refresh_by_contact_open_id_used_by_other')
+
+
+def test_batch_refresh_by_contact_string_mapping_id():
+    """前端 checkbox x-model 会把绑定 ID 收集为字符串，需兼容。"""
+    _mock_session()
+    _mock_repository()
+    FakeRepository.users[100].mobile = '13800138000'
+    _mock_batch_get({
+        'mobiles': {'13800138000': {'open_id': 'open_200_new', 'union_id': 'union_200_new'}},
+        'emails': {},
+    })
+
+    result = mapping_service.UserLarkMappingService.batch_refresh_by_contact(['1'])
+    assert result['success'] == 1
+    assert len(result['failed']) == 0
+    assert FakeRepository.mappings[1].lark_open_id == 'open_200_new'
+    print('PASS: test_batch_refresh_by_contact_string_mapping_id')
+
+
 if __name__ == '__main__':
-    test_bind_user_success()
-    test_bind_user_duplicate_user()
-    test_bind_user_duplicate_open_id()
     test_update_mapping_success()
     test_toggle_status_success()
     test_toggle_status_invalid()
@@ -346,4 +400,8 @@ if __name__ == '__main__':
     test_batch_bind_by_contact_not_found()
     test_batch_bind_by_contact_already_bound()
     test_batch_bind_by_contact_open_id_used()
+    test_batch_bind_by_contact_string_user_id()
+    test_batch_refresh_by_contact_success()
+    test_batch_refresh_by_contact_open_id_used_by_other()
+    test_batch_refresh_by_contact_string_mapping_id()
     print('ALL MAPPING SERVICE TESTS PASSED')

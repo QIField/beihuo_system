@@ -149,6 +149,41 @@ class UserLarkMappingRepository:
         ).all()
         return {row[0] for row in rows}
 
+    @staticmethod
+    def get_mappings_by_ids(session, mapping_ids):
+        """根据绑定 ID 列表查询绑定记录。"""
+        if not mapping_ids:
+            return []
+        return session.query(UserLarkMapping).filter(
+            UserLarkMapping.id.in_(mapping_ids),
+        ).all()
+
+    @staticmethod
+    def update_mapping(session, mapping_id, lark_open_id, lark_union_id=None):
+        """更新指定绑定记录的飞书 open_id 与 union_id。"""
+        mapping = session.query(UserLarkMapping).filter(
+            UserLarkMapping.id == mapping_id,
+        ).first()
+        if not mapping:
+            return None
+        mapping.lark_open_id = lark_open_id
+        if lark_union_id is not None:
+            mapping.lark_union_id = lark_union_id
+        session.flush()
+        return mapping
+
+    @staticmethod
+    def get_active_mapping_by_open_ids_except_user_ids(session, open_ids, user_ids):
+        """查询指定 open_id 列表中，已被非指定 user_id 绑定的 open_id 集合。"""
+        if not open_ids:
+            return set()
+        rows = session.query(UserLarkMapping.lark_open_id).filter(
+            UserLarkMapping.lark_open_id.in_(open_ids),
+            UserLarkMapping.status == 1,
+            UserLarkMapping.user_id.notin_(user_ids),
+        ).all()
+        return {row[0] for row in rows}
+
 
 def mapping_session():
     return orm_session()
