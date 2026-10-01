@@ -92,6 +92,10 @@ api_bp.register_blueprint(business_subtask_bp)
 from .user_lark_mapping_api import user_lark_mapping_bp
 api_bp.register_blueprint(user_lark_mapping_bp)
 
+# 注册拣货发货查询 API
+from .picking_shipping_api import picking_shipping_bp
+api_bp.register_blueprint(picking_shipping_bp)
+
 
 # 注册 CRM 零件品牌别名 API
 from . import pp_alias_api

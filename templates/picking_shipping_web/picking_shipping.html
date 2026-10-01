@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拣货发货 - 已发货</title>
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        :root {
+            --primary: #1890ff;
+            --primary-light: #e6f7ff;
+            --success: #52c41a;
+            --success-light: #f6ffed;
+            --warning: #fa8c16;
+            --warning-light: #fff7e6;
+            --text-main: #262626;
+            --text-secondary: #595959;
+            --text-muted: #8c8c8c;
+            --border-color: #f0f0f0;
+            --bg-body: #f5f7fa;
+            --bg-card: #ffffff;
+            --radius: 10px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background: var(--bg-body);
+            padding: 20px;
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        .container { max-width: 1800px; margin: 0 auto; }
+
+        /* ===== 顶部卡片 ===== */
+        .top-card {
+            background: linear-gradient(135deg, #1890ff 0%, #36cfc9 100%);
+            border-radius: var(--radius);
+            padding: 24px 28px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .top-card::before {
+            content: "";
+            position: absolute;
+            right: -40px;
+            top: -40px;
+            width: 160px;
+            height: 160px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+        }
+        .top-card::after {
+            content: "";
+            position: absolute;
+            right: 50px;
+            bottom: -70px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 50%;
+        }
+        .page-title { position: relative; z-index: 1; }
+        .page-title h1 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .page-title h1 i { font-size: 26px; }
+        .page-title p {
+            font-size: 13px;
+            opacity: 0.9;
+            margin: 0;
+        }
+
+        /* 状态切换标签 */
+        .status-tabs {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            gap: 8px;
+            background: rgba(255,255,255,0.16);
+            padding: 4px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+        }
+        .status-tab {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            border-radius: 6px;
+            color: rgba(255,255,255,0.9);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            border: none;
+            background: transparent;
+        }
+        .status-tab:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+        .status-tab.active {
+            background: #fff;
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .status-tab i { font-size: 16px; }
+
+        /* ===== 工具栏卡片 ===== */
+        .toolbar-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 18px 24px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .toolbar-card .layui-form {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .toolbar-card .layui-input-inline {
+            width: 360px;
+            margin: 0;
+        }
+        .toolbar-card .layui-input {
+            border-radius: 8px;
+            height: 38px;
+            line-height: 38px;
+            border-color: #d9d9d9;
+            transition: all 0.2s;
+        }
+        .toolbar-card .layui-input:focus {
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px rgba(24,144,255,0.12);
+        }
+        .toolbar-card .layui-btn {
+            border-radius: 8px;
+            height: 38px;
+            line-height: 38px;
+            padding: 0 20px;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .toolbar-card .layui-btn i { font-size: 14px; }
+
+        .stat-badges {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .stat-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+        .stat-badge i { font-size: 14px; }
+
+        /* ===== 表格卡片 ===== */
+        .table-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            padding: 20px;
+        }
+        .table-card .layui-table-view {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        /* 自定义单元格样式 */
+        .mono { font-family: 'Roboto Mono', 'Consolas', monospace; color: var(--text-secondary); }
+        .amount { color: #cf1322; font-weight: 700; font-family: 'Roboto Mono', 'Consolas', monospace; }
+        .status-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-tag.shipped {
+            background: var(--success-light);
+            color: var(--success);
+            border: 1px solid #b7eb8f;
+        }
+        .status-tag.pending {
+            background: var(--warning-light);
+            color: var(--warning);
+            border: 1px solid #ffd591;
+        }
+        .status-tag::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* ===== 详情弹窗 ===== */
+        .detail-box { padding: 20px 24px; }
+        .detail-section-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .detail-section-title i { color: var(--primary); font-size: 16px; }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px 28px;
+            margin-bottom: 22px;
+        }
+        .detail-item {
+            display: flex;
+            align-items: baseline;
+            font-size: 14px;
+        }
+        .detail-item.full { grid-column: 1 / -1; }
+        .detail-label {
+            color: var(--text-muted);
+            width: 84px;
+            flex-shrink: 0;
+            font-weight: 500;
+        }
+        .detail-value {
+            color: var(--text-main);
+            flex: 1;
+            word-break: break-all;
+        }
+        .detail-value.mono { font-family: 'Roboto Mono', 'Consolas', monospace; }
+
+        .photo-section { margin-bottom: 22px; }
+        .photo-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .photo-list img {
+            width: 110px;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .photo-list img:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+        }
+        .photo-empty {
+            color: var(--text-muted);
+            font-size: 13px;
+            padding: 16px;
+            background: #fafafa;
+            border-radius: 8px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .detail-items-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .detail-items-title i { color: var(--primary); font-size: 16px; }
+
+        /* 加载与空状态 */
+        .detail-loading {
+            padding: 40px 0;
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .detail-loading i { font-size: 28px; color: var(--primary); }
+        .detail-error {
+            padding: 30px;
+            text-align: center;
+            color: #ff4d4f;
+        }
+        .detail-error i { font-size: 32px; margin-bottom: 10px; display: block; }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .top-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+            .toolbar-card .layui-input-inline { width: 100%; }
+            .stat-badges { margin-left: 0; width: 100%; }
+            .detail-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- 顶部卡片 -->
+    <div class="top-card">
+        <div class="page-title">
+            <h1><i class="layui-icon layui-icon-ok-circle"></i>拣货发货 - 已发货</h1>
+            <p>已发货订单查询与管理</p>
+        </div>
+        <div class="status-tabs">
+            <button class="status-tab" data-href="/web/picking_shipping_web/picking_shipping_pending">
+                <i class="layui-icon layui-icon-time"></i>待发货
+            </button>
+            <button class="status-tab active" data-href="/web/picking_shipping_web/picking_shipping">
+                <i class="layui-icon layui-icon-ok"></i>已发货
+            </button>
+        </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="toolbar-card">
+        <form class="layui-form" lay-filter="searchForm">
+            <div class="layui-input-inline" style="width: 280px;">
+                <input type="text" id="keyword" name="keyword" placeholder="搜索销售订单号 / 出库单号 / 客户名称" autocomplete="off" class="layui-input">
+            </div>
+            <div class="layui-input-inline" style="width: 140px;">
+                <select id="shipper" name="shipper" lay-search="">
+                    <option value="">全部操作员</option>
+                </select>
+            </div>
+            <div class="layui-input-inline" style="width: 210px;">
+                <input type="text" id="shipDateRange" name="shipDateRange" placeholder="发货时间" autocomplete="off" class="layui-input">
+            </div>
+            <div class="layui-input-inline" style="width: 210px;">
+                <input type="text" id="orderDateRange" name="orderDateRange" placeholder="订单日期" autocomplete="off" class="layui-input">
+            </div>
+            <div class="layui-input-inline" style="width: 120px;">
+                <select id="hasPhotos" name="hasPhotos">
+                    <option value="">全部</option>
+                    <option value="1">有图片</option>
+                    <option value="0">无图片</option>
+                </select>
+            </div>
+            <button type="button" class="layui-btn layui-btn-normal" id="search-btn">
+                <i class="layui-icon layui-icon-search"></i>查询
+            </button>
+            <button type="button" class="layui-btn layui-btn-primary" id="reset-btn">
+                <i class="layui-icon layui-icon-refresh"></i>重置
+            </button>
+        </form>
+        <div class="stat-badges">
+            <span class="stat-badge" id="total-badge">
+                <i class="layui-icon layui-icon-form"></i>共 0 条
+            </span>
+        </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="table-card">
+        <table id="shippedTable" lay-filter="shippedTable"></table>
+    </div>
+</div>
+
+{% raw %}
+<!-- 操作列模板 -->
+<script type="text/html" id="detailBar">
+    <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="detail">
+        <i class="layui-icon layui-icon-list"></i>详情
+    </a>
+</script>
+
+<!-- 状态列模板 -->
+<script type="text/html" id="statusTpl">
+    <span class="status-tag shipped">已发货</span>
+</script>
+
+<!-- 详情弹窗模板 -->
+<script type="text/html" id="detailTpl">
+    <div class="detail-box">
+        <div class="detail-section-title">
+            <i class="layui-icon layui-icon-form"></i>
+            {{ d.header.order_no || '订单详情' }}
+            <span class="status-tag shipped" style="margin-left: auto;">已发货</span>
+        </div>
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="detail-label">客户</span>
+                <span class="detail-value">{{ d.header.customer || '-' }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">出库单号</span>
+                <span class="detail-value mono">{{ d.header.out_no || '-' }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">订单日期</span>
+                <span class="detail-value">{{ d.header.order_date || '-' }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">发货时间</span>
+                <span class="detail-value">{{ d.header.ship_date || '-' }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">操作员</span>
+                <span class="detail-value">{{ d.header.shipper || '-' }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">实发金额</span>
+                <span class="detail-value amount">{{ d.header.amount || '-' }}</span>
+            </div>
+        </div>
+
+        {{# if(d.photos && d.photos.length > 0){ }}
+        <div class="photo-section">
+            <div class="detail-section-title">
+                <i class="layui-icon layui-icon-picture"></i>发货照片
+            </div>
+            <div class="photo-list">
+                {{# layui.each(d.photos, function(idx, photo){ }}
+                <img src="https://jh.fsbbr.net/uploads/{{ photo }}" alt="照片{{ idx+1 }}" data-index="{{ idx }}" class="detail-photo">
+                {{# }); }}
+            </div>
+        </div>
+        {{# } }}
+
+        <div class="detail-items-title">
+            <i class="layui-icon layui-icon-component"></i>产品明细
+        </div>
+        <table id="detailItemsTable" lay-filter="detailItemsTable"></table>
+    </div>
+</script>
+{% endraw %}
+
+<script src="/static/layui/layui.js"></script>
+<script>
+    layui.use(['table', 'jquery', 'layer', 'laytpl', 'form', 'laydate'], function () {
+        var table = layui.table;
+        var $ = layui.jquery;
+        var layer = layui.layer;
+        var laytpl = layui.laytpl;
+        var form = layui.form;
+        var laydate = layui.laydate;
+
+        var API_BASE = '/new/api/picking_shipping';
+        var PAGE_SIZE = 20;
+        var STATUS = 'shipped';
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function textCell(cls, value) {
+            return '<span class="' + cls + '">' + escapeHtml(value) + '</span>';
+        }
+
+        function amountCell(value) {
+            return '<span class="amount">' + escapeHtml(value) + '</span>';
+        }
+
+        // 页面切换
+        document.querySelectorAll('.status-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                window.location.href = this.dataset.href;
+            });
+        });
+
+        document.getElementById('keyword').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                document.getElementById('search-btn').click();
+            }
+        });
+
+        // 日期范围选择器
+        laydate.render({ elem: '#shipDateRange', range: true, format: 'yyyy-MM-dd' });
+        laydate.render({ elem: '#orderDateRange', range: true, format: 'yyyy-MM-dd' });
+
+        // 加载操作员下拉框
+        function loadShippers() {
+            $.get(API_BASE + '/shippers', function (resp) {
+                if (resp.code !== 200 || !resp.data) return;
+                var html = '<option value="">全部操作员</option>';
+                layui.each(resp.data, function (idx, name) {
+                    html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+                });
+                $('#shipper').html(html);
+                form.render('select', 'searchForm');
+            });
+        }
+        loadShippers();
+
+        function parseDateRange(rangeVal) {
+            if (!rangeVal) return ['', ''];
+            var parts = rangeVal.split(' - ');
+            if (parts.length !== 2) return ['', ''];
+            return [parts[0].trim(), parts[1].trim()];
+        }
+
+        function buildWhere() {
+            var shipRange = parseDateRange($('#shipDateRange').val());
+            var orderRange = parseDateRange($('#orderDateRange').val());
+            return {
+                keyword: $('#keyword').val().trim(),
+                shipper: $('#shipper').val(),
+                ship_date_start: shipRange[0],
+                ship_date_end: shipRange[1],
+                order_date_start: orderRange[0],
+                order_date_end: orderRange[1],
+                has_photos: $('#hasPhotos').val()
+            };
+        }
+
+        function doSearch(reset) {
+            if (reset) {
+                $('#keyword').val('');
+                $('#shipper').val('');
+                $('#shipDateRange').val('');
+                $('#orderDateRange').val('');
+                $('#hasPhotos').val('');
+                form.render('select', 'searchForm');
+            }
+            table.reload('shippedTable', {
+                where: buildWhere(),
+                page: { curr: 1 }
+            });
+        }
+
+        $('#search-btn').on('click', function () { doSearch(false); });
+        $('#reset-btn').on('click', function () { doSearch(true); });
+
+        table.render({
+            elem: '#shippedTable',
+            id: 'shippedTable',
+            url: API_BASE + '/list',
+            method: 'GET',
+            page: true,
+            limit: PAGE_SIZE,
+            limits: [20, 50, 100],
+            where: buildWhere(),
+            loading: true,
+            skin: 'line',
+            even: true,
+            size: 'lg',
+            parseData: function (res) {
+                return {
+                    code: res.code === 200 ? 0 : res.code,
+                    msg: res.msg,
+                    count: res.data ? res.data.total : 0,
+                    data: res.data ? res.data.list : []
+                };
+            },
+            cols: [[
+                { field: 'order_no', title: '销售订单号', minWidth: 160, templet: function (d) { return textCell('mono', d.order_no); } },
+                { field: 'out_no', title: '出库单号', minWidth: 160, templet: function (d) { return textCell('mono', d.out_no); } },
+                { field: 'customer', title: '客户名称', minWidth: 200 },
+                { field: 'order_date', title: '订单日期', minWidth: 140 },
+                { field: 'amount', title: '实发金额', minWidth: 120, templet: function (d) { return amountCell(d.amount); } },
+                { field: 'sku_count', title: 'SKU数', minWidth: 80, align: 'center' },
+                { field: 'total_quantity', title: '总数量', minWidth: 80, align: 'center' },
+                { field: 'photo_count', title: '图片', minWidth: 70, align: 'center', templet: function (d) { return d.photo_count > 0 ? '<span class="layui-badge layui-bg-blue">' + d.photo_count + '</span>' : '-'; } },
+                { field: 'ship_date', title: '发货时间', minWidth: 140 },
+                { field: 'shipper', title: '操作员', minWidth: 100 },
+                { title: '操作', width: 90, align: 'center', toolbar: '#detailBar', fixed: 'right' }
+            ]],
+            done: function (res, curr, count) {
+                $('#total-badge').html('<i class="layui-icon layui-icon-form"></i>共 ' + (count || 0) + ' 条');
+            }
+        });
+
+        // 行工具事件：详情
+        table.on('tool(shippedTable)', function (obj) {
+            if (obj.event === 'detail') {
+                openDetail(obj.data);
+            }
+        });
+
+        function openDetail(row) {
+            var orderId = row.order_id || row.id;
+            if (!orderId) {
+                layer.msg('缺少订单 ID，无法查看详情', { icon: 2 });
+                return;
+            }
+
+            layer.open({
+                type: 1,
+                title: false,
+                area: ['1400px', '90%'],
+                shadeClose: true,
+                offset: 'auto',
+                content: '<div id="detailContainer" class="detail-box"><div class="detail-loading"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i><p style="margin-top:10px;">加载中...</p></div></div>',
+                success: function (layero) {
+                    $.get(API_BASE + '/detail', { order_id: orderId, status: STATUS }, function (resp) {
+                        if (resp.code !== 200 || !resp.data) {
+                            layero.find('#detailContainer').html(
+                                '<div class="detail-error"><i class="layui-icon layui-icon-close-fill"></i>' +
+                                escapeHtml(resp.msg || '未知错误') + '</div>'
+                            );
+                            return;
+                        }
+                        renderDetail(layero.find('#detailContainer')[0], resp.data);
+                    }).fail(function () {
+                        layero.find('#detailContainer').html(
+                            '<div class="detail-error"><i class="layui-icon layui-icon-close-fill"></i>网络错误，请重试</div>'
+                        );
+                    });
+                }
+            });
+        }
+
+        function renderDetail(container, data) {
+            var header = data.header || {};
+            var items = data.items || [];
+            var photos = [];
+            if (header.photos) {
+                photos = header.photos.split(',').filter(function (p) { return p.trim(); }).map(function (p) { return p.trim(); });
+            }
+
+            var tplData = {
+                header: header,
+                items: items,
+                photos: photos
+            };
+
+            var tpl = document.getElementById('detailTpl').innerHTML;
+            laytpl(tpl).render(tplData, function (html) {
+                container.innerHTML = html;
+
+                // 渲染明细表格
+                table.render({
+                    elem: '#detailItemsTable',
+                    id: 'detailItemsTable',
+                    data: items,
+                    page: false,
+                    limit: items.length || 10,
+                    skin: 'line',
+                    even: true,
+                    size: 'sm',
+                    cols: [[
+                        { type: 'numbers', title: '序号', width: 55, align: 'center' },
+                        { field: 'l_name_zh', title: '商品名称', minWidth: 200 },
+                        { field: 'brand', title: '品牌', minWidth: 100 },
+                        { field: 'number', title: '编号', minWidth: 150, templet: function (d) { return textCell('mono', d.number); } },
+                        { field: 'price', title: '单价', minWidth: 95, align: 'right' },
+                        { field: 'quantity', title: '数量', minWidth: 75, align: 'center' },
+                        { field: 'total_price', title: '小计', minWidth: 95, align: 'right' }
+                    ]]
+                });
+
+                // 照片点击放大
+                if (photos.length > 0) {
+                    $(container).find('.detail-photo').on('click', function () {
+                        var srcList = photos.map(function (p) { return { src: 'https://jh.fsbbr.net/uploads/' + p, alt: p }; });
+                        layer.photos({
+                            photos: { data: srcList },
+                            start: parseInt(this.dataset.index) || 0
+                        });
+                    });
+                }
+            });
+        }
+    });
+</script>
+</body>
+</html>
