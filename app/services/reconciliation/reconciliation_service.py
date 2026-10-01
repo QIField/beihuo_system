@@ -34,11 +34,14 @@ from app.exceptions import (
 
 from .ks_process import merge_ks_data
 from .payment_bill import (
-    build_merge_result,
-    MERGED_OUT_COLS,
+    build_merge_result_dual,
+    build_reconcile_output,
+    DETAIL_OUT_COLS,
     KS_OUT_COLS,
     AR_OUT_COLS,
     OUT_MERGED_PREFIX,
+    R_COUPON_NO,
+    R_COUPON_YES,
     _keep_cols,
 )
 from .push_data import build_payment_bills, write_payment_template, get_default_skd_date
@@ -113,37 +116,47 @@ def run_reconciliation(
             raise DataParseError(f"开思数据合并失败: {e}") from e
         ks_count = len(ks_merged)
 
-        # ---- S2：开思 vs 金蝶 行级对账 ----
+        # ---- S2：开思 vs 金蝶 对账（对账 + 明细 + 开思剩下 + 金蝶剩下）----
         try:
-            merged, ks_rest, ar_rest = build_merge_result(ks=ks_merged, ar_path=ar_path)
+            reconcile_df, detail_df, ks_rest, ar_rest = build_merge_result_dual(
+                ks=ks_merged, ar_path=ar_path
+            )
         except Exception as e:
             raise DataError(f"开思与金蝶应收单对账失败: {e}") from e
 
-        merged_count = len(merged)
+        reconcile_count = len(reconcile_df)
+        detail_count = len(detail_df)
         ks_rest_count = len(ks_rest)
         ar_rest_count = len(ar_rest)
+        if reconcile_count > 0:
+            no_coupon_count = int((reconcile_df["类型"] == R_COUPON_NO).sum())
+            with_coupon_count = int((reconcile_df["类型"] == R_COUPON_YES).sum())
+        else:
+            no_coupon_count = with_coupon_count = 0
 
-        # ---- 输出对账结果 Excel（3 个 sheet） ----
+        # ---- 输出对账结果 Excel（4 个 sheet：对账成功数据/对账成功数据-明细/人工核对-开思/人工核对-金蝶）----
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M")
         merge_result_path = os.path.join(output_dir, f"{OUT_MERGED_PREFIX}_{ts}.xlsx")
-        m_out = _keep_cols(merged, MERGED_OUT_COLS)
+        rec_out = build_reconcile_output(reconcile_df)
+        det_out = _keep_cols(detail_df, DETAIL_OUT_COLS)
         ks_out = _keep_cols(ks_rest, KS_OUT_COLS)
         ar_out = _keep_cols(ar_rest, AR_OUT_COLS)
 
         try:
             with pd.ExcelWriter(merge_result_path, engine="openpyxl") as writer:  # pyright: ignore[reportAbstractUsage]
-                m_out.to_excel(writer, sheet_name="合并数据", index=False)
-                ks_out.to_excel(writer, sheet_name="开思剩下", index=False)
-                ar_out.to_excel(writer, sheet_name="金蝶剩下", index=False)
+                rec_out.to_excel(writer, sheet_name="对账成功数据", index=False)  # pyright: ignore[reportAttributeAccessIssue]
+                det_out.to_excel(writer, sheet_name="对账成功数据-明细", index=False)
+                ks_out.to_excel(writer, sheet_name="人工核对-开思", index=False)
+                ar_out.to_excel(writer, sheet_name="人工核对-金蝶", index=False)
         except Exception as e:
             raise DataError(f"生成对账结果 Excel 失败: {e}") from e
 
-        # ---- S3：生成收款单 ----
+        # ---- S3：生成收款单（对账命中全部数据：无券 + 有券，源单明细按物料行展开）----
         payment_bill_path = None
         payment_count = 0
-        if merged_count > 0:
+        if reconcile_count > 0:
             try:
-                bills = build_payment_bills(merged, skd_date)
+                bills = build_payment_bills(reconcile_df, detail_df, skd_date)
                 payment_count = len(bills)
                 payment_bill_path = write_payment_template(
                     bills, template_path, output_dir=output_dir
@@ -154,12 +167,15 @@ def run_reconciliation(
         # ---- 统计信息 ----
         stats = {
             "开思合并行数": ks_count,
-            "合并命中行数": merged_count,
-            "开思剩下行数": ks_rest_count,
-            "金蝶剩下行数": ar_rest_count,
+            "无开思券对账行数": no_coupon_count,
+            "有开思券对账行数": with_coupon_count,
+            "合并命中总行数": reconcile_count,
+            "明细行数": detail_count,
+            "开思数据需人工处理行数": ks_rest_count,
+            "金蝶数据需人工处理行数": ar_rest_count,
             "生成收款单数": payment_count,
-            "开思剩下原因": ks_rest["剩余原因"].value_counts().to_dict() if ks_rest_count > 0 else {},
-            "金蝶剩下原因": ar_rest["剩余原因"].value_counts().to_dict() if ar_rest_count > 0 else {},
+            "开思需人工处理原因": ks_rest["剩余原因"].value_counts().to_dict() if ks_rest_count > 0 else {},
+            "金蝶需人工处理原因": ar_rest["剩余原因"].value_counts().to_dict() if ar_rest_count > 0 else {},
         }
 
         return {
