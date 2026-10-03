@@ -291,9 +291,9 @@
                 // 统计卡片
                 var statItems = [
                     { label: '开思合并行数', value: stats['开思合并行数'] || 0, color: '#1E9FFF' },
-                    { label: '合并命中行数', value: stats['合并命中行数'] || 0, color: '#5FB878' },
-                    { label: '开思剩下行数', value: stats['开思剩下行数'] || 0, color: '#FFB800' },
-                    { label: '金蝶剩下行数', value: stats['金蝶剩下行数'] || 0, color: '#FF5722' },
+                    { label: '合并命中行数', value: stats['合并命中总行数'] || 0, color: '#5FB878' },
+                    { label: '开思剩下行数', value: stats['开思数据需人工处理行数'] || 0, color: '#FFB800' },
+                    { label: '金蝶剩下行数', value: stats['金蝶数据需人工处理行数'] || 0, color: '#FF5722' },
                     { label: '生成收款单数', value: stats['生成收款单数'] || 0, color: '#01AAED' },
                 ];
 
@@ -311,7 +311,7 @@
                 var dlHtml = '';
                 if(data.merge_result_url){
                     dlHtml += '<a href="' + data.merge_result_url + '" class="layui-btn layui-btn-normal download-btn" download>';
-                    dlHtml += '<i class="layui-icon layui-icon-download-circle"></i> 下载对账结果（合并数据/开思剩下/金蝶剩下）';
+                    dlHtml += '<i class="layui-icon layui-icon-download-circle"></i> 下载对账结果（对账成功数据/对账成功数据-明细/人工核对-开思/人工核对-金蝶）';
                     dlHtml += '</a>';
                 }
                 if(data.payment_bill_url){
@@ -323,8 +323,8 @@
 
                 // 原因明细
                 var reasonHtml = '';
-                var ksReasons = stats['开思剩下原因'] || {};
-                var arReasons = stats['金蝶剩下原因'] || {};
+                var ksReasons = stats['开思需人工处理原因'] || {};
+                var arReasons = stats['金蝶需人工处理原因'] || {};
 
                 if(Object.keys(ksReasons).length > 0 || Object.keys(arReasons).length > 0){
                     reasonHtml += '<fieldset class="layui-elem-field layui-field-title">';
@@ -334,7 +334,7 @@
 
                     // 开思剩下原因
                     reasonHtml += '<div>';
-                    reasonHtml += '<h4 style="margin-bottom: 10px;">开思剩下原因</h4>';
+                    reasonHtml += '<h4 style="margin-bottom: 10px;">人工核对-开思</h4>';
                     reasonHtml += '<table class="layui-table" lay-skin="line">';
                     reasonHtml += '<thead><tr><th>原因</th><th style="width: 100px;">数量</th></tr></thead>';
                     reasonHtml += '<tbody>';
@@ -348,7 +348,7 @@
 
                     // 金蝶剩下原因
                     reasonHtml += '<div>';
-                    reasonHtml += '<h4 style="margin-bottom: 10px;">金蝶剩下原因</h4>';
+                    reasonHtml += '<h4 style="margin-bottom: 10px;">人工核对-金蝶</h4>';
                     reasonHtml += '<table class="layui-table" lay-skin="line">';
                     reasonHtml += '<thead><tr><th>原因</th><th style="width: 100px;">数量</th></tr></thead>';
                     reasonHtml += '<tbody>';

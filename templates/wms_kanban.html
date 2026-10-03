@@ -820,6 +820,7 @@
                         <th>用时</th>
                         <th>发货员</th>
                         <th>发货时间</th>
+                        <th>图片</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -1553,6 +1554,7 @@
                     <td></td>
                     <td>${handleEmpty(item.shipper)}</td>
                     <td>${handleEmpty(item.ship_date)}</td>
+                    <td>${item.photos ? item.photos.split(',').filter(p => p.trim()).length : 0}</td>
                 `;
                 const statusTd = tr.children[4];
                 statusTd.innerHTML = formatStatus(item.status_wms, item.is_data_exists_wms_keywd);
@@ -1683,7 +1685,7 @@
                         loadingText.textContent = '请检查token';
                     } else {
                         const tbody = document.getElementById('tableBody');
-                        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#ff4d4f;">数据加载失败，请稍后重试</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#ff4d4f;">数据加载失败，请稍后重试</td></tr>';
                         const timelineResult = processTimelineData([]);
                         renderTimelineTable(timelineResult);
                     }
