@@ -47,42 +47,50 @@ class UserLarkMappingRepository:
         ).first()
 
     @staticmethod
-    def list_mappings(session, keyword=None, offset=0, limit=10):
+    def list_mappings(session, keyword=None, offset=0, limit=10, store=None):
         query = session.query(UserLarkMapping, CrmappUsers).join(
             CrmappUsers, UserLarkMapping.user_id == CrmappUsers.id
         )
+        if store:
+            query = query.filter(CrmappUsers.store == store)
         if keyword:
             like = f'%{keyword}%'
             query = query.filter(CrmappUsers.username.ilike(like))
         return query.order_by(UserLarkMapping.created_at.desc()).offset(offset).limit(limit).all()
 
     @staticmethod
-    def count_mappings(session, keyword=None):
+    def count_mappings(session, keyword=None, store=None):
         query = session.query(func.count(UserLarkMapping.id)).join(
             CrmappUsers, UserLarkMapping.user_id == CrmappUsers.id
         )
+        if store:
+            query = query.filter(CrmappUsers.store == store)
         if keyword:
             like = f'%{keyword}%'
             query = query.filter(CrmappUsers.username.ilike(like))
         return query.scalar() or 0
 
     @staticmethod
-    def list_candidates(session, keyword=None, limit=50):
+    def list_candidates(session, keyword=None, limit=50, store=None):
         """查询未绑定飞书的业务用户列表。"""
         active_mapping_exists = exists().where(
             UserLarkMapping.user_id == CrmappUsers.id,
             UserLarkMapping.status == 1,
         )
         query = session.query(CrmappUsers).filter(~active_mapping_exists)
+        if store:
+            query = query.filter(CrmappUsers.store == store)
         if keyword:
             like = f'%{keyword}%'
             query = query.filter(CrmappUsers.username.ilike(like))
         return query.order_by(CrmappUsers.id.desc()).limit(limit).all()
 
     @staticmethod
-    def list_all_users(session, keyword=None, limit=200):
+    def list_all_users(session, keyword=None, limit=200, store=None):
         """查询全部业务用户，用于任务分配下拉。"""
         query = session.query(CrmappUsers)
+        if store:
+            query = query.filter(CrmappUsers.store == store)
         if keyword:
             like = f'%{keyword}%'
             query = query.filter(CrmappUsers.username.ilike(like))
@@ -146,6 +154,41 @@ class UserLarkMappingRepository:
         rows = session.query(UserLarkMapping.lark_open_id).filter(
             UserLarkMapping.lark_open_id.in_(open_ids),
             UserLarkMapping.status == 1,
+        ).all()
+        return {row[0] for row in rows}
+
+    @staticmethod
+    def get_mappings_by_ids(session, mapping_ids):
+        """根据绑定 ID 列表查询绑定记录。"""
+        if not mapping_ids:
+            return []
+        return session.query(UserLarkMapping).filter(
+            UserLarkMapping.id.in_(mapping_ids),
+        ).all()
+
+    @staticmethod
+    def update_mapping(session, mapping_id, lark_open_id, lark_union_id=None):
+        """更新指定绑定记录的飞书 open_id 与 union_id。"""
+        mapping = session.query(UserLarkMapping).filter(
+            UserLarkMapping.id == mapping_id,
+        ).first()
+        if not mapping:
+            return None
+        mapping.lark_open_id = lark_open_id
+        if lark_union_id is not None:
+            mapping.lark_union_id = lark_union_id
+        session.flush()
+        return mapping
+
+    @staticmethod
+    def get_active_mapping_by_open_ids_except_user_ids(session, open_ids, user_ids):
+        """查询指定 open_id 列表中，已被非指定 user_id 绑定的 open_id 集合。"""
+        if not open_ids:
+            return set()
+        rows = session.query(UserLarkMapping.lark_open_id).filter(
+            UserLarkMapping.lark_open_id.in_(open_ids),
+            UserLarkMapping.status == 1,
+            UserLarkMapping.user_id.notin_(user_ids),
         ).all()
         return {row[0] for row in rows}
 

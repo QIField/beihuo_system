@@ -18,27 +18,6 @@ class UserLarkMappingServiceError(Exception):
 class UserLarkMappingService:
 
     @staticmethod
-    def bind_user(user_id, lark_open_id, lark_union_id=None):
-        UserLarkMappingService._validate_bind(user_id, lark_open_id)
-
-        with orm_session() as session:
-            existing = UserLarkMappingRepository.get_active_by_user_id(session, user_id)
-            if existing:
-                raise UserLarkMappingServiceError('该用户已绑定飞书')
-
-            open_id_used = UserLarkMappingRepository.get_active_by_open_id(session, lark_open_id)
-            if open_id_used:
-                raise UserLarkMappingServiceError('该飞书 open_id 已被绑定')
-
-            mapping = UserLarkMappingRepository.create(
-                session=session,
-                user_id=user_id,
-                lark_open_id=lark_open_id,
-                lark_union_id=lark_union_id,
-            )
-            return mapping.to_dict()
-
-    @staticmethod
     def update_mapping(mapping_id, lark_open_id, lark_union_id=None):
         if not mapping_id:
             raise UserLarkMappingServiceError('绑定ID不能为空')
@@ -62,6 +41,49 @@ class UserLarkMappingService:
             return mapping.to_dict()
 
     @staticmethod
+    def update_binding_and_contact(mapping_id, mobile=None, email=None, lark_open_id=None):
+        """
+        同时更新已绑定用户的联系方式和飞书 open_id。
+
+        用于一个弹窗内统一管理用户手机号、邮箱和绑定关系。
+        """
+        if not mapping_id:
+            raise UserLarkMappingServiceError('绑定ID不能为空')
+
+        mobile = (mobile or '').strip() or None
+        email = (email or '').strip() or None
+
+        with orm_session() as session:
+            mapping = UserLarkMappingRepository.get_by_id(session, mapping_id)
+            if not mapping:
+                raise UserLarkMappingServiceError('绑定记录不存在')
+
+            user_id = mapping.user_id
+
+            # 更新联系方式
+            existing = UserLarkMappingRepository.get_user_by_mobile_or_email(
+                session, user_id, mobile, email
+            )
+            if existing:
+                raise UserLarkMappingServiceError('手机号或邮箱已被其他用户使用')
+
+            user = UserLarkMappingRepository.update_user_contact(session, user_id, mobile, email)
+            if not user:
+                raise UserLarkMappingServiceError('用户不存在')
+
+            # 更新飞书 open_id
+            if lark_open_id:
+                if lark_open_id != mapping.lark_open_id:
+                    open_id_used = UserLarkMappingRepository.get_active_by_open_id(session, lark_open_id)
+                    if open_id_used and open_id_used.id != mapping_id:
+                        raise UserLarkMappingServiceError('该飞书 open_id 已被绑定')
+
+                mapping.lark_open_id = lark_open_id
+
+            session.flush()
+            return mapping.to_dict()
+
+    @staticmethod
     def toggle_status(mapping_id, status):
         if status not in {0, 1}:
             raise UserLarkMappingServiceError('状态值不合法')
@@ -75,14 +97,14 @@ class UserLarkMappingService:
             return mapping.to_dict()
 
     @staticmethod
-    def list_mappings(keyword=None, page=1, page_size=10):
+    def list_mappings(keyword=None, page=1, page_size=10, store=None):
         page = max(1, page)
         page_size = min(max(1, page_size), 100)
         offset = (page - 1) * page_size
 
         with orm_session() as session:
-            rows = UserLarkMappingRepository.list_mappings(session, keyword, offset, page_size)
-            total = UserLarkMappingRepository.count_mappings(session, keyword)
+            rows = UserLarkMappingRepository.list_mappings(session, keyword, offset, page_size, store)
+            total = UserLarkMappingRepository.count_mappings(session, keyword, store)
             data_list = [UserLarkMappingService._format_mapping(row) for row in rows]
 
         return {
@@ -93,15 +115,15 @@ class UserLarkMappingService:
         }
 
     @staticmethod
-    def list_candidates(keyword=None, limit=50):
+    def list_candidates(keyword=None, limit=50, store=None):
         with orm_session() as session:
-            users = UserLarkMappingRepository.list_candidates(session, keyword, limit)
+            users = UserLarkMappingRepository.list_candidates(session, keyword, limit, store)
             return [u.to_dict() for u in users]
 
     @staticmethod
-    def list_all_users(keyword=None, limit=200):
+    def list_all_users(keyword=None, limit=200, store=None):
         with orm_session() as session:
-            users = UserLarkMappingRepository.list_all_users(session, keyword, limit)
+            users = UserLarkMappingRepository.list_all_users(session, keyword, limit, store)
             return [u.to_dict() for u in users]
 
     @staticmethod
@@ -186,8 +208,17 @@ class UserLarkMappingService:
         if not user_ids:
             raise UserLarkMappingServiceError('用户ID列表不能为空')
 
+        # 前端 checkbox x-model 会把 ID 收集为字符串，统一归一化为整数
+        normalized_user_ids = []
+        failed = []
+        for uid in user_ids:
+            try:
+                normalized_user_ids.append(int(uid))
+            except (TypeError, ValueError):
+                failed.append({'user_id': uid, 'reason': '用户ID格式错误'})
+
         with orm_session() as session:
-            users = UserLarkMappingRepository.get_users_by_ids(session, user_ids)
+            users = UserLarkMappingRepository.get_users_by_ids(session, normalized_user_ids)
             # 在 session 内把 ORM 对象转成普通 dict，避免 detached instance 问题
             user_dict = {
                 u.id: {'id': u.id, 'mobile': u.mobile, 'email': u.email}
@@ -205,17 +236,16 @@ class UserLarkMappingService:
         )
 
         success = 0
-        failed = []
 
         with orm_session() as session:
             bound_user_ids = UserLarkMappingRepository.get_active_mapping_by_user_ids(
-                session, list(user_dict.keys())
+                session, normalized_user_ids
             )
             bound_open_ids = UserLarkMappingRepository.get_active_mapping_by_open_ids(
                 session, open_ids
             )
 
-            for user_id in user_ids:
+            for user_id in normalized_user_ids:
                 user = user_dict.get(user_id)
                 if not user:
                     failed.append({'user_id': user_id, 'reason': '用户不存在'})
@@ -246,17 +276,111 @@ class UserLarkMappingService:
         return {'success': success, 'failed': failed}
 
     @staticmethod
+    def batch_refresh_by_contact(mapping_ids):
+        """
+        根据已绑定用户当前的联系方式，重新反查飞书用户 ID 并更新绑定。
+
+        用于更换组织等场景下，open_id 变化后批量刷新已有绑定。
+
+        :param mapping_ids: 绑定记录 ID 列表
+        :return: {'success': int, 'failed': [{'mapping_id': int, 'user_id': int, 'reason': str}, ...]}
+        """
+        if not mapping_ids:
+            raise UserLarkMappingServiceError('绑定ID列表不能为空')
+
+        # 前端 checkbox x-model 会把 ID 收集为字符串，统一归一化为整数
+        normalized_mapping_ids = []
+        failed = []
+        for mid in mapping_ids:
+            try:
+                normalized_mapping_ids.append(int(mid))
+            except (TypeError, ValueError):
+                failed.append({'mapping_id': mid, 'reason': '绑定ID格式错误'})
+
+        with orm_session() as session:
+            mappings = UserLarkMappingRepository.get_mappings_by_ids(session, normalized_mapping_ids)
+            # 在 session 内把 ORM 对象转成普通 dict，避免 detached instance 问题
+            mapping_dict = {
+                m.id: {'id': m.id, 'user_id': m.user_id}
+                for m in mappings
+            }
+
+            user_ids = [m['user_id'] for m in mapping_dict.values()]
+            users = UserLarkMappingRepository.get_users_by_ids(session, user_ids)
+            user_dict = {
+                u.id: {'id': u.id, 'mobile': u.mobile, 'email': u.email}
+                for u in users
+            }
+
+        mobiles, emails, user_by_mobile, user_by_email = \
+            UserLarkMappingService._collect_contact_inputs(list(user_dict.values()))
+
+        # 飞书接口调用放在 session 外
+        lark_result = batch_get_lark_user_ids(mobiles=mobiles, emails=emails)
+
+        user_id_to_lark_info, open_ids = UserLarkMappingService._build_lark_id_mapping(
+            lark_result, user_by_mobile, user_by_email
+        )
+
+        success = 0
+
+        with orm_session() as session:
+            # 排除当前这批用户本身已有的绑定，允许同 user_id 刷新为新的 open_id
+            bound_open_ids = UserLarkMappingRepository.get_active_mapping_by_open_ids_except_user_ids(
+                session, open_ids, user_ids
+            )
+
+            for mapping_id in normalized_mapping_ids:
+                mapping = mapping_dict.get(mapping_id)
+                if not mapping:
+                    failed.append({'mapping_id': mapping_id, 'reason': '绑定记录不存在'})
+                    continue
+
+                user_id = mapping['user_id']
+                user = user_dict.get(user_id)
+                if not user:
+                    failed.append({
+                        'mapping_id': mapping_id,
+                        'user_id': user_id,
+                        'reason': '用户不存在',
+                    })
+                    continue
+
+                lark_info = user_id_to_lark_info.get(user_id)
+                if not lark_info:
+                    failed.append({
+                        'mapping_id': mapping_id,
+                        'user_id': user_id,
+                        'reason': '未找到飞书用户',
+                    })
+                    continue
+
+                open_id = lark_info['open_id']
+                if open_id in bound_open_ids:
+                    failed.append({
+                        'mapping_id': mapping_id,
+                        'user_id': user_id,
+                        'reason': '该飞书账号已被其他用户绑定',
+                    })
+                    continue
+
+                UserLarkMappingRepository.update_mapping(
+                    session,
+                    mapping_id=mapping_id,
+                    lark_open_id=open_id,
+                    lark_union_id=lark_info.get('union_id'),
+                )
+                success += 1
+
+        return {'success': success, 'failed': failed}
+
+    @staticmethod
     def _format_mapping(row):
         mapping, user = row
         data = mapping.to_dict()
         data['username'] = user.username if user else ''
         data['department'] = user.department if user else ''
         data['store'] = user.store if user else ''
+        data['mobile'] = user.mobile if user else ''
+        data['email'] = user.email if user else ''
         return data
-
-    @staticmethod
-    def _validate_bind(user_id, lark_open_id):
-        if not user_id:
-            raise UserLarkMappingServiceError('用户ID不能为空')
-        if not lark_open_id:
-            raise UserLarkMappingServiceError('飞书 open_id 不能为空')
