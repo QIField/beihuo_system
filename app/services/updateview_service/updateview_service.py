@@ -185,7 +185,7 @@ def _is_valid_update_value(val):
     return True
 
 
-def update_product_view(session, product_id, cass_desc, store_cass_price, store_peer_price, qpl_price, cost_price):
+def update_product_view(session, product_id, cass_desc, store_cass_price, store_peer_price, qpl_price, cost_price, brand_code):
     """
     调用API: POST /api/Product.Product/updateView
     更新产品视图信息（先查view再回传完整字段）
@@ -245,6 +245,10 @@ def update_product_view(session, product_id, cass_desc, store_cass_price, store_
         except (ValueError, TypeError):
             pass
 
+    # 品牌号：有值才添加，按字符串处理
+    if _is_valid_update_value(brand_code):
+        new_values["brand_code"] = str(brand_code).strip()
+
     # 打印调试信息
     print(f"    [DEBUG] 准备更新的字段: {new_values}")
 
@@ -275,26 +279,26 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
     
     # 读取Excel文件
     file_ext = Path(file_path).suffix.lower()
-    # 配件编码、品牌号可能包含前导零，强制按字符串读取
-    read_dtype = {'配件编码': str, '品牌号': str}
+    # 配件编码、品牌号搜索/更新可能包含前导零，强制按字符串读取
+    read_dtype = {'配件编码': str, '品牌号搜索': str, '品牌号更新': str}
     if file_ext == '.xls':
         df = pd.read_excel(file_path, engine='xlrd', dtype=read_dtype)
     else:
         df = pd.read_excel(file_path, engine='openpyxl', dtype=read_dtype)
-    
+
     total_rows = len(df)
     print(f"[UpdateView Service] 读取完成，共 {total_rows} 行数据")
-    
+
     # 检查必要列是否存在
-    # 方式一：品牌号（不需要配件编码，不需要品牌）
-    # 方式二：配件编码 + 品牌（不需要品牌号）
+    # 方式一：品牌号搜索（不需要配件编码，不需要品牌）
+    # 方式二：配件编码 + 品牌（不需要品牌号搜索）
     # 两种方式至少满足一种
-    has_brand_code_col = '品牌号' in df.columns
+    has_brand_code_search_col = '品牌号搜索' in df.columns
     has_peijian_code_col = '配件编码' in df.columns
     has_brand_col = '品牌' in df.columns
-    
-    if not has_brand_code_col and not (has_peijian_code_col and has_brand_col):
-        raise ValueError(f"Excel文件需要包含'品牌号'列，或同时包含'配件编码'和'品牌'列")
+
+    if not has_brand_code_search_col and not (has_peijian_code_col and has_brand_col):
+        raise ValueError(f"Excel文件需要包含'品牌号搜索'列，或同时包含'配件编码'和'品牌'列")
     
     # 添加状态列
     if '更新状态' not in df.columns:
@@ -314,8 +318,9 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
             for idx, row in df.iterrows():
                 peijian_code = row.get('配件编码', '')
                 brand = row.get('品牌', '')
-                brand_code = row.get('品牌号', '')
-                
+                brand_code_search = row.get('品牌号搜索', '')
+                brand_code_update = row.get('品牌号更新', '')
+
                 # 上报进度
                 if progress_callback:
                     progress_callback(
@@ -323,42 +328,41 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
                         total=total_rows,
                         message=f"正在处理第 {idx + 1}/{total_rows} 行: {peijian_code}"
                     )
-                
+
                 print(f"\n[UpdateView Service] 处理第 {idx + 1}/{total_rows} 行")
-                print(f"  配件编码: {peijian_code}, 品牌: {brand}, 品牌号: {brand_code}")
+                print(f"  配件编码: {peijian_code}, 品牌: {brand}, 品牌号搜索: {brand_code_search}, 品牌号更新: {brand_code_update}")
                 
-                # 检查是否有品牌号（方式一）
-                has_brand_code = not pd.isna(brand_code) and str(brand_code).strip()
+                # 检查是否有品牌号搜索（方式一）
+                has_brand_code_search = not pd.isna(brand_code_search) and str(brand_code_search).strip()
                 # 检查是否有配件编码+品牌（方式二）
                 has_peijian_code = not pd.isna(peijian_code) and str(peijian_code).strip()
                 has_brand = not pd.isna(brand) and str(brand).strip()
-                
+
                 # 两种方式都不满足，跳过
-                if not has_brand_code and not (has_peijian_code and has_brand):
-                    df.at[idx, '更新状态'] = '品牌号为空，且配件编码或品牌为空'
-                    print("  跳过：品牌号为空，且配件编码或品牌为空")
+                if not has_brand_code_search and not (has_peijian_code and has_brand):
+                    df.at[idx, '更新状态'] = '品牌号搜索为空，且配件编码或品牌为空'
+                    print("  跳过：品牌号搜索为空，且配件编码或品牌为空")
                     continue
-                
-                if has_brand_code:
-                    brand_code = str(brand_code).strip()
+
+                if has_brand_code_search:
+                    brand_code_search = str(brand_code_search).strip()
                 if has_peijian_code:
                     peijian_code = str(peijian_code).strip()
                 if has_brand:
                     brand = str(brand).strip()
-                
-                product_ids = []
-                
-                # 方式一：优先使用品牌号获取product_id
-                if not pd.isna(brand_code) and str(brand_code).strip():
-                    brand_code = str(brand_code).strip()
-                    print(f"  方式一：使用品牌号 {brand_code} 获取product_id")
 
-                    # 调用API-1，aikeyword直接传品牌号
+                product_ids = []
+
+                # 方式一：优先使用品牌号搜索获取product_id
+                if has_brand_code_search:
+                    print(f"  方式一：使用品牌号搜索 {brand_code_search} 获取product_id")
+
+                    # 调用API-1，aikeyword直接传品牌号搜索
                     time.sleep(0.5)
-                    api1_response = get_product_list_by_aikeyword(session, brand_code)
+                    api1_response = get_product_list_by_aikeyword(session, brand_code_search)
 
                     if api1_response:
-                        product_ids = find_product_id_by_brand_code(api1_response, brand_code)
+                        product_ids = find_product_id_by_brand_code(api1_response, brand_code_search)
                         if product_ids:
                             print(f"  方式一匹配到 {len(product_ids)} 个: {product_ids}")
                     else:
@@ -402,7 +406,7 @@ def process_update_crm_product_async(file_path, progress_callback=None, **kwargs
                         skip_cost_price_count += 1
                         print(f"  [跳过成本价] product_id={pid}, stock={stock}")
                     time.sleep(0.5)
-                    success, msg = update_product_view(session, pid, cass_desc, store_cass_price, store_peer_price, qpl_price, effective_cost_price)
+                    success, msg = update_product_view(session, pid, cass_desc, store_cass_price, store_peer_price, qpl_price, effective_cost_price, brand_code_update)
                     success_count += 1 if success else 0
                     print(f"  {'[成功]' if success else '[失败]'} {pid}")
                 status_text = f'成功{success_count}/{len(product_ids)}'
