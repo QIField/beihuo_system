@@ -7,6 +7,7 @@
  *
  * 依赖（页面需提前引入）：
  *   - handsontable 库
+ *   - /static/js/components/handsontable-builder/sortable-utils.js
  *   - /static/js/components/grid-column-menu/grid-column-menu.js
  *   - /static/js/components/custom-pagination/custom-pagination.js
  *
@@ -448,15 +449,6 @@ var HandsontableBuilder = (function() {
         render(builder, pageData);
     }
 
-    function parseSortableDate(value) {
-        if (typeof value !== 'string') return null;
-        var m = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/);
-        if (!m) return null;
-        var ts = Date.UTC(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10),
-                          parseInt(m[4], 10), parseInt(m[5], 10), parseInt(m[6], 10));
-        return isNaN(ts) ? null : ts;
-    }
-
     function sortLocalData(builder) {
         var data = builder.config.localData || [];
         var colId = builder.sortColumn;
@@ -464,29 +456,7 @@ var HandsontableBuilder = (function() {
         if (!colId || !dir || !data.length) return;
 
         data.sort(function(a, b) {
-            var va = a[colId];
-            var vb = b[colId];
-            if (va === undefined || va === null) va = '';
-            if (vb === undefined || vb === null) vb = '';
-
-            // 对 ISO / SQL 风格的时间字符串按时间戳排序，避免 parseFloat 只取到年份
-            var dateA = parseSortableDate(va);
-            var dateB = parseSortableDate(vb);
-            if (dateA !== null && dateB !== null) {
-                return dir === 'asc' ? dateA - dateB : dateB - dateA;
-            }
-
-            var numA = parseFloat(va);
-            var numB = parseFloat(vb);
-            if (!isNaN(numA) && !isNaN(numB) && String(va).trim() !== '' && String(vb).trim() !== '') {
-                return dir === 'asc' ? numA - numB : numB - numA;
-            }
-
-            va = String(va);
-            vb = String(vb);
-            if (va < vb) return dir === 'asc' ? -1 : 1;
-            if (va > vb) return dir === 'asc' ? 1 : -1;
-            return 0;
+            return SortableUtils.compareValues(a[colId], b[colId], dir);
         });
     }
 

@@ -52,6 +52,45 @@ def compare_permission_required(f):
     return decorated_function
 
 
+def _format_ascii_table(headers, rows):
+    """生成 ASCII 表格线文本，用于 Excel 批注"""
+    col_widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            col_widths[i] = max(col_widths[i], len(cell))
+
+    def make_line(cells, sep="|"):
+        parts = [f" {cell:{col_widths[i]}} " for i, cell in enumerate(cells)]
+        return sep + sep.join(parts) + sep
+
+    def make_sep(sep="+", fill="-"):
+        parts = [f"{fill}{fill * col_widths[i]}{fill}" for i in range(len(headers))]
+        return sep + sep.join(parts) + sep
+
+    lines = [make_line(headers), make_sep()]
+    for row in rows:
+        lines.append(make_line(row))
+    return "\n".join(lines)
+
+
+def _build_procurement_table_text(records):
+    """将采购记录列表转为表格线批注文本"""
+    if not records:
+        return ""
+    sorted_records = sorted(
+        records,
+        key=lambda r: r.get('purchase_date', ''),
+        reverse=True
+    )
+    rows = []
+    for r in sorted_records:
+        date = r.get('purchase_date', '')[:7]
+        supplier = r.get('supplier_name', '')
+        price = f"{float(r.get('purchase_price', 0)):.2f}"
+        rows.append([date, supplier, price])
+    return _format_ascii_table(["日期", "供应商", "价格"], rows)
+
+
 @compare_bp.route('/list', methods=['GET'])
 @compare_permission_required
 def get_compare_list():
@@ -142,18 +181,19 @@ def export_compare_data():
         if not data:
             return jsonify({'code': 1, 'msg': '没有数据可导出'}), 400
 
-        # 从 crmapp_procurement_history 表查询每月最低价（与悬浮窗展示一致）
+        # 从 crmapp_procurement_history 表查询采购记录
         procurement_map = {}
+        procurement_detail_map = {}
         if data:
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cursor:
                     # 构建查询条件
                     placeholders = ', '.join(['(%s, %s)'] * len(data))
-                    params = []
+                    base_params = []
                     for item in data:
-                        params.append(item.get('oe', ''))
-                        params.append(item.get('brand', ''))
+                        base_params.append(item.get('oe', ''))
+                        base_params.append(item.get('brand', ''))
                     if company:
                         # 查询每月最低价（与悬浮窗逻辑一致）
                         sql = f"""
@@ -173,7 +213,7 @@ def export_compare_data():
                             )
                             ORDER BY purchase_date DESC
                         """
-                        params.insert(0, company)
+                        params = [company] + base_params
                         cursor.execute(sql, params)
                         rows = cursor.fetchall()
                         for row in rows:
@@ -185,6 +225,29 @@ def export_compare_data():
                                 'purchase_price': float(row[3]) if row[3] else 0.0,
                                 'purchase_date': row[4].strftime('%Y-%m-%d') if hasattr(row[4], 'strftime') else str(row[4])
                             })
+
+                        # 查询全部采购记录（用于最高/最低价批注）
+                        sql_detail = f"""
+                            SELECT oe, brand, supplier_name, unit_price, purchase_date
+                            FROM crmapp_procurement_history
+                            WHERE company = %s 
+                            AND (oe, brand) IN ({placeholders})
+                            AND purchase_date >= '2024-01-01'
+                            AND purchase_date <= '2026-12-31'
+                            ORDER BY purchase_date DESC
+                        """
+                        params_detail = [company] + base_params
+                        cursor.execute(sql_detail, params_detail)
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            key = (row[0], row[1])
+                            if key not in procurement_detail_map:
+                                procurement_detail_map[key] = []
+                            procurement_detail_map[key].append({
+                                'supplier_name': row[2],
+                                'purchase_price': float(row[3]) if row[3] else 0.0,
+                                'purchase_date': row[4].strftime('%Y-%m-%d') if hasattr(row[4], 'strftime') else str(row[4])
+                            })
             except Exception as e:
                 print(f"查询采购记录失败: {e}")
             finally:
@@ -192,6 +255,7 @@ def export_compare_data():
         
         # 处理数据，构建导出格式
         export_data = []
+        row_comments = []
         for idx, item in enumerate(data, start=1):
             # 从 procurement_map 获取每月最低价记录，格式化为多行文本
             procurement_records_str = ''
@@ -241,6 +305,10 @@ def export_compare_data():
                 except:
                     return value
 
+            max_price = format_price(item.get('max_price'))
+            min_price = format_price(item.get('min_price'))
+            price_pair = f"{max_price} / {min_price}" if (max_price or min_price) else ''
+
             row = {
                 '行号': idx,
                 'OE': item.get('oe', ''),
@@ -250,8 +318,7 @@ def export_compare_data():
                 '替换号': item.get('replace_number', ''),
                 '产品等级': item.get('product_level', ''),
                 '供应商价格': format_price(item.get('supplier_price')),
-                '最高价': format_price(item.get('max_price')),
-                '最低价': format_price(item.get('min_price')),
+                '最高/最低价': price_pair,
                 '采购记录': procurement_records_str,
                 '4S含税进价': format_price(item.get('dealer_purchase_price')),
                 '4S含税售价': format_price(item.get('dealer_sale_price')),
@@ -266,6 +333,12 @@ def export_compare_data():
                 '品牌编码': item.get('brand_code', '')
             }
             export_data.append(row)
+
+            # 生成最高/最低价单元格的采购明细批注
+            comment_text = ''
+            if key in procurement_detail_map and procurement_detail_map[key]:
+                comment_text = _build_procurement_table_text(procurement_detail_map[key])
+            row_comments.append(comment_text)
 
         # 转换为DataFrame
         df = pd.DataFrame(export_data)
@@ -308,26 +381,37 @@ def export_compare_data():
                     'F': 15,  # 替换号
                     'G': 12,  # 产品等级
                     'H': 12,  # 供应商价格
-                    'I': 10,  # 最高价
-                    'J': 10,  # 最低价
-                    'K': 40,  # 采购记录（较宽以显示多行内容）
-                    'L': 12,  # 4S含税进价
-                    'M': 12,  # 4S含税售价
-                    'N': 18,  # 更新价格时间
-                    'O': 10,  # 今日销量
-                    'P': 10,  # 昨日销量
-                    'Q': 12,  # 近7天销量
-                    'R': 12,  # 本月销量
-                    'S': 16,  # 近6个月总销量
-                    'T': 16,  # 近12个月总销量
-                    'U': 25,  # 系统产品备注
-                    'V': 12   # 品牌编码
+                    'I': 18,  # 最高/最低价
+                    'J': 40,  # 采购记录（较宽以显示多行内容）
+                    'K': 12,  # 4S含税进价
+                    'L': 12,  # 4S含税售价
+                    'M': 18,  # 更新价格时间
+                    'N': 10,  # 今日销量
+                    'O': 10,  # 昨日销量
+                    'P': 12,  # 近7天销量
+                    'Q': 12,  # 本月销量
+                    'R': 16,  # 近6个月总销量
+                    'S': 16,  # 近12个月总销量
+                    'T': 25,  # 系统产品备注
+                    'U': 12   # 品牌编码
                 }
                 for col, width in column_widths.items():
                     worksheet.column_dimensions[col].width = width
 
                 # 应用比价模块统一样式
                 apply_uniform_style(worksheet)
+
+                # 给最高/最低价列添加采购明细批注
+                price_col_idx = None
+                for col_idx, col_name in enumerate(df.columns, start=1):
+                    if col_name == '最高/最低价':
+                        price_col_idx = col_idx
+                        break
+                if price_col_idx:
+                    for row_idx, comment_text in enumerate(row_comments, start=2):
+                        if comment_text:
+                            cell = worksheet.cell(row=row_idx, column=price_col_idx)
+                            cell.comment = Comment(comment_text, "采购明细")
 
             output.seek(0)
 

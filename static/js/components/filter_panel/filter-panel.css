@@ -1,18 +1,20 @@
 /**
  * Filter Panel Component Styles
- * 筛选面板组件样式
+ * 筛选面板组件样式（grid-column-menu 也依赖此文件的基础样式）
+ * ERP 风格：简约、扁平、选中态明显
  */
 
-/* 筛选按钮样式 */
+/* ==================== 筛选触发按钮 ==================== */
+
 .filter-btn {
     padding: 8px 12px;
     border: 1px solid #d9d9d9;
-    border-radius: 6px;
+    border-radius: 4px;
     background: #fff;
-    color: #333;
+    color: #334155;
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: all 0.15s;
     text-align: center;
     position: relative;
     min-width: 80px;
@@ -24,31 +26,56 @@
 }
 
 .filter-btn:hover {
-    border-color: #1890ff;
-    color: #1890ff;
+    border-color: #1e3a8a;
+    color: #1e3a8a;
 }
 
+/* 下拉箭头：仅下拉按钮（带 data-field）显示，未选中灰色 */
+.filter-btn[data-field]::after {
+    content: '';
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 6px;
+    vertical-align: middle;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #94a3b8;
+    transition: border-top-color 0.15s;
+}
+
+.filter-btn[data-field]:hover::after {
+    border-top-color: #1e3a8a;
+}
+
+/* 选中（已应用筛选条件）：深蓝底白箭头 */
 .filter-btn.active {
-    background: #52c41a;
+    background: #1e3a8a;
     color: #fff;
-    border-color: #52c41a;
+    border-color: #1e3a8a;
+    font-weight: 500;
+}
+
+.filter-btn[data-field].active::after {
+    border-top-color: #fff;
 }
 
 .filter-btn.active:hover {
-    background: #73d13d;
-    border-color: #73d13d;
+    background: #2563eb;
+    border-color: #2563eb;
 }
 
-/* 筛选下拉面板 */
+/* ==================== 下拉面板 ==================== */
+
 .filter-dropdown-panel {
     position: absolute;
     top: 100%;
     left: 0;
     margin-top: 6px;
     background: #fff;
-    border: 1px solid #d9d9d9;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
     z-index: 9999;
     min-width: 220px;
     max-width: 280px;
@@ -57,33 +84,50 @@
 
 .filter-dropdown-panel.show {
     display: block;
+    animation: dropdown-in 0.12s ease-out;
+}
+
+@keyframes dropdown-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* 面板头部 */
 .filter-dropdown-header {
-    padding: 10px 12px;
-    border-bottom: 1px solid #f0f0f0;
+    padding: 9px 12px;
+    border-bottom: 1px solid #f1f5f9;
     font-weight: 600;
     font-size: 13px;
+    color: #1e293b;
 }
 
-/* 搜索框区域 */
+/* 搜索框 */
 .filter-dropdown-search {
     padding: 8px 12px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid #f1f5f9;
 }
 
 .filter-dropdown-search input {
     width: 100%;
+    box-sizing: border-box;
     padding: 5px 8px;
-    border: 1px solid #d9d9d9;
-    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
     font-size: 12px;
+    color: #1e293b;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .filter-dropdown-search input:focus {
     outline: none;
-    border-color: #1890ff;
+    border-color: #1e3a8a;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.12);
 }
 
 /* 选项列表 */
@@ -93,73 +137,128 @@
     padding: 6px 0;
 }
 
-/* 选项项 */
+/* ==================== 选项项（含自定义复选框） ==================== */
+
 .filter-dropdown-item {
-    padding: 6px 12px;
+    height: 30px;
+    padding: 0 12px;
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
     font-size: 12px;
+    color: #334155;
+    transition: background-color 0.12s;
 }
 
 .filter-dropdown-item:hover {
-    background: #f5f5f5;
+    background: #eff6ff;
 }
 
-.filter-dropdown-item input[type="checkbox"] {
+/* 自定义复选框：纯 CSS，无图片无 JS */
+.filter-dropdown-panel input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
     margin: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    background: #fff;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.12s, border-color 0.12s;
+}
+
+.filter-dropdown-panel input[type="checkbox"]:hover {
+    border-color: #1e3a8a;
+}
+
+.filter-dropdown-panel input[type="checkbox"]:checked {
+    background: #1e3a8a url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E") center / 12px no-repeat;
+    border-color: #1e3a8a;
+}
+
+.filter-dropdown-item label {
+    cursor: pointer;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 勾选行文字深蓝加粗（兄弟选择器，无 :has 开销） */
+.filter-dropdown-item input[type="checkbox"]:checked + label {
+    color: #1e3a8a;
+    font-weight: 600;
 }
 
 /* 数量标记 */
 .filter-dropdown-item .count {
-    color: #999;
+    color: #94a3b8;
     font-size: 11px;
-    margin-left: 4px;
+    margin-left: 2px;
 }
 
-/* 底部按钮区域 */
-.filter-dropdown-footer {
-    padding: 10px 12px;
-    border-top: 1px solid #f0f0f0;
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
+.filter-dropdown-item input[type="checkbox"]:checked ~ label .count {
+    color: #2563eb;
 }
 
-.filter-dropdown-footer button {
-    padding: 4px 10px;
-    border: 1px solid #d9d9d9;
-    border-radius: 4px;
-    background: #fff;
-    cursor: pointer;
+/* 空状态 */
+.dropdown-empty {
+    padding: 28px 12px;
+    text-align: center;
+    color: #94a3b8;
     font-size: 12px;
 }
 
+/* ==================== 底部按钮 ==================== */
+
+.filter-dropdown-footer {
+    padding: 8px 12px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.filter-dropdown-footer button {
+    padding: 4px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+
 .filter-dropdown-footer button:hover {
-    border-color: #1890ff;
-    color: #1890ff;
+    border-color: #1e3a8a;
+    color: #1e3a8a;
 }
 
 .filter-dropdown-footer button.btn-confirm {
-    background: #1890ff;
+    background: #1e3a8a;
     color: #fff;
-    border-color: #1890ff;
+    border-color: #1e3a8a;
 }
 
 .filter-dropdown-footer button.btn-confirm:hover {
-    background: #40a9ff;
-    border-color: #40a9ff;
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
 }
 
-/* 筛选按钮容器（3列网格） */
+/* ==================== 布局容器 ==================== */
+
 .filter-panel-buttons {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
 }
 
-/* 搜索按钮容器（一行显示） */
 .search-panel-buttons {
     display: flex;
     flex-wrap: nowrap;
@@ -172,7 +271,6 @@
     min-width: 80px;
 }
 
-/* 购物车按钮容器样式 */
 #cartFilterButtons {
     display: flex;
     flex-wrap: wrap;
