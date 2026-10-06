@@ -38,54 +38,6 @@ def _format_sales_data(result: OECompareResult) -> str:
     return f"今/昨/近7天: {today}/{yesterday}/{sales_7d}\n近1/6/12月: {sales_month}/{sales_6m}/{sales_12m}"
 
 
-def _format_price_pair(result: OECompareResult) -> str:
-    """格式化最高/最低价字符串：最高价 / 最低价"""
-    if not result.overall_lowest or not result.overall_lowest[0]:
-        return ""
-    low_price = result.overall_lowest[2]
-    if result.overall_highest and result.overall_highest[0]:
-        high_price = result.overall_highest[2]
-    else:
-        high_price = low_price
-    return f"{high_price} / {low_price}"
-
-
-def _format_ascii_table(headers: List[str], rows: List[List[str]]) -> str:
-    """生成 ASCII 表格线文本，用于 Excel 批注"""
-    col_widths = [len(h) for h in headers]
-    for row in rows:
-        for i, cell in enumerate(row):
-            col_widths[i] = max(col_widths[i], len(cell))
-
-    def make_line(cells, sep="|"):
-        parts = [f" {cell:{col_widths[i]}} " for i, cell in enumerate(cells)]
-        return sep + sep.join(parts) + sep
-
-    def make_sep(sep="+", fill="-"):
-        parts = [f"{fill}{fill * col_widths[i]}{fill}" for i in range(len(headers))]
-        return sep + sep.join(parts) + sep
-
-    lines = [make_line(headers), make_sep()]
-    for row in rows:
-        lines.append(make_line(row))
-    return "\n".join(lines)
-
-
-def _build_procurement_table_text(result: OECompareResult) -> str:
-    """汇总所有采购记录并生成表格线批注文本"""
-    records = []
-    for summary in result.month_summaries.values():
-        records.extend(summary.all_records)
-    if not records:
-        return ""
-    records.sort(key=lambda r: (r.year, r.month), reverse=True)
-    rows = [
-        [f"{r.year}-{r.month:02d}", r.supplier, f"{r.price:.2f}"]
-        for r in records
-    ]
-    return _format_ascii_table(["日期", "供应商", "价格"], rows)
-
-
 # ── 列声明配置 ──
 # 增加字段只需在此列表追加一行，无需修改模板
 _COLUMN_SPECS: List[dict] = [
@@ -129,8 +81,10 @@ _COLUMN_SPECS: List[dict] = [
      "getter": lambda r, idx: r.inquiry_3m_avg_national if r.inquiry_3m_avg_national is not None else ""},
     {"title": "销量数据",       "width": 44, "align": "left",
      "getter": lambda r, idx: _format_sales_data(r)},
-    {"title": "最高/最低价",    "width": 18, "align": "left",
-     "getter": lambda r, idx: _format_price_pair(r), "comment": True},
+    {"title": "最低价",         "width": 39, "align": "left",
+     "getter": lambda r, idx: r.get_overall_lowest_text() if r.overall_lowest and r.overall_lowest[0] else ""},
+    {"title": "最高价",         "width": 40, "align": "left",
+     "getter": lambda r, idx: r.get_overall_highest_text() if r.overall_highest and r.overall_highest[0] else ""},
 ]
 
 # 追加 1-12 月列
@@ -247,11 +201,6 @@ class PurchaseHistoryExcelWriter:
             else:
                 getter: Callable[[OECompareResult, int], Any] = spec["getter"]
                 cell.value = getter(result, index)
-
-            if spec.get("comment"):
-                table_text = _build_procurement_table_text(result)
-                if table_text:
-                    cell.comment = Comment(table_text, "采购明细")
 
         self.ws.row_dimensions[row].height = DATA_HEIGHT
 

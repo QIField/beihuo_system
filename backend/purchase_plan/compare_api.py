@@ -52,45 +52,6 @@ def compare_permission_required(f):
     return decorated_function
 
 
-def _format_ascii_table(headers, rows):
-    """生成 ASCII 表格线文本，用于 Excel 批注"""
-    col_widths = [len(h) for h in headers]
-    for row in rows:
-        for i, cell in enumerate(row):
-            col_widths[i] = max(col_widths[i], len(cell))
-
-    def make_line(cells, sep="|"):
-        parts = [f" {cell:{col_widths[i]}} " for i, cell in enumerate(cells)]
-        return sep + sep.join(parts) + sep
-
-    def make_sep(sep="+", fill="-"):
-        parts = [f"{fill}{fill * col_widths[i]}{fill}" for i in range(len(headers))]
-        return sep + sep.join(parts) + sep
-
-    lines = [make_line(headers), make_sep()]
-    for row in rows:
-        lines.append(make_line(row))
-    return "\n".join(lines)
-
-
-def _build_procurement_table_text(records):
-    """将采购记录列表转为表格线批注文本"""
-    if not records:
-        return ""
-    sorted_records = sorted(
-        records,
-        key=lambda r: r.get('purchase_date', ''),
-        reverse=True
-    )
-    rows = []
-    for r in sorted_records:
-        date = r.get('purchase_date', '')[:7]
-        supplier = r.get('supplier_name', '')
-        price = f"{float(r.get('purchase_price', 0)):.2f}"
-        rows.append([date, supplier, price])
-    return _format_ascii_table(["日期", "供应商", "价格"], rows)
-
-
 @compare_bp.route('/list', methods=['GET'])
 @compare_permission_required
 def get_compare_list():
@@ -181,19 +142,18 @@ def export_compare_data():
         if not data:
             return jsonify({'code': 1, 'msg': '没有数据可导出'}), 400
 
-        # 从 crmapp_procurement_history 表查询采购记录
+        # 从 crmapp_procurement_history 表查询每月最低价（与悬浮窗展示一致）
         procurement_map = {}
-        procurement_detail_map = {}
         if data:
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cursor:
                     # 构建查询条件
                     placeholders = ', '.join(['(%s, %s)'] * len(data))
-                    base_params = []
+                    params = []
                     for item in data:
-                        base_params.append(item.get('oe', ''))
-                        base_params.append(item.get('brand', ''))
+                        params.append(item.get('oe', ''))
+                        params.append(item.get('brand', ''))
                     if company:
                         # 查询每月最低价（与悬浮窗逻辑一致）
                         sql = f"""
@@ -213,7 +173,7 @@ def export_compare_data():
                             )
                             ORDER BY purchase_date DESC
                         """
-                        params = [company] + base_params
+                        params.insert(0, company)
                         cursor.execute(sql, params)
                         rows = cursor.fetchall()
                         for row in rows:
@@ -225,29 +185,6 @@ def export_compare_data():
                                 'purchase_price': float(row[3]) if row[3] else 0.0,
                                 'purchase_date': row[4].strftime('%Y-%m-%d') if hasattr(row[4], 'strftime') else str(row[4])
                             })
-
-                        # 查询全部采购记录（用于最高/最低价批注）
-                        sql_detail = f"""
-                            SELECT oe, brand, supplier_name, unit_price, purchase_date
-                            FROM crmapp_procurement_history
-                            WHERE company = %s 
-                            AND (oe, brand) IN ({placeholders})
-                            AND purchase_date >= '2024-01-01'
-                            AND purchase_date <= '2026-12-31'
-                            ORDER BY purchase_date DESC
-                        """
-                        params_detail = [company] + base_params
-                        cursor.execute(sql_detail, params_detail)
-                        rows = cursor.fetchall()
-                        for row in rows:
-                            key = (row[0], row[1])
-                            if key not in procurement_detail_map:
-                                procurement_detail_map[key] = []
-                            procurement_detail_map[key].append({
-                                'supplier_name': row[2],
-                                'purchase_price': float(row[3]) if row[3] else 0.0,
-                                'purchase_date': row[4].strftime('%Y-%m-%d') if hasattr(row[4], 'strftime') else str(row[4])
-                            })
             except Exception as e:
                 print(f"查询采购记录失败: {e}")
             finally:
@@ -255,7 +192,6 @@ def export_compare_data():
         
         # 处理数据，构建导出格式
         export_data = []
-        row_comments = []
         for idx, item in enumerate(data, start=1):
             # 从 procurement_map 获取每月最低价记录，格式化为多行文本
             procurement_records_str = ''
@@ -305,10 +241,6 @@ def export_compare_data():
                 except:
                     return value
 
-            max_price = format_price(item.get('max_price'))
-            min_price = format_price(item.get('min_price'))
-            price_pair = f"{max_price} / {min_price}" if (max_price or min_price) else ''
-
             row = {
                 '行号': idx,
                 'OE': item.get('oe', ''),
@@ -318,7 +250,8 @@ def export_compare_data():
                 '替换号': item.get('replace_number', ''),
                 '产品等级': item.get('product_level', ''),
                 '供应商价格': format_price(item.get('supplier_price')),
-                '最高/最低价': price_pair,
+                '最高价': format_price(item.get('max_price')),
+                '最低价': format_price(item.get('min_price')),
                 '采购记录': procurement_records_str,
                 '4S含税进价': format_price(item.get('dealer_purchase_price')),
                 '4S含税售价': format_price(item.get('dealer_sale_price')),
@@ -333,12 +266,6 @@ def export_compare_data():
                 '品牌编码': item.get('brand_code', '')
             }
             export_data.append(row)
-
-            # 生成最高/最低价单元格的采购明细批注
-            comment_text = ''
-            if key in procurement_detail_map and procurement_detail_map[key]:
-                comment_text = _build_procurement_table_text(procurement_detail_map[key])
-            row_comments.append(comment_text)
 
         # 转换为DataFrame
         df = pd.DataFrame(export_data)
@@ -381,37 +308,26 @@ def export_compare_data():
                     'F': 15,  # 替换号
                     'G': 12,  # 产品等级
                     'H': 12,  # 供应商价格
-                    'I': 18,  # 最高/最低价
-                    'J': 40,  # 采购记录（较宽以显示多行内容）
-                    'K': 12,  # 4S含税进价
-                    'L': 12,  # 4S含税售价
-                    'M': 18,  # 更新价格时间
-                    'N': 10,  # 今日销量
-                    'O': 10,  # 昨日销量
-                    'P': 12,  # 近7天销量
-                    'Q': 12,  # 本月销量
-                    'R': 16,  # 近6个月总销量
-                    'S': 16,  # 近12个月总销量
-                    'T': 25,  # 系统产品备注
-                    'U': 12   # 品牌编码
+                    'I': 10,  # 最高价
+                    'J': 10,  # 最低价
+                    'K': 40,  # 采购记录（较宽以显示多行内容）
+                    'L': 12,  # 4S含税进价
+                    'M': 12,  # 4S含税售价
+                    'N': 18,  # 更新价格时间
+                    'O': 10,  # 今日销量
+                    'P': 10,  # 昨日销量
+                    'Q': 12,  # 近7天销量
+                    'R': 12,  # 本月销量
+                    'S': 16,  # 近6个月总销量
+                    'T': 16,  # 近12个月总销量
+                    'U': 25,  # 系统产品备注
+                    'V': 12   # 品牌编码
                 }
                 for col, width in column_widths.items():
                     worksheet.column_dimensions[col].width = width
 
                 # 应用比价模块统一样式
                 apply_uniform_style(worksheet)
-
-                # 给最高/最低价列添加采购明细批注
-                price_col_idx = None
-                for col_idx, col_name in enumerate(df.columns, start=1):
-                    if col_name == '最高/最低价':
-                        price_col_idx = col_idx
-                        break
-                if price_col_idx:
-                    for row_idx, comment_text in enumerate(row_comments, start=2):
-                        if comment_text:
-                            cell = worksheet.cell(row=row_idx, column=price_col_idx)
-                            cell.comment = Comment(comment_text, "采购明细")
 
             output.seek(0)
 
@@ -431,7 +347,7 @@ def export_compare_data():
 @compare_permission_required
 def import_search_compare_data():
     """
-    导入Excel模板，使用采购历史比对功能生成结果Excel并记录导入日志
+    导入Excel模板，使用采购历史比对功能计算结果并存为网页快照
     支持列：OE、品牌、价格/促销价（可选）、品牌号（可选）
     """
     try:
@@ -508,41 +424,36 @@ def import_search_compare_data():
         company = session.get('current_org', session.get('store', 'fsbbr'))
         operator = session.get('username', '')
 
-        # 调用采购历史比对服务生成结果
+        # 调用采购历史比对服务生成结果（计算逻辑与原Excel导出完全一致）
         from app.services.compare_service.procurement_compare_service import ProcurementCompareService
-        from app.utils.export_tools.purchase_history_excel_writer import PurchaseHistoryExcelWriter
+        from app.services.compare_service.compare_result_snapshot_service import CompareResultSnapshotService
         from app.utils.logger_config import get_task_logger
 
         logger = get_task_logger('purchase_history_compare')
         logger.info(f"[比价导入] 开始处理: file={file.filename}, items={import_count}, company={company}")
 
         results = ProcurementCompareService.batch_generate_compare_results(items, company)
-
         match_count = len(results)
-        result_file_path = ''
 
-        if results:
-            from app.utils.logger_config import BASE_LOG_DIR
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            safe_filename = file.filename.rsplit('.', 1)[0] if '.' in file.filename else file.filename
-            output_filename = f"compare_import_{safe_filename}_{timestamp}.xlsx"
-            task_dir = os.path.join(BASE_LOG_DIR, 'compare_import', company)
-            os.makedirs(task_dir, exist_ok=True)
-            output_path = os.path.join(task_dir, output_filename)
-
-            PurchaseHistoryExcelWriter.generate_excel(results, output_path)
-            result_file_path = output_path
-            logger.info(f"[比价导入] Excel生成完成: {output_path}, 结果行数={match_count}")
-
-        # 保存导入日志
+        # 先保存导入日志（新批次不再生成Excel，result_file_path 留空）
         log_id = CompareDataService.save_import_log(
             company=company,
             file_name=file.filename,
             import_count=import_count,
             match_count=match_count,
             operator=operator,
-            result_file_path=result_file_path
+            result_file_path=''
         )
+
+        # 结果序列化为快照存库，供网页结果视图查看
+        if results:
+            CompareResultSnapshotService.save_snapshot(
+                company=company,
+                log_id=log_id,
+                file_name=file.filename,
+                results=results
+            )
+            logger.info(f"[比价导入] 结果快照已保存: log_id={log_id}, 结果行数={match_count}")
 
         return jsonify({
             'code': 0,
@@ -550,8 +461,7 @@ def import_search_compare_data():
             'log_id': log_id,
             'file_name': file.filename,
             'import_count': import_count,
-            'match_count': match_count,
-            'download_url': f'/api/purchase_plan/compare/download_import_result/{log_id}' if result_file_path else ''
+            'match_count': match_count
         })
 
     except Exception as e:
@@ -573,6 +483,14 @@ def get_import_logs():
 
         logs = CompareDataService.get_import_logs(company=company, limit=limit)
 
+        # 标记哪些批次有网页快照（新批次），无快照但有文件路径的仍是历史Excel批次
+        from app.services.compare_service.compare_result_snapshot_service import CompareResultSnapshotService
+        snapshot_ids = CompareResultSnapshotService.existing_log_ids(
+            company, [log['id'] for log in logs]
+        )
+        for log in logs:
+            log['has_snapshot'] = 1 if log['id'] in snapshot_ids else 0
+
         return jsonify({
             'code': 0,
             'msg': '获取成功',
@@ -581,6 +499,42 @@ def get_import_logs():
 
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'获取导入日志失败: {str(e)}'}), 500
+
+
+@compare_bp.route('/import_result/<int:log_id>', methods=['GET'])
+@compare_permission_required
+def get_import_result(log_id):
+    """
+    查看导入批次的网页结果快照
+    返回：批次元信息 + 结果行（含月份采购明细，供悬停浮窗展示）
+    """
+    try:
+        company = session.get('current_org', session.get('store', 'fsbbr'))
+        log = CompareDataService.get_import_log_by_id(log_id=log_id, company=company)
+
+        if not log:
+            return jsonify({'code': 1, 'msg': '记录不存在'}), 404
+
+        from app.services.compare_service.compare_result_snapshot_service import CompareResultSnapshotService
+        results = CompareResultSnapshotService.get_snapshot(log_id=log_id, company=company)
+        if results is None:
+            return jsonify({'code': 1, 'msg': '该批次没有网页结果（可能是历史Excel批次）'}), 404
+
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': {
+                'log_id': log_id,
+                'file_name': log.get('file_name', ''),
+                'import_count': log.get('import_count', 0),
+                'match_count': log.get('match_count', 0),
+                'created_time': log.get('created_time', ''),
+                'results': results
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取结果失败: {str(e)}'}), 500
 
 
 @compare_bp.route('/download_import_result/<int:log_id>', methods=['GET'])

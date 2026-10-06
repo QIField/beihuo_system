@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/purchase_plan/common.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='js/components/filter_panel/filter-panel.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/hover-popover/hover-popover.css') }}?v=20261005">
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script src="{{ url_for('static', filename='js/handsontable/handsontable.full.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.js') }}"></script>
@@ -18,7 +19,9 @@
     <script src="{{ url_for('static', filename='js/purchase_plan/common.js') }}"></script>
     <script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
     <script src="{{ url_for('static', filename='js/purchase_plan/inquiry_module.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/purchase_plan/compare_module.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/hover-popover/hover-popover.js') }}?v=20261005"></script>
+    <script src="{{ url_for('static', filename='js/purchase_plan/compare-result-popover-provider.js') }}?v=20261005"></script>
+    <script src="{{ url_for('static', filename='js/purchase_plan/compare_module.js') }}?v=20261005"></script>
     <style>
         .file-input {
             display: none;
@@ -294,6 +297,22 @@
             overflow-y: auto;
         }
 
+        /* 比价结果表格：统一单行截断，悬停 title 看完整值 */
+        #compareResultHot td.cr-ellipsis {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        #compareResultHot td.cr-wrap {
+            white-space: pre-line !important;
+            line-height: 1.4 !important;
+        }
+        #compareResultHot td.hp-trigger {
+            text-decoration: underline dotted #b0b0b0;
+            text-underline-offset: 3px;
+            background-color: #fffdf5;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -423,7 +442,8 @@
 
                 <!-- 比价模块 -->
                 <div class="module-content" id="compareModule" data-template-url="{{ url_for('static', filename='excel/OE_Brand_Price_brandcode.xlsx') }}">
-                    <div class="compare-content">
+                    <!-- 日志视图：导入 + 导入日志 -->
+                    <div class="compare-content" id="compareLogView">
                         <div class="upload-actions">
                             <a class="btn btn-default" id="btnCompareDownloadTemplate">下载模板</a>
                             <button type="button" class="btn btn-primary" id="btnCompareImport">导入文件</button>
@@ -455,6 +475,15 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- 结果视图：导入批次的网页比对结果表格 -->
+                    <div class="compare-content" id="compareResultView" style="display: none; flex-direction: column; flex: 1; min-height: 0;">
+                        <div class="data-header" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <button type="button" class="btn btn-default" id="btnCompareBack">← 返回导入日志</button>
+                            <span id="compareResultTitle" style="font-size: 14px; color: #333;"></span>
+                        </div>
+                        <div id="compareResultHot" style="flex: 1; min-height: 300px; margin-top: 10px;"></div>
                     </div>
                 </div>
             </main>
