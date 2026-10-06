@@ -687,6 +687,7 @@ async function parsePreview(file) {
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('thread_count', document.getElementById('matchThreadCount')?.value || 3);
 
     try {
         const response = await fetch('/api/purchase_plan/inquiry/parse_preview', {

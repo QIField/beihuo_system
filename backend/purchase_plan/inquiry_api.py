@@ -12,7 +12,8 @@
 7. 将"处理结果"="上传成功"或二次上传成功的数据导入询价表
 """
 from flask import Blueprint, request, jsonify, session, render_template, send_from_directory
-from functools import wraps
+from functools import wraps, partial
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import math
 import os
@@ -30,6 +31,21 @@ inquiry_bp = Blueprint('inquiry', __name__)
 
 # 没有 CRM 匹配结果时，匹配条码列的提示文案
 NO_MATCH_BARCODE_TIP = '未搜索到系统产品，不进行上传'
+
+# CRM 匹配线程数：默认值与上限（前端可选 1~5）
+DEFAULT_MATCH_THREAD_COUNT = 3
+MAX_MATCH_THREAD_COUNT = 5
+
+
+def resolve_thread_count(value):
+    """
+    解析前端传入的线程数，强制限制在 1~MAX_MATCH_THREAD_COUNT，非法值回落默认值
+    """
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_MATCH_THREAD_COUNT
+    return min(max(count, 1), MAX_MATCH_THREAD_COUNT)
 
 
 @inquiry_bp.route('/inquiry_module')
@@ -1349,6 +1365,109 @@ def precheck_inquiry_file():
             os.remove(temp_path)
 
 
+def match_one_preview_row(row, company, supplier_names):
+    """
+    处理单行预览数据：供应商精确匹配 + CRM 别名池匹配 + 结果组装
+
+    Args:
+        row: DataFrame 的一行（dict 风格）
+        company: 公司代码
+        supplier_names: B2B 合法供应商名称集合（只读）
+
+    Returns:
+        该 OE 展开的结果行列表；OE 为空返回空列表（一个 OE 命中多个产品会展开成多行）
+    """
+    from app.utils.crm_product.crm_product_matcher import fetch_matched_products, pick_product_fields
+    from app.services.pp_alias_service.pp_alias_pool_service import get_match_brands
+
+    oe = str(row.get('oe', '') or '').strip()
+    if not oe:
+        return []
+
+    brand = str(row.get('brand', '') or '').strip()
+    supplier = str(row.get('supplier', '') or '').strip()
+    price = str(row.get('price', '') or '').strip()
+    warehouse = str(row.get('warehouse', '') or '').strip()
+    expire_time = str(row.get('expire_time', '') or '').strip()
+    remark = str(row.get('remark', '') or '').strip()
+    stock_quantity = str(row.get('stock_quantity', '') or '').strip()
+
+    # 供应商精确匹配
+    matched_supplier = supplier if supplier in supplier_names else ''
+
+    # CRM 匹配：按 OE + 品牌（含别名池）匹配，不过滤 CRM 库存
+    matched_products = []
+    if brand:
+        seen_product_ids = set()
+        for cand_brand in get_match_brands(brand):
+            for product in fetch_matched_products(company, oe, cand_brand, ignore_stock=True):
+                product_id = product.get('product_id')
+                if product_id:
+                    if product_id in seen_product_ids:
+                        continue
+                    seen_product_ids.add(product_id)
+                matched_products.append(product)
+
+    base_row = {
+        'oe': oe,
+        'brand': brand,
+        'supplier': supplier,
+        'price': price,
+        'warehouse': warehouse,
+        'expire_time': expire_time,
+        'remark': remark,
+        'stock_quantity': stock_quantity,
+        'matched_supplier': matched_supplier,
+        'final_price': price
+    }
+
+    if not matched_products:
+        base_row['matched_oe'] = ''
+        base_row['matched_brand'] = ''
+        base_row['matched_barcode'] = NO_MATCH_BARCODE_TIP
+        base_row['product_id'] = ''
+        return [base_row]
+
+    result_rows = []
+    for product in matched_products:
+        picked = pick_product_fields(product)
+        row_data = dict(base_row)
+        row_data['matched_oe'] = picked.get('number', '')
+        row_data['matched_brand'] = picked.get('brand_name', '')
+        row_data['matched_barcode'] = picked.get('frey_no', '')
+        row_data['product_id'] = picked.get('product_id', '')
+        result_rows.append(row_data)
+    return result_rows
+
+
+def match_preview_rows(df, company, supplier_names, thread_count):
+    """
+    并发匹配文件全部行并汇总，结果保持原文件行顺序
+
+    Args:
+        df: 已规整列名的 DataFrame
+        company: 公司代码
+        supplier_names: B2B 合法供应商名称集合（只读）
+        thread_count: 线程数（1 表示串行）
+
+    Returns:
+        汇总后的预览结果行列表
+    """
+    rows = [row for _, row in df.iterrows()]
+    worker = partial(match_one_preview_row, company=company, supplier_names=supplier_names)
+
+    if thread_count <= 1:
+        matched = [worker(row) for row in rows]
+    else:
+        with ThreadPoolExecutor(max_workers=thread_count) as executor:
+            matched = list(executor.map(worker, rows))
+
+    result_rows = []
+    for one_row in matched:
+        result_rows.extend(one_row)
+    return result_rows
+
+
 @inquiry_bp.route('/parse_preview', methods=['POST'])
 @login_required
 def parse_preview():
@@ -1427,69 +1546,14 @@ def parse_preview():
             if supplier_df is not None and not supplier_df.empty:
                 supplier_names = set(supplier_df['name'].dropna().astype(str).tolist())
 
-            # 匹配数据
-            # 上传场景下不过滤 CRM 库存，只看 OE+品牌 是否匹配
-            from app.utils.crm_product.crm_product_matcher import fetch_matched_products, pick_product_fields
-            from app.services.pp_alias_service.pp_alias_pool_service import get_match_brands
+            # CRM 匹配（线程池并发，上传场景不过滤库存）
+            thread_count = resolve_thread_count(request.form.get('thread_count'))
 
-            result_rows = []
-            for _, row in df.iterrows():
-                oe = str(row.get('oe', '') or '').strip()
-                brand = str(row.get('brand', '') or '').strip()
-                supplier = str(row.get('supplier', '') or '').strip()
-                price = str(row.get('price', '') or '').strip()
-                warehouse = str(row.get('warehouse', '') or '').strip()
-                expire_time = str(row.get('expire_time', '') or '').strip()
-                remark = str(row.get('remark', '') or '').strip()
-                stock_quantity = str(row.get('stock_quantity', '') or '').strip()
+            # 主线程预热别名池缓存，避免多线程同时触发首次加载
+            from app.services.pp_alias_service.pp_alias_pool_service import _load_pool_cache
+            _load_pool_cache()
 
-                if not oe:
-                    continue
-
-                # 供应商精确匹配
-                matched_supplier = supplier if supplier in supplier_names else ''
-
-                # CRM 匹配：按 OE + 品牌（含别名池）匹配，不过滤 CRM 库存
-                matched_products = []
-                if brand:
-                    seen_product_ids = set()
-                    for cand_brand in get_match_brands(brand):
-                        for p in fetch_matched_products(company, oe, cand_brand, ignore_stock=True):
-                            product_id = p.get('product_id')
-                            if product_id:
-                                if product_id in seen_product_ids:
-                                    continue
-                                seen_product_ids.add(product_id)
-                            matched_products.append(p)
-
-                base_row = {
-                    'oe': oe,
-                    'brand': brand,
-                    'supplier': supplier,
-                    'price': price,
-                    'warehouse': warehouse,
-                    'expire_time': expire_time,
-                    'remark': remark,
-                    'stock_quantity': stock_quantity,
-                    'matched_supplier': matched_supplier,
-                    'final_price': price
-                }
-
-                if matched_products:
-                    for product in matched_products:
-                        picked = pick_product_fields(product)
-                        row_data = dict(base_row)
-                        row_data['matched_oe'] = picked.get('number', '')
-                        row_data['matched_brand'] = picked.get('brand_name', '')
-                        row_data['matched_barcode'] = picked.get('frey_no', '')
-                        row_data['product_id'] = picked.get('product_id', '')
-                        result_rows.append(row_data)
-                else:
-                    base_row['matched_oe'] = ''
-                    base_row['matched_brand'] = ''
-                    base_row['matched_barcode'] = NO_MATCH_BARCODE_TIP
-                    base_row['product_id'] = ''
-                    result_rows.append(base_row)
+            result_rows = match_preview_rows(df, company, supplier_names, thread_count)
 
             return jsonify({
                 'code': 0,
