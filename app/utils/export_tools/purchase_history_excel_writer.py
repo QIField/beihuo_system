@@ -58,7 +58,7 @@ _COLUMN_SPECS: List[dict] = [
     {"title": "品牌",          "width": 12, "align": "left",
      "getter": lambda r, idx: r.brand or ""},
     {"title": "名称",          "width": 22, "align": "left",
-     "getter": lambda r, idx: r.product_name or ""},
+     "getter": lambda r, idx: r.product_name if r.product_name else ("未匹配到数据" if not r.frey_no and not r.month_summaries else "")},
     {"title": "规格",          "width": 50, "align": "left",
      "getter": lambda r, idx: r.spec or ""},
     {"title": "替换号",        "width": 15, "align": "center",

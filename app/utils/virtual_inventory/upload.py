@@ -28,16 +28,16 @@ COMPANY_TABLE_MAP = {
     'fsbbr': 'virtual_inventory',
     'zhbbr': 'virtual_inventory_zhbbr',
     'zsbbr': 'virtual_inventory_zsbbr',
-    'dgby': 'virtual_inventory_dgby',
-    'dghf': 'virtual_inventory_dghf'
+    # 'dgby': 'virtual_inventory_dgby',   # 东莞巴友：暂不参与定时上传
+    # 'dghf': 'virtual_inventory_dghf'    # 东莞恒发：暂不参与定时上传
 }
 
 COMPANY_TOKEN_MAP = {
     'fsbbr': 'openapi_gzbbr_com_fs',
     'zhbbr': 'openapi_gzbbr_com_zh',
     'zsbbr': 'openapi_gzbbr_com_zs',
-    'dgby': 'openapi_gzbbr_com_by',
-    'dghf': 'openapi_gzbbr_com_hf'
+    # 'dgby': 'openapi_gzbbr_com_by',     # 东莞巴友：暂不参与定时上传
+    # 'dghf': 'openapi_gzbbr_com_hf'      # 东莞恒发：暂不参与定时上传
 }
 
 

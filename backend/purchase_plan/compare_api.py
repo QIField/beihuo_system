@@ -347,7 +347,7 @@ def export_compare_data():
 @compare_permission_required
 def import_search_compare_data():
     """
-    导入Excel模板，使用采购历史比对功能生成结果Excel并记录导入日志
+    导入Excel模板，使用采购历史比对功能计算结果并存为网页快照
     支持列：OE、品牌、价格/促销价（可选）、品牌号（可选）
     """
     try:
@@ -424,41 +424,36 @@ def import_search_compare_data():
         company = session.get('current_org', session.get('store', 'fsbbr'))
         operator = session.get('username', '')
 
-        # 调用采购历史比对服务生成结果
+        # 调用采购历史比对服务生成结果（计算逻辑与原Excel导出完全一致）
         from app.services.compare_service.procurement_compare_service import ProcurementCompareService
-        from app.utils.export_tools.purchase_history_excel_writer import PurchaseHistoryExcelWriter
+        from app.services.compare_service.compare_result_snapshot_service import CompareResultSnapshotService
         from app.utils.logger_config import get_task_logger
 
         logger = get_task_logger('purchase_history_compare')
         logger.info(f"[比价导入] 开始处理: file={file.filename}, items={import_count}, company={company}")
 
         results = ProcurementCompareService.batch_generate_compare_results(items, company)
-
         match_count = len(results)
-        result_file_path = ''
 
-        if results:
-            from app.utils.logger_config import BASE_LOG_DIR
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            safe_filename = file.filename.rsplit('.', 1)[0] if '.' in file.filename else file.filename
-            output_filename = f"compare_import_{safe_filename}_{timestamp}.xlsx"
-            task_dir = os.path.join(BASE_LOG_DIR, 'compare_import', company)
-            os.makedirs(task_dir, exist_ok=True)
-            output_path = os.path.join(task_dir, output_filename)
-
-            PurchaseHistoryExcelWriter.generate_excel(results, output_path)
-            result_file_path = output_path
-            logger.info(f"[比价导入] Excel生成完成: {output_path}, 结果行数={match_count}")
-
-        # 保存导入日志
+        # 先保存导入日志（新批次不再生成Excel，result_file_path 留空）
         log_id = CompareDataService.save_import_log(
             company=company,
             file_name=file.filename,
             import_count=import_count,
             match_count=match_count,
             operator=operator,
-            result_file_path=result_file_path
+            result_file_path=''
         )
+
+        # 结果序列化为快照存库，供网页结果视图查看
+        if results:
+            CompareResultSnapshotService.save_snapshot(
+                company=company,
+                log_id=log_id,
+                file_name=file.filename,
+                results=results
+            )
+            logger.info(f"[比价导入] 结果快照已保存: log_id={log_id}, 结果行数={match_count}")
 
         return jsonify({
             'code': 0,
@@ -466,8 +461,7 @@ def import_search_compare_data():
             'log_id': log_id,
             'file_name': file.filename,
             'import_count': import_count,
-            'match_count': match_count,
-            'download_url': f'/api/purchase_plan/compare/download_import_result/{log_id}' if result_file_path else ''
+            'match_count': match_count
         })
 
     except Exception as e:
@@ -489,6 +483,14 @@ def get_import_logs():
 
         logs = CompareDataService.get_import_logs(company=company, limit=limit)
 
+        # 标记哪些批次有网页快照（新批次），无快照但有文件路径的仍是历史Excel批次
+        from app.services.compare_service.compare_result_snapshot_service import CompareResultSnapshotService
+        snapshot_ids = CompareResultSnapshotService.existing_log_ids(
+            company, [log['id'] for log in logs]
+        )
+        for log in logs:
+            log['has_snapshot'] = 1 if log['id'] in snapshot_ids else 0
+
         return jsonify({
             'code': 0,
             'msg': '获取成功',
@@ -497,6 +499,42 @@ def get_import_logs():
 
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'获取导入日志失败: {str(e)}'}), 500
+
+
+@compare_bp.route('/import_result/<int:log_id>', methods=['GET'])
+@compare_permission_required
+def get_import_result(log_id):
+    """
+    查看导入批次的网页结果快照
+    返回：批次元信息 + 结果行（含月份采购明细，供悬停浮窗展示）
+    """
+    try:
+        company = session.get('current_org', session.get('store', 'fsbbr'))
+        log = CompareDataService.get_import_log_by_id(log_id=log_id, company=company)
+
+        if not log:
+            return jsonify({'code': 1, 'msg': '记录不存在'}), 404
+
+        from app.services.compare_service.compare_result_snapshot_service import CompareResultSnapshotService
+        results = CompareResultSnapshotService.get_snapshot(log_id=log_id, company=company)
+        if results is None:
+            return jsonify({'code': 1, 'msg': '该批次没有网页结果（可能是历史Excel批次）'}), 404
+
+        return jsonify({
+            'code': 0,
+            'msg': '获取成功',
+            'data': {
+                'log_id': log_id,
+                'file_name': log.get('file_name', ''),
+                'import_count': log.get('import_count', 0),
+                'match_count': log.get('match_count', 0),
+                'created_time': log.get('created_time', ''),
+                'results': results
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'获取结果失败: {str(e)}'}), 500
 
 
 @compare_bp.route('/download_import_result/<int:log_id>', methods=['GET'])

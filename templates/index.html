@@ -868,6 +868,7 @@
     <script src="{{ url_for('static', filename='js/components/custom-pagination/custom-pagination.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.css') }}">
     <script src="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/handsontable-builder/sortable-utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/components/handsontable-builder/handsontable-builder.js') }}"></script>
 
     <!-- 购物车模块 -->
@@ -1575,8 +1576,8 @@ function openCompareModule() {
         layui.layer.msg('您没有权限访问比价模块', {icon: 2});
         return;
     }
-    // 在新标签页中打开比价模块页面
-    window.open('/api/purchase_plan/compare/compare_module', '_blank');
+    // 在新标签页中打开比价模块页面（已合并至采购计划）
+    window.open('/api/purchase_plan/inquiry/inquiry_module?module=compare', '_blank');
 }
 
 // 专门用于加载使用说明书的函数
