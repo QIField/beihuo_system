@@ -51,6 +51,8 @@ def _build_result():
         overall_highest=('2024-05', '供应商A', 120.0),
         product_name='测试件',
         stock_quantity=5,
+        stock_zaitu=2,
+        safe_stock=8,
         tag='A类',
         sales_today=1,
         price=99.5,
@@ -70,6 +72,8 @@ def test_serialize_structure_and_extremes():
     assert row['overall_highest'] == ['2024-05', '供应商A', 120.0]
     assert row['product_name'] == '测试件'
     assert row['stock_quantity'] == 5
+    assert row['stock_zaitu'] == 2
+    assert row['safe_stock'] == 8
     assert row['price'] == 99.5
 
 

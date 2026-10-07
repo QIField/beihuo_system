@@ -72,8 +72,10 @@ class OECompareResult:
     search_brand: Optional[str] = None            # 原始搜索品牌（从上传文件读取）
     brand_code: Optional[str] = None              # 品牌号（当使用品牌号搜索时）
 
-    # 从crmapp_beihuo表获取的字段
-    stock_quantity: Optional[int] = None          # 库存数量
+    # CRM 实时库存字段（Product.Product/list 接口 child）
+    stock_quantity: Optional[int] = None          # 库存数量（CRM child.stock）
+    stock_zaitu: Optional[int] = None             # 在途库存（CRM child.stock_zaitu）
+    safe_stock: Optional[int] = None              # 安全库存（CRM child.safe_stock）
     tag: Optional[str] = None                     # 标签
     inquiry_1m: Optional[int] = None              # 近1个月询价量
     inquiry_3m_avg: Optional[int] = None          # 近3个月月均询价量

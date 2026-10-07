@@ -96,6 +96,8 @@ class CompareResultSnapshotService:
                 'spec': r.spec or '',
                 'replace_name': r.replace_name or '',
                 'stock_quantity': r.stock_quantity,
+                'stock_zaitu': r.stock_zaitu,
+                'safe_stock': r.safe_stock,
                 'replace_stock_text': r.replace_stock_text or '',
                 'tag': r.tag or '',
                 'inquiry_1m': r.inquiry_1m,
