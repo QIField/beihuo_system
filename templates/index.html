@@ -855,6 +855,7 @@
     <script src="{{ url_for('static', filename='js/components/hover-popover/supplier-popover-provider.js') }}?v=20260919"></script>
     <script src="{{ url_for('static', filename='js/components/hover-popover/intransit-popover-provider.js') }}?v=20260919"></script>
     <script src="{{ url_for('static', filename='js/table-cell-selector.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/cell-ellipsis-tooltip/cell-ellipsis-tooltip.js') }}?v=20261008"></script>
     <script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
     <script src="{{ url_for('static', filename='js/frequency-module.js') }}"></script>
 
@@ -2751,6 +2752,14 @@ window.loadContent = function(type) {
         // 渲染表格
         var myTable = renderBeihuoTable(table);
         // window.beihuoTableIns = myTable; // 保存表格实例到全局变量 - 现在在done回调中设置
+
+        // 省略号单元格悬停展示完整内容（原生 title，事件委托绑在表格父容器上）
+        if (typeof CellEllipsisTooltip !== 'undefined') {
+            var beihuoTableEl = document.querySelector('#beihuoTable');
+            if (beihuoTableEl && beihuoTableEl.parentNode) {
+                CellEllipsisTooltip.bind(beihuoTableEl.parentNode, '.layui-table-cell');
+            }
+        }
 
         // 初始化日期范围选择器
         if (typeof initDateRangePicker !== 'undefined') {

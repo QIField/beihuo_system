@@ -535,6 +535,11 @@ var CartPanel = (function() {
                     // 初始化 Handsontable（内部已绑定移除按钮事件委托）
                     initBuilder(currentDimension);
 
+                    // 省略号单元格悬停展示完整内容（原生 title，事件委托；供应商列已有悬停浮窗自动排除）
+                    if (typeof CellEllipsisTooltip !== 'undefined') {
+                        CellEllipsisTooltip.bind(layero.find('#cartHot')[0], '.htb-ellipsis-cell, .sales-cell-content');
+                    }
+
                     // 绑定删除选中按钮
                     layero.find('#deleteSelectedBtn').on('click', function() {
                         var currentHot = getCurrentHot();

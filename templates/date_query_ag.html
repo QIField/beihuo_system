@@ -34,6 +34,7 @@
     <script src="/static/js/components/hover-popover/hover-popover.js?v=20260919"></script>
     <script src="/static/js/components/hover-popover/supplier-popover-provider.js?v=20260919"></script>
     <script src="/static/js/components/hover-popover/intransit-popover-provider.js?v=20260919"></script>
+    <script src="/static/js/components/cell-ellipsis-tooltip/cell-ellipsis-tooltip.js?v=20261008"></script>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -654,6 +655,11 @@
                             renderCurrentPage(1, currentPageSize);
                         }
                     });
+                }
+
+                // 省略号单元格悬停展示完整内容（原生 title，事件委托；供应商/在途列已有悬停浮窗自动排除）
+                if (typeof CellEllipsisTooltip !== 'undefined') {
+                    CellEllipsisTooltip.bind('#myGrid', '.ag-cell');
                 }
 
                 // 添加自定义拖拽选择功能
