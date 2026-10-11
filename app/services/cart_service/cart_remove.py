@@ -281,3 +281,33 @@ class CartRemoveService:
                 'code': 1,
                 'msg': f'自动删除高库存商品失败: {str(e)}'
             }
+
+    def purge_deleted_items(self, retention_days: int = 90) -> Dict[str, Any]:
+        """
+        物理清理超过保留期的软删除数据 - 定时任务调用
+        适用场景：每日定时清理 is_deleted=1 且 deleted_time 超过保留期的行
+        注意：物理删除不可恢复；deleted_time 为空的行不清理，避免误删历史脏数据
+        """
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            sql = """
+                DELETE FROM crmapp_cart
+                WHERE is_deleted = 1
+                  AND deleted_time IS NOT NULL
+                  AND deleted_time < DATE_SUB(NOW(), INTERVAL %s DAY)
+            """
+            cursor.execute(sql, (retention_days,))
+            purged_count = cursor.rowcount
+            conn.commit()
+
+            return {
+                'code': 0,
+                'msg': f'成功物理清理 {purged_count} 条软删除超过 {retention_days} 天的数据',
+                'purged_count': purged_count,
+                'retention_days': retention_days
+            }
+        except Exception as e:
+            return {'code': 1, 'msg': f'物理清理软删除数据失败: {str(e)}'}
+        finally:
+            conn.close()

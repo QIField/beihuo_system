@@ -347,6 +347,23 @@ def run_cart_cleanup_task():
     except Exception as e:
         print(f"[失败] 每小时购物车清理任务失败: {str(e)}")
 
+# 注册每日购物车软删除数据物理清理任务
+def run_cart_purge_task():
+    """每日03:30物理清理购物车中软删除超过90天的数据"""
+    print(f"[{datetime.now()}] [定时] 开始执行购物车软删除数据物理清理任务...")
+
+    try:
+        from app.services.cart_service.cart_remove import CartRemoveService
+
+        result = CartRemoveService().purge_deleted_items(retention_days=90)
+
+        if result['code'] == 0:
+            print(f"[成功] {result['msg']}")
+        else:
+            print(f"[失败] {result['msg']}")
+    except Exception as e:
+        print(f"[失败] 购物车软删除数据物理清理任务失败: {str(e)}")
+
 #定时更新========================================================================================================================================
 # [已重构] 以下代码已迁移到 app/services/beihuo_service/ 模块
 # 新的实现：
@@ -4448,6 +4465,16 @@ def init_background_tasks():
             'cron',
             'cart_cleanup_hourly',
             minute=0,
+            replace_existing=True
+        )
+
+        # 注册购物车软删除数据物理清理任务（每天03:30，清理软删除超过90天的数据）
+        task_manager.schedule(
+            run_cart_purge_task,
+            'cron',
+            'cart_purge_daily',
+            hour=3,
+            minute=30,
             replace_existing=True
         )
 

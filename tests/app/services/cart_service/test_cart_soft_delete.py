@@ -8,6 +8,7 @@
 3. 单条删除复用批量软删
 4. 定时高库存清理：查询只取未删除行，删除改 UPDATE，操作人记 system
 5. 列表/COUNT 一律过滤 is_deleted = 0（所有用户均不可见已删行）
+6. 物理清理任务 DELETE 仅针对超保留期且 deleted_time 非空的已删行
 
 运行方式：
     python tests/app/services/cart_service/test_cart_soft_delete.py
@@ -213,6 +214,28 @@ class FakeDBCursorContext:
         return False
 
 
+def test_purge_deleted_items_physical_delete():
+    mp = _MonkeyPatch()
+    try:
+        cursor, conn = install_fake_db(mp)
+        service = CartRemoveService()
+
+        result = service.purge_deleted_items(retention_days=90)
+
+        sql, params = cursor.executed[0]
+        assert sql.startswith('DELETE FROM crmapp_cart')
+        assert 'is_deleted = 1' in sql
+        assert 'deleted_time IS NOT NULL' in sql
+        assert 'deleted_time < DATE_SUB(NOW(), INTERVAL %s DAY)' in sql
+        assert params == (90,)
+        assert conn.commits == 1
+        assert result['code'] == 0
+        assert result['purged_count'] == 1
+        assert result['retention_days'] == 90
+    finally:
+        mp.undo()
+
+
 def test_get_cart_data_default_filters_deleted():
     mp = _MonkeyPatch()
     try:
@@ -237,8 +260,9 @@ def main():
     test_remove_multiple_without_barcode_is_soft_delete()
     test_remove_single_item_uses_soft_delete()
     test_auto_remove_high_stock_is_soft_delete()
+    test_purge_deleted_items_physical_delete()
     test_get_cart_data_default_filters_deleted()
-    print('全部购物车软删除测试通过（6/6）')
+    print('全部购物车软删除测试通过（7/7）')
 
 
 if __name__ == '__main__':
