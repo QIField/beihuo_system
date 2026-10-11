@@ -7,9 +7,7 @@
 2. 批量删除（有条码/无条码）均为 UPDATE 软删，且 WHERE 带 is_deleted = 0
 3. 单条删除复用批量软删
 4. 定时高库存清理：查询只取未删除行，删除改 UPDATE，操作人记 system
-5. 列表/COUNT 默认过滤 is_deleted = 0
-6. include_deleted=True 时查询不带过滤
-7. include_deleted 参数仅管理员生效，非管理员强制忽略
+5. 列表/COUNT 一律过滤 is_deleted = 0（所有用户均不可见已删行）
 
 运行方式：
     python tests/app/services/cart_service/test_cart_soft_delete.py
@@ -26,7 +24,6 @@ if PROJECT_ROOT not in sys.path:
 
 from app.services.cart_service.cart_remove import CartRemoveService
 from app.services.cart_service.cart_data_service import CartDataService
-from app.services.cart_service.cart_request_handler import CartRequestHandler
 import app.services.cart_service.cart_remove as crm_module
 import app.services.cart_service.cart_data_service as cds_module
 
@@ -234,43 +231,6 @@ def test_get_cart_data_default_filters_deleted():
         mp.undo()
 
 
-def test_get_cart_data_include_deleted_omits_filter():
-    mp = _MonkeyPatch()
-    try:
-        cursor = FakeCursor(fetch_queues=[{'total': 0}, []])
-        mp.setattr(cds_module, 'db_cursor', FakeDBCursorContext(cursor))
-
-        CartDataService().get_cart_data('fsbbr', include_deleted=True)
-
-        list_sql = cursor.executed[0][0]
-        assert 'is_deleted' not in list_sql
-    finally:
-        mp.undo()
-
-
-def _call_handler(is_admin, args):
-    captured = {}
-
-    def fake_get_cart_data(store, dimension, search_params, page, limit,
-                           sort_field, sort_order, include_deleted):
-        captured['include_deleted'] = include_deleted
-        return [], 0
-
-    handler = CartRequestHandler()
-    handler.cart_data_service.get_cart_data = fake_get_cart_data
-    handler.handle_get_cart_request('fsbbr', is_admin, args)
-    return captured['include_deleted']
-
-
-def test_admin_include_deleted_takes_effect():
-    assert _call_handler(True, {'include_deleted': '1'}) is True
-    assert _call_handler(True, {'include_deleted': 'true'}) is True
-
-
-def test_non_admin_include_deleted_ignored():
-    assert _call_handler(False, {'include_deleted': '1'}) is False
-
-
 def main():
     test_clear_cart_is_soft_delete()
     test_remove_multiple_with_barcode_is_soft_delete()
@@ -278,10 +238,7 @@ def main():
     test_remove_single_item_uses_soft_delete()
     test_auto_remove_high_stock_is_soft_delete()
     test_get_cart_data_default_filters_deleted()
-    test_get_cart_data_include_deleted_omits_filter()
-    test_admin_include_deleted_takes_effect()
-    test_non_admin_include_deleted_ignored()
-    print('全部购物车软删除测试通过（9/9）')
+    print('全部购物车软删除测试通过（6/6）')
 
 
 if __name__ == '__main__':
