@@ -144,6 +144,9 @@ def init_cart_table():
                 added_time DATETIME COMMENT '加入时间',
                 added_by VARCHAR(255) COMMENT '加入账户名',
                 store VARCHAR(100) COMMENT '门店代码',
+                is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标记：0-正常，1-已删除',
+                deleted_time DATETIME NULL DEFAULT NULL COMMENT '删除时间',
+                deleted_by VARCHAR(255) NULL DEFAULT NULL COMMENT '删除操作人',
                 INDEX idx_oe (oe),
                 INDEX idx_barcode (barcode),
                 INDEX idx_store (store),
@@ -152,7 +155,8 @@ def init_cart_table():
                 INDEX idx_barcode_store (barcode, store),  -- 优化添加到购物车的查询
                 INDEX idx_oe_store (oe, store),            -- 优化更新数量的查询
                 INDEX idx_oe_barcode_store (oe, barcode, store), -- 优化精确查找的查询
-                INDEX idx_oe_barcode (oe, barcode)         -- 新增：优化OE和条码的组合查询
+                INDEX idx_oe_barcode (oe, barcode),        -- 新增：优化OE和条码的组合查询
+                INDEX idx_store_is_deleted (store, is_deleted) -- 优化门店+软删除标记的列表查询
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='购物车表';
             """
             cursor.execute(create_table_sql)
@@ -165,6 +169,16 @@ def init_cart_table():
     modify_field_type('crmapp_cart', 'car_model', "TEXT COMMENT '车型'")
     modify_field_type('crmapp_cart', 'replace_number', "TEXT COMMENT '替换号'")
     modify_field_type('crmapp_cart', 'purchase_records', "TEXT COMMENT '采购记录(JSON格式)'")
+
+    # 软删除相关字段与索引（存量库幂等补齐，CREATE TABLE IF NOT EXISTS 不会改已存在的表）
+    check_and_add_fields('crmapp_cart', [
+        {'name': 'is_deleted', 'definition': "TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除标记：0-正常，1-已删除'"},
+        {'name': 'deleted_time', 'definition': "DATETIME NULL DEFAULT NULL COMMENT '删除时间'"},
+        {'name': 'deleted_by', 'definition': "VARCHAR(255) NULL DEFAULT NULL COMMENT '删除操作人'"},
+    ])
+    check_and_create_indexes('crmapp_cart', [
+        {'name': 'idx_store_is_deleted', 'definition': 'ADD INDEX idx_store_is_deleted (store, is_deleted)'},
+    ])
 
 
 def init_user_table():

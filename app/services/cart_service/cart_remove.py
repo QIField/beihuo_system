@@ -25,11 +25,11 @@ def log_step(step_name: str, start_time: float, end_time: float):
 class CartRemoveService:
     """购物车删除服务类 - 精简核心功能"""
     
-    def clear_cart(self, store: str) -> Dict[str, Any]:
+    def clear_cart(self, store: str, deleted_by: Optional[str] = None) -> Dict[str, Any]:
         """
-        清空购物车 - 直接DELETE法
+        清空购物车 - 软删除（UPDATE标记法）
         适用场景：用户一键清空当前门店购物车
-        数据安全：通过store参数确保只删除当前门店数据
+        数据安全：通过store参数确保只标记当前门店数据，物理行保留
         """
         total_start = time.time()
         step_start = total_start
@@ -45,11 +45,15 @@ class CartRemoveService:
             log_step("创建游标", step_start, step_end)
             step_start = step_end
             
-            # 明确指定只删除当前门店数据
-            sql = "DELETE FROM crmapp_cart WHERE store = %s"
-            cursor.execute(sql, (store,))
+            # 明确指定只标记当前门店的未删除数据
+            sql = """
+                UPDATE crmapp_cart
+                SET is_deleted = 1, deleted_time = NOW(), deleted_by = %s
+                WHERE store = %s AND is_deleted = 0
+            """
+            cursor.execute(sql, (deleted_by, store))
             step_end = time.time()
-            log_step("执行DELETE语句", step_start, step_end)
+            log_step("执行软删除UPDATE语句", step_start, step_end)
             step_start = step_end
             
             deleted_count = cursor.rowcount
@@ -81,9 +85,10 @@ class CartRemoveService:
                 'msg': f'清空购物车失败: {str(e)}'
             }
     
-    def remove_multiple_items(self, store: str, item_details: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def remove_multiple_items(self, store: str, item_details: List[Dict[str, Any]],
+                              deleted_by: Optional[str] = None) -> Dict[str, Any]:
         """
-        用户主动批量删除 - 逐条精确删除
+        用户主动批量删除 - 逐条精确软删除
         适用场景：用户明确选择要删除的具体商品
         有 item_barcode 时按 OE+条码 精确匹配，否则仅按 OE 删除（兼容旧逻辑）
         """
@@ -95,17 +100,25 @@ class CartRemoveService:
             cursor = conn.cursor()
             deleted_count = 0
 
-            # 逐条删除，保证 (oe, barcode) 精确配对，避免 IN 列表交叉匹配误删
+            # 逐条软删，保证 (oe, barcode) 精确配对，避免 IN 列表交叉匹配误删
             for item in item_details:
                 item_oe = item.get('item_oe')
                 item_barcode = item.get('item_barcode')
 
                 if item_barcode:
-                    sql = "DELETE FROM crmapp_cart WHERE oe = %s AND barcode = %s AND store = %s"
-                    cursor.execute(sql, (item_oe, item_barcode, store))
+                    sql = """
+                        UPDATE crmapp_cart
+                        SET is_deleted = 1, deleted_time = NOW(), deleted_by = %s
+                        WHERE oe = %s AND barcode = %s AND store = %s AND is_deleted = 0
+                    """
+                    cursor.execute(sql, (deleted_by, item_oe, item_barcode, store))
                 else:
-                    sql = "DELETE FROM crmapp_cart WHERE oe = %s AND store = %s"
-                    cursor.execute(sql, (item_oe, store))
+                    sql = """
+                        UPDATE crmapp_cart
+                        SET is_deleted = 1, deleted_time = NOW(), deleted_by = %s
+                        WHERE oe = %s AND store = %s AND is_deleted = 0
+                    """
+                    cursor.execute(sql, (deleted_by, item_oe, store))
 
                 deleted_count += cursor.rowcount
 
@@ -120,24 +133,26 @@ class CartRemoveService:
             return {'code': 1, 'msg': f'批量删除失败: {str(e)}'}
         finally:
             conn.close()
-    
-    def remove_single_item(self, store: str, item_oe: str, item_barcode: Optional[str] = None) -> Dict[str, Any]:
+
+    def remove_single_item(self, store: str, item_oe: str, item_barcode: Optional[str] = None,
+                           deleted_by: Optional[str] = None) -> Dict[str, Any]:
         """
-        删除单个商品 - Set集合法包装
+        删除单个商品 - 逐条软删的单条包装
         适用场景：用户删除单个明确的商品
         """
         # 将单个商品包装成列表，复用批量删除逻辑
         item_detail = {'item_oe': item_oe}
         if item_barcode:
             item_detail['item_barcode'] = item_barcode
-        
-        return self.remove_multiple_items(store, [item_detail])
+
+        return self.remove_multiple_items(store, [item_detail], deleted_by)
     
-    def auto_remove_high_stock_items(self, store: str, threshold: int = 20) -> Dict[str, Any]:
+    def auto_remove_high_stock_items(self, store: str, threshold: int = 20,
+                                     deleted_by: str = 'system') -> Dict[str, Any]:
         """
-        自动删除高库存商品 - 改进的条件批量删除法
+        自动软删除高库存商品 - 条件批量标记法
         适用场景：系统定时自动清理库存过高的商品
-        优势：符合库存管理业务逻辑，自动化处理
+        优势：符合库存管理业务逻辑，自动化处理，物理行保留可追溯
         """
         total_start = time.time()
         step_start = total_start
@@ -153,11 +168,11 @@ class CartRemoveService:
             log_step("创建游标", step_start, step_end)
             step_start = step_end
             
-            # 方法1: 先获取购物车中所有具有有效条码的项目
+            # 方法1: 先获取购物车中所有具有有效条码的未删除项目
             query_cart_sql = """
                 SELECT id, barcode
                 FROM crmapp_cart
-                WHERE store = %s AND barcode IS NOT NULL AND barcode != ''
+                WHERE store = %s AND barcode IS NOT NULL AND barcode != '' AND is_deleted = 0
             """
             cursor.execute(query_cart_sql, (store,))
             cart_items = cursor.fetchall()
@@ -220,17 +235,18 @@ class CartRemoveService:
                         cart_ids_to_delete.append(item['id'])
             
                 if cart_ids_to_delete:
-                    # 构建删除SQL
+                    # 构建软删除SQL
                     id_placeholders = ','.join(['%s'] * len(cart_ids_to_delete))
                     delete_sql = f"""
-                        DELETE FROM crmapp_cart
-                        WHERE id IN ({id_placeholders}) AND store = %s
+                        UPDATE crmapp_cart
+                        SET is_deleted = 1, deleted_time = NOW(), deleted_by = %s
+                        WHERE id IN ({id_placeholders}) AND store = %s AND is_deleted = 0
                     """
-                    cursor.execute(delete_sql, cart_ids_to_delete + [store])
+                    cursor.execute(delete_sql, [deleted_by] + cart_ids_to_delete + [store])
                     deleted_count = cursor.rowcount
-                    
+
                     step_end = time.time()
-                    log_step(f"执行删除({deleted_count}条)", step_start, step_end)
+                    log_step(f"执行软删除({deleted_count}条)", step_start, step_end)
                     step_start = step_end
                 else:
                     deleted_count = 0

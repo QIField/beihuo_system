@@ -79,7 +79,7 @@ def fetch_cart_data(**search_params) -> list:
         # 导出字段外额外查询 purchase_records，用于重构供应商字段
         query_fields = CART_FIELDS + ['purchase_records']
         fields_str = ', '.join([f'`{f}`' for f in query_fields])
-        where_parts = ["`store` = %s"]
+        where_parts = ["`store` = %s", "`is_deleted` = 0"]
         params = [store]
 
         if search_params.get('oe'):

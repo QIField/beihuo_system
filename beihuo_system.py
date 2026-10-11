@@ -1762,8 +1762,8 @@ def get_cart_items_with_dimension(store, is_admin, dimension='product'):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
 
-    # 统一使用传入的store参数，确保门店数据隔离
-    sql = "SELECT * FROM crmapp_cart WHERE store = %s ORDER BY added_time DESC"
+    # 统一使用传入的store参数，确保门店数据隔离；软删除数据不参与展示与刷新
+    sql = "SELECT * FROM crmapp_cart WHERE store = %s AND is_deleted = 0 ORDER BY added_time DESC"
     cursor.execute(sql, (store,))
 
     result = cursor.fetchall()
@@ -1824,7 +1824,7 @@ def get_cart_items_with_dimension(store, is_admin, dimension='product'):
                     stock_amount = %s, sellable_days = %s, cost_price = %s, 
                     avg_sales_12m = %s, avg_sales_6m = %s, sales_7d = %s, 
                     warning_status = %s, on_way = %s, car_model = %s
-                WHERE barcode = %s AND store = %s
+                WHERE barcode = %s AND store = %s AND is_deleted = 0
             """
             cursor.executemany(update_cart_sql, update_data_for_batch)
             conn.commit()
@@ -2011,7 +2011,7 @@ def add_to_cart():
         barcodes = [item['barcode'] for item in complete_items if item.get('barcode')]
         if barcodes:
             placeholders = ','.join(['%s'] * len(barcodes))
-            check_sql = f"SELECT barcode FROM crmapp_cart WHERE store = %s AND barcode IN ({placeholders})"
+            check_sql = f"SELECT barcode FROM crmapp_cart WHERE store = %s AND is_deleted = 0 AND barcode IN ({placeholders})"
             cursor.execute(check_sql, [store] + barcodes)
             existing_barcodes = {row['barcode'] for row in cursor.fetchall()}
         else:
@@ -2207,7 +2207,8 @@ def clear_cart():
 
     # 委托购物车删除服务执行，即使是管理员也只能操作当前门店
     from app.services.cart_service.cart_remove import CartRemoveService
-    result = CartRemoveService().clear_cart(store)
+    deleted_by = session.get('username')
+    result = CartRemoveService().clear_cart(store, deleted_by)
 
     return jsonify(result)
 
@@ -2301,7 +2302,8 @@ def remove_multiple_from_cart():
 
         # 委托购物车删除服务执行逐条精确删除
         from app.services.cart_service.cart_remove import CartRemoveService
-        result = CartRemoveService().remove_multiple_items(store, item_details)
+        deleted_by = session.get('username')
+        result = CartRemoveService().remove_multiple_items(store, item_details, deleted_by)
 
         # 删除成功后不返回购物车数据，前端自行调用获取购物车接口
         return jsonify(result)
@@ -2330,7 +2332,8 @@ def remove_from_cart():
 
         # 委托购物车删除服务执行单条精确删除
         from app.services.cart_service.cart_remove import CartRemoveService
-        result = CartRemoveService().remove_single_item(store, item_oe, item_barcode)
+        deleted_by = session.get('username')
+        result = CartRemoveService().remove_single_item(store, item_oe, item_barcode, deleted_by)
 
         # 删除成功后不返回购物车数据，前端自行调用获取购物车接口
         return jsonify(result)
@@ -2361,17 +2364,17 @@ def update_cart_quantity():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 先检查商品是否存在
-        check_sql = "SELECT id FROM crmapp_cart WHERE oe = %s AND store = %s"
+        # 先检查商品是否存在（仅未删除数据）
+        check_sql = "SELECT id FROM crmapp_cart WHERE oe = %s AND store = %s AND is_deleted = 0"
         cursor.execute(check_sql, (item_oe, store))
         existing_item = cursor.fetchone()
-        
+
         if not existing_item:
             conn.close()
             return jsonify({'code': 1, 'msg': '购物车中未找到该商品'})
-        
+
         # 更新数量
-        sql = "UPDATE crmapp_cart SET quantity = %s WHERE oe = %s AND store = %s"
+        sql = "UPDATE crmapp_cart SET quantity = %s WHERE oe = %s AND store = %s AND is_deleted = 0"
         cursor.execute(sql, (quantity, item_oe, store))
         
         conn.commit()
@@ -2794,7 +2797,7 @@ def import_cart():
                 cart_barcodes = [item['barcode'] for item in all_matched_items if item['barcode']]
                 if cart_barcodes:
                     placeholders_cart = ','.join(['%s'] * len(cart_barcodes))
-                    cursor.execute(f"SELECT barcode FROM crmapp_cart WHERE barcode IN ({placeholders_cart}) AND store = %s", cart_barcodes + [current_store])
+                    cursor.execute(f"SELECT barcode FROM crmapp_cart WHERE barcode IN ({placeholders_cart}) AND store = %s AND is_deleted = 0", cart_barcodes + [current_store])
                     existing_barcodes = {row['barcode'] for row in cursor.fetchall()}
                 else:
                     existing_barcodes = set()

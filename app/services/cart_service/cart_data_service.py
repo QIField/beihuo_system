@@ -48,7 +48,8 @@ class CartDataService:
 
     def get_cart_data(self, store: str, dimension: str = 'product',
                       search_params: Dict = None, page: int = 1, limit: int = 50,
-                      sort_field: str = None, sort_order: str = None) -> Tuple[List[Dict[str, Any]], int]:
+                      sort_field: str = None, sort_order: str = None,
+                      include_deleted: bool = False) -> Tuple[List[Dict[str, Any]], int]:
         """
         获取购物车数据 - 支持产品维度和供应商维度，支持搜索过滤、排序和分页
 
@@ -60,17 +61,22 @@ class CartDataService:
             limit: 每页数量
             sort_field: 排序字段
             sort_order: 排序方向，'asc' 或 'desc'
+            include_deleted: 是否包含软删除数据，默认 False（仅管理后台可传 True）
 
         Returns:
             (数据列表, 总数量)
         """
         # 使用上下文管理器确保连接正确关闭，避免连接泄漏
         with db_cursor(dict_cursor=True) as cursor:
-            # 构建基础SQL查询
+            # 构建基础SQL查询，默认过滤软删除数据
             sql = "SELECT * FROM crmapp_cart WHERE store = %s"
             count_sql = "SELECT COUNT(*) as total FROM crmapp_cart WHERE store = %s"
             params = [store]
             count_params = [store]
+
+            if not include_deleted:
+                sql += " AND is_deleted = 0"
+                count_sql += " AND is_deleted = 0"
 
             # 复用搜索/筛选条件拼接逻辑
             sql, params = self._apply_search_conditions(sql, params, search_params)
@@ -145,7 +151,7 @@ class CartDataService:
             return []
 
         with db_cursor(dict_cursor=True) as cursor:
-            sql = f"SELECT DISTINCT {db_field} AS col_value FROM crmapp_cart WHERE store = %s"
+            sql = f"SELECT DISTINCT {db_field} AS col_value FROM crmapp_cart WHERE store = %s AND is_deleted = 0"
             params = [store]
             sql, params = self._apply_search_conditions(sql, params, filtered_search_params)
             sql += f" ORDER BY {db_field}"

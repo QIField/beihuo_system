@@ -52,6 +52,8 @@ class CartRequestHandler:
         # 排序参数
         sort_field = None
         sort_order = None
+        # 是否包含软删除数据，默认 False
+        include_deleted = False
 
         if args and isinstance(args, dict):
             dimension = args.get('dimension', 'product')
@@ -75,6 +77,10 @@ class CartRequestHandler:
             sort_field = args.get('field')  # 排序字段
             sort_order = args.get('order')  # 排序方向：asc 或 desc
 
+            # 仅管理员可查看软删除数据，非管理员传参一律忽略
+            if is_admin and str(args.get('include_deleted', '')).lower() in ('1', 'true'):
+                include_deleted = True
+
         # 提取搜索和筛选参数
         search_params = self._extract_search_params(args)
 
@@ -82,7 +88,8 @@ class CartRequestHandler:
         try:
             # 使用CartDataService中的get_cart_data方法，传入维度参数、搜索参数、分页参数和排序参数
             cart_data, total_count = self.cart_data_service.get_cart_data(
-                store, dimension, search_params, page, limit, sort_field, sort_order
+                store, dimension, search_params, page, limit, sort_field, sort_order,
+                include_deleted
             )
 
             # 返回符合API接口格式的结果（包含分页信息）

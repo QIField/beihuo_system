@@ -23,11 +23,11 @@ def update_cart_data(store: Optional[str] = None) -> None:
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
     try:
-        # 获取购物车数据（如果指定了门店，则只获取该门店的数据）
+        # 获取购物车数据（如果指定了门店，则只获取该门店的数据），软删除数据不参与同步
         if store:
-            cursor.execute("SELECT id, barcode, store FROM crmapp_cart WHERE store = %s", (store,))
+            cursor.execute("SELECT id, barcode, store FROM crmapp_cart WHERE store = %s AND is_deleted = 0", (store,))
         else:
-            cursor.execute("SELECT id, barcode, store FROM crmapp_cart")
+            cursor.execute("SELECT id, barcode, store FROM crmapp_cart WHERE is_deleted = 0")
         cart_items = cursor.fetchall()
         
         if not cart_items:
@@ -112,7 +112,7 @@ def update_cart_data(store: Optional[str] = None) -> None:
                         stock_amount = %s, sellable_days = %s, cost_price = %s, 
                         avg_sales_12m = %s, avg_sales_6m = %s, sales_7d = %s, warning_status = %s, 
                         on_way = %s, car_model = %s, replace_number = %s, purchase_records = %s
-                    WHERE id = %s
+                    WHERE id = %s AND is_deleted = 0
                 """
                 cursor.executemany(update_sql, update_data_for_batch)
                 conn.commit()

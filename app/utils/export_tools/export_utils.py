@@ -235,9 +235,9 @@ def export_cart(store, search_params=None):
         
         # 构建SQL
         fields_str = ', '.join([f'`{f}`' for f in fields])
-        where_parts = ["`store` = %s"]
+        where_parts = ["`store` = %s", "`is_deleted` = 0"]
         params = [store]
-        
+
         # 复合搜索条件
         if search_params:
             # OE搜索
