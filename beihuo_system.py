@@ -2204,18 +2204,12 @@ def clear_cart():
     
     # 统一获取当前用户门店，确保门店数据隔离
     store = get_user_store()  # 使用新的函数获取用户门店
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # 统一使用传入的store参数，确保门店数据隔离，即使是管理员也只能操作当前门店
-    sql = "DELETE FROM crmapp_cart WHERE store = %s"
-    cursor.execute(sql, (store,))
-    
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'code': 0, 'msg': '购物车已清空'})
+
+    # 委托购物车删除服务执行，即使是管理员也只能操作当前门店
+    from app.services.cart_service.cart_remove import CartRemoveService
+    result = CartRemoveService().clear_cart(store)
+
+    return jsonify(result)
 
 @app.route('/api/switch_org', methods=['POST'])
 @login_required
@@ -2305,34 +2299,12 @@ def remove_multiple_from_cart():
         # 获取当前用户门店
         store = get_user_store()
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        deleted_count = 0
-        for item in item_details:
-            item_oe = item.get('item_oe')
-            item_barcode = item.get('item_barcode')
-
-            # 修改删除逻辑：如果提供了物料条码，则按OE和物料条码组合删除；否则按OE删除（兼容旧逻辑）
-            if item_barcode:
-                sql = "DELETE FROM crmapp_cart WHERE oe = %s AND barcode = %s AND store = %s"
-                cursor.execute(sql, (item_oe, item_barcode, store))
-            else:
-                # 兼容旧逻辑，仅按OE删除
-                sql = "DELETE FROM crmapp_cart WHERE oe = %s AND store = %s"
-                cursor.execute(sql, (item_oe, store))
-
-            deleted_count += cursor.rowcount
-
-        conn.commit()
-        conn.close()
+        # 委托购物车删除服务执行逐条精确删除
+        from app.services.cart_service.cart_remove import CartRemoveService
+        result = CartRemoveService().remove_multiple_items(store, item_details)
 
         # 删除成功后不返回购物车数据，前端自行调用获取购物车接口
-        return jsonify({
-            'code': 0,
-            'msg': f'成功删除 {deleted_count} 个商品',
-            'deleted_count': deleted_count
-        })
+        return jsonify(result)
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'删除失败: {str(e)}'})
 
@@ -2356,26 +2328,12 @@ def remove_from_cart():
         # 获取当前用户门店
         store = get_user_store()
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 修改删除逻辑：如果提供了物料条码，则按OE和物料条码组合删除；否则按OE删除（兼容旧逻辑）
-        if item_barcode:
-            sql = "DELETE FROM crmapp_cart WHERE oe = %s AND barcode = %s AND store = %s"
-            cursor.execute(sql, (item_oe, item_barcode, store))
-        else:
-            # 兼容旧逻辑，仅按OE删除
-            sql = "DELETE FROM crmapp_cart WHERE oe = %s AND store = %s"
-            cursor.execute(sql, (item_oe, store))
-
-        conn.commit()
-        conn.close()
+        # 委托购物车删除服务执行单条精确删除
+        from app.services.cart_service.cart_remove import CartRemoveService
+        result = CartRemoveService().remove_single_item(store, item_oe, item_barcode)
 
         # 删除成功后不返回购物车数据，前端自行调用获取购物车接口
-        return jsonify({
-            'code': 0,
-            'msg': '删除成功'
-        })
+        return jsonify(result)
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'删除失败: {str(e)}'})
 

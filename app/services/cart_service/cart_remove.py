@@ -83,110 +83,43 @@ class CartRemoveService:
     
     def remove_multiple_items(self, store: str, item_details: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        用户主动批量删除 - Set集合优化法
+        用户主动批量删除 - 逐条精确删除
         适用场景：用户明确选择要删除的具体商品
-        优势：精确控制，避免误删，性能优秀
+        有 item_barcode 时按 OE+条码 精确匹配，否则仅按 OE 删除（兼容旧逻辑）
         """
-        total_start = time.time()
-        step_start = total_start
-        
         if not item_details:
-            return {
-                'code': 1,
-                'msg': '没有要删除的商品'
-            }
-        
+            return {'code': 1, 'msg': '没有要删除的商品'}
+
+        conn = get_db_connection()
         try:
-            conn = get_db_connection()
-            step_end = time.time()
-            log_step("获取数据库连接", step_start, step_end)
-            step_start = step_end
-            
             cursor = conn.cursor()
-            step_end = time.time()
-            log_step("创建游标", step_start, step_end)
-            step_start = step_end
-            
-            # 分离有条码和无条码的商品
-            items_with_barcode = []
-            items_without_barcode = []
-            
+            deleted_count = 0
+
+            # 逐条删除，保证 (oe, barcode) 精确配对，避免 IN 列表交叉匹配误删
             for item in item_details:
                 item_oe = item.get('item_oe')
                 item_barcode = item.get('item_barcode')
-                
+
                 if item_barcode:
-                    items_with_barcode.append((item_oe, item_barcode))
+                    sql = "DELETE FROM crmapp_cart WHERE oe = %s AND barcode = %s AND store = %s"
+                    cursor.execute(sql, (item_oe, item_barcode, store))
                 else:
-                    items_without_barcode.append(item_oe)
-            
-            step_end = time.time()
-            log_step("分离商品数据", step_start, step_end)
-            step_start = step_end
-            
-            deleted_count = 0
-            
-            # 处理有条码的商品 - 使用IN子句批量删除
-            if items_with_barcode:
-                oe_list = [item[0] for item in items_with_barcode]
-                barcode_list = [item[1] for item in items_with_barcode]
-                
-                oe_placeholders = ','.join(['%s'] * len(oe_list))
-                barcode_placeholders = ','.join(['%s'] * len(barcode_list))
-                
-                sql = f"""
-                    DELETE FROM crmapp_cart 
-                    WHERE oe IN ({oe_placeholders}) 
-                    AND barcode IN ({barcode_placeholders}) 
-                    AND store = %s
-                """
-                params = oe_list + barcode_list + [store]
-                cursor.execute(sql, params)
+                    sql = "DELETE FROM crmapp_cart WHERE oe = %s AND store = %s"
+                    cursor.execute(sql, (item_oe, store))
+
                 deleted_count += cursor.rowcount
-                
-                step_end = time.time()
-                log_step(f"删除有条码商品({len(items_with_barcode)}个)", step_start, step_end)
-                step_start = step_end
-            
-            # 处理无条码的商品 - 使用IN子句批量删除
-            if items_without_barcode:
-                oe_placeholders = ','.join(['%s'] * len(items_without_barcode))
-                sql = f"DELETE FROM crmapp_cart WHERE oe IN ({oe_placeholders}) AND store = %s"
-                params = items_without_barcode + [store]
-                cursor.execute(sql, params)
-                deleted_count += cursor.rowcount
-                
-                step_end = time.time()
-                log_step(f"删除无条码商品({len(items_without_barcode)}个)", step_start, step_end)
-                step_start = step_end
-            
+
             conn.commit()
-            step_end = time.time()
-            log_step("提交事务", step_start, step_end)
-            step_start = step_end
-            
-            conn.close()
-            step_end = time.time()
-            log_step("关闭连接", step_start, step_end)
-            
-            total_end = time.time()
-            log_step("【批量删除商品】总耗时", total_start, total_end)
-            
+
             return {
                 'code': 0,
                 'msg': f'成功删除 {deleted_count} 个用户选择的商品',
                 'deleted_count': deleted_count
             }
-            
         except Exception as e:
-            if 'conn' in locals():
-                conn.close()
-            total_end = time.time()
-            log_step("【批量删除商品】失败总耗时", total_start, total_end)
-            return {
-                'code': 1,
-                'msg': f'批量删除失败: {str(e)}'
-            }
+            return {'code': 1, 'msg': f'批量删除失败: {str(e)}'}
+        finally:
+            conn.close()
     
     def remove_single_item(self, store: str, item_oe: str, item_barcode: Optional[str] = None) -> Dict[str, Any]:
         """
