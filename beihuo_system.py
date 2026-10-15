@@ -2207,28 +2207,6 @@ def get_current_user():
         'ip_records_formatted': ip_records_formatted
     })
 
-@app.route('/api/cart/clear', methods=['POST'])
-@login_required
-def clear_cart():
-    """清空购物车"""
-    # 检查用户是否有删除购物车权限
-    can_delete_cart = session.get('can_delete_cart', False)
-    is_admin = session.get('is_admin', False)
-    
-    # 普通用户需要有删除购物车权限或为管理员
-    if not (can_delete_cart or is_admin):
-        return jsonify({'code': 1, 'msg': '权限不足，无法清空购物车'}), 403
-    
-    # 统一获取当前用户门店，确保门店数据隔离
-    store = get_user_store()  # 使用新的函数获取用户门店
-
-    # 委托购物车删除服务执行，即使是管理员也只能操作当前门店
-    from app.services.cart_service.cart_remove import CartRemoveService
-    deleted_by = session.get('username')
-    result = CartRemoveService().clear_cart(store, deleted_by)
-
-    return jsonify(result)
-
 @app.route('/api/switch_org', methods=['POST'])
 @login_required
 def switch_org():

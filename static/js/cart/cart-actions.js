@@ -1,6 +1,6 @@
 /**
  * 购物车操作模块
- * 包含移除、清空、导入、导出等操作
+ * 包含移除、导入、导出等操作
  */
 var CartActions = (function() {
     'use strict';
@@ -13,34 +13,6 @@ var CartActions = (function() {
     function removeFromCart(itemOe, itemBarcode) {
         // 使用 CartManager 进行删除（前端立即删除 + 后台异步同步）
         CartManager.removeItem(itemOe, itemBarcode);
-    }
-
-    /**
-     * 清空购物车
-     */
-    function clearCart() {
-        layui.use(['layer'], function(layer) {
-            layer.confirm('确定要清空购物车吗？', function(index) {
-                fetch('/api/cart/clear', {
-                    method: 'POST'
-                })
-                .then(function(response) { return response.json(); })
-                .then(function(result) {
-                    if (result.code === 0) {
-                        var dimension = window.currentCartDimension || 'product';
-                        CartPanel.refresh(dimension);
-                        updateCartCount();
-                        layui.layer.msg('购物车已清空', { icon: 1 });
-                    } else {
-                        layui.layer.msg(result.msg, { icon: 2 });
-                    }
-                })
-                .catch(function(error) {
-                    layui.layer.msg('操作失败: ' + error.message, { icon: 2 });
-                });
-                layer.close(index);
-            });
-        });
     }
 
     /**
@@ -187,7 +159,6 @@ var CartActions = (function() {
 
     return {
         removeFromCart: removeFromCart,
-        clearCart: clearCart,
         importCartData: importCartData,
         exportCartData: exportCartData
     };
