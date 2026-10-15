@@ -7,6 +7,7 @@
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.scripts.spiders.pipeline_clean.crm_gzbbr_clean import clean_purchase_order_list, clean_purchase_order_items
 from typing import List, Dict, Optional
+from datetime import datetime, timedelta
 
 from app.utils.common_util_module.time_conversion_util import get_day_timestamp
 from app.utils.orm.session import orm_session
@@ -214,35 +215,64 @@ def daily_inventory_crawler_service(cookies_key: str = 'fs',
                                       create_date_start: Optional[str] = None,
                                       create_date_end: Optional[str] = None) -> None:
     """
-    每日库存爬虫服务入口
+    每日库存爬虫服务入口（按日期逐天循环爬取）
+
+    大日期范围一次性请求 CRM 接口可能返回空数据，因此拆分为按天循环：
+    - 每天单独构造 orderdate 时间窗请求订单列表
+    - 列表入库为按 purchase_order_id 主键 upsert，逐天爬取幂等不写重
+    - 某天无数据时跳过继续下一天，不中断整体更新
 
     :param cookies_key: cookies的key，可选值：fs, zs, zh, hf, by，默认为fs
-    :param create_date_start: 创建时间范围的起始值（可选）
-    :param create_date_end: 创建时间范围的结束值（可选）
+    :param create_date_start: 创建时间范围的起始值（可选，格式 yyyy-MM-dd，不传默认当天）
+    :param create_date_end: 创建时间范围的结束值（可选，格式 yyyy-MM-dd，不传默认当天）
     """
+    # 未传日期时默认只更新当天；只传一边时补齐为同一天
+    if not create_date_start and not create_date_end:
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        create_date_start = today_str
+        create_date_end = today_str
+    elif not create_date_end:
+        create_date_end = create_date_start
+    elif not create_date_start:
+        create_date_start = create_date_end
 
+    start_dt = datetime.strptime(create_date_start, '%Y-%m-%d')
+    end_dt = datetime.strptime(create_date_end, '%Y-%m-%d')
+    if start_dt > end_dt:
+        start_dt, end_dt = end_dt, start_dt
 
     print("=" * 100)
+    total_purchase_count = 0
+    total_details_count = 0
 
-    orderdate_start,_=get_day_timestamp(create_date_start)  # pyright: ignore[reportArgumentType]
-    _,orderdate_end=get_day_timestamp(create_date_end)  # pyright: ignore[reportArgumentType]
+    current_dt = start_dt
+    while current_dt <= end_dt:
+        day_str = current_dt.strftime('%Y-%m-%d')
+        orderdate_start, orderdate_end = get_day_timestamp(day_str)
 
+        # 爬取当天采购订单
+        print(f"\n>>> 开始爬取 {day_str} 的采购订单...")
+        try:
+            purchase_count = crawl_purchase_orders(
+                orderdate_start=orderdate_start * 1000,
+                orderdate_end=orderdate_end * 1000,
+                page_num=None, cookies_key=cookies_key)
+        except ValueError as e:
+            # 当天无订单数据，跳过继续下一天
+            print(f"{day_str} 无数据（{str(e)}），跳过")
+            purchase_count = 0
+        print(f"{day_str} 共爬取到 {purchase_count} 条采购订单数据")
+        total_purchase_count += purchase_count
 
-    # 爬取采购订单
-    print("开始爬取采购订单...")
-    purchase_count = crawl_purchase_orders(
-        orderdate_start=orderdate_start*1000,   # pyright: ignore[reportArgumentType]
-        orderdate_end=orderdate_end*1000,  # pyright: ignore[reportArgumentType]
-        page_num=None, cookies_key=cookies_key)
-    print(f"共爬取到 {purchase_count} 条采购订单数据")
+        # 爬取当天订单明细（按当天日期从库里取订单ID）
+        purchase_order_ids = get_purchase_order_ids_from_db(cookies_key, day_str, day_str)
+        details_count = crawl_purchase_order_details(purchase_order_ids, cookies_key)
+        print(f"{day_str} 共爬取到 {details_count} 条采购订单明细数据")
+        total_details_count += details_count
 
-    # 爬取采购订单明细
-    print("\n开始爬取采购订单明细...")
-    purchase_order_ids = get_purchase_order_ids_from_db(cookies_key, create_date_start, create_date_end)
-    details_count = crawl_purchase_order_details(purchase_order_ids, cookies_key)
-    print(f"共爬取到 {details_count} 条采购订单明细数据")
+        current_dt += timedelta(days=1)
 
-   
+    print(f"\n全部日期爬取完成：共爬取 {total_purchase_count} 条采购订单、{total_details_count} 条订单明细")
     print("=" * 100)
 
 
