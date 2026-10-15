@@ -25,66 +25,6 @@ def log_step(step_name: str, start_time: float, end_time: float):
 class CartRemoveService:
     """购物车删除服务类 - 精简核心功能"""
     
-    def clear_cart(self, store: str, deleted_by: Optional[str] = None) -> Dict[str, Any]:
-        """
-        清空购物车 - 软删除（UPDATE标记法）
-        适用场景：用户一键清空当前门店购物车
-        数据安全：通过store参数确保只标记当前门店数据，物理行保留
-        """
-        total_start = time.time()
-        step_start = total_start
-        
-        try:
-            conn = get_db_connection()
-            step_end = time.time()
-            log_step("获取数据库连接", step_start, step_end)
-            step_start = step_end
-            
-            cursor = conn.cursor()
-            step_end = time.time()
-            log_step("创建游标", step_start, step_end)
-            step_start = step_end
-            
-            # 明确指定只标记当前门店的未删除数据
-            sql = """
-                UPDATE crmapp_cart
-                SET is_deleted = 1, deleted_time = NOW(), deleted_by = %s
-                WHERE store = %s AND is_deleted = 0
-            """
-            cursor.execute(sql, (deleted_by, store))
-            step_end = time.time()
-            log_step("执行软删除UPDATE语句", step_start, step_end)
-            step_start = step_end
-            
-            deleted_count = cursor.rowcount
-            conn.commit()
-            step_end = time.time()
-            log_step("提交事务", step_start, step_end)
-            step_start = step_end
-            
-            conn.close()
-            step_end = time.time()
-            log_step("关闭连接", step_start, step_end)
-            
-            total_end = time.time()
-            log_step("【清空购物车】总耗时", total_start, total_end)
-            
-            return {
-                'code': 0,
-                'msg': f'成功清空{store}门店购物车，删除 {deleted_count} 个商品',
-                'deleted_count': deleted_count
-            }
-            
-        except Exception as e:
-            if 'conn' in locals():
-                conn.close()
-            total_end = time.time()
-            log_step("【清空购物车】失败总耗时", total_start, total_end)
-            return {
-                'code': 1,
-                'msg': f'清空购物车失败: {str(e)}'
-            }
-    
     def remove_multiple_items(self, store: str, item_details: List[Dict[str, Any]],
                               deleted_by: Optional[str] = None) -> Dict[str, Any]:
         """

@@ -94,10 +94,6 @@ var CartPanel = (function() {
                         <i class="layui-icon layui-icon-delete"></i>
                         <span>删除选中</span>
                     </button>
-                    <button class="layui-btn layui-btn-sm btn-secondary" id="clearCartBtn">
-                        <i class="layui-icon layui-icon-fonts-clear"></i>
-                        <span>清空购物车</span>
-                    </button>
                     <button class="layui-btn layui-btn-sm btn-secondary" id="exportCartBtn">
                         <i class="layui-icon layui-icon-export"></i>
                         <span>导出数据</span>
@@ -609,11 +605,6 @@ var CartPanel = (function() {
                     // 绑定导入产品按钮
                     layero.find('#importCartBtn').on('click', function() {
                         CartActions.importCartData();
-                    });
-
-                    // 绑定清空购物车按钮
-                    layero.find('#clearCartBtn').on('click', function() {
-                        CartActions.clearCart();
                     });
 
                     // 绑定导出数据按钮
