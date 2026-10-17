@@ -15,6 +15,7 @@
   Step 1: 爬取销售订单历史数据 → 更新最近 3 天（最先执行）
   Step 2: 刷新安全库存表 (stock_safe)
   Step 3: 生成补货清单 Excel 下载链接
+  Step 4: 推送安全库存数据到 CRM
 
 销售&退货+销量表刷新（每月 1/10/20 号凌晨 3:00 执行）：
   Step 1: 爬取销售订单历史数据 (sales_order_history) —— 兜底更新最近 20 天
@@ -98,7 +99,8 @@ def _stock_safe_crawl_replenish_pipeline() -> None:
     """
     每日销售爬取 + 补货清单下载链接生成流程（每天凌晨 3:00 执行）
 
-    执行顺序：先爬取销售订单历史数据，再刷新安全库存表，最后生成补货清单下载链接。
+    执行顺序：先爬取销售订单历史数据，再刷新安全库存表，
+    然后生成补货清单下载链接，最后推送安全库存数据到 CRM。
     全部步骤执行完后，将各步骤结果汇总通过 message_push 推送到微信
     （参考 region_by_number_query_tasks 的推送方式）。
     """
@@ -109,40 +111,54 @@ def _stock_safe_crawl_replenish_pipeline() -> None:
     step_results: list = []
 
     # Step 1: 爬虫最先执行（更新最近 3 天）
-    logger.info("[Step 1/3] 爬取销售订单历史数据")
+    logger.info("[Step 1/4] 爬取销售订单历史数据")
     try:
         _crawl_and_store_sales_order_history()
         step_results.append("Step1 销售爬取：成功")
     except Exception as e:
-        logger.error("[Step 1/3] 失败: %s", e, exc_info=True)
+        logger.error("[Step 1/4] 失败: %s", e, exc_info=True)
         step_results.append(f"Step1 销售爬取：失败({e})")
 
     # Step 2: 刷新安全库存表
-    logger.info("[Step 2/3] 刷新安全库存表")
+    logger.info("[Step 2/4] 刷新安全库存表")
     try:
         from app.services.stock_safe_service.stock_safe_compute_service import run_compute
         r1 = run_compute()
-        logger.info("[Step 2/3] 完成: %s", r1)
+        logger.info("[Step 2/4] 完成: %s", r1)
         step_results.append("Step2 刷新安全库存：成功")
     except Exception as e:
-        logger.error("[Step 2/3] 失败: %s", e, exc_info=True)
+        logger.error("[Step 2/4] 失败: %s", e, exc_info=True)
         step_results.append(f"Step2 刷新安全库存：失败({e})")
 
     # Step 3: 生成补货清单 Excel 下载链接
-    logger.info("[Step 3/3] 生成补货清单 Excel 下载链接")
+    logger.info("[Step 3/4] 生成补货清单 Excel 下载链接")
     try:
         r2 = _generate_replenish_download_link()
         if r2.get('status') == 'completed':
             download_url = r2.get('download_url')
             step_results.append(f"Step3 补货清单链接：成功  {download_url} ")
-            logger.info("[Step 3/3] 完成: %s", download_url)
+            logger.info("[Step 3/4] 完成: %s", download_url)
         else:
             error = r2.get('error')
             step_results.append(f"Step3 补货清单链接：失败({error})")
-            logger.error("[Step 3/3] 失败: %s", error)
+            logger.error("[Step 3/4] 失败: %s", error)
     except Exception as e:
-        logger.error("[Step 3/3] 失败: %s", e, exc_info=True)
+        logger.error("[Step 3/4] 失败: %s", e, exc_info=True)
         step_results.append(f"Step3 补货清单链接：失败({e})")
+
+    # Step 4: 推送安全库存数据到 CRM
+    logger.info("[Step 4/4] 推送安全库存数据到 CRM")
+    try:
+        from app.services.stock_safe_service.push_data import push_replenish_data_to_crm
+        r3 = push_replenish_data_to_crm()
+        total = r3.get('total', 0)
+        success = r3.get('success_count', 0)
+        fail = r3.get('fail_count', 0)
+        step_results.append(f"Step4 推送安全库存：总数={total} 成功={success} 失败={fail}")
+        logger.info("[Step 4/4] 完成: 总数=%d 成功=%d 失败=%d", total, success, fail)
+    except Exception as e:
+        logger.error("[Step 4/4] 失败: %s", e, exc_info=True)
+        step_results.append(f"Step4 推送安全库存：失败({e})")
 
     # 执行完后推送结果汇总
     _push_replenish_pipeline_result(step_results, total_start)

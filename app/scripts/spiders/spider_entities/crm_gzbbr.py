@@ -511,6 +511,36 @@ class CrmGzbbrSpider:
         self.logger.info(f"【请求参数】{params}")
         return self.spider_tool.fetch(url, params=params, headers=self._get_auth_header())
 
+    # https://crm.gzbbr.com/api/Product.Product/saveSafeStock
+    # 载荷格式：{"params":[{"product_id":"321227","warehouse_id":1,"safety_stock":0,"max_stock":0,"isnotstock":"0","seasonal_coefficient":1}]}
+    # params 为数组，每个元素对应一个商品的安全库存设置，支持批量
+    # product_id 商品ID（字符串）
+    # warehouse_id 仓库ID（整数）
+    # safety_stock 安全库存数量
+    # max_stock 最大库存数量
+    # isnotstock 是否无库存（字符串 "0"=否, "1"=是）
+    # seasonal_coefficient 季节系数
+    def save_safe_stock(self, items):
+        """
+        保存商品安全库存（支持批量）
+
+        :param items: 安全库存设置列表，每个元素为字典，包含以下字段：
+                      - product_id: 商品ID（字符串，如 "321227"）
+                      - warehouse_id: 仓库ID（整数，如 1）
+                      - safety_stock: 安全库存数量
+                      - max_stock: 最大库存数量
+                      - isnotstock: 是否无库存（字符串 "0"=否, "1"=是）
+                      - seasonal_coefficient: 季节系数
+        :return: 请求响应对象，成功时响应 {"status": 200, "msg": "安全库存操作成功"}
+        """
+        url = f"{self.BASE_URL}/api/Product.Product/saveSafeStock"
+        data = {
+            "params": items,
+        }
+        self.logger.info(f"【请求API地址】{url}")
+        self.logger.info(f"【请求参数】{data}")
+        return self.spider_tool.fetch(url, method="POST", json=data, headers=self._get_auth_header())
+
     def close(self):
         """
         关闭会话连接，释放资源
