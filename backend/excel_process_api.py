@@ -7,11 +7,18 @@ import os
 import tempfile
 import pandas as pd
 import importlib.util
-from flask import request, jsonify, send_file, session
+from flask import request, jsonify, send_file, session, render_template
 from datetime import datetime
 
 def register_excel_process_routes(app):
     """注册Excel处理相关的路由"""
+
+    @app.route('/excel_process')
+    def excel_process_page():
+        """Excel 处理独立页面（询比价模块同款风格）"""
+        if 'logged_in' not in session:
+            return render_template('login.html')
+        return render_template('excel_process.html')
 
     @app.route('/api/excel/columns/check', methods=['POST'])
     def check_excel_columns():
