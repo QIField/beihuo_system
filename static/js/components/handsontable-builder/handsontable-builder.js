@@ -253,6 +253,8 @@ var HandsontableBuilder = (function() {
             sortDir: null,
             filterColumn: null,
             filterValues: null,
+            // 多列筛选：{ field: [value1, value2], ... }，列之间 AND
+            columnFilters: {},
             visibleColumns: null,
             destroyed: false
         };
@@ -428,12 +430,20 @@ var HandsontableBuilder = (function() {
     function renderLocalData(builder) {
         var data = builder.config.localData || [];
 
-        // 本地筛选
-        if (builder.filterColumn && builder.filterValues && builder.filterValues.length > 0) {
+        // 本地筛选：所有列条件 AND
+        var columnFilters = builder.columnFilters || {};
+        var filterKeys = Object.keys(columnFilters);
+        if (filterKeys.length > 0) {
             data = data.filter(function(row) {
-                var val = row[builder.filterColumn];
-                if (val === undefined || val === null) val = '';
-                return builder.filterValues.indexOf(String(val)) !== -1;
+                for (var i = 0; i < filterKeys.length; i++) {
+                    var field = filterKeys[i];
+                    var values = columnFilters[field];
+                    if (!values || values.length === 0) continue;
+                    var val = row[field];
+                    if (val === undefined || val === null) val = '';
+                    if (values.indexOf(String(val)) === -1) return false;
+                }
+                return true;
             });
         }
 
@@ -478,6 +488,12 @@ var HandsontableBuilder = (function() {
         if (builder.filterColumn && builder.filterValues && builder.filterValues.length > 0) {
             params.filter_column = builder.filterColumn;
             params.filter_values = builder.filterValues;
+        }
+
+        // 多列筛选（列之间 AND）；后端支持 column_filters 时优先使用它
+        var filterKeys = Object.keys(builder.columnFilters || {});
+        if (filterKeys.length > 0) {
+            params.column_filters = JSON.stringify(builder.columnFilters);
         }
 
         if (typeof config.beforeLoad === 'function') {
@@ -822,6 +838,8 @@ var HandsontableBuilder = (function() {
 
         menuOptions.onDataRefresh = function(filterState) {
             var activeFilters = filterState.filters || {};
+            // 深拷贝多列筛选状态，列之间 AND
+            builder.columnFilters = JSON.parse(JSON.stringify(activeFilters));
             var keys = Object.keys(activeFilters);
             if (keys.length > 0) {
                 builder.filterColumn = keys[0];
@@ -855,7 +873,16 @@ var HandsontableBuilder = (function() {
                 delete params.sort_dir;
                 delete params.filter_column;
                 delete params.filter_values;
+                delete params.column_filters;
                 params.column = colId;
+                // 候选值按其他列已生效筛选级联（排除本列，本列条件不缩小自己的候选）
+                var otherFilters = {};
+                Object.keys(builder.columnFilters || {}).forEach(function(field) {
+                    if (field !== colId) otherFilters[field] = builder.columnFilters[field];
+                });
+                if (Object.keys(otherFilters).length > 0) {
+                    params.column_filters = JSON.stringify(otherFilters);
+                }
                 config.getFilterValues(colId, callback, params);
             };
         }
@@ -868,6 +895,7 @@ var HandsontableBuilder = (function() {
         builder.sortDir = null;
         builder.filterColumn = null;
         builder.filterValues = null;
+        builder.columnFilters = {};
         builder.currentPage = 1;
         refresh(builder);
     }

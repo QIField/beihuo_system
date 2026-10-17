@@ -5,6 +5,7 @@
 # @File    : qpl_quote_api.py
 # @Software: PyCharm
 
+import json
 from functools import wraps
 from flask import Blueprint, request, jsonify, session
 from app.utils.database_connection import get_db_connection
@@ -37,7 +38,7 @@ def get_user_store():
 
 def _build_conditions(current_store, supplier_enquiry_no='', item_oe='', item_name='', brand_name='',
                       company='', begin_date='', end_date='', filter_column=None, filter_values=None,
-                      allowed_filter_columns=None):
+                      allowed_filter_columns=None, column_filters=None):
     """构建公共 WHERE 条件和参数列表"""
     conditions = ['company = %s']
     params = [current_store]
@@ -68,6 +69,15 @@ def _build_conditions(current_store, supplier_enquiry_no='', item_oe='', item_na
         conditions.append(f'{filter_column} IN ({placeholders})')
         params.extend(filter_values)
 
+    # 多列筛选（列之间 AND），白名单统一走 allowed_filter_columns
+    if column_filters and allowed_filter_columns:
+        for col, vals in column_filters.items():
+            if col not in allowed_filter_columns:
+                continue
+            placeholders = ', '.join(['%s'] * len(vals))
+            conditions.append(f'{col} IN ({placeholders})')
+            params.extend(vals)
+
     return conditions, params
 
 
@@ -83,6 +93,48 @@ def _prefix_conditions(conditions, prefix):
         else:
             prefixed.append(cond)
     return prefixed
+
+
+def _parse_column_filters(allowed_columns, exclude=None):
+    """
+    解析前端上送的 column_filters（JSON: {列名: [值,...]}，列之间 AND）
+    仅保留白名单内的列；exclude 为当前打开筛选面板的列，候选值查询时排除本列
+    """
+    raw = request.args.get('column_filters', '').strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+
+    result = {}
+    for col, vals in data.items():
+        if not col or col == exclude or col not in allowed_columns:
+            continue
+        if not isinstance(vals, list):
+            continue
+        clean_vals = [str(v) for v in vals if v is not None and str(v) != '']
+        if clean_vals:
+            result[col] = clean_vals
+    return result
+
+
+def _build_in_clause(column_filters, column_expr_map=None):
+    """
+    把多列等值筛选拼成 IN 片段列表与参数（列之间 AND）
+    column_expr_map: 列名 -> SQL 表达式（如聚合别名映射），默认用列名本身
+    :return: (sql_parts, params)
+    """
+    parts, params = [], []
+    for col, vals in (column_filters or {}).items():
+        expr = (column_expr_map or {}).get(col, col)
+        placeholders = ', '.join(['%s'] * len(vals))
+        parts.append(f'{expr} IN ({placeholders})')
+        params.extend(vals)
+    return parts, params
 
 
 @qpl_quote_bp.route('/records', methods=['GET'])
@@ -115,7 +167,12 @@ def get_records():
             'parts_no', 'quote_source', 'is_quoted', 'fail_stage', 'fail_reason',
             'submit_status', 'order_status'
         }
-        
+
+        # 多列筛选优先；存在时忽略旧的单列参数，避免重复条件
+        column_filters = _parse_column_filters(allowed_columns)
+        if column_filters:
+            filter_column, filter_values = '', []
+
         # 获取用户当前门店
         current_store = get_user_store()
 
@@ -131,7 +188,8 @@ def get_records():
             end_date=end_date,
             filter_column=filter_column,
             filter_values=filter_values,
-            allowed_filter_columns=allowed_columns
+            allowed_filter_columns=allowed_columns,
+            column_filters=column_filters
         )
 
         # 构建SQL查询
@@ -228,6 +286,9 @@ def get_filter_values():
         begin_date = request.args.get('begin_date', '')
         end_date = request.args.get('end_date', '')
 
+        # 候选值按"其他列已生效筛选"级联，排除当前打开的本列
+        column_filters = _parse_column_filters(allowed_columns, exclude=column)
+
         current_store = get_user_store()
 
         conditions, params = _build_conditions(
@@ -238,7 +299,9 @@ def get_filter_values():
             brand_name=brand_name,
             company=company,
             begin_date=begin_date,
-            end_date=end_date
+            end_date=end_date,
+            allowed_filter_columns=allowed_columns,
+            column_filters=column_filters
         )
 
         where_clause = 'WHERE ' + ' AND '.join(conditions)
@@ -369,13 +432,21 @@ def get_oe_stats():
         current_store = get_user_store()
 
         # occurrence_count/ordered_count/conversion_rate 是聚合字段，需用 HAVING 过滤，不能放在 WHERE
-        having_filter_condition = ''
-        having_filter_params = []
+        agg_columns = {'occurrence_count', 'ordered_count', 'conversion_rate'}
+
+        # 多列筛选优先：普通列进 WHERE，聚合列进 HAVING（列之间 AND）
+        all_filters = _parse_column_filters(allowed_filter_columns)
+        having_filters = {c: v for c, v in all_filters.items() if c in agg_columns}
+        where_filters = {c: v for c, v in all_filters.items() if c not in agg_columns}
+        having_parts, having_filter_params = _build_in_clause(having_filters)
+        having_filter_condition = ''.join(' AND ' + p for p in having_parts)
+
+        # 兼容旧的单列参数（多列筛选存在时忽略，避免重复条件）
         query_filter_column = filter_column
         query_filter_values = filter_values
-        if filter_column in ('occurrence_count', 'ordered_count', 'conversion_rate') and filter_values:
+        if not all_filters and filter_column in agg_columns and filter_values:
             placeholders = ', '.join(['%s'] * len(filter_values))
-            having_filter_condition = f' AND {filter_column} IN ({placeholders})'
+            having_filter_condition += f' AND {filter_column} IN ({placeholders})'
             having_filter_params = list(filter_values)
             query_filter_column = ''
             query_filter_values = []
@@ -389,7 +460,8 @@ def get_oe_stats():
             end_date=end_date,
             filter_column=query_filter_column,
             filter_values=query_filter_values,
-            allowed_filter_columns=allowed_filter_columns
+            allowed_filter_columns=allowed_filter_columns,
+            column_filters=where_filters
         )
 
         where_clause = 'WHERE ' + ' AND '.join(conditions)
@@ -477,6 +549,14 @@ def get_oe_filter_values():
         begin_date = request.args.get('begin_date', '')
         end_date = request.args.get('end_date', '')
 
+        # 候选值级联：其他列筛选（排除本列），普通列进 WHERE，聚合列进 HAVING
+        agg_columns = {'occurrence_count', 'ordered_count', 'conversion_rate'}
+        all_filters = _parse_column_filters(allowed_columns, exclude=column)
+        having_filters = {c: v for c, v in all_filters.items() if c in agg_columns}
+        where_filters = {c: v for c, v in all_filters.items() if c not in agg_columns}
+        having_parts, having_params = _build_in_clause(having_filters)
+        having_sql = ''.join(' AND ' + p for p in having_parts)
+
         current_store = get_user_store()
         conditions, params = _build_conditions(
             current_store,
@@ -484,12 +564,14 @@ def get_oe_filter_values():
             item_name=item_name,
             company=company,
             begin_date=begin_date,
-            end_date=end_date
+            end_date=end_date,
+            allowed_filter_columns=allowed_columns,
+            column_filters=where_filters
         )
 
         where_clause = 'WHERE ' + ' AND '.join(conditions)
 
-        if column in ('occurrence_count', 'ordered_count', 'conversion_rate'):
+        if column in agg_columns:
             sql = f'''
                 SELECT {column} AS value, COUNT(*) AS count
                 FROM (
@@ -498,6 +580,25 @@ def get_oe_filter_values():
                     FROM qpl_quote_result_v2
                     {where_clause}
                     GROUP BY item_oe, COALESCE(item_name, '')
+                    HAVING 1=1 {having_sql}
+                ) t
+                GROUP BY {column}
+                ORDER BY {column} ASC
+                LIMIT 1000
+            '''
+        elif having_filters:
+            # 本列是普通列、但其他列含聚合筛选时，先在 OE 分组粒度完成 HAVING，再对本列去重
+            sql = f'''
+                SELECT {column} AS value, COUNT(*) AS count
+                FROM (
+                    SELECT
+                        item_oe,
+                        COALESCE(item_name, '') AS item_name,
+                        {_build_oe_stats_select()}
+                    FROM qpl_quote_result_v2
+                    {where_clause}
+                    GROUP BY item_oe, COALESCE(item_name, '')
+                    HAVING 1=1 {having_sql}
                 ) t
                 GROUP BY {column}
                 ORDER BY {column} ASC
@@ -516,7 +617,7 @@ def get_oe_filter_values():
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute(sql, params)
+                cursor.execute(sql, params + having_params)
                 rows = cursor.fetchall()
                 values = []
                 for row in rows:
@@ -589,8 +690,9 @@ def _get_vin_dimension_config(dimension):
 
 
 def _query_vin_stats(dimension, current_store, company, begin_date, end_date,
-                     sort_column, sort_dir, filter_column, filter_values, page, limit):
-    """通用 VIN 维度统计查询"""
+                     sort_column, sort_dir, filter_column, filter_values, page, limit,
+                     column_filters=None):
+    """通用 VIN 维度统计查询（column_filters 为多列筛选，列之间 AND，优先于单列参数）"""
     config = _get_vin_dimension_config(dimension)
     if not config:
         return None, '无效的统计维度'
@@ -600,13 +702,26 @@ def _query_vin_stats(dimension, current_store, company, begin_date, end_date,
     )
     where_clause = 'WHERE ' + ' AND '.join(conditions)
 
-    # 维度字段过滤条件
+    # 维度字段过滤条件（HAVING）
     filter_condition = ''
     filter_params = []
-    # occurrence_count 聚合字段过滤条件
+    # occurrence_count 聚合字段过滤条件（HAVING）
     having_count_condition = ''
     having_count_params = []
-    if filter_column and filter_column in config['allowed_filter_columns'] and filter_values:
+
+    if column_filters:
+        # 多列筛选：维度列与 occurrence_count 都在分组后用 HAVING 过滤
+        for col, vals in column_filters.items():
+            if col not in config['allowed_filter_columns'] or not vals:
+                continue
+            placeholders = ', '.join(['%s'] * len(vals))
+            if col == 'occurrence_count':
+                having_count_condition += f' AND occurrence_count IN ({placeholders})'
+                having_count_params.extend(vals)
+            else:
+                filter_condition += f' AND {config["label_column"]} IN ({placeholders})'
+                filter_params.extend(vals)
+    elif filter_column and filter_column in config['allowed_filter_columns'] and filter_values:
         placeholders = ', '.join(['%s'] * len(filter_values))
         if filter_column == 'occurrence_count':
             having_count_condition = f' AND occurrence_count IN ({placeholders})'
@@ -679,8 +794,9 @@ def _query_vin_stats(dimension, current_store, company, begin_date, end_date,
         conn.close()
 
 
-def _query_vin_filter_values(dimension, column, current_store, company, begin_date, end_date):
-    """通用 VIN 维度列头筛选值查询"""
+def _query_vin_filter_values(dimension, column, current_store, company, begin_date, end_date,
+                             column_filters=None):
+    """通用 VIN 维度列头筛选值查询（column_filters 为已排除本列的其他列筛选，候选值级联）"""
     config = _get_vin_dimension_config(dimension)
     if not config or column not in config['allowed_filter_columns']:
         return None, '无效的列名'
@@ -689,6 +805,20 @@ def _query_vin_filter_values(dimension, column, current_store, company, begin_da
         current_store, company=company, begin_date=begin_date, end_date=end_date
     )
     where_clause = 'WHERE ' + ' AND '.join(conditions)
+
+    # 维度列级联条件作用于分组子查询；occurrence_count 级联条件作用于外层 value 粒度
+    label_having_sql, label_having_params = '', []
+    outer_having_sql, outer_having_params = '', []
+    for col, vals in (column_filters or {}).items():
+        if col not in config['allowed_filter_columns'] or not vals:
+            continue
+        placeholders = ', '.join(['%s'] * len(vals))
+        if col == 'occurrence_count':
+            outer_having_sql += f' AND occurrence_count IN ({placeholders})'
+            outer_having_params.extend(vals)
+        else:
+            label_having_sql += f' AND {config["label_column"]} IN ({placeholders})'
+            label_having_params.extend(vals)
 
     if column == 'occurrence_count':
         sql = f'''
@@ -699,12 +829,13 @@ def _query_vin_filter_values(dimension, column, current_store, company, begin_da
                 {config['join_clause']}
                 {where_clause}
                 GROUP BY {config['group_expr']}
-                HAVING {config['label_column']} != ''
+                HAVING {config['label_column']} != '' {label_having_sql}
             ) t
             GROUP BY occurrence_count
             ORDER BY occurrence_count ASC
             LIMIT 1000
         '''
+        query_params = params + label_having_params
     else:
         sql = f'''
             SELECT {config['value_select']} AS value, COUNT(DISTINCT q.supplier_enquiry_no) AS count
@@ -712,15 +843,16 @@ def _query_vin_filter_values(dimension, column, current_store, company, begin_da
             {config['join_clause']}
             {where_clause}
             GROUP BY {config['group_expr']}
-            HAVING value != ''
+            HAVING value != '' {outer_having_sql}
             ORDER BY {config['label_column']} ASC
             LIMIT 1000
         '''
+        query_params = params + outer_having_params
 
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute(sql, params)
+            cursor.execute(sql, query_params)
             values = []
             for row in cursor.fetchall():
                 if isinstance(row, dict):
@@ -753,9 +885,12 @@ def get_vin_stats_oenum():
         filter_values = request.args.getlist('filter_values')
 
         current_store = get_user_store()
+        vin_cfg = _get_vin_dimension_config('oenum')
+        column_filters = _parse_column_filters(vin_cfg['allowed_filter_columns'])
         result, error = _query_vin_stats(
             'oenum', current_store, company, begin_date, end_date,
-            sort_column, sort_dir, filter_column, filter_values, page, limit
+            sort_column, sort_dir, filter_column, filter_values, page, limit,
+            column_filters=column_filters
         )
         if error:
             return jsonify({'code': 1, 'msg': error})
@@ -780,9 +915,12 @@ def get_vin_stats_engine():
         filter_values = request.args.getlist('filter_values')
 
         current_store = get_user_store()
+        vin_cfg = _get_vin_dimension_config('engine')
+        column_filters = _parse_column_filters(vin_cfg['allowed_filter_columns'])
         result, error = _query_vin_stats(
             'engine', current_store, company, begin_date, end_date,
-            sort_column, sort_dir, filter_column, filter_values, page, limit
+            sort_column, sort_dir, filter_column, filter_values, page, limit,
+            column_filters=column_filters
         )
         if error:
             return jsonify({'code': 1, 'msg': error})
@@ -807,9 +945,12 @@ def get_vin_stats_chassis():
         filter_values = request.args.getlist('filter_values')
 
         current_store = get_user_store()
+        vin_cfg = _get_vin_dimension_config('chassis')
+        column_filters = _parse_column_filters(vin_cfg['allowed_filter_columns'])
         result, error = _query_vin_stats(
             'chassis', current_store, company, begin_date, end_date,
-            sort_column, sort_dir, filter_column, filter_values, page, limit
+            sort_column, sort_dir, filter_column, filter_values, page, limit,
+            column_filters=column_filters
         )
         if error:
             return jsonify({'code': 1, 'msg': error})
@@ -829,8 +970,11 @@ def get_vin_oenum_filter_values():
         end_date = request.args.get('end_date', '')
 
         current_store = get_user_store()
+        vin_cfg = _get_vin_dimension_config('oenum')
+        column_filters = _parse_column_filters(vin_cfg['allowed_filter_columns'], exclude=column)
         result, error = _query_vin_filter_values(
-            'oenum', column, current_store, company, begin_date, end_date
+            'oenum', column, current_store, company, begin_date, end_date,
+            column_filters=column_filters
         )
         if error:
             return jsonify({'code': 1, 'msg': error})
@@ -850,8 +994,11 @@ def get_vin_engine_filter_values():
         end_date = request.args.get('end_date', '')
 
         current_store = get_user_store()
+        vin_cfg = _get_vin_dimension_config('engine')
+        column_filters = _parse_column_filters(vin_cfg['allowed_filter_columns'], exclude=column)
         result, error = _query_vin_filter_values(
-            'engine', column, current_store, company, begin_date, end_date
+            'engine', column, current_store, company, begin_date, end_date,
+            column_filters=column_filters
         )
         if error:
             return jsonify({'code': 1, 'msg': error})
@@ -871,8 +1018,11 @@ def get_vin_chassis_filter_values():
         end_date = request.args.get('end_date', '')
 
         current_store = get_user_store()
+        vin_cfg = _get_vin_dimension_config('chassis')
+        column_filters = _parse_column_filters(vin_cfg['allowed_filter_columns'], exclude=column)
         result, error = _query_vin_filter_values(
-            'chassis', column, current_store, company, begin_date, end_date
+            'chassis', column, current_store, company, begin_date, end_date,
+            column_filters=column_filters
         )
         if error:
             return jsonify({'code': 1, 'msg': error})

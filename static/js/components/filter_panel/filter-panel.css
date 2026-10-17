@@ -204,6 +204,31 @@
     color: #2563eb;
 }
 
+/* 孤儿值：已勾选但在其他列筛选条件下暂无数据，变灰保留直到用户手动取消 */
+.filter-dropdown-item.is-orphan label {
+    color: #94a3b8;
+    font-style: italic;
+    font-weight: normal;
+}
+
+.filter-dropdown-item.is-orphan input[type="checkbox"] {
+    background-color: #f1f5f9;
+}
+
+.filter-dropdown-item.is-orphan input[type="checkbox"]:checked {
+    background-color: #f1f5f9;
+    border-color: #cbd5e1;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 12px;
+    border-radius: 3px;
+}
+
+.filter-dropdown-item.is-orphan .count {
+    color: #cbd5e1;
+}
+
 /* 空状态 */
 .dropdown-empty {
     padding: 28px 12px;
