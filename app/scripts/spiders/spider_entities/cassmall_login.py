@@ -19,12 +19,21 @@
 5. 最终到达 /seller 页面，cookie 即为有效
 """
 
+import base64
+import io
 import time
 from typing import Optional, Tuple, Dict, Any
 
 from app.scripts.spiders.spider_tool import SpiderTool
 from app.services.system_setting_service.beihuo_system_config_service import update_json_config
 from config.config_list_manager.config_cache import get_config_value
+
+try:
+    from PIL import Image, ImageFilter
+    import numpy as np
+    _CAPTCHA_SOLVER_AVAILABLE = True
+except ImportError:
+    _CAPTCHA_SOLVER_AVAILABLE = False
 
 
 # ===================== 账号密码登录类 =====================
@@ -41,6 +50,8 @@ class CassmallLogin:
     # 接口地址
     LOGIN_PAGE_URL = f"{PASSPORT_URL}/login"
     CAPTCHA_NEED_URL = f"{PASSPORT_URL}/captcha/need"
+    CAPTCHA_IMAGE_URL = f"{PASSPORT_URL}/captcha"
+    CAPTCHA_VERIFY_URL = f"{PASSPORT_URL}/captcha/verification"
     LOGIN_SUBMIT_URL = f"{PASSPORT_URL}/login"
     SELLER_HOME_URL = f"{BASE_URL}/seller"
     VALIDATE_API_URL = f"{BASE_URL}/member/seller/menu-plus-star?key=PLUS_STAR_MENU"
@@ -182,6 +193,168 @@ class CassmallLogin:
             print("  [警告] 解析验证码需求响应失败，默认不需要")
             return False, False
 
+    def _detect_gap_x(self, shade_b64: str, cutout_b64: str, y: int) -> int:
+        """
+        通过 cutout 滑块图与 shade 背景图的边缘匹配，计算缺口左边缘 x 坐标。
+
+        原理：
+        - shade 图中缺口位置的边缘轮廓与 cutout 滑块图的边缘轮廓一致
+        - 用 FIND_EDGES 提取两者边缘，做归一化互相关匹配
+        - 取匹配度最高的 x 作为候选，并在 ±2px 范围内取次优候选
+
+        Args:
+            shade_b64: 背景图 base64
+            cutout_b64: 滑块图 base64
+            y: 服务端返回的缺口 y 坐标
+
+        Returns:
+            int: 缺口左边缘 x 坐标（像素）
+        """
+        shade = np.array(Image.open(io.BytesIO(base64.b64decode(shade_b64))))
+        cutout = np.array(Image.open(io.BytesIO(base64.b64decode(cutout_b64))))
+
+        shade_gray = shade.mean(axis=2) if shade.ndim == 3 else shade
+        cutout_gray = cutout[:, :, :3].mean(axis=2) if cutout.ndim == 3 else cutout
+        ch, cw = cutout_gray.shape
+        h, w = shade_gray.shape
+
+        y0 = max(0, int(y))
+        y1 = min(h, y0 + ch)
+        shade_roi = shade_gray[y0:y1, :]
+        if shade_roi.shape[0] < ch:
+            cutout_gray = cutout_gray[:shade_roi.shape[0], :]
+            ch = shade_roi.shape[0]
+
+        cutout_edges = np.array(
+            Image.fromarray(cutout_gray.astype(np.uint8)).filter(ImageFilter.FIND_EDGES),
+            dtype=np.float32
+        )
+        shade_edges = np.array(
+            Image.fromarray(shade_roi.astype(np.uint8)).filter(ImageFilter.FIND_EDGES),
+            dtype=np.float32
+        )
+
+        scores = []
+        for x in range(0, shade_edges.shape[1] - cw + 1):
+            region = shade_edges[:, x:x + cw]
+            a = region - region.mean()
+            b = cutout_edges - cutout_edges.mean()
+            denom = np.sqrt((a ** 2).sum()) * np.sqrt((b ** 2).sum()) + 1e-8
+            score = (a * b).sum() / denom
+            scores.append((score, x))
+        scores.sort(reverse=True)
+        return scores[0][1] if scores else 0
+
+    def _solve_slider_captcha(self, max_retry: int = 5) -> bool:
+        """
+        自动求解滑块验证码。
+
+        流程：
+        1. GET /passport/captcha 获取背景图、滑块图、captchaToken、y
+        2. 用边缘匹配计算缺口 x 坐标
+        3. POST /passport/captcha/verification 提交 {y, x, captchaToken, userName}
+        4. 成功则返回 True，失败则换一张图重试
+
+        Args:
+            max_retry: 最大重试次数
+
+        Returns:
+            bool: 是否验证通过
+        """
+        if not _CAPTCHA_SOLVER_AVAILABLE:
+            print("  [失败] 缺少 Pillow/numpy 依赖，无法自动识别滑块验证码")
+            return False
+
+        for attempt in range(1, max_retry + 1):
+            try:
+                # 1. 获取验证码图片
+                params = {
+                    "userName": self.username,
+                    "date": int(time.time() * 1000)
+                }
+                headers = {
+                    "Accept": "application/json, text/plain, */*",
+                    "Referer": getattr(self, '_login_page_url', self.LOGIN_PAGE_URL),
+                    "X-Requested-With": "XMLHttpRequest",
+                }
+                response = self._direct_request(
+                    self.CAPTCHA_IMAGE_URL,
+                    method="GET",
+                    params=params,
+                    headers=headers
+                )
+                if not response or response.status_code != 200:
+                    print(f"  [重试 {attempt}] 获取验证码图片失败")
+                    continue
+
+                data = response.json().get("data", {})
+                shade_b64 = data.get("shadeImage", "")
+                cutout_b64 = data.get("cutoutImage", "")
+                captcha_token = data.get("captchaToken", "")
+                y = data.get("y", 0)
+
+                if not shade_b64 or not cutout_b64 or not captcha_token:
+                    print(f"  [重试 {attempt}] 验证码数据不完整")
+                    continue
+
+                # 2. 检测缺口 x
+                gap_x = self._detect_gap_x(shade_b64, cutout_b64, y)
+                print(f"  [重试 {attempt}] 检测到缺口 x={gap_x}, y={y}")
+
+                # 3. 提交验证（在最佳匹配 ±2px 范围内尝试）
+                success = False
+                tried = set()
+                candidates = []
+                for dx in range(-2, 3):
+                    xx = gap_x + dx
+                    if 0 <= xx < 400 and xx not in tried:
+                        tried.add(xx)
+                        candidates.append(xx)
+
+                for x in candidates:
+                    payload = {
+                        "y": y,
+                        "x": x,
+                        "captchaToken": captcha_token,
+                        "userName": self.username
+                    }
+                    verify_headers = {
+                        "Accept": "application/json, text/plain, */*",
+                        "Content-Type": "application/json;charset=UTF-8",
+                        "Referer": getattr(self, '_login_page_url', self.LOGIN_PAGE_URL),
+                        "X-Requested-With": "XMLHttpRequest",
+                    }
+                    verify_resp = self._direct_request(
+                        self.CAPTCHA_VERIFY_URL,
+                        method="POST",
+                        json=payload,
+                        headers=verify_headers
+                    )
+                    if verify_resp and verify_resp.status_code == 200:
+                        try:
+                            result = verify_resp.json()
+                            if result.get("code") == 200 and result.get("data") is True:
+                                print(f"  [成功] 滑块验证通过 (x={x})")
+                                success = True
+                                break
+                        except Exception:
+                            pass
+                    # 同一 token 验证失败后快速失败，换下一张图
+                    break
+
+                if success:
+                    return True
+
+                print(f"  [重试 {attempt}] 验证失败，换图重试")
+                time.sleep(0.3)
+
+            except Exception as e:
+                print(f"  [重试 {attempt}] 验证码求解异常: {str(e)}")
+                time.sleep(0.3)
+
+        print("  [失败] 滑块验证码多次重试均未通过")
+        return False
+
     def _step3_save_privacy_agreement(self) -> bool:
         """
         步骤3: 保存隐私协议确认记录
@@ -316,11 +489,13 @@ class CassmallLogin:
             if not self._step1_visit_seller_and_get_login_page():
                 return False, {"error": "获取登录页失败"}
 
-            # 步骤2: 检查是否需要验证码
+            # 步骤2: 检查是否需要验证码，需要则自动求解
             print("\n[步骤 2/4] 检查验证码需求...")
             _, need_captcha = self._step2_check_captcha_need()
             if need_captcha:
-                return False, {"error": "需要滑块验证码，当前版本不支持自动识别"}
+                print("[步骤 2/4] 需要滑块验证码，开始自动识别...")
+                if not self._solve_slider_captcha():
+                    return False, {"error": "滑块验证码识别失败，请手动登录后更新 Cookie"}
 
             # 步骤3: 保存隐私协议
             print("\n[步骤 3/4] 确认隐私协议...")
