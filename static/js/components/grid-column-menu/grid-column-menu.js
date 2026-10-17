@@ -38,6 +38,9 @@ var GridColumnMenu = (function() {
     var currentPanel = null;
     var currentMode = null;   // 'columnVisibility' | 'columnFilter'
     var currentField = null;
+    // 当前筛选面板是否处于"全选"语义：全选=该列无筛选；打开时无激活筛选即为 true，
+    // 用户手动勾选/反选/清空后置 false，点击"全选"按钮恢复 true
+    var currentFilterAllSelected = false;
 
     // ==================== Handsontable 检测 ====================
 
@@ -665,7 +668,8 @@ var GridColumnMenu = (function() {
         var hasActiveFilter = gridInfo.columnFilters &&
             gridInfo.columnFilters[colId] && gridInfo.columnFilters[colId].length > 0;
         var currentFilter = hasActiveFilter ? gridInfo.columnFilters[colId] : null;
-        var allValuesChecked = !hasActiveFilter;
+        // 无激活筛选时，初始语义等同全选（直接点确定不会产生筛选）
+        currentFilterAllSelected = !hasActiveFilter;
 
         // 创建面板，默认显示加载中
         var panel = document.createElement('div');
@@ -704,19 +708,19 @@ var GridColumnMenu = (function() {
             try {
                 gridInfo.getFilterValues(colId, function(values) {
                     if (!currentPanel || currentPanel !== panel) return;
-                    renderFilterValueList(values, currentFilter, allValuesChecked);
+                    renderFilterValueList(values, currentFilter);
                 });
             } catch (e) {
                 console.error('[GridColumnMenu] getFilterValues 执行失败:', e);
-                renderFilterValueListFromRows(colId, gridInfo, currentFilter, allValuesChecked);
+                renderFilterValueListFromRows(colId, gridInfo, currentFilter);
             }
         } else {
-            renderFilterValueListFromRows(colId, gridInfo, currentFilter, allValuesChecked);
+            renderFilterValueListFromRows(colId, gridInfo, currentFilter);
         }
     }
 
-    // 从本地行数据渲染筛选列表（兼容旧逻辑）
-    function renderFilterValueListFromRows(colId, gridInfo, currentFilter, allValuesChecked) {
+    // 从本地行数据渲染筛选列表（候选值按"其他列已生效筛选"级联）
+    function renderFilterValueListFromRows(colId, gridInfo, currentFilter) {
         var api = gridInfo.api;
         var rowData = [];
         if (gridInfo._originalRows && gridInfo._originalRows.length > 0) {
@@ -731,8 +735,22 @@ var GridColumnMenu = (function() {
             } catch (e) {}
         }
 
+        // Excel 式级联：候选值只统计"通过其他列筛选"的行，本列条件不参与
+        var otherFilters = gridInfo.columnFilters || {};
+        var scopedRows = rowData.filter(function(row) {
+            for (var f in otherFilters) {
+                if (f === colId) continue;
+                var vals = otherFilters[f];
+                if (!vals || vals.length === 0) continue;
+                var cellValue = row[f];
+                var cellStr = cellValue === undefined || cellValue === null ? '' : String(cellValue);
+                if (vals.indexOf(cellStr) === -1) return false;
+            }
+            return true;
+        });
+
         var valueCount = {};
-        rowData.forEach(function(row) {
+        scopedRows.forEach(function(row) {
             var val = row[colId];
             if (val !== undefined && val !== null && val !== '') {
                 var s = String(val);
@@ -743,24 +761,26 @@ var GridColumnMenu = (function() {
             .map(function(v) { return { value: v, count: valueCount[v] }; })
             .sort(function(a, b) { return a.value.localeCompare(b.value); });
 
-        renderFilterValueList(values, currentFilter, allValuesChecked);
+        renderFilterValueList(values, currentFilter);
     }
 
     // 渲染筛选值列表（values 为对象数组 {value, count} 或字符串数组）
-    function renderFilterValueList(values, currentFilter, allValuesChecked) {
+    // 已选但不在级联候选里的"孤儿值"变灰保留，防止改其他列时本列条件静默丢失
+    function renderFilterValueList(values, currentFilter) {
         if (!currentPanel) return;
 
         var listContainer = currentPanel.querySelector('.filter-dropdown-list');
         if (!listContainer) return;
 
         var listHtml = '';
+        var candidateSet = {};
         if (values && values.length > 0) {
             values.forEach(function(item) {
                 var value = typeof item === 'object' ? item.value : item;
                 var count = typeof item === 'object' ? item.count : 0;
-                var isChecked = '';
-                if (allValuesChecked) isChecked = 'checked';
-                else if (currentFilter && currentFilter.indexOf(value) !== -1) isChecked = 'checked';
+                candidateSet[value] = true;
+                // 无激活筛选时默认全选；有激活筛选时恢复上次勾选
+                var isChecked = (!currentFilter || currentFilter.indexOf(value) !== -1) ? 'checked' : '';
                 var countHtml = count > 0 ? ' <span class="count">(' + count + ')</span>' : '';
                 listHtml += '<div class="filter-dropdown-item col-filter-item" data-value="' + value +
                     '" onclick="GridColumnMenu.toggleItemCheckbox(this)">' +
@@ -768,15 +788,29 @@ var GridColumnMenu = (function() {
                     '<label>' + value + countHtml + '</label>' +
                 '</div>';
             });
-        } else {
-            listHtml = '<div class="dropdown-empty">暂无数据</div>';
         }
-        listContainer.innerHTML = listHtml;
+
+        // 孤儿值：本列已勾选、但在其他列筛选条件下候选列表里已不存在
+        if (currentFilter && currentFilter.length > 0) {
+            currentFilter.forEach(function(value) {
+                if (candidateSet[value]) return;
+                listHtml += '<div class="filter-dropdown-item col-filter-item is-orphan" data-value="' + value +
+                    '" title="其他列筛选条件下暂无数据" onclick="GridColumnMenu.toggleItemCheckbox(this)">' +
+                    '<input type="checkbox" value="' + value + '" checked onclick="event.stopPropagation()">' +
+                    '<label>' + value + ' <span class="count">(无)</span></label>' +
+                '</div>';
+            });
+        }
+
+        listContainer.innerHTML = listHtml ||
+            '<div class="dropdown-empty">其他列筛选条件下暂无可选值</div>';
     }
 
     function toggleItemCheckbox(item) {
         var checkbox = item.querySelector('input');
         checkbox.checked = !checkbox.checked;
+        // 手动改动任一项后，退出"全选"语义（点确定应按实际勾选值筛选）
+        currentFilterAllSelected = false;
     }
 
     function filterSearch(input) {
@@ -793,18 +827,22 @@ var GridColumnMenu = (function() {
         if (!currentPanel) return;
         var checkboxes = currentPanel.querySelectorAll('.col-filter-item input[type="checkbox"]');
         checkboxes.forEach(function(cb) { cb.checked = true; });
+        // 显式全选 = 清除本列筛选的语义
+        currentFilterAllSelected = true;
     }
 
     function selectNone() {
         if (!currentPanel) return;
         var checkboxes = currentPanel.querySelectorAll('.col-filter-item input[type="checkbox"]');
         checkboxes.forEach(function(cb) { cb.checked = false; });
+        currentFilterAllSelected = false;
     }
 
     function invert() {
         if (!currentPanel) return;
         var checkboxes = currentPanel.querySelectorAll('.col-filter-item input[type="checkbox"]');
         checkboxes.forEach(function(cb) { cb.checked = !cb.checked; });
+        currentFilterAllSelected = false;
     }
 
     function cancelColumnFilter() {
@@ -814,15 +852,15 @@ var GridColumnMenu = (function() {
     function applyColumnFilter(colId, gridSelector) {
         if (!currentPanel) return;
         var checkboxes = currentPanel.querySelectorAll('.col-filter-item input[type="checkbox"]:checked');
-        var allCheckboxes = currentPanel.querySelectorAll('.col-filter-item input[type="checkbox"]');
         var selectedValues = [];
         for (var i = 0; i < checkboxes.length; i++) selectedValues.push(checkboxes[i].value);
 
         var info = menuConfig.grids[gridSelector];
         if (!info) return;
 
-        // 全选 / 全不选 → 视为清除该列筛选
-        if (selectedValues.length === 0 || selectedValues.length === allCheckboxes.length) {
+        // 全选语义（打开时未动 / 点了"全选"）或一个都没勾 → 清除该列筛选；
+        // 注意：级联后候选只是"其他列条件下的可见值"，不能用勾选数==候选数判定全选
+        if (currentFilterAllSelected || selectedValues.length === 0) {
             delete info.columnFilters[colId];
         } else {
             info.columnFilters[colId] = selectedValues;
@@ -1051,6 +1089,15 @@ var GridColumnMenu = (function() {
         var isMenuBtn = e.target.closest('.ag-col-menu-btn');
         var isDropdown = e.target.closest('.filter-dropdown-panel');
         if (!isMenuBtn && !isDropdown) closeAll();
+    });
+
+    // 直接点复选框（事件被 stopPropagation，不走 div 的 toggle）时，同步退出全选语义
+    document.addEventListener('change', function(e) {
+        if (currentMode !== 'columnFilter') return;
+        var t = e.target;
+        if (t && t.matches && t.matches('.col-filter-item input[type="checkbox"]')) {
+            currentFilterAllSelected = false;
+        }
     });
 
     return {

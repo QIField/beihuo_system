@@ -246,6 +246,10 @@ var CartPanel = (function() {
                     delete params.sort_dir;
                 }
 
+                // 购物车使用下方 paramsBuilder 拼出的 filter_xxx 系列参数，
+                // 移除 builder 通用的多列筛选参数，避免两套筛选参数同时上送
+                delete params.column_filters;
+
                 return params;
             },
             columns: columns,
