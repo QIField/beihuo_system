@@ -149,18 +149,19 @@ def register_excel_process_routes(app):
     @app.route('/api/excel/async/product_archive', methods=['POST'])
     def async_product_archive():
         """
-        新建档案-异步提交接口
-        提交任务后立即返回task_id，前端通过task_id轮询状态
+        新建档案-匹配检查接口（阶段一，不写CRM）
+        检查每条 OE+品牌 在 CRM 中是否已存在，已存在的通过 view 接口取品牌编码，
+        返回核对清单供页面表格展示；用户确认后调用 confirm 接口真正新建
         """
         try:
             # 检查文件
             if 'file' not in request.files:
                 return jsonify({'code': 1, 'msg': '没有上传文件'}), 400
-            
+
             file = request.files['file']
             if file.filename == '':
                 return jsonify({'code': 1, 'msg': '文件名为空'}), 400
-            
+
             # 验证文件类型
             allowed_extensions = {'.xlsx', '.xls', '.csv'}
             file_ext = os.path.splitext(file.filename)[1].lower()
@@ -169,7 +170,7 @@ def register_excel_process_routes(app):
                     'code': 1,
                     'msg': f'不支持的文件格式，仅支持: {", ".join(allowed_extensions)}'
                 }), 400
-            
+
             # 获取处理模式
             mode = request.form.get('mode', 'two_column')
             if mode not in ['two_column', 'three_column']:
@@ -177,17 +178,17 @@ def register_excel_process_routes(app):
                     'code': 1,
                     'msg': '无效的处理模式，支持: two_column, three_column'
                 }), 400
-            
+
             # 保存临时文件
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             temp_filename = f"async_{timestamp}_{file.filename}"
             temp_file_path = os.path.join(tempfile.gettempdir(), temp_filename)
             file.save(temp_file_path)
-            
+
             # 提交异步任务
             from app.core.async_task_store import submit_excel_task
-            from app.utils.crm_product.crm_productAdd.api_wrappers import process_excel_async_wrapper
-            
+            from app.utils.crm_product.crm_productAdd.api_wrappers import check_excel_items_wrapper
+
             # 获取用户当前门店/组织
             user_store = session.get('store', 'fsbbr')
             current_org = session.get('current_org', user_store)
@@ -195,18 +196,85 @@ def register_excel_process_routes(app):
                 company = user_store
             else:
                 company = current_org
-            
-            task_id = submit_excel_task(process_excel_async_wrapper, temp_file_path, mode, company=company)
-            
+
+            task_id = submit_excel_task(check_excel_items_wrapper, temp_file_path, mode, company=company)
+
             return jsonify({
                 'code': 0,
                 'msg': '任务已提交',
                 'data': {'task_id': task_id}
             })
-            
+
         except Exception as e:
             import traceback
-            print(f"[ERROR] 提交 CRM 档案异步任务失败: {e}")
+            print(f"[ERROR] 提交 CRM 匹配检查任务失败: {e}")
+            traceback.print_exc()
+            return jsonify({'code': 1, 'msg': f'提交失败: {str(e)}'}), 500
+
+    @app.route('/api/excel/async/product_archive_confirm', methods=['POST'])
+    def async_product_archive_confirm():
+        """
+        新建档案-确认新建接口（阶段二）
+        仅新建用户核对后确认的待新建条目，完成后生成结果文件并清理临时文件
+        """
+        try:
+            data = request.get_json(silent=True) or {}
+            check_task_id = str(data.get('check_task_id', '') or '')
+            raw_items = data.get('items')
+            if not check_task_id or not isinstance(raw_items, list) or not raw_items:
+                return jsonify({'code': 1, 'msg': '缺少检查任务ID或待新建数据'}), 400
+
+            from app.core.async_task_store import get_task_status, submit_excel_task
+            from app.utils.crm_product.crm_productAdd.api_wrappers import create_confirmed_items_wrapper
+
+            # 校验检查任务及临时文件仍然有效
+            check_status = get_task_status(check_task_id)
+            if not check_status:
+                return jsonify({'code': 1, 'msg': '匹配检查任务不存在，请重新上传检查'}), 404
+
+            check_data = check_status.get('result_data') or {}
+            file_path = check_data.get('file_path')
+            mode = check_data.get('mode')
+            if mode not in ('two_column', 'three_column') or not file_path or not os.path.exists(file_path):
+                return jsonify({'code': 1, 'msg': '检查任务已失效，请重新上传文件检查'}), 400
+
+            # 清洗确认条目
+            clean_items = []
+            for it in raw_items:
+                if not isinstance(it, dict):
+                    continue
+                oe = str(it.get('oe', '') or '').strip()
+                brand = str(it.get('brand', '') or '').strip()
+                if not oe or not brand:
+                    continue
+                clean_items.append({
+                    'sheet_name': str(it.get('sheet_name', '') or ''),
+                    'oe': oe,
+                    'brand': brand,
+                    'brand_code': str(it.get('brand_code', '') or '').strip()
+                })
+            if not clean_items:
+                return jsonify({'code': 1, 'msg': '没有有效的待新建数据'}), 400
+
+            # 获取用户当前门店/组织
+            user_store = session.get('store', 'fsbbr')
+            current_org = session.get('current_org', user_store)
+            if not current_org or current_org in ('all', 'none', 'undefined', ''):
+                company = user_store
+            else:
+                company = current_org
+
+            task_id = submit_excel_task(create_confirmed_items_wrapper, file_path, clean_items, mode, company=company)
+
+            return jsonify({
+                'code': 0,
+                'msg': '任务已提交',
+                'data': {'task_id': task_id}
+            })
+
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] 提交 CRM 确认新建任务失败: {e}")
             traceback.print_exc()
             return jsonify({'code': 1, 'msg': f'提交失败: {str(e)}'}), 500
 

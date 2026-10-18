@@ -73,9 +73,12 @@ def _format_result_message(result: ProcessResult) -> str:
     return msg
 
 
-def _search_brand_id_by_name(session, headers: dict, brand_name: str) -> Optional[str]:
+def _search_brand_info_by_name(session, headers: dict, brand_name: str) -> Optional[tuple]:
     """
-    根据品牌名称从 CRM 查询品牌 ID
+    根据品牌名称从 CRM 查询品牌信息
+
+    Returns:
+        (brand_id, 系统品牌名)，未匹配返回 None
     """
     id_response = session.get(
         CRM_BRAND_INDEX_URL,
@@ -89,7 +92,7 @@ def _search_brand_id_by_name(session, headers: dict, brand_name: str) -> Optiona
     brand_list = id_response.json().get('data', {}).get('list', [])
     for brand_item in brand_list:
         if brand_item.get('l_name_zh') == brand_name:
-            return brand_item.get('brand_id')
+            return (brand_item.get('brand_id'), brand_item.get('l_name_zh') or brand_name)
     return None
 
 
@@ -97,27 +100,38 @@ def _get_brand_id(session, brand: str, use_alias: bool = True) -> Optional[str]:
     """
     根据品牌名称获取品牌 ID，支持别名匹配
     """
+    info = _get_brand_info(session, brand, use_alias)
+    return info[0] if info else None
+
+
+def _get_brand_info(session, brand: str, use_alias: bool = True) -> Optional[tuple]:
+    """
+    根据品牌名称获取品牌信息，支持别名匹配
+
+    Returns:
+        (brand_id, 系统品牌名)，未匹配返回 None
+    """
     from config import get_auth_headers
 
     headers = get_auth_headers(session)
 
     # 直接匹配
-    brand_id = _search_brand_id_by_name(session, headers, brand)
-    if brand_id:
-        return brand_id
+    matched = _search_brand_info_by_name(session, headers, brand)
+    if matched:
+        return matched
 
     # 别名匹配
     if use_alias:
         corrected_brand = find_brand_by_alias(brand)
         if corrected_brand and corrected_brand != brand:
-            return _search_brand_id_by_name(session, headers, corrected_brand)
+            return _search_brand_info_by_name(session, headers, corrected_brand)
 
     return None
 
 
 def _query_product_list(session, oe_number: str) -> Optional[list]:
     """
-    根据 OE 查询 CRM Product.Product/list，返回所有 (number, brand_name) 组合
+    根据 OE 查询 CRM Product.Product/list，返回所有 (number, brand_name, product_id, brand_code) 组合
     """
     from config import get_auth_headers
 
@@ -146,27 +160,50 @@ def _query_product_list(session, oe_number: str) -> Optional[list]:
             continue
         for child_item in item['child']:
             if isinstance(child_item, dict):
-                items.append((child_item.get('number', ''), child_item.get('brand_name', '')))
+                items.append((
+                    child_item.get('number', ''),
+                    child_item.get('brand_name', ''),
+                    child_item.get('product_id'),
+                    child_item.get('brand_code', '')
+                ))
     return items
+
+
+def _find_existed_children(oe_number: str, brand: str, product_items: list) -> list:
+    """
+    查找 OE+品牌已存在于 CRM 中的所有产品条目。
+
+    原厂 / 原厂国内4s件：必须 OE 和品牌同时精确匹配。
+    其他品牌：只要品牌名在结果中出现过即视为已存在。
+
+    Returns:
+        所有匹配的 (number, brand_name, product_id, brand_code) 元组列表
+    """
+    if not product_items:
+        return []
+
+    if brand in ORIGINAL_BRANDS:
+        return [item for item in product_items if item[0] == oe_number and item[1] == brand]
+
+    return [item for item in product_items if item[1] == brand]
+
+
+def _find_existed_child(oe_number: str, brand: str, product_items: list) -> Optional[tuple]:
+    """
+    查找 OE+品牌已存在于 CRM 中的第一条产品条目。
+
+    Returns:
+        匹配的 (number, brand_name, product_id, brand_code) 元组，不存在返回 None
+    """
+    children = _find_existed_children(oe_number, brand, product_items)
+    return children[0] if children else None
 
 
 def _is_product_existed_in_crm(oe_number: str, brand: str, product_items: list) -> bool:
     """
     判断 OE+品牌是否已存在于 CRM 中。
-
-    原厂 / 原厂国内4s件：必须 OE 和品牌同时精确匹配。
-    其他品牌：只要品牌名在结果中出现过即视为已存在。
     """
-    if not product_items:
-        return False
-
-    if brand in ORIGINAL_BRANDS:
-        return any(
-            item_number == oe_number and item_brand == brand
-            for item_number, item_brand in product_items
-        )
-
-    return any(item_brand == brand for _, item_brand in product_items)
+    return _find_existed_child(oe_number, brand, product_items) is not None
 
 
 def _get_oe_info(session, oe_number: str) -> Optional[dict]:

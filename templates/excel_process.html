@@ -136,6 +136,17 @@
         .ep-result-msg { color: #389e0d; margin-bottom: 12px; font-size: 13px; }
         .ep-result-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
+        /* 新建产品核对表格 */
+        .crm-check-table-wrap { max-height: 420px; overflow-y: auto; margin-bottom: 12px; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px; }
+        .crm-check-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .crm-check-table th, .crm-check-table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; text-align: left; vertical-align: middle; }
+        .crm-check-table th { background: #fafafa; font-weight: 600; color: #333; position: sticky; top: 0; }
+        .crm-check-table tr:last-child td { border-bottom: none; }
+        .crm-check-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+        .crm-check-tag.existed { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .crm-check-tag.to_create { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; }
+        .crm-brand-unmatched { color: #d46b08; }
+
         /* 底部操作栏 */
         .ep-footer {
             flex-shrink: 0;
@@ -209,6 +220,13 @@
                     <input type="file" id="crmFileSelect" accept=".xlsx,.xls,.csv">
                     <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
                     <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，仅单个文件</div>
+                </div>
+                <div class="ep-result" id="crmCheckArea" style="display:none;">
+                    <div class="ep-result-msg" id="crmCheckStats"></div>
+                    <div id="crmCheckTableWrap" class="crm-check-table-wrap"></div>
+                    <div class="ep-result-actions">
+                        <button type="button" class="btn btn-primary" id="crmStartCreateBtn">开始新建</button>
+                    </div>
                 </div>
                 <div class="ep-result" id="crmResultArea" style="display:none;">
                     <div class="ep-result-msg" id="crmResultMsg"></div>

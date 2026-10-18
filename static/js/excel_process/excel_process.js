@@ -20,6 +20,11 @@ layui.use('layer', function () {
     var currentTaskId = null;
     var currentTaskData = null;
 
+    // 新建产品两阶段数据
+    var crmCheckTaskId = null;      // 阶段一匹配检查任务ID
+    var crmCheckMode = '';          // 匹配检查时的模式
+    var crmPendingCreateItems = []; // 待新建条目（阶段二提交用）
+
     // ====== 权限控制：无权限的功能Tab直接隐藏 ======
     fetch('/api/current_user')
         .then(function (response) { return response.json(); })
@@ -104,7 +109,10 @@ layui.use('layer', function () {
             input.value = '';
         }
         document.getElementById('crmResultArea').style.display = 'none';
+        document.getElementById('crmCheckArea').style.display = 'none';
         document.getElementById('replaceNumberResultArea').style.display = 'none';
+        crmCheckTaskId = null;
+        crmPendingCreateItems = [];
         updateFileList();
     });
 
@@ -213,21 +221,22 @@ layui.use('layer', function () {
 
         // 隐藏上次 CRM 结果
         document.getElementById('crmResultArea').style.display = 'none';
+        document.getElementById('crmCheckArea').style.display = 'none';
         document.getElementById('replaceNumberResultArea').style.display = 'none';
         currentTaskId = null;
         currentTaskData = null;
+        crmCheckTaskId = null;
+        crmPendingCreateItems = [];
 
         // 显示处理进度
         var processLoading = layer.load(1, { shade: [0.1, '#fff'] });
 
         if (currentTab === 'crm') {
+            crmCheckMode = crmMode;
             handleCrmAsyncProcess(formData, processLoading, '/api/excel/async/product_archive', function (taskId, resultData) {
-                currentTaskId = taskId;
-                currentTaskData = resultData || {};
-                var sc = currentTaskData.success_count || 0;
-                var fc = currentTaskData.fail_count || 0;
-                document.getElementById('crmResultMsg').textContent = '处理完成：成功 ' + sc + ' 条，失败 ' + fc + ' 条';
-                document.getElementById('crmResultArea').style.display = 'block';
+                // 阶段一完成：渲染核对表格，等待用户确认后再新建
+                crmCheckTaskId = taskId;
+                renderCrmCheckTable(resultData || {});
             });
         } else if (currentTab === 'update_crm') {
             handleCrmAsyncProcess(formData, processLoading, '/api/excel/async/update_crm_product');
@@ -263,6 +272,83 @@ layui.use('layer', function () {
         }
     });
 
+    // ====== 创建进度提示层 ======
+    function createProgressLayer(contentId, textId) {
+        return layer.open({
+            type: 1,
+            title: false,
+            closeBtn: 0,
+            shade: 0.3,
+            area: ['280px', '100px'],
+            content: '<div id="' + contentId + '" style="padding: 28px 0; text-align: center; font-size: 14px;"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> <span id="' + textId + '">初始化中...</span></div>'
+        });
+    }
+
+    // ====== 轮询异步任务状态 ======
+    // onCompleted(taskId, resultData)：有回调则交给调用方处理，无回调则自动下载结果
+    // onFailed()：任务失败/超时/查询异常时回调（可选）
+    function pollExcelTask(taskId, loadingIndex, progressLayerIndex, textId, onCompleted, onFailed) {
+        var fail = function (msg) {
+            layer.close(loadingIndex);
+            layer.close(progressLayerIndex);
+            layer.msg(msg, {icon: 2});
+            if (typeof onFailed === 'function') {
+                onFailed();
+            }
+        };
+        var pollCount = 0;
+        var maxPollCount = 900; // 最多轮询 900 次，约 30 分钟
+        var checkInterval = setInterval(function () {
+            pollCount++;
+            if (pollCount > maxPollCount) {
+                clearInterval(checkInterval);
+                fail('处理超时，请稍后重试');
+                return;
+            }
+
+            fetch('/api/excel/async/status/' + taskId)
+            .then(response => response.json())
+            .then(statusResult => {
+                if (statusResult.code !== 0) {
+                    clearInterval(checkInterval);
+                    fail('查询状态失败: ' + statusResult.msg);
+                    return;
+                }
+
+                var status = statusResult.data;
+
+                if (status.status === 'running') {
+                    var progress = status.progress || 0;
+                    var total = status.total || 0;
+                    var message = status.message || '处理中...';
+                    var displayMsg = (progress === 0 && total === 0) ? '初始化中...' : '处理中: ' + progress + '/' + total + ' - ' + message;
+                    var progressText = document.getElementById(textId);
+                    if (progressText) {
+                        progressText.textContent = displayMsg;
+                    }
+                } else if (status.status === 'completed') {
+                    clearInterval(checkInterval);
+                    layer.close(loadingIndex);
+                    layer.close(progressLayerIndex);
+                    if (typeof onCompleted === 'function') {
+                        onCompleted(taskId, status.result_data);
+                        layer.msg('处理完成', {icon: 1});
+                    } else {
+                        layer.msg('处理完成，开始下载...', {icon: 1});
+                        window.location.href = '/api/excel/async/download/' + taskId;
+                    }
+                } else if (status.status === 'failed') {
+                    clearInterval(checkInterval);
+                    fail('处理失败: ' + (status.error || '未知错误'));
+                }
+            })
+            .catch(error => {
+                clearInterval(checkInterval);
+                fail('查询状态失败: ' + error.message);
+            });
+        }, 2000); // 每2秒查询一次
+    }
+
     // ====== CRM异步处理函数 ======
     // onComplete 回调参数: (taskId, resultData)
     function handleCrmAsyncProcess(formData, loadingIndex, apiUrl, onComplete) {
@@ -282,95 +368,146 @@ layui.use('layer', function () {
             var taskId = result.data.task_id;
             layer.msg('任务已提交，处理中...', {icon: 1});
 
-            // 创建进度提示层（使用固定 DOM，避免闪烁）
-            var progressLayerIndex = layer.open({
-                type: 1,
-                title: false,
-                closeBtn: 0,
-                shade: 0.3,
-                area: ['280px', '100px'],
-                content: '<div id="crmProgressContent" style="padding: 28px 0; text-align: center; font-size: 14px;"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> <span id="crmProgressText">初始化中...</span></div>'
-            });
-
             // 步骤2：轮询查询任务状态
-            var pollCount = 0;
-            var maxPollCount = 900; // 最多轮询 900 次，约 30 分钟
-            var checkInterval = setInterval(function () {
-                pollCount++;
-                if (pollCount > maxPollCount) {
-                    clearInterval(checkInterval);
-                    layer.close(loadingIndex);
-                    layer.close(progressLayerIndex);
-                    layer.msg('处理超时，请稍后重试', {icon: 2});
-                    return;
-                }
-
-                fetch('/api/excel/async/status/' + taskId)
-                .then(response => response.json())
-                .then(statusResult => {
-                    if (statusResult.code !== 0) {
-                        clearInterval(checkInterval);
-                        layer.close(loadingIndex);
-                        layer.close(progressLayerIndex);
-                        layer.msg('查询状态失败: ' + statusResult.msg, {icon: 2});
-                        return;
-                    }
-
-                    var status = statusResult.data;
-
-                    if (status.status === 'running') {
-                        // 更新进度提示
-                        var progress = status.progress || 0;
-                        var total = status.total || 0;
-                        var message = status.message || '处理中...';
-
-                        var displayMsg;
-                        if (progress === 0 && total === 0) {
-                            displayMsg = '初始化中...';
-                        } else {
-                            displayMsg = '处理中: ' + progress + '/' + total + ' - ' + message;
-                        }
-
-                        var progressText = document.getElementById('crmProgressText');
-                        if (progressText) {
-                            progressText.textContent = displayMsg;
-                        }
-                    } else if (status.status === 'completed') {
-                        // 任务完成
-                        clearInterval(checkInterval);
-                        layer.close(loadingIndex);
-                        layer.close(progressLayerIndex);
-
-                        // 如果有完成回调，把 taskId 和 result_data 传出去
-                        if (typeof onComplete === 'function') {
-                            onComplete(taskId, status.result_data);
-                            layer.msg('处理完成', {icon: 1});
-                        } else {
-                            layer.msg('处理完成，开始下载...', {icon: 1});
-                            // 下载结果文件
-                            window.location.href = '/api/excel/async/download/' + taskId;
-                        }
-                    } else if (status.status === 'failed') {
-                        // 任务失败
-                        clearInterval(checkInterval);
-                        layer.close(loadingIndex);
-                        layer.close(progressLayerIndex);
-                        layer.msg('处理失败: ' + (status.error || '未知错误'), {icon: 2});
-                    }
-                })
-                .catch(error => {
-                    clearInterval(checkInterval);
-                    layer.close(loadingIndex);
-                    layer.close(progressLayerIndex);
-                    layer.msg('查询状态失败: ' + error.message, {icon: 2});
-                });
-            }, 2000); // 每2秒查询一次
+            var progressLayerIndex = createProgressLayer('crmProgressContent', 'crmProgressText');
+            pollExcelTask(taskId, loadingIndex, progressLayerIndex, 'crmProgressText', onComplete);
         })
         .catch(error => {
             layer.close(loadingIndex);
             layer.msg('提交失败: ' + error.message, {icon: 2});
         });
     }
+
+    // ====== HTML 转义（表格单元格内容来自Excel，防止破坏页面结构） ======
+    function escapeHtml(text) {
+        return String(text == null ? '' : text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // ====== 渲染匹配核对表格（阶段一完成后） ======
+    function renderCrmCheckTable(data) {
+        var items = data.items || [];
+        var matchedCount = data.matched_count || 0;
+        var unmatchedCount = data.unmatched_count || 0;
+        var isThreeColumn = crmCheckMode === 'three_column';
+
+        crmPendingCreateItems = [];
+        var unmatchedBrandCount = 0;
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].status === 'to_create') {
+                // 未匹配系统品牌的行不会新建（与原流程一致：没匹配到品牌ID就不新建），不进入新建清单
+                if (items[i].brand_matched === false) {
+                    unmatchedBrandCount++;
+                } else {
+                    crmPendingCreateItems.push({
+                        sheet_name: items[i].sheet_name,
+                        oe: items[i].oe,
+                        brand: items[i].brand,
+                        brand_code: items[i].brand_code || ''
+                    });
+                }
+            }
+        }
+
+        var html = '<table class="crm-check-table"><thead><tr>';
+        html += '<th style="width:70px;">状态</th><th>OE号</th><th>品牌</th><th>系统品牌</th><th>CRM品牌编码</th><th>产品ID</th>';
+        if (isThreeColumn) {
+            html += '<th>文件品牌号</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        for (var j = 0; j < items.length; j++) {
+            var it = items[j];
+            var existed = it.status === 'existed';
+            html += '<tr>';
+            html += '<td><span class="crm-check-tag ' + (existed ? 'existed' : 'to_create') + '">' + (existed ? '已存在' : '待新建') + '</span></td>';
+            html += '<td>' + escapeHtml(it.oe) + '</td>';
+            html += '<td>' + escapeHtml(it.brand) + '</td>';
+            if (!existed && it.brand_matched === false) {
+                html += '<td><span class="crm-brand-unmatched">未匹配品牌，不会新建</span></td>';
+            } else {
+                html += '<td>' + escapeHtml(it.system_brand || '—') + '</td>';
+            }
+            html += '<td>' + escapeHtml(it.crm_brand_code || '') + '</td>';
+            html += '<td>' + escapeHtml(it.product_id || '—') + '</td>';
+            if (isThreeColumn) {
+                html += '<td>' + escapeHtml(it.brand_code || '') + '</td>';
+            }
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+
+        var statsMsg = '匹配完成：已存在（不需新建）' + matchedCount + ' 条，需新建 ' + unmatchedCount + ' 条';
+        if (unmatchedBrandCount > 0) {
+            statsMsg += '（其中未匹配品牌 ' + unmatchedBrandCount + ' 条不会新建）';
+        }
+        statsMsg += '。请核对下方清单后点击开始新建。';
+        document.getElementById('crmCheckStats').textContent = statsMsg;
+        document.getElementById('crmCheckTableWrap').innerHTML = html;
+
+        var startBtn = document.getElementById('crmStartCreateBtn');
+        startBtn.textContent = '开始新建（' + crmPendingCreateItems.length + ' 条）';
+        startBtn.disabled = crmPendingCreateItems.length === 0;
+
+        document.getElementById('crmCheckArea').style.display = 'block';
+    }
+
+    // ====== 阶段二：确认后开始新建 ======
+    document.getElementById('crmStartCreateBtn').addEventListener('click', function () {
+        var startBtn = this;
+        if (!crmCheckTaskId) {
+            layer.msg('请先完成匹配检查', {icon: 2});
+            return;
+        }
+        if (!crmPendingCreateItems.length) {
+            layer.msg('没有需要新建的数据', {icon: 2});
+            return;
+        }
+
+        startBtn.disabled = true;
+        var enableBtn = function () { startBtn.disabled = false; };
+        var loadingIndex = layer.load(1, { shade: [0.1, '#fff'] });
+        fetch('/api/excel/async/product_archive_confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                check_task_id: crmCheckTaskId,
+                items: crmPendingCreateItems
+            })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.code !== 0) {
+                layer.close(loadingIndex);
+                enableBtn();
+                layer.msg('提交失败: ' + result.msg, {icon: 2});
+                return;
+            }
+
+            var taskId = result.data.task_id;
+            layer.msg('任务已提交，处理中...', {icon: 1});
+
+            var progressLayerIndex = createProgressLayer('crmCreateProgressContent', 'crmCreateProgressText');
+            pollExcelTask(taskId, loadingIndex, progressLayerIndex, 'crmCreateProgressText', function (tId, resultData) {
+                currentTaskId = tId;
+                currentTaskData = resultData || {};
+                document.getElementById('crmCheckArea').style.display = 'none';
+                var sc = currentTaskData.success_count || 0;
+                var fc = currentTaskData.fail_count || 0;
+                document.getElementById('crmResultMsg').textContent = '处理完成：成功 ' + sc + ' 条，失败 ' + fc + ' 条';
+                document.getElementById('crmResultArea').style.display = 'block';
+            }, enableBtn);
+        })
+        .catch(error => {
+            layer.close(loadingIndex);
+            enableBtn();
+            layer.msg('提交失败: ' + error.message, {icon: 2});
+        });
+    });
 
     // ====== 更新替换号处理函数 ======
     function handleReplaceNumberProcess(formData, loadingIndex, mode) {
