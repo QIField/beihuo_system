@@ -24,8 +24,19 @@ def login_required(f):
     return wrapper
 
 
+def permission_required(f):
+    """修理厂询价单权限验证（管理员放行）"""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not (session.get('is_admin') or session.get('can_cass_inquiry')):
+            return jsonify({'code': 1, 'msg': '您没有权限访问修理厂询价单'}), 403
+        return f(*args, **kwargs)
+    return wrapper
+
+
 @bp.route('/web/cass_inquiry')
 @login_required
+@permission_required
 def page():
     """修理厂询价单页面"""
     return render_template('cass_inquiry/inquiry_list.html')
@@ -33,6 +44,7 @@ def page():
 
 @bp.route('/api/cass_inquiry/list')
 @login_required
+@permission_required
 def list_quotes():
     """
     分页查询修理厂询单报价数据
