@@ -12,7 +12,8 @@ from typing import Callable, Optional
 from config import create_crm_session
 from .excel_data_loader import load_product_data, load_alias_data
 from .excel_reader import read_excel_file, filter_sheets_by_mode, build_items
-from .crm_processor import process_items
+from .crm_processor import process_items, _query_product_list, _find_existed_children, _get_brand_info
+from .crm_updateView import update_brand_code_if_changed
 from .result_saver import save_multi_sheet_results
 
 
@@ -156,5 +157,288 @@ def process_excel_async_wrapper(file_path: str, mode: str, company: str = 'fsbbr
         'result_file': result_path,
         'result_data': result_data
     }
+
+
+def check_excel_items_wrapper(file_path: str, mode: str, company: str = 'fsbbr', progress_callback: Optional[Callable] = None):
+    """
+    匹配检查包装器（阶段一，不写CRM）
+
+    读取 Excel 构建条目，按 OE 去重查询 CRM 判定是否已存在；
+    同时按别名池规则匹配 CRM 系统品牌（与新建流程 _get_brand_id 同规则）；
+    已存在的条目按 CRM 命中明细全展开（brand_code/product_id 直接取自 list 接口）。
+
+    Returns:
+        {
+            'result_file': None（检查阶段不生成结果文件）,
+            'result_data': {
+                'file_path': 临时文件路径（保留给确认阶段重读）,
+                'file_name': 原文件名,
+                'mode': 处理模式,
+                'items': [{sheet_name, oe, brand, brand_code, crm_brand_code, status}],
+                'matched_count': 已存在条数,
+                'unmatched_count': 待新建条数
+            }
+        }
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在: {file_path}")
+
+    session = create_crm_session(company)
+
+    try:
+        all_sheets = read_excel_file(file_path)
+        valid_sheets = filter_sheets_by_mode(all_sheets, mode)
+
+        if not valid_sheets:
+            raise ValueError("没有找到符合要求的工作表")
+
+        items = []
+        for sheet_name, sheet_info in valid_sheets.items():
+            for item in build_items(sheet_info['df'], sheet_info['columns'], mode):
+                items.append({
+                    'sheet_name': sheet_name,
+                    'oe': item['oe_number'],
+                    'brand': item['brand'],
+                    'brand_code': item.get('brand_code', ''),
+                    'crm_brand_code': '',
+                    'status': 'to_create'
+                })
+
+        total = len(items)
+        oe_children_cache = {}
+        brand_info_cache = {}
+        matched_count = 0
+        output_items = []
+
+        for idx, entry in enumerate(items, 1):
+            # 品牌ID匹配（顺便，同品牌只查一次；与新建流程 _get_brand_id 同规则）
+            brand_key = entry['brand']
+            if brand_key not in brand_info_cache:
+                brand_info_cache[brand_key] = _get_brand_info(session, brand_key)
+            brand_info = brand_info_cache[brand_key]
+            if brand_info:
+                entry['system_brand'] = brand_info[1]
+                entry['brand_matched'] = True
+            else:
+                entry['system_brand'] = ''
+                entry['brand_matched'] = False
+
+            oe = entry['oe']
+            if oe not in oe_children_cache:
+                oe_children_cache[oe] = _query_product_list(session, oe)
+            children = oe_children_cache[oe]
+
+            existed_children = _find_existed_children(oe, entry['brand'], children) if children is not None else []
+            if existed_children:
+                # 已存在：按文件行计 1 条；明细按 CRM 命中全展开（brand_code/product_id 直接取自 list 接口）
+                matched_count += 1
+                for child in existed_children:
+                    output_items.append({
+                        'sheet_name': entry['sheet_name'],
+                        'oe': entry['oe'],
+                        'brand': entry['brand'],
+                        'brand_code': entry['brand_code'],
+                        'system_brand': entry['system_brand'],
+                        'brand_matched': entry['brand_matched'],
+                        'crm_brand_code': child[3] or '',
+                        'product_id': child[2],
+                        'matched_key': f"{child[0] or ''}/{child[1] or ''}",
+                        'status': 'existed'
+                    })
+            else:
+                entry['product_id'] = ''
+                output_items.append(entry)
+
+            if progress_callback:
+                progress_callback(idx, total, f"匹配检查 {idx}/{total}")
+
+        return {
+            'result_file': None,
+            'result_data': {
+                'file_path': file_path,
+                'file_name': os.path.basename(file_path),
+                'mode': mode,
+                'items': output_items,
+                'matched_count': matched_count,
+                'unmatched_count': total - matched_count
+            }
+        }
+    finally:
+        session.close()
+
+
+def _merge_result_text(results, key, text):
+    """
+    按 (oe, brand) 合并已存在行的结果文案（同 key 多条 CRM 记录用"；"拼接）
+    """
+    if key in results and isinstance(results[key], str) and results[key]:
+        results[key] = f"{results[key]}；{text}"
+    else:
+        results[key] = text
+
+
+def create_confirmed_items_wrapper(file_path: str, confirmed_items: list, mode: str, company: str = 'fsbbr', progress_callback: Optional[Callable] = None):
+    """
+    确认处理包装器（阶段二）
+
+    待新建条目走新建流程（brand_code 使用实际更新品牌号）；
+    已存在条目对比 CRM 系统品牌编码与实际更新品牌号，不同才通过
+    view+updateView 更新（结果："产品存在，品牌号已更新"/"产品存在，品牌号一致"）。
+    重读原文件以保持结果文件格式不变（原Excel数据 + 结果列），完成后清理临时文件。
+
+    Args:
+        confirmed_items: [{sheet_name, oe, brand, brand_code, status, product_id}]
+            status 为 'existed' 时走对比更新，否则走新建
+
+    Returns:
+        {'result_file': 结果文件路径, 'result_data': 统计与成功清单}
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在: {file_path}")
+
+    session = create_crm_session(company)
+    product_df, alias_df = _load_common_data()
+
+    try:
+        all_sheets = read_excel_file(file_path)
+        valid_sheets = filter_sheets_by_mode(all_sheets, mode)
+
+        # 按 sheet 分组，并区分新建/已存在更新
+        create_grouped = {}
+        existed_grouped = {}
+        for it in confirmed_items:
+            sheet_name = str(it.get('sheet_name', '') or '')
+            if str(it.get('status', '') or '') == 'existed':
+                existed_grouped.setdefault(sheet_name, []).append(it)
+            else:
+                create_grouped.setdefault(sheet_name, []).append(it)
+
+        total = len(confirmed_items)
+        all_results = {}
+        all_items = []
+        processed = 0
+        exist_updated = 0
+        exist_unchanged = 0
+        exist_failed = 0
+
+        # —— 待新建行：复用现有新建流程 ——
+        for sheet_name, sheet_confirm_items in create_grouped.items():
+            sheet_info = valid_sheets.get(sheet_name)
+            if not sheet_info:
+                continue
+
+            items = [{
+                'oe_number': str(it.get('oe', '') or '').strip(),
+                'brand': str(it.get('brand', '') or '').strip(),
+                'brand_code': str(it.get('brand_code', '') or '').strip(),
+                'mode': mode
+            } for it in sheet_confirm_items]
+            items = [it for it in items if it['oe_number'] and it['brand']]
+            if not items:
+                continue
+
+            results = process_items(
+                items, product_df, alias_df, session,
+                progress_callback=progress_callback,
+                progress_offset=processed,
+                total_items=total
+            )
+
+            columns = sheet_info['columns']
+            all_results[sheet_name] = {
+                'df': sheet_info['df'],
+                'results': results,
+                'oe_col': columns[0],
+                'brand_col': columns[1]
+            }
+            all_items.extend(items)
+            processed += len(items)
+
+        # —— 已存在行：view 对比系统当前品牌编码，不同才更新 ——
+        for sheet_name, sheet_exist_items in existed_grouped.items():
+            sheet_info = valid_sheets.get(sheet_name)
+            if not sheet_info:
+                processed += len(sheet_exist_items)
+                continue
+
+            sheet_entry = all_results.setdefault(sheet_name, {
+                'df': sheet_info['df'],
+                'results': {},
+                'oe_col': sheet_info['columns'][0],
+                'brand_col': sheet_info['columns'][1]
+            })
+            for it in sheet_exist_items:
+                oe = str(it.get('oe', '') or '').strip()
+                brand = str(it.get('brand', '') or '').strip()
+                actual_code = str(it.get('brand_code', '') or '').strip()
+                product_id = str(it.get('product_id', '') or '').strip()
+
+                if actual_code and product_id:
+                    result_flag, msg = update_brand_code_if_changed(session, product_id, actual_code)
+                    if result_flag == 'updated':
+                        exist_updated += 1
+                        text = '产品存在，品牌号已更新'
+                    elif result_flag == 'unchanged':
+                        exist_unchanged += 1
+                        text = '产品存在，品牌号一致'
+                    else:
+                        exist_failed += 1
+                        text = f'产品存在，品牌号更新失败: {msg}'
+                    if oe and brand:
+                        _merge_result_text(sheet_entry['results'], (oe, brand), text)
+
+                processed += 1
+                if progress_callback:
+                    progress_callback(processed, total, f"品牌号对比更新 {processed}/{total}")
+
+        if not all_results:
+            raise ValueError("确认的条目没有匹配到有效的工作表数据，请重新上传检查")
+
+        result_path = save_multi_sheet_results(all_results, file_path)
+
+        success_count = 0
+        fail_count = 0
+        processed_oe_set = set()
+        oe_brand_list = []
+        seen = set()
+        for item in all_items:
+            key = (item['oe_number'], item['brand'])
+            result = None
+            for sheet_data in all_results.values():
+                if key in sheet_data['results']:
+                    result = sheet_data['results'][key]
+                    break
+            if result is None:
+                continue
+            processed_oe_set.add(item['oe_number'])
+            if isinstance(result, str):
+                # 已存在行结果为字符串文案，不计入新建成功/失败统计
+                continue
+            if result.is_success():
+                success_count += 1
+                if key not in seen:
+                    oe_brand_list.append({'oe': item['oe_number'], 'brand': item['brand']})
+                    seen.add(key)
+            else:
+                fail_count += 1
+
+        return {
+            'result_file': result_path,
+            'result_data': {
+                'oe_list': sorted(processed_oe_set),
+                'oe_brand_list': oe_brand_list,
+                'total': len(processed_oe_set),
+                'success_count': success_count + exist_updated,
+                'fail_count': fail_count + exist_failed,
+                'unchanged_count': exist_unchanged
+            }
+        }
+    finally:
+        session.close()
+        # 处理完成后清理上传的临时文件
+        try:
+            os.remove(file_path)
+        except Exception:
+            pass
 
 

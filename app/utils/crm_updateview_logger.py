@@ -139,6 +139,52 @@ def execute_update_view_with_log(session, payload, source, store_code, headers=N
         return False, error_msg
 
 
+def _fetch_view_data(session, product_id, store_code, source, headers=None, timeout=30):
+    """
+    查询 view 接口获取产品完整字段数据，失败记录日志
+
+    :return: (view_data, error_msg)，成功时 error_msg 为空字符串
+    """
+    try:
+        response = session.get(
+            VIEW_URL,
+            params={"product_id": product_id},
+            headers=headers,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("status") != 200:
+            error_msg = f"查询view失败: {data.get('msg', '未知错误')}"
+            log_update_view_request(source, store_code, {"product_id": product_id}, "error", error_msg)
+            return None, error_msg
+
+        return data.get("data", {}), ""
+    except Exception as e:
+        error_msg = f"查询view失败: {e}"
+        log_update_view_request(source, store_code, {"product_id": product_id}, "error", error_msg)
+        return None, error_msg
+
+
+def _build_update_payload(product_id, view_data, new_values):
+    """
+    合并字段：view 原值为底，new_values 覆盖
+    """
+    payload = {}
+    for field in ALL_VIEW_FIELDS:
+        if field in new_values:
+            payload[field] = new_values[field]
+        elif field in view_data:
+            payload[field] = view_data[field]
+        else:
+            payload[field] = None if field != "product_id" else str(product_id)
+
+    # 确保 product_id 正确
+    payload["product_id"] = str(product_id)
+    return payload
+
+
 def fetch_view_then_update(session, product_id, new_values, source, store_code, headers=None, timeout=30):
     """
     先查询产品视图获取完整字段，将新值与原值合并后调用 updateView。
@@ -153,39 +199,12 @@ def fetch_view_then_update(session, product_id, new_values, source, store_code, 
     :return: (success: bool, msg: str)
     """
     # 1. 查询 view 接口
-    try:
-        response = session.get(
-            VIEW_URL,
-            params={"product_id": product_id},
-            headers=headers,
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("status") != 200:
-            error_msg = f"查询view失败: {data.get('msg', '未知错误')}"
-            log_update_view_request(source, store_code, {"product_id": product_id}, "error", error_msg)
-            return False, error_msg
-
-        view_data = data.get("data", {})
-    except Exception as e:
-        error_msg = f"查询view失败: {e}"
-        log_update_view_request(source, store_code, {"product_id": product_id}, "error", error_msg)
+    view_data, error_msg = _fetch_view_data(session, product_id, store_code, source, headers, timeout)
+    if view_data is None:
         return False, error_msg
 
-    # 2. 合并字段：view 原值为底，new_values 覆盖
-    payload = {}
-    for field in ALL_VIEW_FIELDS:
-        if field in new_values:
-            payload[field] = new_values[field]
-        elif field in view_data:
-            payload[field] = view_data[field]
-        else:
-            payload[field] = None if field != "product_id" else str(product_id)
-
-    # 确保 product_id 正确
-    payload["product_id"] = str(product_id)
+    # 2. 合并字段后调用 updateView
+    payload = _build_update_payload(product_id, view_data, new_values)
 
     # 3. 提取原始字段值并调用 updateView
     original_values = _extract_original_values(view_data)
@@ -200,3 +219,35 @@ def fetch_view_then_update(session, product_id, new_values, source, store_code, 
         original_values=original_values,
         extra_original_values=extra_original_values,
     )
+
+
+def fetch_view_then_update_brand_code_if_changed(session, product_id, brand_code, source, store_code, headers=None, timeout=30):
+    """
+    先查询 view 获取所有原值，brand_code 与系统当前值一致则跳过，不一致才合并更新。
+
+    :return: (result, msg)，result 为 'updated' / 'unchanged' / 'failed'
+    """
+    # 1. 查询 view 接口
+    view_data, error_msg = _fetch_view_data(session, str(product_id), store_code, source, headers, timeout)
+    if view_data is None:
+        return 'failed', error_msg
+
+    # 2. 对比系统当前 brand_code，一致则不处理
+    current = view_data.get('brand_code')
+    current = str(current) if current is not None else ''
+    if current.strip() == str(brand_code or '').strip():
+        return 'unchanged', current
+
+    # 3. 不一致：合并原值后调用 updateView
+    payload = _build_update_payload(str(product_id), view_data, {"brand_code": brand_code})
+    success, msg = execute_update_view_with_log(
+        session=session,
+        payload=payload,
+        source=source,
+        store_code=store_code,
+        headers=headers,
+        timeout=timeout,
+        original_values=_extract_original_values(view_data),
+        extra_original_values=_extract_extra_values(view_data),
+    )
+    return ('updated' if success else 'failed'), msg

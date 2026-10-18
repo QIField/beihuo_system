@@ -73,6 +73,10 @@ register_purchase_history_routes(app)  # 注册采购历史同步API路由
 app.register_blueprint(region_by_number_query_bp)  # 注册溯源查询蓝图
 app.register_blueprint(ks_inquiry_monitor_bp)  # 注册开思询价单监控蓝图
 
+# 注册修理厂询价单蓝图
+from backend.cass_inquiry_api import bp as cass_inquiry_bp
+app.register_blueprint(cass_inquiry_bp)
+
 # 注册备货数据API蓝图
 from app.api.beihuo_api import bp as beihuo_bp
 app.register_blueprint(beihuo_bp)

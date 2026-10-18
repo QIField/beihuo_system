@@ -4,7 +4,7 @@ CRM UpdateView 接口模块
 """
 
 from config import get_auth_headers
-from app.utils.crm_updateview_logger import execute_update_view_with_log, fetch_view_then_update
+from app.utils.crm_updateview_logger import execute_update_view_with_log, fetch_view_then_update, fetch_view_then_update_brand_code_if_changed
 from .crm_product_id import get_product_id
 
 
@@ -46,6 +46,24 @@ def update_product_name(session, product_id, product_name, store_code='fsbbr'):
     if success:
         return {"status": 200, "msg": msg}
     return None
+
+
+def update_brand_code_if_changed(session, product_id, brand_code, store_code='fsbbr'):
+    """
+    对比系统当前 brand_code 与新值，不同才更新（统一先 view 取所有原值再 updateView）
+
+    Returns:
+        (result, msg)，result 为 'updated' / 'unchanged' / 'failed'
+    """
+    return fetch_view_then_update_brand_code_if_changed(
+        session=session,
+        product_id=str(product_id),
+        brand_code=brand_code,
+        source="crm_updateView",
+        store_code=store_code,
+        headers=get_auth_headers(session),
+        timeout=30,
+    )
 
 
 def update_brand_code_by_oe(session, oe_number, brand, brand_code):

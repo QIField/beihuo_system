@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修理厂询价单</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/handsontable/handsontable.full.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/purchase_plan/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.css') }}">
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/handsontable/handsontable.full.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/custom-pagination/custom-pagination.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/handsontable-builder/sortable-utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/handsontable-builder/handsontable-builder.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/purchase_plan/common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cass_inquiry/inquiry_list.js') }}"></script>
+    <style>
+        /* 页面级模块布局（与询比价模块一致） */
+        .purchase-plan-page {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 32px);
+            min-height: 600px;
+        }
+
+        .page-header {
+            flex-shrink: 0;
+            margin-bottom: 12px;
+            border-bottom: none;
+            border-radius: 3px;
+            padding: 10px 16px;
+        }
+
+        .main-layout {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            gap: 12px;
+        }
+
+        .filter-panel {
+            width: 260px;
+            flex-shrink: 0;
+            background-color: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 3px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .filter-item {
+            margin-bottom: 14px;
+        }
+
+        .filter-item label {
+            display: block;
+            font-size: 12px;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+
+        .filter-item .search-input {
+            width: 100%;
+        }
+
+        .filter-actions {
+            margin-top: auto;
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-actions .btn {
+            flex: 1;
+        }
+
+        .content-area {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        /* 数据容器扁平化 */
+        .data-container {
+            border: 1px solid #e2e8f0;
+            border-radius: 0;
+            box-shadow: none;
+            flex: 1;
+            min-height: 0;
+        }
+
+        #handsontable-container {
+            flex: 1;
+            min-height: 0;
+        }
+
+        #mainPaginationBar {
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="purchase-plan-page">
+        <div class="page-header">
+            <h2>修理厂询价单</h2>
+        </div>
+
+        <div class="main-layout">
+            <!-- 左侧筛选面板 -->
+            <aside class="filter-panel" id="filterPanel">
+                <div class="filter-panel-title">筛选条件</div>
+                <div class="filter-item">
+                    <label>询单日期范围</label>
+                    <input type="text" class="search-input" id="inquiryDateRange" placeholder="选择日期范围" readonly>
+                </div>
+                <div class="filter-item">
+                    <label>译码OE号</label>
+                    <input type="text" class="search-input" id="searchDecodeNum" placeholder="请输入OE号">
+                </div>
+                <div class="filter-item">
+                    <label>品牌</label>
+                    <input type="text" class="search-input" id="searchBrand" placeholder="请输入品牌">
+                </div>
+                <div class="filter-item">
+                    <label>供应商</label>
+                    <input type="text" class="search-input" id="searchStore" placeholder="请输入供应商">
+                </div>
+                <div class="filter-item">
+                    <label>询单ID</label>
+                    <input type="text" class="search-input" id="searchInquiryId" placeholder="请输入询单ID">
+                </div>
+                <div class="filter-actions">
+                    <button type="button" class="btn btn-default" id="filterResetBtn">清空</button>
+                    <button type="button" class="btn btn-primary" id="filterSearchBtn">搜索</button>
+                </div>
+            </aside>
+
+            <!-- 右侧内容区 -->
+            <main class="content-area">
+                <div class="data-container">
+                    <div class="data-header">
+                        <span>修理厂询单报价数据</span>
+                    </div>
+                    <div id="handsontable-container"></div>
+                    <div id="mainPaginationBar"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

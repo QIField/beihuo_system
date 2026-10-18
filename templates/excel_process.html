@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel 处理</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <style>
+        /* 基础样式（与 purchase_plan/common.css 保持一致） */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background-color: #f1f5f9;
+            padding: 16px;
+            color: #1e293b;
+            font-size: 14px;
+        }
+
+        /* 页面级模块布局 */
+        .excel-process-page {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 32px);
+            min-height: 600px;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            margin-bottom: 12px;
+            border-bottom: none;
+            border-radius: 3px;
+            padding: 10px 16px;
+            background-color: #1e3a8a;
+        }
+
+        .module-tabs {
+            display: flex;
+            gap: 4px;
+        }
+
+        .module-tab {
+            padding: 8px 24px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            background-color: transparent;
+            color: #cbd5e1;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .module-tab:hover {
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.7);
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .module-tab.active {
+            background-color: #fff;
+            border-color: #fff;
+            color: #1e3a8a;
+            font-weight: 600;
+        }
+
+        /* 内容区 */
+        .content-area {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        /* 按钮样式（与 purchase_plan/common.css 保持一致） */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            border: 1px solid transparent;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1.4;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background-color: #1e3a8a;
+            border-color: #1e3a8a;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+
+        /* 危险动作（新建产品核对后的"开始新建"） */
+        .btn-danger {
+            background-color: #dc2626;
+            border-color: #dc2626;
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background-color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .btn-default {
+            background-color: #fff;
+            border-color: #d9d9d9;
+            color: #595959;
+        }
+
+        .btn-default:hover {
+            color: #1e3a8a;
+            border-color: #1e3a8a;
+        }
+
+        /* 功能面板（沿用原弹窗结构，配色对齐 slate 色系） */
+        .ep-panel { display: none; }
+        .ep-panel.active { display: block; flex: 1; min-height: 0; padding: 24px; overflow-y: auto; }
+        .ep-desc { color: #64748b; font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
+        .ep-info { background: #f1f5f9; border: 1px solid #e2e8f0; border-left: 3px solid #1e3a8a; padding: 10px 12px; border-radius: 4px; margin-bottom: 16px; font-size: 13px; color: #475569; }
+        .ep-option { margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+        .ep-option label { white-space: nowrap; color: #475569; font-size: 13px; }
+        .ep-option select { padding: 5px 10px; border: 1px solid #d9d9d9; border-radius: 3px; min-width: 160px; font-size: 13px; color: #1e293b; background: #fff; height: 30px; }
+        .ep-upload-zone { position: relative; border: 1px dashed #d9d9d9; border-radius: 3px; padding: 32px; text-align: center; background: #f8fafc; margin-bottom: 12px; transition: border-color 0.2s; }
+        .ep-upload-zone:hover { border-color: #2563eb; }
+        .ep-upload-zone.dragover { border-color: #2563eb; background: #eff6ff; }
+        .ep-upload-zone input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .ep-upload-text { color: #475569; font-size: 13px; margin-bottom: 6px; }
+        .ep-upload-hint { color: #94a3b8; font-size: 12px; }
+        .ep-template-link { font-size: 12px; color: #2563eb; }
+        .ep-result { margin-top: 16px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 3px solid #1e3a8a; border-radius: 4px; box-shadow: 0 1px 3px rgba(30, 58, 138, 0.06); }
+        .ep-result-msg { color: #1e293b; margin-bottom: 12px; font-size: 13px; font-weight: 500; }
+        .ep-result-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+        /* 新建产品核对表格（独立于结果卡片，全宽展示） */
+        .crm-check-stats { font-size: 13px; color: #475569; margin-bottom: 8px; }
+        .crm-check-table-wrap { max-height: 55vh; overflow-y: auto; margin-bottom: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; }
+        .crm-check-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .crm-check-table th, .crm-check-table td { padding: 3px 8px; border-bottom: 1px solid #f1f5f9; text-align: left; vertical-align: middle; }
+        .crm-check-table th { background: #f8fafc; font-weight: 600; color: #475569; position: sticky; top: 0; }
+        .crm-check-table tr:last-child td { border-bottom: none; }
+        .crm-check-tag { display: inline-block; padding: 0 7px; border-radius: 10px; font-size: 12px; line-height: 18px; white-space: nowrap; }
+        .crm-check-tag.existed { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        .crm-check-tag.to_create { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; }
+        .crm-brand-unmatched { color: #d46b08; }
+        .crm-actual-input { width: 100%; box-sizing: border-box; padding: 1px 6px; border: 1px solid #d9d9d9; border-radius: 3px; font-size: 13px; height: 22px; }
+        .crm-actual-input:focus { border-color: #40a9ff; outline: none; }
+
+        /* 底部操作栏 */
+        .ep-footer {
+            flex-shrink: 0;
+            padding: 12px 24px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            background: #fff;
+        }
+
+        .ep-footer-left { font-size: 13px; color: #64748b; max-height: 90px; overflow-y: auto; flex: 1; }
+        .ep-footer-right { display: flex; gap: 12px; }
+    </style>
+</head>
+<body>
+    <div class="excel-process-page">
+        <!-- 页头：功能标签页 -->
+        <div class="page-header">
+            <div class="module-tabs">
+                <button class="module-tab active" data-tab="bill">对账</button>
+                <button class="module-tab" data-tab="order" id="tabOrder">单据</button>
+                <button class="module-tab" data-tab="crm">新建产品</button>
+                <button class="module-tab" data-tab="update_crm" id="tabUpdateCrm">更新产品</button>
+                <button class="module-tab" data-tab="replace_number">更新替换号</button>
+            </div>
+        </div>
+
+        <!-- 内容区 -->
+        <main class="content-area">
+            <!-- 对账 -->
+            <div class="ep-panel active" data-panel="bill">
+                <div class="ep-upload-zone">
+                    <input type="file" id="billFileSelect" accept=".xlsx,.xls,.csv" multiple>
+                    <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
+                    <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，可多选</div>
+                </div>
+            </div>
+
+            <!-- 单据 -->
+            <div class="ep-panel" data-panel="order">
+                <div class="ep-option">
+                    <label>单据类型</label>
+                    <select id="orderTypeSelect">
+                        <option value="" selected>请选择</option>
+                        <option value="广州龙星景丰">广州龙星景丰</option>
+                        <option value="厦门华禹">厦门华禹</option>
+                    </select>
+                    <a href="javascript:;" id="orderTemplateLink" class="ep-template-link">下载模板</a>
+                </div>
+                <div class="ep-upload-zone">
+                    <input type="file" id="orderFileSelect" accept=".xlsx,.xls,.csv" multiple>
+                    <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
+                    <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，可多选</div>
+                </div>
+            </div>
+
+            <!-- 新建产品 -->
+            <div class="ep-panel" data-panel="crm">
+                <div class="ep-option">
+                    <label>品牌编码</label>
+                    <select id="crmModeSelect">
+                        <option value="" selected>请选择有无品牌编码</option>
+                        <option value="two_column">无品牌编码</option>
+                        <option value="three_column">有品牌编码</option>
+                    </select>
+                    <a href="javascript:;" id="crmTemplateLink" class="ep-template-link">下载模板</a>
+                </div>
+                <div class="ep-upload-zone">
+                    <input type="file" id="crmFileSelect" accept=".xlsx,.xls,.csv">
+                    <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
+                    <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，仅单个文件</div>
+                </div>
+                <div id="crmCheckArea" style="display:none;">
+                    <div class="crm-check-stats" id="crmCheckStats"></div>
+                    <div id="crmCheckTableWrap" class="crm-check-table-wrap"></div>
+                </div>
+                <div class="ep-result" id="crmResultArea" style="display:none;">
+                    <div class="ep-result-msg" id="crmResultMsg"></div>
+                    <div class="ep-result-actions">
+                        <button type="button" class="btn btn-primary" id="crmDownloadBtn">下载结果文件</button>
+                        <button type="button" class="btn btn-default" id="crmDiffBtn">查看替换号差异</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 更新产品 -->
+            <div class="ep-panel" data-panel="update_crm">
+                <div class="ep-option">
+                    <a href="javascript:;" id="updateCrmTemplateLink" class="ep-template-link">下载模板</a>
+                </div>
+                <div class="ep-upload-zone">
+                    <input type="file" id="updateCrmFileSelect" accept=".xlsx,.xls,.csv">
+                    <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
+                    <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，仅单个文件</div>
+                </div>
+            </div>
+
+            <!-- 更新替换号 -->
+            <div class="ep-panel" data-panel="replace_number">
+                <div class="ep-option">
+                    <label>处理方式</label>
+                    <select id="replaceNumberModeSelect">
+                        <option value="" selected>请选择处理方式</option>
+                        <option value="direct">直接添加替换号</option>
+                        <option value="compare">对比添加替换号</option>
+                    </select>
+                    <a href="javascript:;" id="replaceNumberTemplateLink" class="ep-template-link">下载模板</a>
+                </div>
+                <div class="ep-upload-zone">
+                    <input type="file" id="replaceNumberFileSelect" accept=".xlsx,.xls,.csv">
+                    <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
+                    <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，仅单个文件</div>
+                </div>
+                <div class="ep-result" id="replaceNumberResultArea" style="display:none;">
+                    <div class="ep-result-msg" id="replaceNumberResultMsg"></div>
+                    <div class="ep-result-actions">
+                        <button type="button" class="btn btn-primary" id="replaceNumberDownloadBtn">下载结果文件</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部操作栏 -->
+            <div class="ep-footer">
+                <div class="ep-footer-left" id="selectedFilesList">暂无选择文件</div>
+                <div class="ep-footer-right">
+                    <button type="button" class="btn btn-default" id="epResetBtn">重置</button>
+                    <button type="button" class="btn btn-primary" id="confirmProcessBtn">开始处理</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/excel_process/excel_process.js') }}"></script>
+</body>
+</html>
