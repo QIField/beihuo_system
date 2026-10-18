@@ -1592,9 +1592,8 @@ function openCompareModule() {
 
 // 添加打开修理厂询价单的函数
 function openCassInquiryModule() {
-    // 检查用户是否有权限访问修理厂询价单（管理员始终放行）
-    var isAdmin = window.currentUserPermissions && window.currentUserPermissions.is_admin;
-    if (!isAdmin && (!window.currentUserPermissions || !window.currentUserPermissions.can_cass_inquiry)) {
+    // 检查用户是否有权限访问修理厂询价单（与管理员身份无关，必须显式勾选权限）
+    if (!window.currentUserPermissions || !window.currentUserPermissions.can_cass_inquiry) {
         layui.layer.msg('您没有权限访问修理厂询价单', {icon: 2});
         return;
     }

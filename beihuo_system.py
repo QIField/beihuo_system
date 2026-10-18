@@ -1001,14 +1001,14 @@ def login():
             session['can_compare_module'] = 1  # admin默认拥有比价模块权限
             session['can_update_crm'] = 1  # admin默认拥有更新CRM权限
             session['can_multi_channel_quote_adjust'] = 1  # admin默认拥有多渠道报价调价权限
-            session['can_cass_inquiry'] = 1  # admin默认拥有修理厂询价单权限
         else:
             session['can_process_orders'] = user['can_process_orders']  # 添加处理单据权限到session
             session['can_inquiry_module'] = user.get('can_inquiry_module', False)  # 询价模块权限
             session['can_compare_module'] = user.get('can_compare_module', False)  # 比价模块权限
             session['can_update_crm'] = user.get('can_update_crm', False)  # 更新CRM权限
             session['can_multi_channel_quote_adjust'] = user.get('can_multi_channel_quote_adjust', False)  # 多渠道报价调价权限
-            session['can_cass_inquiry'] = user.get('can_cass_inquiry', False)  # 修理厂询价单权限
+        # 修理厂询价单权限：与管理员身份无关，统一按数据库字段判定
+        session['can_cass_inquiry'] = user.get('can_cass_inquiry', False)
             
         session['user_id'] = user['id']  # 添加用户ID到session，用于后续权限检查
         # 检查用户store是否有效，如果无效则设置为默认值

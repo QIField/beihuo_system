@@ -25,10 +25,10 @@ def login_required(f):
 
 
 def permission_required(f):
-    """修理厂询价单权限验证（管理员放行）"""
+    """修理厂询价单权限验证（与管理员身份无关，必须显式拥有权限）"""
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not (session.get('is_admin') or session.get('can_cass_inquiry')):
+        if not session.get('can_cass_inquiry'):
             return jsonify({'code': 1, 'msg': '您没有权限访问修理厂询价单'}), 403
         return f(*args, **kwargs)
     return wrapper
