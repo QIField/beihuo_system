@@ -25,6 +25,7 @@ layui.use('layer', function () {
     var crmCheckMode = '';          // 匹配检查时的模式
     var crmCheckItems = [];         // 阶段一核对清单（含实际更新品牌号输入值）
     var crmPendingCreateItems = []; // 阶段二确认提交清单（待新建 + 已存在更新）
+    var crmStage = '';              // crm 流程阶段：''=待检查 / 'checked'=核对中（footer 按钮变"开始新建"）
 
     // ====== 权限控制：无权限的功能Tab直接隐藏 ======
     fetch('/api/current_user')
@@ -63,6 +64,7 @@ layui.use('layer', function () {
             document.querySelector('.ep-panel[data-panel="' + target + '"]').classList.add('active');
 
             updateFileList();
+            updateConfirmBtnState();
         });
     });
 
@@ -102,6 +104,48 @@ layui.use('layer', function () {
         });
     });
 
+    // ====== 上传框显示控制：处理进入核对/结果阶段后隐藏，重置后恢复 ======
+    function setUploadZoneVisible(tab, visible) {
+        var zone = document.querySelector('.ep-panel[data-panel="' + tab + '"] .ep-upload-zone');
+        if (zone) {
+            zone.style.display = visible ? '' : 'none';
+        }
+    }
+
+    // ====== 底部确认按钮状态：crm 核对阶段显示红色"开始新建"，其余显示"开始处理" ======
+    function updateConfirmBtnState() {
+        var btn = document.getElementById('confirmProcessBtn');
+        if (currentTab === 'crm' && crmStage === 'checked') {
+            btn.textContent = '开始新建';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-danger');
+        } else {
+            btn.textContent = '开始处理';
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-primary');
+        }
+    }
+
+    // ====== 上传区拖拽高亮：拖入时边框变蓝 + 底色微变，拖出/落下恢复 ======
+    function initUploadDragHighlight() {
+        document.querySelectorAll('.ep-upload-zone').forEach(function (zone) {
+            zone.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+            zone.addEventListener('dragleave', function (e) {
+                if (!zone.contains(e.relatedTarget)) {
+                    zone.classList.remove('dragover');
+                }
+            });
+            zone.addEventListener('drop', function () {
+                zone.classList.remove('dragover');
+            });
+        });
+    }
+
+    initUploadDragHighlight();
+
     // ====== 重置：清空当前功能已选文件并隐藏结果区 ======
     document.getElementById('epResetBtn').addEventListener('click', function () {
         tabFiles[currentTab] = [];
@@ -115,6 +159,10 @@ layui.use('layer', function () {
         crmCheckTaskId = null;
         crmCheckItems = [];
         crmPendingCreateItems = [];
+        crmStage = '';
+        setUploadZoneVisible('crm', true);
+        setUploadZoneVisible('replace_number', true);
+        updateConfirmBtnState();
         updateFileList();
     });
 
@@ -144,6 +192,12 @@ layui.use('layer', function () {
 
     // ====== 开始处理 ======
     document.getElementById('confirmProcessBtn').onclick = function () {
+        // crm 核对阶段：按钮为红色"开始新建"，触发阶段二确认处理
+        if (currentTab === 'crm' && crmStage === 'checked') {
+            startCrmConfirm();
+            return;
+        }
+
         var files = tabFiles[currentTab];
         var formData = new FormData();
         var processType = currentTab;
@@ -230,6 +284,8 @@ layui.use('layer', function () {
         crmCheckTaskId = null;
         crmCheckItems = [];
         crmPendingCreateItems = [];
+        crmStage = '';
+        updateConfirmBtnState();
 
         // 显示处理进度
         var processLoading = layer.load(1, { shade: [0.1, '#fff'] });
@@ -283,7 +339,7 @@ layui.use('layer', function () {
             closeBtn: 0,
             shade: 0.3,
             area: ['280px', '100px'],
-            content: '<div id="' + contentId + '" style="padding: 28px 0; text-align: center; font-size: 14px;"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> <span id="' + textId + '">初始化中...</span></div>'
+            content: '<div id="' + contentId + '" style="padding: 28px 0; text-align: center; font-size: 14px; color: #1e293b;"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop" style="color: #1e3a8a; font-size: 18px;"></i> <span id="' + textId + '">初始化中...</span></div>'
         });
     }
 
@@ -432,7 +488,7 @@ layui.use('layer', function () {
         }
 
         var html = '<table class="crm-check-table"><thead><tr>';
-        html += '<th style="width:70px;">状态</th><th>OE号</th><th>品牌</th><th>系统品牌</th><th>CRM品牌编码</th><th>产品ID</th>';
+        html += '<th style="width:86px;">状态</th><th>OE号</th><th>品牌</th><th>系统品牌</th><th>匹配OE/品牌</th><th>CRM品牌编码</th>';
         if (isThreeColumn) {
             html += '<th>文件品牌号</th>';
         }
@@ -453,8 +509,9 @@ layui.use('layer', function () {
             } else {
                 html += '<td>' + escapeHtml(it.system_brand || '—') + '</td>';
             }
+            // 匹配OE/品牌：仅已存在行展示系统命中的号码/品牌
+            html += '<td>' + (existed ? escapeHtml(it.matched_key || '') : '—') + '</td>';
             html += '<td>' + escapeHtml(it.crm_brand_code || '') + '</td>';
-            html += '<td>' + escapeHtml(it.product_id || '—') + '</td>';
             if (isThreeColumn) {
                 html += '<td>' + escapeHtml(it.brand_code || '') + '</td>';
             }
@@ -467,20 +524,20 @@ layui.use('layer', function () {
         if (unmatchedBrandCount > 0) {
             statsMsg += '（其中未匹配品牌 ' + unmatchedBrandCount + ' 条不会处理）';
         }
-        statsMsg += '。实际更新品牌号可编辑，核对后点击开始处理。';
+        statsMsg += '。实际更新品牌号可编辑，核对后点击右下角开始新建。';
         document.getElementById('crmCheckStats').textContent = statsMsg;
         document.getElementById('crmCheckTableWrap').innerHTML = html;
 
-        var startBtn = document.getElementById('crmStartCreateBtn');
-        startBtn.textContent = '开始处理（' + crmPendingCreateItems.length + ' 条）';
-        startBtn.disabled = crmPendingCreateItems.length === 0;
-
+        // 进入核对阶段：底部按钮变红色"开始新建"，上传框隐藏（重置后恢复）
+        crmStage = 'checked';
+        updateConfirmBtnState();
         document.getElementById('crmCheckArea').style.display = 'block';
+        setUploadZoneVisible('crm', false);
     }
 
     // ====== 阶段二：确认后开始处理（新建 + 已存在行品牌号对比更新） ======
-    document.getElementById('crmStartCreateBtn').addEventListener('click', function () {
-        var startBtn = this;
+    function startCrmConfirm() {
+        var confirmBtn = document.getElementById('confirmProcessBtn');
         if (!crmCheckTaskId) {
             layer.msg('请先完成匹配检查', {icon: 2});
             return;
@@ -504,8 +561,11 @@ layui.use('layer', function () {
             };
         });
 
-        startBtn.disabled = true;
-        var enableBtn = function () { startBtn.disabled = false; };
+        confirmBtn.disabled = true;
+        var enableBtn = function () {
+            confirmBtn.disabled = false;
+            updateConfirmBtnState();
+        };
         var loadingIndex = layer.load(1, { shade: [0.1, '#fff'] });
         fetch('/api/excel/async/product_archive_confirm', {
             method: 'POST',
@@ -532,6 +592,10 @@ layui.use('layer', function () {
                 currentTaskId = tId;
                 currentTaskData = resultData || {};
                 document.getElementById('crmCheckArea').style.display = 'none';
+                // 处理完成：退出核对阶段，按钮恢复"开始处理"（需重置后重新走流程）
+                crmStage = '';
+                crmPendingCreateItems = [];
+                enableBtn();
                 var sc = currentTaskData.success_count || 0;
                 var fc = currentTaskData.fail_count || 0;
                 var msg = '处理完成：成功 ' + sc + ' 条，失败 ' + fc + ' 条';
@@ -548,7 +612,7 @@ layui.use('layer', function () {
             enableBtn();
             layer.msg('提交失败: ' + error.message, {icon: 2});
         });
-    });
+    }
 
     // ====== 更新替换号处理函数 ======
     function handleReplaceNumberProcess(formData, loadingIndex, mode) {
@@ -625,6 +689,8 @@ layui.use('layer', function () {
                         layer.close(loadingIndex);
                         document.getElementById('replaceNumberResultMsg').textContent = '处理完成，请下载结果文件';
                         document.getElementById('replaceNumberResultArea').style.display = 'block';
+                        // 处理完成：隐藏上传框，重置后才恢复
+                        setUploadZoneVisible('replace_number', false);
                         layer.msg('处理完成', {icon: 1});
                     } else if (status.status === 'failed') {
                         clearInterval(checkInterval);

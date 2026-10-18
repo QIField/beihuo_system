@@ -242,6 +242,7 @@ def check_excel_items_wrapper(file_path: str, mode: str, company: str = 'fsbbr',
                         'brand_matched': entry['brand_matched'],
                         'crm_brand_code': child[3] or '',
                         'product_id': child[2],
+                        'matched_key': f"{child[0] or ''}/{child[1] or ''}",
                         'status': 'existed'
                     })
             else:

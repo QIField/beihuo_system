@@ -108,6 +108,18 @@
             border-color: #2563eb;
         }
 
+        /* 危险动作（新建产品核对后的"开始新建"） */
+        .btn-danger {
+            background-color: #dc2626;
+            border-color: #dc2626;
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background-color: #ef4444;
+            border-color: #ef4444;
+        }
+
         .btn-default {
             background-color: #fff;
             border-color: #d9d9d9;
@@ -123,30 +135,33 @@
         .ep-panel { display: none; }
         .ep-panel.active { display: block; flex: 1; min-height: 0; padding: 24px; overflow-y: auto; }
         .ep-desc { color: #64748b; font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
-        .ep-info { background: #f6ffed; border: 1px solid #b7eb8f; padding: 10px 12px; border-radius: 4px; margin-bottom: 16px; font-size: 13px; color: #389e0d; }
+        .ep-info { background: #f1f5f9; border: 1px solid #e2e8f0; border-left: 3px solid #1e3a8a; padding: 10px 12px; border-radius: 4px; margin-bottom: 16px; font-size: 13px; color: #475569; }
         .ep-option { margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
         .ep-option label { white-space: nowrap; color: #475569; font-size: 13px; }
         .ep-option select { padding: 5px 10px; border: 1px solid #d9d9d9; border-radius: 3px; min-width: 160px; font-size: 13px; color: #1e293b; background: #fff; height: 30px; }
         .ep-upload-zone { position: relative; border: 1px dashed #d9d9d9; border-radius: 3px; padding: 32px; text-align: center; background: #f8fafc; margin-bottom: 12px; transition: border-color 0.2s; }
         .ep-upload-zone:hover { border-color: #2563eb; }
+        .ep-upload-zone.dragover { border-color: #2563eb; background: #eff6ff; }
         .ep-upload-zone input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
         .ep-upload-text { color: #475569; font-size: 13px; margin-bottom: 6px; }
         .ep-upload-hint { color: #94a3b8; font-size: 12px; }
-        .ep-result { margin-top: 16px; padding: 12px 16px; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 4px; }
-        .ep-result-msg { color: #389e0d; margin-bottom: 12px; font-size: 13px; }
+        .ep-template-link { font-size: 12px; color: #2563eb; }
+        .ep-result { margin-top: 16px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-left: 3px solid #1e3a8a; border-radius: 4px; box-shadow: 0 1px 3px rgba(30, 58, 138, 0.06); }
+        .ep-result-msg { color: #1e293b; margin-bottom: 12px; font-size: 13px; font-weight: 500; }
         .ep-result-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
-        /* 新建产品核对表格 */
-        .crm-check-table-wrap { max-height: 420px; overflow-y: auto; margin-bottom: 12px; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px; }
+        /* 新建产品核对表格（独立于结果卡片，全宽展示） */
+        .crm-check-stats { font-size: 13px; color: #475569; margin-bottom: 8px; }
+        .crm-check-table-wrap { max-height: 55vh; overflow-y: auto; margin-bottom: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; }
         .crm-check-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .crm-check-table th, .crm-check-table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; text-align: left; vertical-align: middle; }
-        .crm-check-table th { background: #fafafa; font-weight: 600; color: #333; position: sticky; top: 0; }
+        .crm-check-table th, .crm-check-table td { padding: 3px 8px; border-bottom: 1px solid #f1f5f9; text-align: left; vertical-align: middle; }
+        .crm-check-table th { background: #f8fafc; font-weight: 600; color: #475569; position: sticky; top: 0; }
         .crm-check-table tr:last-child td { border-bottom: none; }
-        .crm-check-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-        .crm-check-tag.existed { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .crm-check-tag { display: inline-block; padding: 0 7px; border-radius: 10px; font-size: 12px; line-height: 18px; white-space: nowrap; }
+        .crm-check-tag.existed { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
         .crm-check-tag.to_create { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; }
         .crm-brand-unmatched { color: #d46b08; }
-        .crm-actual-input { width: 100%; box-sizing: border-box; padding: 3px 6px; border: 1px solid #d9d9d9; border-radius: 3px; font-size: 13px; }
+        .crm-actual-input { width: 100%; box-sizing: border-box; padding: 1px 6px; border: 1px solid #d9d9d9; border-radius: 3px; font-size: 13px; height: 22px; }
         .crm-actual-input:focus { border-color: #40a9ff; outline: none; }
 
         /* 底部操作栏 */
@@ -198,7 +213,7 @@
                         <option value="广州龙星景丰">广州龙星景丰</option>
                         <option value="厦门华禹">厦门华禹</option>
                     </select>
-                    <a href="javascript:;" id="orderTemplateLink" style="font-size: 12px; color: #2563eb; margin-left: 8px;">下载模板</a>
+                    <a href="javascript:;" id="orderTemplateLink" class="ep-template-link">下载模板</a>
                 </div>
                 <div class="ep-upload-zone">
                     <input type="file" id="orderFileSelect" accept=".xlsx,.xls,.csv" multiple>
@@ -216,19 +231,16 @@
                         <option value="two_column">无品牌编码</option>
                         <option value="three_column">有品牌编码</option>
                     </select>
-                    <a href="javascript:;" id="crmTemplateLink" style="font-size: 12px; color: #2563eb; margin-left: 8px;">下载模板</a>
+                    <a href="javascript:;" id="crmTemplateLink" class="ep-template-link">下载模板</a>
                 </div>
                 <div class="ep-upload-zone">
                     <input type="file" id="crmFileSelect" accept=".xlsx,.xls,.csv">
                     <div class="ep-upload-text">点击或拖拽文件到此处上传</div>
                     <div class="ep-upload-hint">支持 .xlsx, .xls, .csv，仅单个文件</div>
                 </div>
-                <div class="ep-result" id="crmCheckArea" style="display:none;">
-                    <div class="ep-result-msg" id="crmCheckStats"></div>
+                <div id="crmCheckArea" style="display:none;">
+                    <div class="crm-check-stats" id="crmCheckStats"></div>
                     <div id="crmCheckTableWrap" class="crm-check-table-wrap"></div>
-                    <div class="ep-result-actions">
-                        <button type="button" class="btn btn-primary" id="crmStartCreateBtn">开始新建</button>
-                    </div>
                 </div>
                 <div class="ep-result" id="crmResultArea" style="display:none;">
                     <div class="ep-result-msg" id="crmResultMsg"></div>
@@ -242,7 +254,7 @@
             <!-- 更新产品 -->
             <div class="ep-panel" data-panel="update_crm">
                 <div class="ep-option">
-                    <a href="javascript:;" id="updateCrmTemplateLink" style="font-size: 12px; color: #2563eb;">下载模板</a>
+                    <a href="javascript:;" id="updateCrmTemplateLink" class="ep-template-link">下载模板</a>
                 </div>
                 <div class="ep-upload-zone">
                     <input type="file" id="updateCrmFileSelect" accept=".xlsx,.xls,.csv">
@@ -260,7 +272,7 @@
                         <option value="direct">直接添加替换号</option>
                         <option value="compare">对比添加替换号</option>
                     </select>
-                    <a href="javascript:;" id="replaceNumberTemplateLink" style="font-size: 12px; color: #2563eb; margin-left: 8px;">下载模板</a>
+                    <a href="javascript:;" id="replaceNumberTemplateLink" class="ep-template-link">下载模板</a>
                 </div>
                 <div class="ep-upload-zone">
                     <input type="file" id="replaceNumberFileSelect" accept=".xlsx,.xls,.csv">
