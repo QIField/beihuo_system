@@ -23,7 +23,8 @@ layui.use('layer', function () {
     // 新建产品两阶段数据
     var crmCheckTaskId = null;      // 阶段一匹配检查任务ID
     var crmCheckMode = '';          // 匹配检查时的模式
-    var crmPendingCreateItems = []; // 待新建条目（阶段二提交用）
+    var crmCheckItems = [];         // 阶段一核对清单（含实际更新品牌号输入值）
+    var crmPendingCreateItems = []; // 阶段二确认提交清单（待新建 + 已存在更新）
 
     // ====== 权限控制：无权限的功能Tab直接隐藏 ======
     fetch('/api/current_user')
@@ -112,6 +113,7 @@ layui.use('layer', function () {
         document.getElementById('crmCheckArea').style.display = 'none';
         document.getElementById('replaceNumberResultArea').style.display = 'none';
         crmCheckTaskId = null;
+        crmCheckItems = [];
         crmPendingCreateItems = [];
         updateFileList();
     });
@@ -226,6 +228,7 @@ layui.use('layer', function () {
         currentTaskId = null;
         currentTaskData = null;
         crmCheckTaskId = null;
+        crmCheckItems = [];
         crmPendingCreateItems = [];
 
         // 显示处理进度
@@ -395,19 +398,34 @@ layui.use('layer', function () {
         var unmatchedCount = data.unmatched_count || 0;
         var isThreeColumn = crmCheckMode === 'three_column';
 
+        crmCheckItems = items;
         crmPendingCreateItems = [];
         var unmatchedBrandCount = 0;
         for (var i = 0; i < items.length; i++) {
-            if (items[i].status === 'to_create') {
-                // 未匹配系统品牌的行不会新建（与原流程一致：没匹配到品牌ID就不新建），不进入新建清单
+            if (items[i].status === 'existed' && items[i].product_id) {
+                // 已存在行：进入确认清单，阶段二对比品牌编码后按需更新
+                crmPendingCreateItems.push({
+                    _idx: i,
+                    sheet_name: items[i].sheet_name,
+                    oe: items[i].oe,
+                    brand: items[i].brand,
+                    brand_code: items[i].crm_brand_code || '',
+                    status: 'existed',
+                    product_id: items[i].product_id
+                });
+            } else if (items[i].status === 'to_create') {
+                // 未匹配系统品牌的行不会新建（与原流程一致：没匹配到品牌ID就不新建），不进入清单
                 if (items[i].brand_matched === false) {
                     unmatchedBrandCount++;
                 } else {
                     crmPendingCreateItems.push({
+                        _idx: i,
                         sheet_name: items[i].sheet_name,
                         oe: items[i].oe,
                         brand: items[i].brand,
-                        brand_code: items[i].brand_code || ''
+                        brand_code: items[i].brand_code || '',
+                        status: 'to_create',
+                        product_id: ''
                     });
                 }
             }
@@ -418,11 +436,14 @@ layui.use('layer', function () {
         if (isThreeColumn) {
             html += '<th>文件品牌号</th>';
         }
+        html += '<th>实际更新品牌号</th>';
         html += '</tr></thead><tbody>';
 
         for (var j = 0; j < items.length; j++) {
             var it = items[j];
             var existed = it.status === 'existed';
+            // 实际更新品牌号默认值：已存在行取CRM品牌编码，待新建行三列模式取文件品牌号
+            var actualDefault = existed ? (it.crm_brand_code || '') : (isThreeColumn ? (it.brand_code || '') : '');
             html += '<tr>';
             html += '<td><span class="crm-check-tag ' + (existed ? 'existed' : 'to_create') + '">' + (existed ? '已存在' : '待新建') + '</span></td>';
             html += '<td>' + escapeHtml(it.oe) + '</td>';
@@ -437,26 +458,27 @@ layui.use('layer', function () {
             if (isThreeColumn) {
                 html += '<td>' + escapeHtml(it.brand_code || '') + '</td>';
             }
+            html += '<td><input type="text" class="crm-actual-input" data-idx="' + j + '" value="' + escapeHtml(actualDefault) + '"></td>';
             html += '</tr>';
         }
         html += '</tbody></table>';
 
-        var statsMsg = '匹配完成：已存在（不需新建）' + matchedCount + ' 条，需新建 ' + unmatchedCount + ' 条';
+        var statsMsg = '匹配完成：已存在 ' + matchedCount + ' 条（对比品牌号后按需更新），需新建 ' + unmatchedCount + ' 条';
         if (unmatchedBrandCount > 0) {
-            statsMsg += '（其中未匹配品牌 ' + unmatchedBrandCount + ' 条不会新建）';
+            statsMsg += '（其中未匹配品牌 ' + unmatchedBrandCount + ' 条不会处理）';
         }
-        statsMsg += '。请核对下方清单后点击开始新建。';
+        statsMsg += '。实际更新品牌号可编辑，核对后点击开始处理。';
         document.getElementById('crmCheckStats').textContent = statsMsg;
         document.getElementById('crmCheckTableWrap').innerHTML = html;
 
         var startBtn = document.getElementById('crmStartCreateBtn');
-        startBtn.textContent = '开始新建（' + crmPendingCreateItems.length + ' 条）';
+        startBtn.textContent = '开始处理（' + crmPendingCreateItems.length + ' 条）';
         startBtn.disabled = crmPendingCreateItems.length === 0;
 
         document.getElementById('crmCheckArea').style.display = 'block';
     }
 
-    // ====== 阶段二：确认后开始新建 ======
+    // ====== 阶段二：确认后开始处理（新建 + 已存在行品牌号对比更新） ======
     document.getElementById('crmStartCreateBtn').addEventListener('click', function () {
         var startBtn = this;
         if (!crmCheckTaskId) {
@@ -464,9 +486,23 @@ layui.use('layer', function () {
             return;
         }
         if (!crmPendingCreateItems.length) {
-            layer.msg('没有需要新建的数据', {icon: 2});
+            layer.msg('没有需要处理的数据', {icon: 2});
             return;
         }
+
+        // 从核对表格收集编辑后的实际更新品牌号（data-idx 对应 crmCheckItems 索引）
+        var submitItems = crmPendingCreateItems.map(function (item) {
+            var input = document.querySelector('.crm-actual-input[data-idx="' + item._idx + '"]');
+            var actual = input ? input.value.trim() : '';
+            return {
+                sheet_name: item.sheet_name,
+                oe: item.oe,
+                brand: item.brand,
+                brand_code: actual,
+                status: item.status,
+                product_id: item.product_id
+            };
+        });
 
         startBtn.disabled = true;
         var enableBtn = function () { startBtn.disabled = false; };
@@ -476,7 +512,7 @@ layui.use('layer', function () {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 check_task_id: crmCheckTaskId,
-                items: crmPendingCreateItems
+                items: submitItems
             })
         })
         .then(response => response.json())
@@ -498,7 +534,12 @@ layui.use('layer', function () {
                 document.getElementById('crmCheckArea').style.display = 'none';
                 var sc = currentTaskData.success_count || 0;
                 var fc = currentTaskData.fail_count || 0;
-                document.getElementById('crmResultMsg').textContent = '处理完成：成功 ' + sc + ' 条，失败 ' + fc + ' 条';
+                var msg = '处理完成：成功 ' + sc + ' 条，失败 ' + fc + ' 条';
+                var uc = currentTaskData.unchanged_count || 0;
+                if (uc > 0) {
+                    msg += '，一致跳过 ' + uc + ' 条';
+                }
+                document.getElementById('crmResultMsg').textContent = msg;
                 document.getElementById('crmResultArea').style.display = 'block';
             }, enableBtn);
         })

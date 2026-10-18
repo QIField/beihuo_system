@@ -214,8 +214,9 @@ def register_excel_process_routes(app):
     @app.route('/api/excel/async/product_archive_confirm', methods=['POST'])
     def async_product_archive_confirm():
         """
-        新建档案-确认新建接口（阶段二）
-        仅新建用户核对后确认的待新建条目，完成后生成结果文件并清理临时文件
+        新建档案-确认处理接口（阶段二）
+        待新建条目走新建流程（品牌号用实际更新品牌号）；已存在条目对比系统品牌编码
+        与实际更新品牌号，不同才通过 view+updateView 更新。完成后生成结果文件并清理临时文件
         """
         try:
             data = request.get_json(silent=True) or {}
@@ -238,7 +239,7 @@ def register_excel_process_routes(app):
             if mode not in ('two_column', 'three_column') or not file_path or not os.path.exists(file_path):
                 return jsonify({'code': 1, 'msg': '检查任务已失效，请重新上传文件检查'}), 400
 
-            # 清洗确认条目
+            # 清洗确认条目（status=existed 走品牌号对比更新，其余走新建）
             clean_items = []
             for it in raw_items:
                 if not isinstance(it, dict):
@@ -251,10 +252,12 @@ def register_excel_process_routes(app):
                     'sheet_name': str(it.get('sheet_name', '') or ''),
                     'oe': oe,
                     'brand': brand,
-                    'brand_code': str(it.get('brand_code', '') or '').strip()
+                    'brand_code': str(it.get('brand_code', '') or '').strip(),
+                    'status': str(it.get('status', '') or '').strip(),
+                    'product_id': str(it.get('product_id', '') or '').strip()
                 })
             if not clean_items:
-                return jsonify({'code': 1, 'msg': '没有有效的待新建数据'}), 400
+                return jsonify({'code': 1, 'msg': '没有有效的处理数据'}), 400
 
             # 获取用户当前门店/组织
             user_store = session.get('store', 'fsbbr')

@@ -13,6 +13,7 @@ from config import create_crm_session
 from .excel_data_loader import load_product_data, load_alias_data
 from .excel_reader import read_excel_file, filter_sheets_by_mode, build_items
 from .crm_processor import process_items, _query_product_list, _find_existed_children, _get_brand_info
+from .crm_updateView import update_brand_code_if_changed
 from .result_saver import save_multi_sheet_results
 
 
@@ -265,15 +266,28 @@ def check_excel_items_wrapper(file_path: str, mode: str, company: str = 'fsbbr',
         session.close()
 
 
+def _merge_result_text(results, key, text):
+    """
+    按 (oe, brand) 合并已存在行的结果文案（同 key 多条 CRM 记录用"；"拼接）
+    """
+    if key in results and isinstance(results[key], str) and results[key]:
+        results[key] = f"{results[key]}；{text}"
+    else:
+        results[key] = text
+
+
 def create_confirmed_items_wrapper(file_path: str, confirmed_items: list, mode: str, company: str = 'fsbbr', progress_callback: Optional[Callable] = None):
     """
-    确认新建包装器（阶段二）
+    确认处理包装器（阶段二）
 
-    仅处理用户确认的待新建条目，重读原文件以保持结果文件格式不变
-    （原Excel数据 + 新建结果列），完成后清理临时文件。
+    待新建条目走新建流程（brand_code 使用实际更新品牌号）；
+    已存在条目对比 CRM 系统品牌编码与实际更新品牌号，不同才通过
+    view+updateView 更新（结果："产品存在，品牌号已更新"/"产品存在，品牌号一致"）。
+    重读原文件以保持结果文件格式不变（原Excel数据 + 结果列），完成后清理临时文件。
 
     Args:
-        confirmed_items: [{sheet_name, oe, brand, brand_code}]
+        confirmed_items: [{sheet_name, oe, brand, brand_code, status, product_id}]
+            status 为 'existed' 时走对比更新，否则走新建
 
     Returns:
         {'result_file': 结果文件路径, 'result_data': 统计与成功清单}
@@ -288,17 +302,26 @@ def create_confirmed_items_wrapper(file_path: str, confirmed_items: list, mode: 
         all_sheets = read_excel_file(file_path)
         valid_sheets = filter_sheets_by_mode(all_sheets, mode)
 
-        grouped = {}
+        # 按 sheet 分组，并区分新建/已存在更新
+        create_grouped = {}
+        existed_grouped = {}
         for it in confirmed_items:
             sheet_name = str(it.get('sheet_name', '') or '')
-            grouped.setdefault(sheet_name, []).append(it)
+            if str(it.get('status', '') or '') == 'existed':
+                existed_grouped.setdefault(sheet_name, []).append(it)
+            else:
+                create_grouped.setdefault(sheet_name, []).append(it)
 
+        total = len(confirmed_items)
         all_results = {}
         all_items = []
         processed = 0
-        total = len(confirmed_items)
+        exist_updated = 0
+        exist_unchanged = 0
+        exist_failed = 0
 
-        for sheet_name, sheet_confirm_items in grouped.items():
+        # —— 待新建行：复用现有新建流程 ——
+        for sheet_name, sheet_confirm_items in create_grouped.items():
             sheet_info = valid_sheets.get(sheet_name)
             if not sheet_info:
                 continue
@@ -330,6 +353,43 @@ def create_confirmed_items_wrapper(file_path: str, confirmed_items: list, mode: 
             all_items.extend(items)
             processed += len(items)
 
+        # —— 已存在行：view 对比系统当前品牌编码，不同才更新 ——
+        for sheet_name, sheet_exist_items in existed_grouped.items():
+            sheet_info = valid_sheets.get(sheet_name)
+            if not sheet_info:
+                processed += len(sheet_exist_items)
+                continue
+
+            sheet_entry = all_results.setdefault(sheet_name, {
+                'df': sheet_info['df'],
+                'results': {},
+                'oe_col': sheet_info['columns'][0],
+                'brand_col': sheet_info['columns'][1]
+            })
+            for it in sheet_exist_items:
+                oe = str(it.get('oe', '') or '').strip()
+                brand = str(it.get('brand', '') or '').strip()
+                actual_code = str(it.get('brand_code', '') or '').strip()
+                product_id = str(it.get('product_id', '') or '').strip()
+
+                if actual_code and product_id:
+                    result_flag, msg = update_brand_code_if_changed(session, product_id, actual_code)
+                    if result_flag == 'updated':
+                        exist_updated += 1
+                        text = '产品存在，品牌号已更新'
+                    elif result_flag == 'unchanged':
+                        exist_unchanged += 1
+                        text = '产品存在，品牌号一致'
+                    else:
+                        exist_failed += 1
+                        text = f'产品存在，品牌号更新失败: {msg}'
+                    if oe and brand:
+                        _merge_result_text(sheet_entry['results'], (oe, brand), text)
+
+                processed += 1
+                if progress_callback:
+                    progress_callback(processed, total, f"品牌号对比更新 {processed}/{total}")
+
         if not all_results:
             raise ValueError("确认的条目没有匹配到有效的工作表数据，请重新上传检查")
 
@@ -350,6 +410,9 @@ def create_confirmed_items_wrapper(file_path: str, confirmed_items: list, mode: 
             if result is None:
                 continue
             processed_oe_set.add(item['oe_number'])
+            if isinstance(result, str):
+                # 已存在行结果为字符串文案，不计入新建成功/失败统计
+                continue
             if result.is_success():
                 success_count += 1
                 if key not in seen:
@@ -364,8 +427,9 @@ def create_confirmed_items_wrapper(file_path: str, confirmed_items: list, mode: 
                 'oe_list': sorted(processed_oe_set),
                 'oe_brand_list': oe_brand_list,
                 'total': len(processed_oe_set),
-                'success_count': success_count,
-                'fail_count': fail_count
+                'success_count': success_count + exist_updated,
+                'fail_count': fail_count + exist_failed,
+                'unchanged_count': exist_unchanged
             }
         }
     finally:

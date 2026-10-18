@@ -13,7 +13,7 @@ from typing import Callable, Dict, List, Optional
 from .crm_brand_id import get_brand_list
 from .crm_get_oe_link import get_oe_link
 from .crm_Product_Add import add_product
-from .crm_updateView import update_brand_code_by_oe
+from .crm_updateView import update_brand_code, update_brand_code_by_oe
 from .excel_data_loader import find_brand_by_alias
 from .models import ProcessResult, ProcessStatus
 
@@ -260,7 +260,6 @@ def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session
     oe_number = item['oe_number']
     brand = item['brand']
     brand_code = item.get('brand_code', '')
-    is_three_column = item.get('mode') == 'three_column'
 
     # 步骤 1: 获取品牌 ID
     brand_id = _get_brand_id(session, brand, use_alias=use_brand_alias)
@@ -326,9 +325,9 @@ def process_single_oe(item: dict, product_df, alias_df, db_manager=None, session
         _save_result(db_manager, oe_number, brand, result)
         return result
 
-    # 步骤 6: 三列模式更新 brand_code
-    if is_three_column and brand_code:
-        update_result = update_brand_code_by_oe(session, oe_number, brand, brand_code)
+    # 步骤 6: 更新 brand_code（三列模式取文件品牌号 / 确认新建取实际更新品牌号）
+    if brand_code and result.product_id:
+        update_result = update_brand_code(session, result.product_id, brand_code)
         result.brand_code_updated = bool(update_result)
 
     _save_result(db_manager, oe_number, brand, result)
