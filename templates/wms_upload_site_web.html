@@ -247,9 +247,9 @@
     <script type="text/html" id="settingsTemplate">
         <form class="layui-form" lay-filter="settingsForm" style="padding: 30px;">
             <div class="layui-form-item layui-form-text">
-                <label class="layui-form-label">Cookie</label>
+                <label class="layui-form-label">备用Cookie</label>
                 <div class="layui-input-block">
-                    <textarea id="cookieInput" name="cookie" placeholder="请输入Cookie" class="layui-textarea" style="height: 200px;"></textarea>
+                    <textarea id="cookieInput" name="cookie" placeholder="自动登录失败时使用的备用Cookie" class="layui-textarea" style="height: 200px;"></textarea>
                 </div>
             </div>
             <div class="layui-form-item" style="text-align: center; padding-top: 20px;">
@@ -671,7 +671,7 @@
             $('#settingsBtn').click(function(){
                 var getTpl = settingsTemplate.innerHTML;
                 var layerIndex = layer.open({
-                    title: '设置',
+                    title: '备用Cookie设置',
                     type: 1,
                     area: ['600px', '400px'],
                     content: getTpl,
@@ -681,7 +681,7 @@
                             var cookie = $('#cookieInput').val();
                             
                             if(!cookie || cookie.trim() === ''){
-                                layer.msg('Cookie不能为空', {icon: 0});
+                                layer.msg('备用Cookie不能为空', {icon: 0});
                                 return;
                             }
                             

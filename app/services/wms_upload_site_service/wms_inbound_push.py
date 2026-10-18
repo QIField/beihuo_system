@@ -13,7 +13,7 @@ from app.services.wms_upload_site_service.crm_oe_price_crawler import crm_get_oe
 from app.services.wms_upload_site_service.wms_get_status_orders_type import wms_get_return_items_service
 from app.utils.orm.session import orm_session
 from app.models.orm_models.wms_return_items import WmsReturnItems
-from app.services.system_setting_service.beihuo_system_config_service import set_config_by_key
+from app.services.system_setting_service.beihuo_system_config_service import update_json_config
 
 
 def wms_get_return_items_data():
@@ -267,26 +267,35 @@ def inventory_sync_batch(items):
 
 def set_cookie(cookie):
     """
-    设置 Cookie 配置
+    设置开思mall备用 Cookie（自动登录失败时的回退方案）
+
+    将手动上传的 Cookie 保存到 cassmall_fsbbr 配置的 backup_cookie 字段，
+    当自动登录失败时，CassmallLoginService 会自动回退使用该备用 Cookie。
+
     :param cookie: Cookie 字符串
     :return: 设置结果
     """
     try:
-        set_config_by_key(
-            'main_ks_cookie',
-            cookie,
+        result = update_json_config(
+            'cassmall_fsbbr',
+            {'backup_cookie': cookie},
             config_group='wms',
-            label='开思mall Cookie',
-            remark='用于访问开思mall的Cookie'
+            label='开思mall配置',
+            remark='开思mall账号配置（含备用Cookie）'
         )
+        if result.get('code') == 200:
+            return {
+                'code': 200,
+                'message': '备用Cookie设置成功'
+            }
         return {
-            'code': 200,
-            'message': 'Cookie设置成功'
+            'code': 500,
+            'message': result.get('message', '备用Cookie设置失败')
         }
     except Exception as e:
         return {
             'code': 500,
-            'message': f'Cookie设置失败: {str(e)}'
+            'message': f'备用Cookie设置失败: {str(e)}'
         }
 
 

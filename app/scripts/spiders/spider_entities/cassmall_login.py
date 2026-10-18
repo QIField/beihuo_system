@@ -564,7 +564,8 @@ class CassmallLoginService:
 
     配置存储：
     - 每个公司独立配置 key: cassmall_{company_code}
-    - 配置结构: {"username": "...", "password": "...", "cookie": "..."}
+    - 配置结构: {"username": "...", "password": "...", "cookie": "...", "backup_cookie": "..."}
+      其中 backup_cookie 为手动上传的备用 Cookie，自动登录失败时作为回退方案使用
     """
 
     # 配置 key 前缀
@@ -689,7 +690,8 @@ class CassmallLoginService:
         3. 如果无效，使用配置中的用户名密码重新登录
         4. 登录成功后保存新 cookie 到数据库
         5. 再次验证新 cookie
-        6. 验证失败则抛出异常
+        6. 验证失败/登录失败/无凭据时，回退使用配置中的 backup_cookie（手动上传的备用 Cookie）
+        7. 备用 cookie 也无效则抛出异常
 
         Args:
             company: 公司代码（fsbbr/zsbbr/zhbbr/dghf/dgby）
@@ -738,10 +740,8 @@ class CassmallLoginService:
 
         # 检查是否有登录凭据
         if not username or not password:
-            raise Exception(
-                f"无法登录：配置 '{config_key}' 中没有保存用户名和密码。"
-                f"请在系统设置中添加配置。"
-            )
+            print("[提示] 配置中没有保存用户名和密码，尝试使用备用 Cookie")
+            return CassmallLoginService._try_backup_cookie(config, config_key)
 
         # 3. 使用账号密码登录
         print("\n[3/6] 开始账号密码登录...")
@@ -750,8 +750,8 @@ class CassmallLoginService:
         if not success:
             error_msg = result.get("error", "未知登录错误")
             print(f"[失败] 登录失败: {error_msg}")
-            print("=" * 80)
-            raise Exception(f"开思登录失败: {error_msg}")
+            # 自动登录失败，回退到备用 cookie
+            return CassmallLoginService._try_backup_cookie(config, config_key)
 
         print("[成功] 账号密码登录成功")
         new_cookie = result.get("cookie", "")
@@ -784,9 +784,52 @@ class CassmallLoginService:
             print("=" * 80)
             return new_cookie
         else:
-            # 6. 验证失败，抛出异常
+            # 6. 验证失败，尝试使用备用 cookie
             print(f"[失败] 新配置验证失败: {error_msg}")
-            print("\n[6/6] 配置验证失败，异常抛出")
+            return CassmallLoginService._try_backup_cookie(config, config_key)
+
+    @staticmethod
+    def _try_backup_cookie(config: Optional[Dict[str, Any]], config_key: str) -> str:
+        """
+        尝试使用配置中的备用 cookie 作为自动登录失败时的回退方案
+
+        流程：
+        1. 从配置中读取 backup_cookie
+        2. 验证备用 cookie 是否有效
+        3. 验证通过则将其提升为主 cookie（下次直接使用）并返回
+        4. 验证失败或未配置则抛出异常
+
+        Args:
+            config: 配置字典（可能为 None）
+            config_key: 配置 key
+
+        Returns:
+            str: 有效的备用 cookie 字符串
+
+        Raises:
+            Exception: 未配置备用 cookie 或备用 cookie 无效时抛出
+        """
+        backup_cookie = config.get("backup_cookie") if isinstance(config, dict) else None
+
+        if not backup_cookie:
+            print("[失败] 未配置备用 Cookie")
             print("=" * 80)
-            raise Exception(f"新配置验证失败: {error_msg}")
+            raise Exception(
+                "自动登录失败且未配置备用 Cookie，请在页面「设置」中上传备用 Cookie"
+            )
+
+        print("\n[回退] 尝试使用备用 Cookie...")
+        is_valid, error_msg = CassmallLoginService.validate_cookie(backup_cookie)
+
+        if not is_valid:
+            print(f"[失败] 备用 Cookie 验证失败: {error_msg}")
+            print("=" * 80)
+            raise Exception(f"备用 Cookie 无效: {error_msg}，请重新上传")
+
+        print("[成功] 备用 Cookie 有效")
+        # 将备用 cookie 提升为主 cookie，下次获取时可直接命中主 cookie 校验
+        update_json_config(config_key, {"cookie": backup_cookie})
+        print("[提示] 已将备用 Cookie 提升为主 Cookie")
+        print("=" * 80)
+        return backup_cookie
 
