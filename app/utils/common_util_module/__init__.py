@@ -29,6 +29,10 @@ from app.utils.common_util_module.time_conversion_util import (
 # 缓存工具
 # ============================================================
 
+# ============================================================
+# 去重队列
+# ============================================================
+from app.utils.common_util_module.unique_queue import UniqueQueue
 
 __all__ = [
     # 时间工具
@@ -40,4 +44,6 @@ __all__ = [
     "get_border_month_timestamp",
     # 缓存工具
 
+    # 去重队列
+    "UniqueQueue",
 ]

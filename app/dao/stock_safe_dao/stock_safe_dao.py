@@ -19,7 +19,8 @@
     crmapp_beihuo (库存数据)   ──→  available_stock（两字段匹配）
 """
 
-from sqlalchemy import text
+from sqlalchemy import or_, text
+from app.models.orm_models.stock_safe_models.stock_safe import StockSafe
 from app.utils.orm.session import orm_session
 
 
@@ -176,5 +177,39 @@ def truncate_table() -> None:
     """
     with orm_session() as session:
         session.execute(text("TRUNCATE TABLE stock_safe"))
+
+
+def fetch_push_values_by_keys(session, keys: list) -> list:
+    """
+    按 (number, brand_name) 组合批量查询安全库存推送值
+
+    Args:
+        session: orm_session 上下文内的 SQLAlchemy Session
+        keys: (number, brand_name) 元组列表
+
+    Returns:
+        list: 字典列表，每项包含 number / brand_name / safety_stock /
+              stock_upper_limit / season_coefficient
+    """
+    if not keys:
+        return []
+    records = (
+        session.query(StockSafe)
+        .filter(or_(*[
+            (StockSafe.number == number) & (StockSafe.brand_name == brand_name)
+            for number, brand_name in keys
+        ]))
+        .all()
+    )
+    return [
+        {
+            "number": r.number,
+            "brand_name": r.brand_name,
+            "safety_stock": r.safety_stock,
+            "stock_upper_limit": r.stock_upper_limit,
+            "season_coefficient": r.season_coefficient,
+        }
+        for r in records
+    ]
 
 

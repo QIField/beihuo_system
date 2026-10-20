@@ -35,6 +35,7 @@
         sales_status: '',
         stock_status: '',
         abc_classification: '',
+        sync_enabled: '',
         data_type: 'useful'   // 默认显示有用数据
     };
 
@@ -132,6 +133,27 @@
         {
             headerName: '库存状态', field: 'stock_status', width: 180,
             cellRenderer: renderStockStatusCell
+        },
+        {
+            headerName: '最近同步时间', field: 'synced_at', width: 150, sortable: false,
+            cellRenderer: function (p) {
+                if (!p.value) return '<span style="color:#bbb;">未同步</span>';
+                return '<span class="cell-synced-time">' + p.value + '</span>';
+            }
+        },
+        {
+            headerName: '是否同步', field: 'sync_enabled', width: 100, sortable: false, pinned: 'right',
+            cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+            cellRenderer: function (p) {
+                var checked = (p.value == 1) ? 'checked' : '';
+                return '<label class="sync-switch" style="margin:0;">'
+                    + '<input type="checkbox" data-id="' + (p.data ? p.data.id : '') + '" '
+                    + 'data-number="' + (p.data ? (p.data.number || '') : '') + '" '
+                    + 'data-brand="' + (p.data ? (p.data.brand_name || '') : '') + '" '
+                    + checked + '>'
+                    + '<span class="sync-switch-slider"></span>'
+                    + '</label>';
+            }
         },
         {
             headerName: '操作', width: 110, pinned: 'right', sortable: false,
@@ -534,7 +556,8 @@
             document.getElementById('filterStockStatus').value = '';
             document.getElementById('filterABC').value = '';
             document.getElementById('filterDataType').value = 'useful';
-            currentFilter = { keyword: '', sales_status: '', stock_status: '', abc_classification: '', data_type: 'useful' };
+            document.getElementById('filterSyncEnabled').value = '';
+            currentFilter = { keyword: '', sales_status: '', stock_status: '', abc_classification: '', sync_enabled: '', data_type: 'useful' };
             if (pagination) pagination.currentPage = 1;
             fetchData();
         });
@@ -547,6 +570,13 @@
         // 批量废弃 / 批量恢复（基于复选框勾选的行）
         document.getElementById('btnBatchAbandon').addEventListener('click', batchAbandon);
         document.getElementById('btnBatchRestore').addEventListener('click', batchRestore);
+
+        // 批量开启 / 批量关闭同步（基于复选框勾选的行）
+        document.getElementById('btnBatchSyncOn').addEventListener('click', function () { batchSetSyncEnabled(1); });
+        document.getElementById('btnBatchSyncOff').addEventListener('click', function () { batchSetSyncEnabled(0); });
+
+        // 批量手动同步：加入同步队列，由每分钟轮询任务推送 CRM
+        document.getElementById('btnBatchManualSync').addEventListener('click', batchManualSync);
 
         // 数据范围切换：同步批量按钮显示，并直接刷新当前视图数据
         document.getElementById('filterDataType').addEventListener('change', function () {
@@ -573,6 +603,18 @@
                 if (reBtn) {
                     var frey = reBtn.getAttribute('data-frey');
                     if (frey) restoreRow(frey);
+                }
+            });
+
+            // 是否同步开关：监听 checkbox 的 change 事件
+            gridDiv.addEventListener('change', function (e) {
+                var checkbox = e.target.closest('.sync-switch input[type="checkbox"]');
+                if (!checkbox) return;
+                var number = checkbox.getAttribute('data-number') || '';
+                var brand = checkbox.getAttribute('data-brand') || '';
+                var enabled = checkbox.checked ? 1 : 0;
+                if (number && brand) {
+                    setSyncEnabled(number, brand, enabled, checkbox);
                 }
             });
         }
@@ -753,6 +795,125 @@
     }
 
     // ============================================================
+    // 批量开启 / 关闭同步（基于复选框勾选的行）
+    // ============================================================
+    function batchSetSyncEnabled(enabled) {
+        var rows = getSelectedRows();
+        var items = [];
+        rows.forEach(function (r) {
+            if (r.number && r.brand_name) {
+                items.push({
+                    number: r.number,
+                    brand_name: r.brand_name,
+                    frey_no: r.frey_no || '',
+                    pdname: r.pdname || ''
+                });
+            }
+        });
+        if (items.length === 0) {
+            layui.use(['layer'], function (l) { l.msg('请先勾选要设置的数据（勾选行首复选框）', { icon: 0 }); });
+            return;
+        }
+        var actionText = enabled ? '开启' : '关闭';
+        layui.use(['layer'], function (layer) {
+            layer.confirm('确定批量' + actionText + '所选 ' + items.length + ' 条数据的同步吗？', {
+                title: '批量' + actionText + '同步',
+                btn: ['确定', '取消']
+            }, function (index) {
+                layer.close(index);
+                submitBatchSyncEnabled(items, enabled);
+            });
+        });
+    }
+
+    function submitBatchSyncEnabled(items, enabled) {
+        layui.use(['layer'], function (layer) {
+            layer.load(2);
+            fetch('/new/api/stock_safe/sync-enabled/batch', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: items, enabled: enabled })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    layer.closeAll('loading');
+                    if (res.code !== 0) { layer.msg(res.msg || '批量设置失败', { icon: 2 }); return; }
+                    var d = res.data || {};
+                    var actionText = enabled ? '开启' : '关闭';
+                    layer.msg('批量' + actionText + '同步成功：更新 ' + (d.updated || 0) + ' 条，新增 ' + (d.inserted || 0) + ' 条', { icon: 1 });
+                    fetchData();
+                })
+                .catch(function (err) {
+                    layer.closeAll('loading');
+                    layer.msg('网络错误，请稍后重试', { icon: 2 });
+                    console.error('[stock_safe] batch sync-enabled 失败:', err);
+                });
+        });
+    }
+
+    // ============================================================
+    // 批量手动同步（基于复选框勾选的行）
+    // 加入同步队列（进程内去重 + 落库展示），由每 1 分钟轮询任务推送 CRM
+    // ============================================================
+    function batchManualSync() {
+        var rows = getSelectedRows();
+        var items = [];
+        rows.forEach(function (r) {
+            if (r.number && r.brand_name) {
+                items.push({
+                    number: r.number,
+                    brand_name: r.brand_name,
+                    frey_no: r.frey_no || '',
+                    pdname: r.pdname || ''
+                });
+            }
+        });
+        if (items.length === 0) {
+            layui.use(['layer'], function (l) { l.msg('请先勾选要同步的数据（勾选行首复选框）', { icon: 0 }); });
+            return;
+        }
+        layui.use(['layer'], function (layer) {
+            layer.confirm('确定将所选 ' + items.length + ' 条数据加入手动同步队列吗？加入后将在 1 分钟内自动推送 CRM。', {
+                title: '手动同步',
+                btn: ['确定', '取消']
+            }, function (index) {
+                layer.close(index);
+                submitBatchManualSync(items);
+            });
+        });
+    }
+
+    function submitBatchManualSync(items) {
+        layui.use(['layer'], function (layer) {
+            layer.load(2);
+            fetch('/new/api/stock_safe/manual-sync/queue', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: items })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    layer.closeAll('loading');
+                    if (res.code !== 0) { layer.msg(res.msg || '加入同步队列失败', { icon: 2 }); return; }
+                    var d = res.data || {};
+                    var invalidCount = (d.invalid && d.invalid.length) || 0;
+                    var msg = '已加入同步队列：入队 ' + (d.queued || 0) + ' 条';
+                    if (invalidCount > 0) msg += '，跳过无效 ' + invalidCount + ' 条';
+                    msg += '，1 分钟内自动推送';
+                    layer.msg(msg, { icon: 1 });
+                    fetchData();
+                })
+                .catch(function (err) {
+                    layer.closeAll('loading');
+                    layer.msg('网络错误，请稍后重试', { icon: 2 });
+                    console.error('[stock_safe] batch manual-sync 失败:', err);
+                });
+        });
+    }
+
+    // ============================================================
     // 恢复数据操作
     // ============================================================
     var isRestoring = false;   // 恢复操作防重复提交
@@ -810,11 +971,57 @@
         });
     }
 
+    // ============================================================
+    // 是否同步开关操作
+    // ============================================================
+    function setSyncEnabled(number, brandName, enabled, checkboxEl) {
+        if (!number || !brandName) {
+            layui.use(['layer'], function (l) { l.msg('OE号和品牌名不能为空', { icon: 2 }); });
+            if (checkboxEl) checkboxEl.checked = !enabled;
+            return;
+        }
+
+        // 请求期间禁用开关，防止重复提交
+        if (checkboxEl) checkboxEl.disabled = true;
+
+        layui.use(['layer'], function (layer) {
+            fetch('/new/api/stock_safe/sync-enabled', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    number: number,
+                    brand_name: brandName,
+                    enabled: enabled
+                })
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    if (checkboxEl) checkboxEl.disabled = false;
+                    if (res.code !== 0) {
+                        // 失败时回滚开关状态
+                        if (checkboxEl) checkboxEl.checked = !enabled;
+                        layer.msg(res.msg || '设置失败', { icon: 2 });
+                        return;
+                    }
+                    layer.msg(enabled ? '已开启同步' : '已关闭同步', { icon: 1 });
+                })
+                .catch(function (err) {
+                    if (checkboxEl) checkboxEl.disabled = false;
+                    // 失败时回滚开关状态
+                    if (checkboxEl) checkboxEl.checked = !enabled;
+                    layer.msg('网络错误，请稍后重试', { icon: 2 });
+                    console.error('[stock_safe] setSyncEnabled 失败:', err);
+                });
+        });
+    }
+
     function applyFiltersFromDOM() {
         currentFilter.keyword = (document.getElementById('filterKeyword').value || '').trim();
         currentFilter.sales_status = (document.getElementById('filterSalesStatus').value || '').trim();
         currentFilter.stock_status = (document.getElementById('filterStockStatus').value || '').trim();
         currentFilter.abc_classification = (document.getElementById('filterABC').value || '').trim();
+        currentFilter.sync_enabled = (document.getElementById('filterSyncEnabled').value || '').trim();
         currentFilter.data_type = (document.getElementById('filterDataType').value || 'useful').trim();
     }
 
@@ -950,6 +1157,7 @@
             if (currentFilter.sales_status)    url += '&sales_status=' + encodeURIComponent(currentFilter.sales_status);
             if (currentFilter.stock_status)    url += '&stock_status=' + encodeURIComponent(currentFilter.stock_status);
             if (currentFilter.abc_classification) url += '&abc_classification=' + encodeURIComponent(currentFilter.abc_classification);
+            if (currentFilter.sync_enabled !== '') url += '&sync_enabled=' + encodeURIComponent(currentFilter.sync_enabled);
             url += '&data_type=' + encodeURIComponent(currentFilter.data_type);
 
             fetch(url, { credentials: 'same-origin' })
@@ -1004,6 +1212,7 @@
             if (currentFilter.sales_status)    url += '&sales_status=' + encodeURIComponent(currentFilter.sales_status);
             if (currentFilter.stock_status)    url += '&stock_status=' + encodeURIComponent(currentFilter.stock_status);
             if (currentFilter.abc_classification) url += '&abc_classification=' + encodeURIComponent(currentFilter.abc_classification);
+            if (currentFilter.sync_enabled !== '') url += '&sync_enabled=' + encodeURIComponent(currentFilter.sync_enabled);
             url += '&data_type=' + encodeURIComponent(currentFilter.data_type);
 
             fetch(url, { credentials: 'same-origin' })

@@ -23,6 +23,8 @@ from app.services.stock_safe_service.stock_safe_useless_data_service import (
     abandon_stock_safe_rows,
     restore_stock_safe_rows,
 )
+from app.services.stock_safe_service.sync_queue import set_sync_enabled, batch_set_sync_enabled
+from app.services.stock_safe_service.manual_sync import add_manual_sync_queue
 
 
 # 创建子蓝图，url_prefix 将在主蓝图注册时拼接
@@ -38,6 +40,7 @@ def api_stock_safe_list():
         keyword:             搜索关键词（OE号/品牌/产品名称/条码）
         stock_status:        库存状态筛选
         abc_classification:  ABC 分类筛选（A/B/C）
+        sync_enabled:        是否同步筛选（1=已开启 / 0=未开启 / 空=全部）
         data_type:           数据范围：all 全部 / useful 有用（默认）/ useless 废弃
         page:                页码，默认 1
         limit:               每页条数，默认 50，最大 500
@@ -61,6 +64,7 @@ def api_stock_safe_list():
         stock_status = request.args.get('stock_status', '').strip()
         sales_status = request.args.get('sales_status', '').strip()
         abc_classification = request.args.get('abc_classification', '').strip()
+        sync_enabled = request.args.get('sync_enabled', '').strip()
         data_type = request.args.get('data_type', 'useful').strip()
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 50))
@@ -76,6 +80,7 @@ def api_stock_safe_list():
             stock_status=stock_status,
             sales_status=sales_status,
             abc_classification=abc_classification,
+            sync_enabled=sync_enabled,
             data_type=data_type,
             page=page,
             limit=limit,
@@ -216,6 +221,188 @@ def api_restore_stock_safe():
             'code': 1,
             'msg': f'恢复失败: {str(e)}',
             'data': {'restored': 0},
+        }), 500
+
+
+@stock_safe_bp.route('/sync-enabled', methods=['POST'])
+def api_set_sync_enabled():
+    """
+    设置安全库存同步开关
+
+    请求体（JSON）：
+        {
+            "number": "OE号",           # 必填
+            "brand_name": "品牌名",      # 必填
+            "enabled": 1,               # 必填，1=开启同步，0=关闭同步
+            "frey_no": "条码",           # 可选，新增记录时写入
+            "pdname": "产品名称"         # 可选，新增记录时写入
+        }
+
+    返回：
+        {
+            "code": 0,
+            "msg": "success",
+            "data": { "success": true, "sync_enabled": 1, "action": "insert" }
+        }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        number = (payload.get('number') or '').strip()
+        brand_name = (payload.get('brand_name') or '').strip()
+        enabled = payload.get('enabled')
+        frey_no = payload.get('frey_no')
+        pdname = payload.get('pdname')
+
+        if not number or not brand_name:
+            return jsonify({
+                'code': 1,
+                'msg': 'OE号和品牌名不能为空',
+                'data': {'success': False},
+            }), 400
+
+        if enabled is None:
+            return jsonify({
+                'code': 1,
+                'msg': 'enabled 参数不能为空',
+                'data': {'success': False},
+            }), 400
+
+        result = set_sync_enabled(
+            number=number,
+            brand_name=brand_name,
+            enabled=int(enabled),
+            frey_no=frey_no,
+            pdname=pdname,
+        )
+
+        if not result.get('success'):
+            return jsonify({
+                'code': 1,
+                'msg': result.get('message', '设置失败'),
+                'data': result,
+            }), 400
+
+        return jsonify({'code': 0, 'msg': 'success', 'data': result})
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'设置同步开关失败: {str(e)}',
+            'data': {'success': False},
+        }), 500
+
+
+@stock_safe_bp.route('/sync-enabled/batch', methods=['POST'])
+def api_batch_set_sync_enabled():
+    """
+    批量设置安全库存同步开关
+
+    请求体（JSON）：
+        {
+            "items": [                     # 必填，待设置记录列表
+                {"number": "OE号", "brand_name": "品牌名", "frey_no": "条码", "pdname": "产品名称"}
+            ],
+            "enabled": 1                   # 必填，1=开启同步，0=关闭同步
+        }
+
+    处理逻辑（对每个 number+brand_name）：
+        - 队列记录已存在 → 更新 sync_enabled
+        - 队列记录不存在 → 新增一条，sync_enabled=enabled
+
+    返回：
+        {
+            "code": 0,
+            "msg": "success",
+            "data": { "success": true, "enabled": 1, "updated": 3, "inserted": 2,
+                      "total": 5, "failed": [] }
+        }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        items = payload.get('items') or []
+        enabled = payload.get('enabled')
+
+        if not items:
+            return jsonify({
+                'code': 1,
+                'msg': '待设置列表为空',
+                'data': {'success': False},
+            }), 400
+
+        if enabled is None:
+            return jsonify({
+                'code': 1,
+                'msg': 'enabled 参数不能为空',
+                'data': {'success': False},
+            }), 400
+
+        result = batch_set_sync_enabled(items, int(enabled))
+
+        if not result.get('success'):
+            return jsonify({
+                'code': 1,
+                'msg': result.get('message', '批量设置失败'),
+                'data': result,
+            }), 400
+
+        return jsonify({'code': 0, 'msg': 'success', 'data': result})
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'批量设置同步开关失败: {str(e)}',
+            'data': {'success': False},
+        }), 500
+
+
+@stock_safe_bp.route('/manual-sync/queue', methods=['POST'])
+def api_add_manual_sync_queue():
+    """
+    手动同步：把所选数据加入同步队列
+
+    请求体（JSON）：
+        {
+            "items": [                     # 必填，待同步记录列表
+                {"number": "OE号", "brand_name": "品牌名", "frey_no": "条码", "pdname": "产品名称"}
+            ]
+        }
+
+    处理逻辑（委托 manual_sync.add_manual_sync_queue）：
+        - 校验 number / brand_name 必填
+        - 加入进程内去重队列（重复 key 自动丢弃），由每 1 分钟轮询的定时任务执行推送
+        - 不进行任何数据库写入操作
+
+    返回：
+        {
+            "code": 0,
+            "msg": "success",
+            "data": { "success": true, "total": 5, "valid": 5, "queued": 4, "invalid": [] }
+        }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        items = payload.get('items') or []
+
+        if not items:
+            return jsonify({
+                'code': 1,
+                'msg': '待同步列表为空',
+                'data': {'success': False},
+            }), 400
+
+        result = add_manual_sync_queue(items)
+
+        if not result.get('success'):
+            return jsonify({
+                'code': 1,
+                'msg': result.get('message', '加入同步队列失败'),
+                'data': result,
+            }), 400
+
+        return jsonify({'code': 0, 'msg': 'success', 'data': result})
+    except Exception as e:
+        return jsonify({
+            'code': 1,
+            'msg': f'加入同步队列失败: {str(e)}',
+            'data': {'success': False},
         }), 500
 
 

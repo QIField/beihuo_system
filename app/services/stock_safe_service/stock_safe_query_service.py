@@ -15,11 +15,12 @@
 查询使用 SQLAlchemy ORM 语法，与 stock_safe ORM 模型字段一一对应。
 """
 
-from sqlalchemy import or_, case, asc, desc, func, select
+from sqlalchemy import or_, case, asc, desc, func, select, and_
 from app.utils.orm.session import orm_session
 from app.utils.logger_config import get_task_logger
 from app.models.orm_models.stock_safe_models.stock_safe import StockSafe
 from app.models.orm_models.stock_safe_models.stock_safe_useless_data import StockSafeUselessData
+from app.models.orm_models.stock_safe_models.stock_safe_sync_queue import StockSafeSyncQueue
 
 logger = get_task_logger('stock_safe')
 
@@ -29,6 +30,7 @@ def get_stock_safe_list(
     stock_status: str = '',
     sales_status: str = '',
     abc_classification: str = '',
+    sync_enabled: str = '',
     data_type: str = 'useful',
     page: int = 1,
     limit: int = 50,
@@ -39,18 +41,23 @@ def get_stock_safe_list(
     分页查询安全库存列表（服务端排序 + 分页）
 
     支持关键词搜索（number / brand_name / pdname / frey_no）、
-    库存状态筛选、销售状态筛选、ABC 分类筛选，以及任意字段排序。
+    库存状态筛选、销售状态筛选、ABC 分类筛选、是否同步筛选，以及任意字段排序。
 
     数据范围筛选（data_type，默认 'useful'）：
         all:     全部数据（不做废弃过滤）
         useful:  有用数据（排除 stock_safe_useless_data 表中存在的 frey_no）
         useless: 废弃数据（仅返回 stock_safe_useless_data 表中存在的 frey_no）
 
+    是否同步筛选（sync_enabled，默认空=全部）：
+        '1': 已开启同步（队列记录存在且 sync_enabled=1）
+        '0': 未开启同步（无队列记录，或队列记录 sync_enabled=0）
+
     Args:
         keyword: 搜索关键词（匹配 OE号/品牌/产品名称/条码）
         stock_status: 库存状态编码（1=呆滞清库/2=慢动销去库/3=紧急补货/4=需补货/5=库存正常）
         sales_status: 销售状态（无销售/销量极低/销量低/销量正常）
         abc_classification: ABC 分类筛选（A/B/C）
+        sync_enabled: 是否同步筛选（'1'=已开启 / '0'=未开启 / ''=全部）
         data_type: 数据范围：all / useful / useless，默认 useful
         page: 页码，从 1 开始
         limit: 每页条数，默认 50，最大 500
@@ -69,8 +76,19 @@ def get_stock_safe_list(
         data_type = 'useful'
 
     with orm_session() as session:
-        # 构建基础查询
-        query = session.query(StockSafe)
+        # 构建基础查询：LEFT JOIN stock_safe_sync_queue，获取同步开关与最近同步时间
+        # stock_safe 唯一键为 (number, brand_name, frey_no)，sync_queue 唯一键为 (number, brand_name)，
+        # 同一 (number, brand_name) 下多条 frey_no 会关联到同一条同步记录。
+        query = (
+            session.query(StockSafe, StockSafeSyncQueue)
+            .outerjoin(
+                StockSafeSyncQueue,
+                and_(
+                    StockSafe.number == StockSafeSyncQueue.number,
+                    StockSafe.brand_name == StockSafeSyncQueue.brand_name,
+                ),
+            )
+        )
 
         # ---- 数据范围筛选（按 frey_no 匹配 stock_safe_useless_data 表） ----
         # 废弃数据仅按 frey_no 记录在废弃表中，stock_safe 原数据保留未删除，
@@ -107,6 +125,25 @@ def get_stock_safe_list(
         if abc_classification:
             query = query.filter(StockSafe.abc_classification == abc_classification)
 
+        # ---- 是否同步筛选（基于 LEFT JOIN 的同步队列记录） ----
+        # '1'=已开启同步：队列记录存在且 sync_enabled=1
+        # '0'=未开启同步：无队列记录，或队列记录 sync_enabled=0
+        if sync_enabled in ('0', '1'):
+            if sync_enabled == '1':
+                query = query.filter(
+                    and_(
+                        StockSafeSyncQueue.id.isnot(None),
+                        StockSafeSyncQueue.sync_enabled == 1,
+                    )
+                )
+            else:
+                query = query.filter(
+                    or_(
+                        StockSafeSyncQueue.id.is_(None),
+                        StockSafeSyncQueue.sync_enabled == 0,
+                    )
+                )
+
         # ---- 总数统计（在分页和排序前执行） ----
         total = query.count()
 
@@ -135,8 +172,17 @@ def get_stock_safe_list(
         # ---- 分页查询 ----
         rows = query.offset(offset).limit(limit).all()
 
-        # ---- 转换为字典列表 ----
-        result_list = [row.to_dict() for row in rows]
+        # ---- 转换为字典列表，并合并同步队列表字段 ----
+        result_list = []
+        for stock_safe_row, sync_queue_row in rows:
+            item = stock_safe_row.to_dict()
+            item["sync_enabled"] = sync_queue_row.sync_enabled if sync_queue_row else 0
+            item["synced_at"] = (
+                sync_queue_row.synced_at.strftime("%Y-%m-%d %H:%M:%S")
+                if sync_queue_row and sync_queue_row.synced_at
+                else None
+            )
+            result_list.append(item)
 
     return {
         'list': result_list,

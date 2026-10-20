@@ -73,6 +73,10 @@ def expansion_tasks(task_manager):
     from app.scripts.tasks.stock_safe_tasks import stock_safe_crawl_replenish_register
     stock_safe_crawl_replenish_register(task_manager)
 
+    # 注册安全库存手动同步队列轮询（每 1 分钟，空队列自动跳过）
+    from app.scripts.tasks.stock_safe_tasks import stock_safe_manual_sync_register
+    stock_safe_manual_sync_register(task_manager)
+
     # 注册商机体系每日全流程定时任务（每天凌晨2:00执行）
     from app.scripts.tasks.niche_task import niche_daily_register
     niche_daily_register(task_manager)

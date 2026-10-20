@@ -27,12 +27,15 @@
         stock_safe_daily_register,
         stock_safe_sales_refund_register,
         stock_safe_crawl_replenish_register,
+        stock_safe_manual_sync_register,
     )
     stock_safe_daily_register(task_manager)
     stock_safe_sales_refund_register(task_manager)
     stock_safe_crawl_replenish_register(task_manager)
+    stock_safe_manual_sync_register(task_manager)
 """
 
+import os
 import time
 from datetime import datetime, timedelta
 
@@ -146,19 +149,19 @@ def _stock_safe_crawl_replenish_pipeline() -> None:
         logger.error("[Step 3/4] 失败: %s", e, exc_info=True)
         step_results.append(f"Step3 补货清单链接：失败({e})")
 
-    # Step 4: 推送安全库存数据到 CRM
-    logger.info("[Step 4/4] 推送安全库存数据到 CRM")
+    # Step 4: 按同步队列推送安全库存数据到 CRM（推送全部 sync_enabled=1 的记录，成功后回填 synced_at）
+    logger.info("[Step 4/4] 按同步队列推送安全库存数据到 CRM")
     try:
-        from app.services.stock_safe_service.push_data import push_replenish_data_to_crm
-        r3 = push_replenish_data_to_crm()
+        from app.services.stock_safe_service.push_data import push_sync_queue_data_to_crm
+        r3 = push_sync_queue_data_to_crm()
         total = r3.get('total', 0)
         success = r3.get('success_count', 0)
         fail = r3.get('fail_count', 0)
-        step_results.append(f"Step4 推送安全库存：总数={total} 成功={success} 失败={fail}")
-        logger.info("[Step 4/4] 完成: 总数=%d 成功=%d 失败=%d", total, success, fail)
+        step_results.append(f"Step4 队列同步CRM：待同步={total} 成功={success} 失败={fail}")
+        logger.info("[Step 4/4] 完成: 待同步=%d 成功=%d 失败=%d", total, success, fail)
     except Exception as e:
         logger.error("[Step 4/4] 失败: %s", e, exc_info=True)
-        step_results.append(f"Step4 推送安全库存：失败({e})")
+        step_results.append(f"Step4 队列同步CRM：失败({e})")
 
     # 执行完后推送结果汇总
     _push_replenish_pipeline_result(step_results, total_start)
@@ -193,6 +196,45 @@ def _push_replenish_pipeline_result(step_results: list, total_start: float) -> N
         logger.info("[库存智能补货] 结果推送完成")
     except Exception as e:
         logger.error("[库存智能补货] 结果推送失败: %s", e, exc_info=True)
+
+
+def _stock_safe_manual_sync_poll() -> None:
+    """
+    手动同步队列轮询（每 1 分钟执行）
+
+    消费进程内手动同步队列（UniqueQueue）的数据并推送 CRM。
+    队列为空时直接跳过（has_pending 判断），不产生调用开销与日志噪音。
+    若上一轮推送尚未结束，APScheduler 默认 max_instances=1 会自动跳过本轮，
+    未消费的数据由下一轮继续处理。
+    """
+    try:
+        from app.services.stock_safe_service.manual_sync import has_pending, run_manual_sync
+        if not has_pending():
+            return
+        r = run_manual_sync()
+        logger.info("[手动同步轮询] 完成: %s", r)
+    except Exception as e:
+        logger.error("[手动同步轮询] 失败: %s", e, exc_info=True)
+
+
+def stock_safe_manual_sync_register(task_manager) -> None:
+    """注册手动同步队列轮询定时任务（每 1 分钟执行一次，空队列自动跳过）"""
+    auto_start = os.environ.get('AUTO_START_STOCK_SAFE_MANUAL_SYNC', 'true').lower() != 'false'
+    if not auto_start:
+        print("[手动同步轮询] 已禁用（AUTO_START_STOCK_SAFE_MANUAL_SYNC=false）")
+        return
+
+    try:
+        task_manager.schedule(
+            _stock_safe_manual_sync_poll,
+            'interval',
+            'stock_safe_manual_sync_poll',
+            minutes=1,
+            replace_existing=True,
+        )
+        print("[手动同步轮询] 定时任务已注册（每 1 分钟执行一次）")
+    except Exception as e:
+        print(f"[手动同步轮询] 注册失败: {e}")
 
 
 def stock_safe_crawl_replenish_register(task_manager) -> None:
