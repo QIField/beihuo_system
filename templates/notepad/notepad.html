@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记事本</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/notepad/notepad.css') }}?v=20261022">
+</head>
+<body>
+    <div class="np-wrap">
+        <!-- 标题栏 -->
+        <div class="np-header">
+            <span class="np-title">记事本</span>
+            <span class="np-user">当前用户：{{ session.get('username') or '-' }}</span>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="np-toolbar">
+            <button type="button" class="layui-btn np-btn-primary" id="btnAdd">+ 新增笔记</button>
+            <div class="np-search">
+                <input type="text" id="keyword" class="layui-input" placeholder="搜索标题 / 内容关键字" autocomplete="off">
+                <button type="button" class="layui-btn layui-btn-primary np-btn-search" id="btnSearch">搜索</button>
+            </div>
+        </div>
+
+        <!-- 笔记列表 -->
+        <div class="np-table-wrap">
+            <table class="np-table">
+                <thead>
+                    <tr>
+                        <th style="width:44%">标题 / 摘要</th>
+                        <th style="width:14%">创建时间</th>
+                        <th style="width:14%">更新时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="noteBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 新增/编辑弹层模板 -->
+    <div id="noteModal" style="display:none; padding:16px 16px 0;">
+        <div class="np-field">
+            <label>标题（选填，最多 50 字）</label>
+            <input type="text" id="noteTitle" class="layui-input" maxlength="50" placeholder="为空时列表显示内容首行">
+        </div>
+        <div class="np-field">
+            <label>内容 <span class="np-req">*</span>（必填，最多 5000 字）</label>
+            <textarea id="noteContent" class="np-textarea" maxlength="5000" placeholder="输入笔记内容…"></textarea>
+            <div class="np-counter"><span id="contentCount">0</span> / 5000</div>
+        </div>
+        <div class="np-modal-foot">
+            <button type="button" class="layui-btn layui-btn-primary" id="btnCancel">取消</button>
+            <button type="button" class="layui-btn np-btn-primary" id="btnSave">保存</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/notepad/notepad.js') }}?v=20261022"></script>
+</body>
+</html>
