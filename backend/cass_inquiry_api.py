@@ -50,7 +50,8 @@ def list_quotes():
     分页查询修理厂询单报价数据
 
     参数：page、limit（或 page_size）、inquiry_start、inquiry_end、decode_num、
-          brand_name、store_name、inquiry_id、sort_column、sort_dir
+          brand_name、store_name、inquiry_id、sort_column、sort_dir、
+          column_filters（列头菜单筛选 JSON，如 {"brand_name": ["博世"]}）
     """
     try:
         result = cass_inquiry_query_service.query_quotes(
@@ -64,6 +65,35 @@ def list_quotes():
             inquiry_id=request.args.get('inquiry_id'),
             sort_column=request.args.get('sort_column'),
             sort_dir=request.args.get('sort_dir'),
+            column_filters=request.args.get('column_filters'),
+        )
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'code': 1, 'msg': str(e)}), 400
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'查询失败: {e}'}), 500
+
+
+@bp.route('/api/cass_inquiry/filter_values')
+@login_required
+@permission_required
+def filter_values():
+    """
+    查询某列的全量去重候选值（列头菜单筛选勾选用）
+
+    参数：column（列名，白名单内）、inquiry_start、inquiry_end、decode_num、
+          brand_name、store_name、inquiry_id、column_filters（级联条件，已排除本列）
+    """
+    try:
+        result = cass_inquiry_query_service.filter_values(
+            column=request.args.get('column'),
+            inquiry_start=request.args.get('inquiry_start'),
+            inquiry_end=request.args.get('inquiry_end'),
+            decode_num=request.args.get('decode_num'),
+            brand_name=request.args.get('brand_name'),
+            store_name=request.args.get('store_name'),
+            inquiry_id=request.args.get('inquiry_id'),
+            column_filters=request.args.get('column_filters'),
         )
         return jsonify(result)
     except ValueError as e:

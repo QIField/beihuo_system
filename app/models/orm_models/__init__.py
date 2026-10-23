@@ -25,6 +25,7 @@ from .vin_vehicle_full_info import VinVehicleFullInfo
 from .ks_inquiry_summary_models import KsInquiryOeMonthlySummary, KsInquiryCustomerByOeMonthlySummary
 from .business_task import BusinessTask
 from .business_subtask import BusinessSubtask
+from .notepad_note import NotepadNote
 from .user_lark_mapping import UserLarkMapping
 from .lark_task_mapping import LarkTaskMapping
 from .lark_event_log import LarkEventLog

@@ -121,6 +121,27 @@ var CassInquiryList = (function() {
     }
 
     /**
+     * 获取列筛选候选值（服务端全量去重+计数，按左侧面板条件与其他列已生效筛选级联）
+     * params 由 Builder 组装：面板条件 + column=列名 + column_filters（已排除本列）
+     * 返回 [{value, count}]，与日期查询页面筛选值后的数量显示一致
+     */
+    function getFilterValues(colId, callback, params) {
+        var query = Object.keys(params || {})
+            .filter(function(key) { return params[key] !== undefined && params[key] !== null && params[key] !== ''; })
+            .map(function(key) { return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]); })
+            .join('&');
+        fetch('/api/cass_inquiry/filter_values' + (query ? '?' + query : ''), {
+            method: 'GET',
+            credentials: 'same-origin'
+        })
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                callback(result && result.code === 0 ? (result.data.values || []) : []);
+            })
+            .catch(function() { callback([]); });
+    }
+
+    /**
      * 创建表格（Builder 服务端分页模式）
      */
     function initBuilder() {
@@ -128,6 +149,7 @@ var CassInquiryList = (function() {
             columns: columns,
             dataUrl: '/api/cass_inquiry/list',
             paramsBuilder: buildFilterParams,
+            getFilterValues: getFilterValues,
             readOnly: true,
             pageKey: 'cass_inquiry',
             gridKey: 'cass_inquiry_list_v2',

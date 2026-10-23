@@ -88,6 +88,10 @@ api_bp.register_blueprint(business_task_bp)
 from .business_subtask_api import business_subtask_bp
 api_bp.register_blueprint(business_subtask_bp)
 
+# 注册个人记事本 API
+from .notepad_api import notepad_api_bp
+api_bp.register_blueprint(notepad_api_bp)
+
 # 注册用户飞书绑定管理 API
 from .user_lark_mapping_api import user_lark_mapping_bp
 api_bp.register_blueprint(user_lark_mapping_bp)
