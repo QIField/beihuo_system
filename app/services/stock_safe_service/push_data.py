@@ -9,19 +9,23 @@
 安全库存数据推送 CRM 服务
 
 职责：
-  将 stock_safe 表中的安全库存数据推送到 CRM 系统。
+  将 stock_safe_sync_queue 同步队列中的待同步记录推送到 CRM 系统。
   推送前通过 OE 号调用 CRM Product.Product/list 接口，
   匹配获取对应商品的 product_id，再调用 Product.Product/saveSafeStock 推送。
 
 核心函数：
   - push_stock_safe_data: 单条 OE 推送安全库存
   - batch_push_stock_safe_data: 批量推送安全库存
+  - push_sync_queue_data_to_crm: 定时同步任务（队列驱动）
 """
+
+from datetime import datetime
 
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.scripts.spiders.spiders_services.log import get_stock_safe_logger
 from app.utils.orm.session import orm_session
-from app.dao.stock_safe_dao.replenish_dao import fetch_replenish_data
+from app.models.orm_models.stock_safe_models.stock_safe import StockSafe
+from app.models.orm_models.stock_safe_models.stock_safe_sync_queue import StockSafeSyncQueue
 
 # 统一日志记录器，复用 stock_safe 模块的日志配置
 logger = get_stock_safe_logger()
@@ -319,76 +323,143 @@ def batch_push_stock_safe_data(records):
     }
 
 
-def fetch_replenish_records() -> list:
+def fetch_sync_queue_records() -> list:
     """
-    从 stock_safe 表查询符合补货条件的记录。
+    从 stock_safe_sync_queue 队列表查询定时同步记录。
 
-    筛选条件与补货清单 Excel（replenish.py）完全一致：
-      - 销售状态（sales_status）：销量低、销量正常
-      - 库存状态（stock_status）：需补货|可卖天数较少、需补货、紧急补货
+    筛选条件：
+      - sync_enabled = 1（同步开关已开启）
 
-    排序：库存状态按紧急程度（紧急补货 > 需补货|可卖天数较少 > 需补货），
-          再按可用库存升序。
+    说明：
+      定时同步为全量推送，不按 synced_at 过滤——
+      每次执行都推送所有开启同步的记录，成功后回填 synced_at。
 
-    :return: 符合补货条件的记录列表（每项为字典，包含 stock_safe 全字段）
+    排序：按 created_at 升序（先入队先同步）。
+
+    :return: 待同步记录列表（每项含 id / number / brand_name，在会话内序列化）
     """
     with orm_session() as session:
-        records = fetch_replenish_data(session)
-    logger.info(f"[推送安全库存] 查询到 {len(records)} 条需补货记录")
+        rows = (
+            session.query(StockSafeSyncQueue)
+            .filter(StockSafeSyncQueue.sync_enabled == 1)
+            .order_by(StockSafeSyncQueue.created_at.asc())
+            .all()
+        )
+        # 在会话内完成序列化，避免 DetachedInstanceError
+        records = [
+            {"id": r.id, "number": r.number, "brand_name": r.brand_name}
+            for r in rows
+        ]
+    logger.info(f"[队列同步CRM] 查询到 {len(records)} 条开启同步的记录")
     return records
 
 
-def push_replenish_data_to_crm() -> dict:
+def push_sync_queue_data_to_crm() -> dict:
     """
-    查询需补货的安全库存数据并推送到 CRM。
+    定时同步任务：将同步队列（stock_safe_sync_queue）中开启同步的记录推送到 CRM。
 
     执行流程：
-      1. 从 stock_safe 表查询符合补货条件的记录（与补货 Excel 筛选条件一致）
-      2. 转换为推送所需格式：
-         - number: OE 号
-         - brand_name: 品牌名
-         - safety_stock: 调整后安全库存（stock_safe.safety_stock）
+      1. 查询队列中 sync_enabled=1 的全部记录（定时全量同步，不按 synced_at 过滤）
+      2. 按 (number, brand_name) 从 stock_safe 实时读取推送值：
+         - safety_stock: 调整后安全库存
          - max_stock: 库存上限（stock_safe.stock_upper_limit）
-         - season_coefficient: 季节系数（stock_safe.season_coefficient）
+         - season_coefficient: 季节系数
+         （同一组合多条记录时取第一条）
       3. 调用 batch_push_stock_safe_data 批量推送到 CRM
+      4. 推送成功的记录回填 synced_at=当前时间；
+         stock_safe 中无对应数据的记录跳过（不回填）
 
     :return: dict，包含推送统计：
-             - total: 总记录数
+             - total: 队列记录数
              - success_count: 成功推送数
              - fail_count: 失败数
              - details: 每条记录的推送结果列表
     """
-    logger.info("[推送安全库存] ====== 开始执行 ======")
+    logger.info("[队列同步CRM] ====== 开始执行 ======")
 
-    # 步骤1：查询符合补货条件的安全库存数据
-    records = fetch_replenish_records()
-    if not records:
-        logger.info("[推送安全库存] 无需补货的记录，跳过推送")
+    # 步骤1：查询开启同步的队列记录
+    queue_records = fetch_sync_queue_records()
+    if not queue_records:
+        logger.info("[队列同步CRM] 无开启同步的记录，跳过推送")
         return {"total": 0, "success_count": 0, "fail_count": 0, "details": []}
 
-    # 步骤2：转换为推送所需格式
+    # 步骤2：从 stock_safe 实时读取推送值
+    # 按 number 一次性查询，再按 (number, brand_name) 取第一条，避免逐条查询
+    numbers = list({rec["number"] for rec in queue_records})
+    push_value_map = {}
+    with orm_session() as session:
+        rows = session.query(StockSafe).filter(StockSafe.number.in_(numbers)).all()
+        for row in rows:
+            key = (row.number, row.brand_name)
+            if key not in push_value_map:
+                push_value_map[key] = {
+                    "safety_stock": row.safety_stock,
+                    "stock_upper_limit": row.stock_upper_limit,
+                    "season_coefficient": row.season_coefficient,
+                }
+
+    # 步骤3：组装推送记录（stock_safe 中无对应数据的组合跳过）
     push_records = []
-    for rec in records:
+    skipped_records = []
+    for rec in queue_records:
+        values = push_value_map.get((rec["number"], rec["brand_name"]))
+        if not values:
+            skipped_records.append(rec)
+            continue
         push_records.append({
-            "number": rec.get("number"),
-            "brand_name": rec.get("brand_name"),
-            "safety_stock": rec.get("safety_stock", 0),
-            "max_stock": rec.get("stock_upper_limit", 0),
-            "season_coefficient": rec.get("season_coefficient", 1),
+            "number": rec["number"],
+            "brand_name": rec["brand_name"],
+            "safety_stock": values["safety_stock"] if values["safety_stock"] is not None else 0,
+            "max_stock": values["stock_upper_limit"] if values["stock_upper_limit"] is not None else 0,
+            "season_coefficient": values["season_coefficient"] if values["season_coefficient"] is not None else 1,
         })
 
-    logger.info(f"[推送安全库存] 待推送 {len(push_records)} 条")
+    if skipped_records:
+        logger.warning(
+            f"[队列同步CRM] {len(skipped_records)} 条记录在 stock_safe 中无数据，跳过推送 "
+            f"(示例: {[(r['number'], r['brand_name']) for r in skipped_records[:5]]})"
+        )
 
-    # 步骤3：批量推送到 CRM
+    if not push_records:
+        logger.info("[队列同步CRM] 无可推送记录，跳过")
+        return {"total": len(queue_records), "success_count": 0,
+                "fail_count": len(queue_records), "details": []}
+
+    logger.info(f"[队列同步CRM] 待推送 {len(push_records)} 条")
+
+    # 步骤4：批量推送到 CRM
     result = batch_push_stock_safe_data(push_records)
 
+    # 步骤5：回填同步时间（推送成功的记录 synced_at=当前时间）
+    success_keys = {
+        (detail.get("number"), detail.get("brand_name"))
+        for detail in result.get("details", [])
+        if detail.get("success")
+    }
+    synced_ids = [
+        rec["id"] for rec in queue_records
+        if (rec["number"], rec["brand_name"]) in success_keys
+    ]
+    if synced_ids:
+        with orm_session() as session:
+            (
+                session.query(StockSafeSyncQueue)
+                .filter(StockSafeSyncQueue.id.in_(synced_ids))
+                .update(
+                    {StockSafeSyncQueue.synced_at: datetime.now()},
+                    synchronize_session=False,
+                )
+            )
+        logger.info(f"[队列同步CRM] 已回填 {len(synced_ids)} 条记录的 synced_at")
+
     logger.info(
-        f"[推送安全库存] ====== 完成 总数={result['total']} "
-        f"成功={result['success_count']} 失败={result['fail_count']} ======"
+        f"[队列同步CRM] ====== 完成 队列待同步={len(queue_records)} "
+        f"推送={result['total']} 成功={result['success_count']} "
+        f"失败={result['fail_count']} 跳过={len(skipped_records)} ======"
     )
 
     return result
 
 # if __name__ == '__main__':
-#     result = push_replenish_data_to_crm()
+#     result = push_sync_queue_data_to_crm()
 #     print(result)
