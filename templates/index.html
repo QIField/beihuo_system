@@ -1511,11 +1511,13 @@ window.loadStoreInfo = function() {
                         {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
                         {title: '操作', width: 150, align: 'center', templet: function(d) {
                             // 只保留编辑和删除按钮，其他功能移到编辑弹窗内
-                            if (currentUser.logged_in && currentUser.is_admin && d.username !== currentUser.username) {
-                                return '<div class="user-action-btns">' +
-                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ')">编辑</button>' +
-                                       '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteUser(' + d.id + ', \'' + d.username + '\')">删除</button>' +
-                                       '</div>';
+                            if (currentUser.logged_in && currentUser.is_admin) {
+                                var editBtn = '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ')">编辑</button>';
+                                // 删除按钮对自己隐藏，防止误删当前登录账号
+                                var deleteBtn = d.username !== currentUser.username
+                                    ? '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteUser(' + d.id + ', \'' + d.username + '\')">删除</button>'
+                                    : '';
+                                return '<div class="user-action-btns">' + editBtn + deleteBtn + '</div>';
                             }
                             return '';
                         }}
