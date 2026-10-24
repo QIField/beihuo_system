@@ -9,6 +9,7 @@
 from flask import Blueprint, render_template
 
 from app.core.permission.decorators import require_page_login
+from app.core.permission.user_flags import flag_required
 
 
 business_task_web_bp = Blueprint(
@@ -21,6 +22,7 @@ business_task_web_bp = Blueprint(
 @business_task_web_bp.route('/', defaults={'page': 'index'})
 @business_task_web_bp.route('/<path:page>')
 @require_page_login()
+@flag_required('can_business_task', '您没有权限访问企业业务系统')
 def serve_page(page):
     if not page.endswith('.html'):
         page += '.html'

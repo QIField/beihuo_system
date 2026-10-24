@@ -31,19 +31,35 @@ var CassInquiryList = (function() {
         return merchant === normalizeOe(decodeNum);
     }
 
+    // 佛山巴博瑞汽配供应商名（精确匹配），该行商家替换号渲染为可点击链接
+    var BBRI_STORE_NAME = '佛山巴博瑞汽配';
+
     /**
      * 商家替换号渲染器：省略号 + title（与统一省略号组件同结构），
+     * 供应商为佛山巴博瑞汽配且替换号非空时渲染为蓝色链接（点击打开 CRM 产品开思价弹窗），
      * 与译码OE号不一致时单元格淡黄背景高亮
      */
     function merchantPartsRenderer(instance, td, row, col, prop, value) {
         Handsontable.renderers.TextRenderer.apply(this, arguments);
         var text = (value === null || value === undefined) ? '' : String(value);
-        td.innerHTML = '<div class="htb-ellipsis-cell" title="' +
-            text.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">' +
-            text.replace(/\n/g, ' ') +
-            '</div>';
-
         var rowData = instance.getSourceDataAtRow(instance.toPhysicalRow(row));
+        var isBbri = rowData &&
+            String(rowData.store_name || '').trim() === BBRI_STORE_NAME &&
+            text.trim() !== '';
+
+        if (isBbri) {
+            td.innerHTML = '<div class="htb-ellipsis-cell cass-replacement-link" data-replacement="' +
+                text.replace(/"/g, '&quot;').replace(/'/g, '&#39;') +
+                '" title="点击查看 CRM 产品">' +
+                text.replace(/\n/g, ' ') +
+                '</div>';
+        } else {
+            td.innerHTML = '<div class="htb-ellipsis-cell" title="' +
+                text.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">' +
+                text.replace(/\n/g, ' ') +
+                '</div>';
+        }
+
         if (rowData && !isSameOe(rowData.decode_num, value)) {
             td.style.backgroundColor = '#FFF3CD';
         }

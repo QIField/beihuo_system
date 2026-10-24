@@ -83,21 +83,22 @@ def gylqp_start():
     zhongshan_data = []
 
     for i in d_:
-        if '佛山' in i[6]:
-            bm = i[0].replace(' ','')
-            bm = bm.split('-')[0].replace('AM','')
-            gys = '爱车贝母'
-            pp = '巴博瑞'
-            # 根据品牌处理价格
-            original_price = i[4]
-            price = process_price_by_brand(original_price, pp)
-            kc = i[5]
-            next_day_later = (current_time + timedelta(days=1)).strftime(
-                "%Y-%m-%d %H:%M:%S")
-            ck = '佛山禅城仓'
-            foshan_data.append([
-                gys, bm, pp, price, original_price, next_day_later, ck, kc, '', fetch_time
-            ])
+        # 佛山仓数据不再对接（2026-10-24），保留注释以备恢复
+        # if '佛山' in i[6]:
+        #     bm = i[0].replace(' ','')
+        #     bm = bm.split('-')[0].replace('AM','')
+        #     gys = '爱车贝母'
+        #     pp = '巴博瑞'
+        #     # 根据品牌处理价格
+        #     original_price = i[4]
+        #     price = process_price_by_brand(original_price, pp)
+        #     kc = i[5]
+        #     next_day_later = (current_time + timedelta(days=1)).strftime(
+        #         "%Y-%m-%d %H:%M:%S")
+        #     ck = '佛山禅城仓'
+        #     foshan_data.append([
+        #         gys, bm, pp, price, original_price, next_day_later, ck, kc, '', fetch_time
+        #     ])
         if '东莞' in i[6]:
             bm = i[0].replace(' ','')
             bm = bm.split('-')[0].replace('AM','')
@@ -132,25 +133,26 @@ def gylqp_start():
     # 批量保存到数据库
     db_manager = get_db_connection()
     try:
-        # 保存佛山数据
-        batch_size = 1000
-        for i in range(0, len(foshan_data), batch_size):
-            batch = foshan_data[i:i + batch_size]
-
-            # 准备批量插入数据（跳过 original_price 字段）
-            batch_data = []
-            for row in batch:
-                batch_data.append((row[0], row[1], row[2], row[3], row[5], row[6], row[7], row[8], row[9]))
-
-            # 批量插入
-            sql = """
-                INSERT INTO aichebeimu_foshan_data (supplier, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            db_manager.execute_many(sql, batch_data)
-            logger.info(f"已批量保存 {min(i + batch_size, len(foshan_data))} / {len(foshan_data)} 条爱车贝母佛山数据")
+        # 佛山仓数据不再对接（2026-10-24），保留注释以备恢复
+        # # 保存佛山数据
+        # for i in range(0, len(foshan_data), batch_size):
+        #     batch = foshan_data[i:i + batch_size]
+        #
+        #     # 准备批量插入数据（跳过 original_price 字段）
+        #     batch_data = []
+        #     for row in batch:
+        #         batch_data.append((row[0], row[1], row[2], row[3], row[5], row[6], row[7], row[8], row[9]))
+        #
+        #     # 批量插入
+        #     sql = """
+        #         INSERT INTO aichebeimu_foshan_data (supplier, oe_code, brand, price, expiry_date, warehouse, stock, remark, fetch_time)
+        #         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        #     """
+        #     db_manager.execute_many(sql, batch_data)
+        #     logger.info(f"已批量保存 {min(i + batch_size, len(foshan_data))} / {len(foshan_data)} 条爱车贝母佛山数据")
 
         # 保存东莞数据
+        batch_size = 1000
         for i in range(0, len(dongguan_data), batch_size):
             batch = dongguan_data[i:i + batch_size]
 
@@ -188,7 +190,8 @@ def gylqp_start():
         db_manager.close()
 
     # 将数据保存到各公司整合表
-    all_data = foshan_data + dongguan_data + zhongshan_data
+    # all_data = foshan_data + dongguan_data + zhongshan_data  # 佛山仓数据不再对接（2026-10-24）
+    all_data = dongguan_data + zhongshan_data
     df = pd.DataFrame(all_data, columns=['供应商名称', '原厂OE码', '品牌', '价格', '原价格', '失效时间', '仓库名称', '库存', '备注', 'fetch_time'])
 
     # 保存到各公司表（爱车贝母数据不是万拓也不是昌盛）

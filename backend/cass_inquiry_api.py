@@ -7,6 +7,11 @@ from flask import Blueprint, jsonify, render_template, session, request
 from functools import wraps
 
 from app.services.cass_inquiry_service import CassInquiryQueryService
+from app.services.cass_inquiry_service.price_edit_service import (
+    search_products_by_replacement,
+    update_cass_prices,
+)
+from app.core.permission.user_flags import flag_required
 
 bp = Blueprint('cass_inquiry', __name__)
 
@@ -26,12 +31,7 @@ def login_required(f):
 
 def permission_required(f):
     """修理厂询价单权限验证（与管理员身份无关，必须显式拥有权限）"""
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not session.get('can_cass_inquiry'):
-            return jsonify({'code': 1, 'msg': '您没有权限访问修理厂询价单'}), 403
-        return f(*args, **kwargs)
-    return wrapper
+    return flag_required('can_cass_inquiry', '您没有权限访问修理厂询价单')(f)
 
 
 @bp.route('/web/cass_inquiry')
@@ -100,3 +100,43 @@ def filter_values():
         return jsonify({'code': 1, 'msg': str(e)}), 400
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'查询失败: {e}'}), 500
+
+
+@bp.route('/api/cass_inquiry/crm_products')
+@login_required
+@permission_required
+def crm_products():
+    """
+    按商家替换号搜索 CRM 产品（开思价修改弹窗数据源）
+
+    参数：replacement（替换号/OE）
+    返回：[{product_id, number, brand_name, l_name_zh, store_cass_price, cost_price}]
+    """
+    replacement = (request.args.get('replacement') or '').strip()
+    if not replacement:
+        return jsonify({'code': 1, 'msg': '缺少替换号参数'}), 400
+    try:
+        products = search_products_by_replacement(replacement)
+        return jsonify({'code': 0, 'data': {'list': products}})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'CRM 搜索失败: {e}'}), 500
+
+
+@bp.route('/api/cass_inquiry/update_price', methods=['POST'])
+@login_required
+@permission_required
+def update_price():
+    """
+    批量更新产品开思价（前端仅提交勾选且改价的行，逐行返回结果）
+
+    请求体：[{'product_id', 'store_cass_price'}]
+    返回：{'results': [{'product_id', 'success', 'msg'}]}，与请求顺序一致
+    """
+    try:
+        items = request.get_json(silent=True)
+        if not isinstance(items, list) or not items:
+            return jsonify({'code': 1, 'msg': '没有需要更新的产品'}), 400
+        results = update_cass_prices(items)
+        return jsonify({'code': 0, 'data': {'results': results}})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'更新失败: {e}'}), 500
