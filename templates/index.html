@@ -777,8 +777,8 @@
                     <li class="layui-nav-item layui-nav-itemed">
                         <a href="javascript:;">CRM</a>
                         <dl class="layui-nav-child">
-                            <dd><a href="javascript:void(0);" onclick="openReplaceNumberEditInNewTab()">替换号编辑</a></dd>
-                            <dd id="multiChannelQuoteAdjustMenuItem" style="display: none;"><a href="/multi_channel_quote_adjust" target="_blank">多渠道报价调价</a></dd>
+                            <dd id="multiChannelQuoteAdjustMenuItem" data-perm="can_multi_channel_quote_adjust" style="display: none;"><a href="/multi_channel_quote_adjust" target="_blank">多渠道报价调价</a></dd>
+                            <dd id="businessTaskMenuItem" data-perm="can_business_task" style="display: none;"><a href="/business-task/index.html" target="_blank">企业业务系统</a></dd>
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed">
@@ -821,8 +821,8 @@
                     <li class="layui-nav-item layui-nav-itemed" id="purchasePlanMenu" style="display: none;">
                         <a href="javascript:;">采购计划</a>
                         <dl class="layui-nav-child">
-                            <dd id="inquiryModuleMenuItem" style="display: none;"><a href="javascript:void(0);" onclick="openInquiryModule()">询价模块</a></dd>
-                            <dd id="compareModuleMenuItem" style="display: none;"><a href="javascript:void(0);" onclick="openCompareModule()">比价模块</a></dd>
+                            <dd id="inquiryModuleMenuItem" data-perm="can_inquiry_module" style="display: none;"><a href="javascript:void(0);" onclick="openInquiryModule()">询价模块</a></dd>
+                            <dd id="compareModuleMenuItem" data-perm="can_compare_module" style="display: none;"><a href="javascript:void(0);" onclick="openCompareModule()">比价模块</a></dd>
                         </dl>
                     </li>
                     <li class="layui-nav-item layui-nav-itemed" id="permissionManagement" style="display: none;">
@@ -1015,182 +1015,25 @@ function initExcelCellSelectionForCart(tableId) {
 }
 
 
-// 添加新用户功能
-function addUser() {
-    layui.use(['layer', 'form'], function(){
-        var layer = layui.layer;
-        var form = layui.form;
-        var $ = layui.$;
-        
-        // 弹出添加用户对话框
-        layer.open({
-            type: 1,
-            title: '添加新用户',
-            content: `
-                <div style="padding: 20px;">
-                    <form class="layui-form" action="">
-                        <div class="layui-form-item">
-                            <label class="layui-form-label">用户名</label>
-                            <div class="layui-input-block">
-                                <input type="text" name="username" required lay-verify="required" placeholder="请输入用户名" autocomplete="off" class="layui-input">
-                            </div>
-                        </div>
-                        <div class="layui-form-item">
-                            <label class="layui-form-label">密码</label>
-                            <div class="layui-input-block">
-                                <input type="password" name="password" required lay-verify="required" placeholder="请输入密码" autocomplete="off" class="layui-input">
-                            </div>
-                        </div>
-                        <div class="layui-form-item">
-                            <label class="layui-form-label">管理员</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="is_admin" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="processOrdersPermissionItemAdd" style="display: none;">
-                            <label class="layui-form-label">删除购物车权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_delete_cart" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="processOrdersPermissionItemAdd2" style="display: none;">
-                            <label class="layui-form-label">处理单据权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_process_orders" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="inquiryModulePermissionItemAdd" style="display: none;">
-                            <label class="layui-form-label">询价模块权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_inquiry_module" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="compareModulePermissionItemAdd" style="display: none;">
-                            <label class="layui-form-label">比价模块权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_compare_module" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="cassInquiryPermissionItemAdd" style="display: none;">
-                            <label class="layui-form-label">修理厂询价单权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_cass_inquiry" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="updateCrmPermissionItemAdd" style="display: none;">
-                            <label class="layui-form-label">更新CRM信息权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_update_crm" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="multiChannelQuoteAdjustPermissionItemAdd" style="display: none;">
-                            <label class="layui-form-label">多渠道报价调价权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_multi_channel_quote_adjust" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item">
-                            <label class="layui-form-label">所属门店</label>
-                            <div class="layui-input-block">
-                                <select name="store" id="addUserStore" class="layui-select">
-                                    <option value="fsbbr">佛山门店</option>
-                                    <option value="zsbbr">中山门店</option>
-                                    <option value="zhbbr">珠海门店</option>
-                                    <option value="dgby">百业门店</option>
-                                    <option value="dghf">合峰门店</option>
-                                    <option value="all">所有门店</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="layui-form-item">
-                            <label class="layui-form-label">板块</label>
-                            <div class="layui-input-block">
-                                <select name="department" required lay-verify="required" class="layui-select">
-                                    <option value="">请选择板块</option>
-                                    <option value="业务">业务</option>
-                                    <option value="市场">市场</option>
-                                    <option value="后勤">后勤</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="layui-form-item">
-                            <label class="layui-form-label">职级</label>
-                            <div class="layui-input-block">
-                                <select name="job_level" required lay-verify="required" class="layui-select">
-                                    <option value="">请选择职级</option>
-                                    <option value="经理">经理</option>
-                                    <option value="主管">主管</option>
-                                    <option value="业务员">业务员</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="layui-form-item">
-                            <div class="layui-input-block">
-                                <button class="layui-btn" lay-submit lay-filter="addUserForm">确认添加</button>
-                                <button type="reset" class="layui-btn layui-btn-primary">重置</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            `,
-            area: ['500px', '450px'],
-            success: function(layero, index){
-                // 检查当前用户是否为管理员，决定是否显示处理单据权限选项
-                if (window.currentUserPermissions && window.currentUserPermissions.is_admin) {
-                    layero.find('#processOrdersPermissionItemAdd')[0].style.display = 'block';
-                    layero.find('#processOrdersPermissionItemAdd2')[0].style.display = 'block';
-                } else {
-                    layero.find('#processOrdersPermissionItemAdd')[0].style.display = 'none';
-                    layero.find('#processOrdersPermissionItemAdd2')[0].style.display = 'none';
-                }
-                
-                form.render(); // 渲染表单元素
-                
-                // 绑定表单提交事件
-                form.on('submit(addUserForm)', function(form_data){
-                    // 发送添加用户请求
-                    fetch('/api/users', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            username: form_data.field.username,
-                            password: form_data.field.password,
-                            is_admin: form_data.field.is_admin === 'on' ? 1 : 0,
-                            can_delete_cart: form_data.field.can_delete_cart === 'on' ? 1 : 0, // 添加删除购物车权限字段
-                            can_process_orders: form_data.field.can_process_orders === 'on' ? 1 : 0, // 添加处理单据权限字段
-                            can_inquiry_module: form_data.field.can_inquiry_module === 'on' ? 1 : 0, // 询价模块权限
-                            can_compare_module: form_data.field.can_compare_module === 'on' ? 1 : 0, // 比价模块权限
-                            can_cass_inquiry: form_data.field.can_cass_inquiry === 'on' ? 1 : 0, // 修理厂询价单权限
-                            can_update_crm: form_data.field.can_update_crm === 'on' ? 1 : 0, // 更新CRM权限
-                            can_multi_channel_quote_adjust: form_data.field.can_multi_channel_quote_adjust === 'on' ? 1 : 0, // 多渠道报价调价权限
-                            store: form_data.field.store,
-                            department: form_data.field.department,  // 板块
-                            job_level: form_data.field.job_level     // 职级
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(result => {
-                        if(result.code === 0){
-                            layer.msg('用户添加成功', {icon: 1});
-                            layer.close(index);
-                            // 重新加载用户表格
-                            layui.table.reload('usersTable');
-                        } else {
-                            layer.msg(result.msg, {icon: 2});
-                        }
-                    })
-                    .catch(error => {
-                        layer.msg('添加失败: ' + error.message, {icon: 2});
-                    });
-                    
-                    return false; // 阻止表单跳转
-                });
-            }
-        });
-    });
-}
+// 用户权限清单（与后端 app/core/permission/user_flags.py 保持一致，新增权限各加一行）
+const USER_PERMISSION_FLAGS = [
+    { field: 'can_delete_cart', label: '删除购物车', width: 90 },
+    { field: 'can_process_orders', label: '处理单据', width: 80 },
+    { field: 'can_inquiry_module', label: '询价模块', width: 80 },
+    { field: 'can_compare_module', label: '比价模块', width: 80 },
+    { field: 'can_update_crm', label: '更新CRM', width: 80 },
+    { field: 'can_multi_channel_quote_adjust', label: '多渠道报价', width: 90 },
+    { field: 'can_cass_inquiry', label: '修理厂询价单', width: 105 },
+    { field: 'can_business_task', label: '企业业务系统', width: 105 }
+];
+
+// 权限列模板（按清单生成，用户表格共用）
+const USER_PERM_COLS = USER_PERMISSION_FLAGS.map(f => ({
+    field: f.field, title: f.label, width: f.width, align: 'center',
+    templet: function(d){
+        return d[f.field] ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
+    }
+}));
 
 layui.use(['layer'], function(){
     var layer = layui.layer;
@@ -1469,29 +1312,16 @@ fetch('/api/current_user')
             document.getElementById('purchasePlanMenu').style.display =
                 hasPurchasePlanPermission ? 'block' : 'none';
 
-            // 控制询价模块菜单项的显示
-            document.getElementById('inquiryModuleMenuItem').style.display =
-                result.can_inquiry_module ? 'block' : 'none';
-
-            // 控制比价模块菜单项的显示
-            document.getElementById('compareModuleMenuItem').style.display =
-                result.can_compare_module ? 'block' : 'none';
-
-            // 控制多渠道报价调价菜单项的显示
-            document.getElementById('multiChannelQuoteAdjustMenuItem').style.display =
-                result.can_multi_channel_quote_adjust ? 'block' : 'none';
+            // 权限菜单项统一按 data-perm 属性控制显示
+            document.querySelectorAll('[data-perm]').forEach(function (el) {
+                el.style.display = result[el.dataset.perm] ? 'block' : 'none';
+            });
 
             // 将用户权限存储到全局变量中
             window.currentUserPermissions = {
                 username: result.username,
                 is_admin: result.is_admin,
-                can_delete_cart: result.can_delete_cart,
-                can_process_orders: result.can_process_orders || false,
-                can_inquiry_module: result.can_inquiry_module || false,  // 询价模块权限
-                can_compare_module: result.can_compare_module || false,  // 比价模块权限
-                can_cass_inquiry: result.can_cass_inquiry || false,  // 修理厂询价单权限
-                can_update_crm: result.can_update_crm || false,  // 更新CRM权限
-                can_multi_channel_quote_adjust: result.can_multi_channel_quote_adjust || false,  // 多渠道报价调价权限
+                ...Object.fromEntries(USER_PERMISSION_FLAGS.map(f => [f.field, result[f.field] || false])),
                 store: result.store,
                 current_org: result.current_org,
                 allowed_orgs: result.allowed_orgs || []  // 允许切换的组织列表
@@ -1552,11 +1382,6 @@ function openKsInquiryRecordsInNewTab() {
 function openQplQuoteRecordInNewTab() {
     // 在新标签页中打开汽配龙自动报价页面
     window.open('/web/qpl_quote_records', '_blank');
-}
-
-// 添加打开替换号编辑新标签页的函数
-function openReplaceNumberEditInNewTab() {
-    window.open('/replace_number_edit', '_blank');
 }
 
 // 添加打开仓库看板新标签页的函数
@@ -1681,34 +1506,14 @@ window.loadStoreInfo = function() {
                         {field: 'is_admin', title: '管理员', width: 60, align: 'center', templet: function(d){
                             return d.is_admin ? '<span style="color: #FF5722;">是</span>' : '<span style="color: #999;">否</span>';
                         }},
-                        {field: 'can_delete_cart', title: '删购物车', width: 80, align: 'center', templet: function(d){
-                            return d.can_delete_cart ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_process_orders', title: '处理单据', width: 80, align: 'center', templet: function(d){
-                            return d.can_process_orders ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_inquiry_module', title: '询价模块', width: 80, align: 'center', templet: function(d){
-                            return d.can_inquiry_module ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_compare_module', title: '比价模块', width: 80, align: 'center', templet: function(d){
-                            return d.can_compare_module ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_update_crm', title: '更新CRM', width: 80, align: 'center', templet: function(d){
-                            return d.can_update_crm ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_multi_channel_quote_adjust', title: '多渠道报价', width: 90, align: 'center', templet: function(d){
-                            return d.can_multi_channel_quote_adjust ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_cass_inquiry', title: '修理厂询价单', width: 105, align: 'center', templet: function(d){
-                            return d.can_cass_inquiry ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
+                        ...USER_PERM_COLS,
                         {field: 'store_name', title: '门店', width: 80, align: 'center'},
                         {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
                         {title: '操作', width: 150, align: 'center', templet: function(d) {
                             // 只保留编辑和删除按钮，其他功能移到编辑弹窗内
                             if (currentUser.logged_in && currentUser.is_admin && d.username !== currentUser.username) {
                                 return '<div class="user-action-btns">' +
-                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ', \'' + d.username + '\', ' + d.is_admin + ', ' + d.can_delete_cart + ', \'' + d.store + '\', ' + d.can_process_orders + ', ' + d.is_admin + ', \'' + (d.department || '') + '\', \'' + (d.job_level || '') + '\', ' + (d.allowed_orgs ? '\'' + btoa(JSON.stringify(d.allowed_orgs)) + '\'' : 'null') + ', ' + (d.can_inquiry_module || 0) + ', ' + (d.can_compare_module || 0) + ', ' + (d.can_update_crm || 0) + ', ' + (d.can_multi_channel_quote_adjust || 0) + ', ' + (d.can_cass_inquiry || 0) + ', \'' + (d.order_mobile || '') + '\')">编辑</button>' +
+                                       '<button class="layui-btn layui-btn-xs layui-btn-normal" onclick="editUser(' + d.id + ')">编辑</button>' +
                                        '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteUser(' + d.id + ', \'' + d.username + '\')">删除</button>' +
                                        '</div>';
                             }
@@ -1752,27 +1557,7 @@ window.loadStoreInfo = function() {
                         {field: 'is_admin', title: '管理员', width: 60, align: 'center', templet: function(d){
                             return d.is_admin ? '<span style="color: #FF5722;">是</span>' : '<span style="color: #999;">否</span>';
                         }},
-                        {field: 'can_delete_cart', title: '删购物车', width: 80, align: 'center', templet: function(d){
-                            return d.can_delete_cart ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_process_orders', title: '处理单据', width: 80, align: 'center', templet: function(d){
-                            return d.can_process_orders ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_inquiry_module', title: '询价模块', width: 80, align: 'center', templet: function(d){
-                            return d.can_inquiry_module ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_compare_module', title: '比价模块', width: 80, align: 'center', templet: function(d){
-                            return d.can_compare_module ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_update_crm', title: '更新CRM', width: 80, align: 'center', templet: function(d){
-                            return d.can_update_crm ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_multi_channel_quote_adjust', title: '多渠道报价', width: 90, align: 'center', templet: function(d){
-                            return d.can_multi_channel_quote_adjust ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
-                        {field: 'can_cass_inquiry', title: '修理厂询价单', width: 105, align: 'center', templet: function(d){
-                            return d.can_cass_inquiry ? '<span style="color: #5FB878;">✓</span>' : '<span style="color: #ccc;">-</span>';
-                        }},
+                        ...USER_PERM_COLS,
                         {field: 'store_name', title: '门店', width: 80, align: 'center'},
                         {field: 'ip_records_formatted', title: '登录IP', width: 180, align: 'center'},
                         {title: '操作', width: 150, align: 'center', templet: function(d) {
@@ -2242,25 +2027,33 @@ function setAllowedOrgs(userId, username, currentAllowedOrgs, userStore) {
 }
 
 // 编辑用户功能
-function editUser(userId, username, is_admin, can_delete_cart, store, can_process_orders, admin_flag, department, job_level, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust, can_cass_inquiry, order_mobile) {
+function editUser(userId) {
     layui.use(['layer', 'form'], function(){
         var layer = layui.layer;
         var form = layui.form;
         var $ = layui.$;
-        
-        // 解码allowed_orgs参数（Base64编码）
-        var decodedAllowedOrgs = null;
-        if (allowed_orgs && allowed_orgs !== 'null') {
-            try {
-                decodedAllowedOrgs = JSON.parse(atob(allowed_orgs));
-            } catch (e) {
-                console.error('解析allowed_orgs失败:', e);
-                decodedAllowedOrgs = null;
-            }
-        }
-        
+
+        // 从表格缓存取行数据（含权限标志与门店/组织等信息）
+        var d = (layui.table.cache.usersTable || []).find(function (u) { return u.id === userId; }) || {};
+        var username = d.username;
+        var is_admin = d.is_admin;
+        var store = d.store;
+        var department = d.department;
+        var job_level = d.job_level;
+        var order_mobile = d.order_mobile;
+
         // 将allowed_orgs转换为Base64编码的JSON字符串传递给设置函数
-        var allowedOrgsJson = decodedAllowedOrgs ? btoa(JSON.stringify(decodedAllowedOrgs)) : 'null';
+        var allowedOrgsJson = d.allowed_orgs ? btoa(JSON.stringify(d.allowed_orgs)) : 'null';
+
+        // 权限开关区（按清单生成，仅 admin 操作者可见，见 success 回调）
+        var permSwitchesHtml = USER_PERMISSION_FLAGS.map(function (f) {
+            return '<div class="layui-form-item perm-flag-item" style="display: none;">' +
+                   '<label class="layui-form-label">' + f.label + '权限</label>' +
+                   '<div class="layui-input-block">' +
+                   '<input type="checkbox" name="' + f.field + '" lay-skin="switch" lay-text="是|否">' +
+                   '</div>' +
+                   '</div>';
+        }).join('');
         
         // 弹出编辑用户对话框
         layer.open({
@@ -2281,48 +2074,7 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
                                 <input type="checkbox" name="is_admin" lay-skin="switch" lay-text="是|否">
                             </div>
                         </div>
-                        <div class="layui-form-item" id="processOrdersPermissionItem" style="display: none;">
-                            <label class="layui-form-label">删除购物车权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_delete_cart" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="processOrdersPermissionItemAdd" style="display: none;">
-                            <label class="layui-form-label">处理单据权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_process_orders" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="inquiryModulePermissionItem" style="display: none;">
-                            <label class="layui-form-label">询价模块权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_inquiry_module" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="compareModulePermissionItem" style="display: none;">
-                            <label class="layui-form-label">比价模块权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_compare_module" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="cassInquiryPermissionItem" style="display: none;">
-                            <label class="layui-form-label">修理厂询价单权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_cass_inquiry" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="updateCrmPermissionItem" style="display: none;">
-                            <label class="layui-form-label">更新CRM信息权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_update_crm" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
-                        <div class="layui-form-item" id="multiChannelQuoteAdjustPermissionItem" style="display: none;">
-                            <label class="layui-form-label">多渠道报价调价权限</label>
-                            <div class="layui-input-block">
-                                <input type="checkbox" name="can_multi_channel_quote_adjust" lay-skin="switch" lay-text="是|否">
-                            </div>
-                        </div>
+                        ` + permSwitchesHtml + `
                         <div class="layui-form-item">
                             <label class="layui-form-label">所属门店</label>
                             <div class="layui-input-block">
@@ -2383,78 +2135,46 @@ function editUser(userId, username, is_admin, can_delete_cart, store, can_proces
             `,
             area: ['550px', '600px'], // 弹窗高度
             success: function(layero, index){
-                // 检查当前登录用户是否为"admin"，决定是否显示处理单据权限选项
-                if (window.currentUserPermissions && window.currentUserPermissions.username === 'admin') {
-                    var permItem1 = layero.find('#processOrdersPermissionItem')[0];
-                    var permItem2 = layero.find('#processOrdersPermissionItemAdd')[0];
-                    var permItem3 = layero.find('#inquiryModulePermissionItem')[0];
-                    var permItem4 = layero.find('#compareModulePermissionItem')[0];
-                    var permItem5 = layero.find('#updateCrmPermissionItem')[0];
-                    var permItem6 = layero.find('#multiChannelQuoteAdjustPermissionItem')[0];
-                    var permItem7 = layero.find('#cassInquiryPermissionItem')[0];
-                    if (permItem1) permItem1.style.display = 'block';
-                    if (permItem2) permItem2.style.display = 'block';
-                    if (permItem3) permItem3.style.display = 'block';
-                    if (permItem4) permItem4.style.display = 'block';
-                    if (permItem5) permItem5.style.display = 'block';
-                    if (permItem6) permItem6.style.display = 'block';
-                    if (permItem7) permItem7.style.display = 'block';
-                } else {
-                    var permItem1 = layero.find('#processOrdersPermissionItem')[0];
-                    var permItem2 = layero.find('#processOrdersPermissionItemAdd')[0];
-                    var permItem3 = layero.find('#inquiryModulePermissionItem')[0];
-                    var permItem4 = layero.find('#compareModulePermissionItem')[0];
-                    var permItem5 = layero.find('#updateCrmPermissionItem')[0];
-                    var permItem6 = layero.find('#multiChannelQuoteAdjustPermissionItem')[0];
-                    var permItem7 = layero.find('#cassInquiryPermissionItem')[0];
-                    if (permItem1) permItem1.style.display = 'none';
-                    if (permItem2) permItem2.style.display = 'none';
-                    if (permItem3) permItem3.style.display = 'none';
-                    if (permItem4) permItem4.style.display = 'none';
-                    if (permItem5) permItem5.style.display = 'none';
-                    if (permItem6) permItem6.style.display = 'none';
-                    if (permItem7) permItem7.style.display = 'none';
-                }
+                // 权限开关区仅对 admin 操作者显示
+                var isOperatorAdmin = window.currentUserPermissions && window.currentUserPermissions.username === 'admin';
+                layero.find('.perm-flag-item').each(function () {
+                    this.style.display = isOperatorAdmin ? 'block' : 'none';
+                });
 
                 form.render(); // 渲染表单元素
 
-                // 设置初始值
-                form.val('editUserForm', {
+                // 设置初始值（权限标志统一按清单回显）
+                var formVals = {
                     'is_admin': is_admin ? 'on' : '',
-                    'can_delete_cart': can_delete_cart ? 'on' : '', // 添加删除购物车权限开关
-                    'can_process_orders': can_process_orders ? 'on' : '', // 添加处理单据权限开关
-                    'can_inquiry_module': can_inquiry_module ? 'on' : '', // 添加询价模块权限开关
-                    'can_compare_module': can_compare_module ? 'on' : '', // 添加比价模块权限开关
-                    'can_update_crm': can_update_crm ? 'on' : '', // 更新CRM权限开关
-                    'can_multi_channel_quote_adjust': can_multi_channel_quote_adjust ? 'on' : '', // 多渠道报价调价权限开关
-                    'can_cass_inquiry': can_cass_inquiry ? 'on' : '', // 修理厂询价单权限开关
                     'store': store,
                     'order_mobile': order_mobile || ''
+                };
+                USER_PERMISSION_FLAGS.forEach(function (f) {
+                    formVals[f.field] = d[f.field] ? 'on' : '';
                 });
-                
+                form.val('editUserForm', formVals);
+
                 // 绑定表单提交事件
                 form.on('submit(editUserForm)', function(form_data){
+                    // 组装请求体（权限标志统一按清单收集）
+                    var body = {
+                        is_admin: form_data.field.is_admin === 'on' ? 1 : 0, // 转换开关值
+                        store: form_data.field.store,
+                        department: form_data.field.department || null,  // 板块
+                        job_level: form_data.field.job_level || null,    // 职级
+                        order_mobile: form_data.field.order_mobile || null  // 订单分享联系电话
+                        // 注意：这里不包含 allowed_orgs，因为它在单独的对话框中设置
+                    };
+                    USER_PERMISSION_FLAGS.forEach(function (f) {
+                        body[f.field] = form_data.field[f.field] === 'on' ? 1 : 0;
+                    });
                     // 发送编辑用户请求
                     fetch('/api/users/' + userId, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({
-                            is_admin: form_data.field.is_admin === 'on' ? 1 : 0, // 转换开关值
-                            can_delete_cart: form_data.field.can_delete_cart === 'on' ? 1 : 0, // 添加删除购物车权限字段
-                            can_process_orders: form_data.field.can_process_orders === 'on' ? 1 : 0, // 添加处理单据权限字段
-                            can_inquiry_module: form_data.field.can_inquiry_module === 'on' ? 1 : 0, // 添加询价模块权限字段
-                            can_compare_module: form_data.field.can_compare_module === 'on' ? 1 : 0, // 添加比价模块权限字段
-                            can_cass_inquiry: form_data.field.can_cass_inquiry === 'on' ? 1 : 0, // 修理厂询价单权限字段
-                            can_update_crm: form_data.field.can_update_crm === 'on' ? 1 : 0, // 更新CRM权限字段
-                            can_multi_channel_quote_adjust: form_data.field.can_multi_channel_quote_adjust === 'on' ? 1 : 0, // 多渠道报价调价权限字段
-                            store: form_data.field.store,
-                            department: form_data.field.department || null,  // 板块
-                            job_level: form_data.field.job_level || null,    // 职级
-                            order_mobile: form_data.field.order_mobile || null  // 订单分享联系电话
-                            // 注意：这里不包含 allowed_orgs，因为它在单独的对话框中设置
-                        })
+                        body: JSON.stringify(body)
                     })
                     .then(response => response.json())
                     .then(result => {

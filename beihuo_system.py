@@ -7,6 +7,7 @@ from backend.virtual_inventory_api import register_virtual_inventory_routes
 from backend.search_in_crm import search_in_crm_bp
 from backend.ks_auto_bill_api import ks_auto_bill_bp
 from backend.excel_process_api import register_excel_process_routes
+from backend.replace_number_process_api import register_replace_number_process_routes
 from backend.api.excel.updateview_api import register_updateview_routes
 from urllib.parse import unquote
 import pandas as pd
@@ -50,6 +51,9 @@ from app.services.b2b_intransit_service.query_service import find_intransit_deta
 # 导入轻量级任务管理器（延迟初始化）
 from app.core.task_manager import task_manager
 
+# 用户权限标志清单（登录/用户管理/页面拦截的统一数据源）
+from app.core.permission.user_flags import USER_PERMISSION_FLAGS
+
 # 导入并初始化全局Session管理器
 from app.core.session_init import init_session_manager
 init_session_manager()
@@ -62,6 +66,7 @@ app.secret_key = 'your-very-secret-key'
 
 register_virtual_inventory_routes(app)
 register_excel_process_routes(app)  # 注册Excel处理API
+register_replace_number_process_routes(app)  # 注册替换号处理API
 register_updateview_routes(app)  # 注册UpdateView API
 app.register_blueprint(search_in_crm_bp)
 app.register_blueprint(get_order_bp)
@@ -91,6 +96,12 @@ from app.services.beihuo_service.config import STORES, COMPANIES
 #扩展总蓝图
 from app import expansion_app
 expansion_app(app)
+
+# 用户权限字段按清单幂等补列（新增权限自动建列，无需手动 SQL）
+from app.utils.database.table_manager import check_and_add_fields
+check_and_add_fields('crmapp_users', [
+    {'name': f['field'], 'definition': 'TINYINT(1) DEFAULT 0'} for f in USER_PERMISSION_FLAGS
+])
 
 
 
@@ -992,24 +1003,13 @@ def login():
         session['logged_in'] = True
         session['username'] = username
         session['is_admin'] = user['is_admin']
-        session['can_delete_cart'] = user['can_delete_cart']  # 添加删除购物车权限到session
-        
-        # 对于用户名为"admin"的用户，默认处理单据权限为开启状态
-        if username == 'admin':
-            session['can_process_orders'] = 1
-            session['can_inquiry_module'] = 1  # admin默认拥有询价模块权限
-            session['can_compare_module'] = 1  # admin默认拥有比价模块权限
-            session['can_update_crm'] = 1  # admin默认拥有更新CRM权限
-            session['can_multi_channel_quote_adjust'] = 1  # admin默认拥有多渠道报价调价权限
-        else:
-            session['can_process_orders'] = user['can_process_orders']  # 添加处理单据权限到session
-            session['can_inquiry_module'] = user.get('can_inquiry_module', False)  # 询价模块权限
-            session['can_compare_module'] = user.get('can_compare_module', False)  # 比价模块权限
-            session['can_update_crm'] = user.get('can_update_crm', False)  # 更新CRM权限
-            session['can_multi_channel_quote_adjust'] = user.get('can_multi_channel_quote_adjust', False)  # 多渠道报价调价权限
-        # 修理厂询价单权限：与管理员身份无关，统一按数据库字段判定
-        session['can_cass_inquiry'] = user.get('can_cass_inquiry', False)
-            
+        # 权限标志统一按清单写入 session（admin 按 admin_default 默认开启）
+        for _flag in USER_PERMISSION_FLAGS:
+            if username == 'admin' and _flag['admin_default']:
+                session[_flag['field']] = 1
+            else:
+                session[_flag['field']] = user.get(_flag['field'], False)
+
         session['user_id'] = user['id']  # 添加用户ID到session，用于后续权限检查
         # 检查用户store是否有效，如果无效则设置为默认值
         user_store = user['store']
@@ -1136,13 +1136,6 @@ def update_user(user_id):
     username = data.get('username')
     password = data.get('password')
     is_admin = data.get('is_admin')
-    can_delete_cart = data.get('can_delete_cart')
-    can_process_orders = data.get('can_process_orders')
-    can_inquiry_module = data.get('can_inquiry_module')  # 新增：询价模块权限
-    can_compare_module = data.get('can_compare_module')  # 新增：比价模块权限
-    can_update_crm = data.get('can_update_crm')  # 新增：更新CRM权限
-    can_multi_channel_quote_adjust = data.get('can_multi_channel_quote_adjust')  # 新增：多渠道报价调价权限
-    can_cass_inquiry = data.get('can_cass_inquiry')  # 新增：修理厂询价单权限
     store = data.get('store')
     allowed_orgs = data.get('allowed_orgs')  # 新增：允许切换的组织列表
     department = data.get('department')  # 板块:业务/市场/后勤
@@ -1175,27 +1168,12 @@ def update_user(user_id):
         if is_admin is not None:
             update_fields.append("is_admin = %s")
             params.append(is_admin)
-        if can_delete_cart is not None:
-            update_fields.append("can_delete_cart = %s")
-            params.append(can_delete_cart)
-        if can_process_orders is not None:
-            update_fields.append("can_process_orders = %s")
-            params.append(can_process_orders)
-        if can_inquiry_module is not None:
-            update_fields.append("can_inquiry_module = %s")
-            params.append(can_inquiry_module)
-        if can_compare_module is not None:
-            update_fields.append("can_compare_module = %s")
-            params.append(can_compare_module)
-        if can_update_crm is not None:
-            update_fields.append("can_update_crm = %s")
-            params.append(can_update_crm)
-        if can_multi_channel_quote_adjust is not None:
-            update_fields.append("can_multi_channel_quote_adjust = %s")
-            params.append(can_multi_channel_quote_adjust)
-        if can_cass_inquiry is not None:
-            update_fields.append("can_cass_inquiry = %s")
-            params.append(can_cass_inquiry)
+        # 权限标志统一按清单处理
+        for _flag in USER_PERMISSION_FLAGS:
+            _v = data.get(_flag['field'])
+            if _v is not None:
+                update_fields.append(f"{_flag['field']} = %s")
+                params.append(_v)
         if store is not None:
             update_fields.append("store = %s")
             params.append(store)
@@ -2153,17 +2131,13 @@ def get_current_user():
     can_process_orders = session.get('can_process_orders', False)
     store = session.get('store', '')
     user_id = session.get('user_id', None)
-    
+
     # 新的权限字段 - 完全独立的权限控制
     admin_access = session.get('admin_access', False)  # 管理员访问权限（独立于is_admin）
     org_switch_access = session.get('org_switch_access', False)  # 组织切换权限（独立于is_admin）
     can_view_all_data = session.get('can_view_all_data', False)
     can_export_data = session.get('can_export_data', False)
     can_modify_prices = session.get('can_modify_prices', False)
-    can_inquiry_module = session.get('can_inquiry_module', False)  # 询价模块权限
-    can_compare_module = session.get('can_compare_module', False)  # 比价模块权限
-    can_update_crm = session.get('can_update_crm', False)  # 更新CRM权限
-    can_cass_inquiry = session.get('can_cass_inquiry', False)  # 修理厂询价单权限
     allowed_orgs = session.get('allowed_orgs', [])
     
     # 板块和职级信息（新增字段）
@@ -2204,11 +2178,8 @@ def get_current_user():
         'can_view_all_data': can_view_all_data,
         'can_export_data': can_export_data,
         'can_modify_prices': can_modify_prices,
-        'can_inquiry_module': can_inquiry_module,  # 询价模块权限
-        'can_compare_module': can_compare_module,  # 比价模块权限
-        'can_update_crm': can_update_crm,  # 更新CRM权限
-        'can_multi_channel_quote_adjust': session.get('can_multi_channel_quote_adjust', False),  # 多渠道报价调价权限
-        'can_cass_inquiry': can_cass_inquiry,  # 修理厂询价单权限
+        # 权限标志统一按清单返回
+        **{f['field']: session.get(f['field'], False) for f in USER_PERMISSION_FLAGS},
         'allowed_orgs': allowed_orgs,  # 允许切换的组织列表
         'department': department,  # 板块:业务/市场/后勤
         'job_level': job_level,    # 职级:经理/主管/业务员
@@ -2411,7 +2382,8 @@ def get_users():
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
     # 获取所有用户信息（不包括密码）
-    cursor.execute("SELECT id, username, is_admin, store, can_delete_cart, can_process_orders, department, job_level, ip_records, allowed_orgs, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust, can_cass_inquiry, order_mobile FROM crmapp_users ORDER BY id")
+    _flag_cols = ', '.join(f['field'] for f in USER_PERMISSION_FLAGS)
+    cursor.execute(f"SELECT id, username, is_admin, store, {_flag_cols}, department, job_level, ip_records, allowed_orgs, order_mobile FROM crmapp_users ORDER BY id")
     users = cursor.fetchall()
     
     # 添加门店名称和处理权限字段
@@ -2468,13 +2440,6 @@ def create_user():
     username = data.get('username')
     password = data.get('password')
     is_admin = data.get('is_admin', 0)
-    can_delete_cart = data.get('can_delete_cart', 0)
-    can_process_orders = data.get('can_process_orders', 0)  # 新增：处理单据权限
-    can_inquiry_module = data.get('can_inquiry_module', 0)  # 新增：询价模块权限
-    can_compare_module = data.get('can_compare_module', 0)  # 新增：比价模块权限
-    can_update_crm = data.get('can_update_crm', 0)  # 新增：更新CRM权限
-    can_multi_channel_quote_adjust = data.get('can_multi_channel_quote_adjust', 0)  # 新增：多渠道报价调价权限
-    can_cass_inquiry = data.get('can_cass_inquiry', 0)  # 新增：修理厂询价单权限
     store = data.get('store', 'fsbbr')
     department = data.get('department')  # 板块:业务/市场/后勤
     job_level = data.get('job_level')    # 职级:经理/主管/业务员
@@ -2500,27 +2465,12 @@ def create_user():
     # 验证字段类型
     if not isinstance(is_admin, bool) and is_admin not in [0, 1]:
         return jsonify({'code': 1, 'msg': '管理员权限值必须为0或1'}), 400
-    
-    if not isinstance(can_delete_cart, bool) and can_delete_cart not in [0, 1]:
-        return jsonify({'code': 1, 'msg': '删除购物车权限值必须为0或1'}), 400
 
-    if not isinstance(can_process_orders, bool) and can_process_orders not in [0, 1]:  # 新增验证
-        return jsonify({'code': 1, 'msg': '处理单据权限值必须为0或1'}), 400
-
-    if not isinstance(can_inquiry_module, bool) and can_inquiry_module not in [0, 1]:  # 新增验证
-        return jsonify({'code': 1, 'msg': '询价模块权限值必须为0或1'}), 400
-
-    if not isinstance(can_compare_module, bool) and can_compare_module not in [0, 1]:  # 新增验证
-        return jsonify({'code': 1, 'msg': '比价模块权限值必须为0或1'}), 400
-
-    if not isinstance(can_update_crm, bool) and can_update_crm not in [0, 1]:  # 新增验证
-        return jsonify({'code': 1, 'msg': '更新CRM权限值必须为0或1'}), 400
-
-    if not isinstance(can_multi_channel_quote_adjust, bool) and can_multi_channel_quote_adjust not in [0, 1]:  # 新增验证
-        return jsonify({'code': 1, 'msg': '多渠道报价调价权限值必须为0或1'}), 400
-
-    if not isinstance(can_cass_inquiry, bool) and can_cass_inquiry not in [0, 1]:  # 新增验证
-        return jsonify({'code': 1, 'msg': '修理厂询价单权限值必须为0或1'}), 400
+    # 权限标志统一按清单校验
+    for _flag in USER_PERMISSION_FLAGS:
+        _v = data.get(_flag['field'], 0)
+        if not isinstance(_v, bool) and _v not in [0, 1]:
+            return jsonify({'code': 1, 'msg': f'{_flag["label"]}权限值必须为0或1'}), 400
 
     if not isinstance(store, str):
         return jsonify({'code': 1, 'msg': '门店代码必须为字符串'}), 400
@@ -2534,10 +2484,13 @@ def create_user():
         if cursor.fetchone():
             return jsonify({'code': 1, 'msg': '用户名已存在'}), 400
         
-        # 插入新用户
+        # 插入新用户（权限标志统一按清单拼列）
+        _flag_cols = ', '.join(f['field'] for f in USER_PERMISSION_FLAGS)
+        _flag_ph = ', '.join(['%s'] * len(USER_PERMISSION_FLAGS))
+        _flag_vals = [data.get(f['field'], 0) for f in USER_PERMISSION_FLAGS]
         cursor.execute(
-            "INSERT INTO crmapp_users (username, password, is_admin, store, can_delete_cart, can_process_orders, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust, can_cass_inquiry, department, job_level) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (username, password, is_admin, store, can_delete_cart, can_process_orders, can_inquiry_module, can_compare_module, can_update_crm, can_multi_channel_quote_adjust, can_cass_inquiry, department, job_level)  # 添加新字段
+            f"INSERT INTO crmapp_users (username, password, is_admin, store, {_flag_cols}, department, job_level) VALUES (%s, %s, %s, %s, {_flag_ph}, %s, %s)",
+            (username, password, is_admin, store, *_flag_vals, department, job_level)
         )
         
         conn.commit()
