@@ -27,6 +27,11 @@ layui.use('layer', function () {
     var crmPendingCreateItems = []; // 阶段二确认提交清单（待新建 + 已存在更新）
     var crmStage = '';              // crm 流程阶段：''=待检查 / 'checked'=核对中（footer 按钮变"开始新建"）
 
+    // 替换号两阶段数据（compare 模式页内核对编辑）
+    var rnCheckTaskId = null;       // 阶段一匹配检查任务ID
+    var rnCheckItems = [];          // 阶段一核对清单（含替换号编辑值）
+    var rnStage = '';               // 流程阶段：''=待检查 / 'checked'=核对中（footer 按钮变"开始更新"）
+
     // ====== 权限控制：无权限的功能Tab直接隐藏 ======
     fetch('/api/current_user')
         .then(function (response) { return response.json(); })
@@ -112,11 +117,15 @@ layui.use('layer', function () {
         }
     }
 
-    // ====== 底部确认按钮状态：crm 核对阶段显示红色"开始新建"，其余显示"开始处理" ======
+    // ====== 底部确认按钮状态：crm/替换号 核对阶段显示红色"开始新建/开始更新"，其余显示"开始处理" ======
     function updateConfirmBtnState() {
         var btn = document.getElementById('confirmProcessBtn');
         if (currentTab === 'crm' && crmStage === 'checked') {
             btn.textContent = '开始新建';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-danger');
+        } else if (currentTab === 'replace_number' && rnStage === 'checked') {
+            btn.textContent = '开始更新';
             btn.classList.remove('btn-primary');
             btn.classList.add('btn-danger');
         } else {
@@ -156,10 +165,14 @@ layui.use('layer', function () {
         document.getElementById('crmResultArea').style.display = 'none';
         document.getElementById('crmCheckArea').style.display = 'none';
         document.getElementById('replaceNumberResultArea').style.display = 'none';
+        document.getElementById('rnCheckArea').style.display = 'none';
         crmCheckTaskId = null;
         crmCheckItems = [];
         crmPendingCreateItems = [];
         crmStage = '';
+        rnCheckTaskId = null;
+        rnCheckItems = [];
+        rnStage = '';
         setUploadZoneVisible('crm', true);
         setUploadZoneVisible('replace_number', true);
         updateConfirmBtnState();
@@ -195,6 +208,12 @@ layui.use('layer', function () {
         // crm 核对阶段：按钮为红色"开始新建"，触发阶段二确认处理
         if (currentTab === 'crm' && crmStage === 'checked') {
             startCrmConfirm();
+            return;
+        }
+
+        // 替换号核对阶段：按钮为红色"开始更新"，触发阶段二确认更新
+        if (currentTab === 'replace_number' && rnStage === 'checked') {
+            startReplaceNumberUpdate();
             return;
         }
 
@@ -275,16 +294,20 @@ layui.use('layer', function () {
             formData.append('order_type', orderType);
         }
 
-        // 隐藏上次 CRM 结果
+        // 隐藏上次 CRM/替换号 结果
         document.getElementById('crmResultArea').style.display = 'none';
         document.getElementById('crmCheckArea').style.display = 'none';
         document.getElementById('replaceNumberResultArea').style.display = 'none';
+        document.getElementById('rnCheckArea').style.display = 'none';
         currentTaskId = null;
         currentTaskData = null;
         crmCheckTaskId = null;
         crmCheckItems = [];
         crmPendingCreateItems = [];
         crmStage = '';
+        rnCheckTaskId = null;
+        rnCheckItems = [];
+        rnStage = '';
         updateConfirmBtnState();
 
         // 显示处理进度
@@ -317,17 +340,6 @@ layui.use('layer', function () {
     document.getElementById('replaceNumberDownloadBtn').addEventListener('click', function () {
         if (currentTaskId) {
             window.location.href = '/api/excel/async/download/' + currentTaskId;
-        }
-    });
-
-    // 查看替换号差异：将新建成功或已存在的 OE+品牌 传入替换号编辑页面
-    document.getElementById('crmDiffBtn').addEventListener('click', function () {
-        var oeBrandList = currentTaskData && currentTaskData.oe_brand_list;
-        if (oeBrandList && oeBrandList.length > 0) {
-            sessionStorage.setItem('replace_number_oe_brand_list', JSON.stringify(oeBrandList));
-            window.open('/replace_number_edit', '_blank');
-        } else {
-            layer.msg('没有可查看替换号的成功/已存在数据', {icon: 2});
         }
     });
 
@@ -615,6 +627,7 @@ layui.use('layer', function () {
     }
 
     // ====== 更新替换号处理函数 ======
+    // direct: 直接添加，完成后展示结果区；compare: 阶段一匹配检查，完成后渲染核对表格
     function handleReplaceNumberProcess(formData, loadingIndex, mode) {
         fetch('/api/excel/async/replace_number', {
             method: 'POST',
@@ -628,87 +641,171 @@ layui.use('layer', function () {
                 return;
             }
 
-            if (mode === 'compare') {
-                layer.close(loadingIndex);
-                if (result.data && result.data.oe_brand_list) {
-                    sessionStorage.setItem('replace_number_oe_brand_list', JSON.stringify(result.data.oe_brand_list));
-                }
-                layer.msg('已跳转到替换号编辑页面', {icon: 1});
-                window.open('/replace_number_edit', '_blank');
-                return;
-            }
-
-            // direct 模式：轮询下载
             var taskId = result.data.task_id;
-            currentTaskId = taskId;
             layer.msg('任务已提交，处理中...', {icon: 1});
 
-            var progressLayerIndex = layer.open({
-                type: 1,
-                title: false,
-                closeBtn: 0,
-                shade: 0.3,
-                area: ['280px', '100px'],
-                content: '<div id="rnProgressContent" style="padding: 28px 0; text-align: center; font-size: 14px;"><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i> <span id="rnProgressText">初始化中...</span></div>'
-            });
-
-            var pollCount = 0;
-            var maxPollCount = 900;
-            var checkInterval = setInterval(function () {
-                pollCount++;
-                if (pollCount > maxPollCount) {
-                    clearInterval(checkInterval);
-                    layer.close(progressLayerIndex);
-                    layer.msg('处理超时，请稍后重试', {icon: 2});
-                    return;
+            var progressLayerIndex = createProgressLayer('rnProgressContent', 'rnProgressText');
+            pollExcelTask(taskId, loadingIndex, progressLayerIndex, 'rnProgressText', function (tId, resultData) {
+                if (mode === 'compare') {
+                    // 阶段一完成：渲染核对表格，等待用户编辑后点"开始更新"
+                    rnCheckTaskId = tId;
+                    renderRnCheckTable(resultData || {});
+                } else {
+                    // direct 直接添加完成：展示结果区
+                    currentTaskId = tId;
+                    document.getElementById('replaceNumberResultMsg').textContent = '处理完成，请下载结果文件';
+                    document.getElementById('replaceNumberResultArea').style.display = 'block';
+                    setUploadZoneVisible('replace_number', false);
                 }
-
-                fetch('/api/excel/async/status/' + taskId)
-                .then(response => response.json())
-                .then(statusResult => {
-                    if (statusResult.code !== 0) {
-                        clearInterval(checkInterval);
-                        layer.close(progressLayerIndex);
-                        layer.msg('查询状态失败: ' + statusResult.msg, {icon: 2});
-                        return;
-                    }
-
-                    var status = statusResult.data;
-                    if (status.status === 'running') {
-                        var progress = status.progress || 0;
-                        var total = status.total || 0;
-                        var message = status.message || '处理中...';
-                        var displayMsg = (progress === 0 && total === 0) ? '初始化中...' : '处理中: ' + progress + '/' + total + ' - ' + message;
-                        var progressText = document.getElementById('rnProgressText');
-                        if (progressText) {
-                            progressText.textContent = displayMsg;
-                        }
-                    } else if (status.status === 'completed') {
-                        clearInterval(checkInterval);
-                        layer.close(progressLayerIndex);
-                        layer.close(loadingIndex);
-                        document.getElementById('replaceNumberResultMsg').textContent = '处理完成，请下载结果文件';
-                        document.getElementById('replaceNumberResultArea').style.display = 'block';
-                        // 处理完成：隐藏上传框，重置后才恢复
-                        setUploadZoneVisible('replace_number', false);
-                        layer.msg('处理完成', {icon: 1});
-                    } else if (status.status === 'failed') {
-                        clearInterval(checkInterval);
-                        layer.close(progressLayerIndex);
-                        layer.close(loadingIndex);
-                        layer.msg('处理失败: ' + (status.error || '未知错误'), {icon: 2});
-                    }
-                })
-                .catch(error => {
-                    clearInterval(checkInterval);
-                    layer.close(progressLayerIndex);
-                    layer.close(loadingIndex);
-                    layer.msg('查询状态失败: ' + error.message, {icon: 2});
-                });
-            }, 2000);
+            });
         })
         .catch(error => {
             layer.close(loadingIndex);
+            layer.msg('提交失败: ' + error.message, {icon: 2});
+        });
+    }
+
+    // ====== 替换号输入拆分：兼容中英文逗号分隔 ======
+    function splitNumbers(text) {
+        if (!text) return [];
+        return String(text).split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+
+    // ====== 渲染替换号核对表格（阶段一完成后） ======
+    function renderRnCheckTable(data) {
+        var items = data.items || [];
+        var matchedCount = data.matched_count || 0;
+        var unmatchedCount = data.unmatched_count || 0;
+
+        rnCheckItems = items;
+
+        var html = '<table class="crm-check-table"><thead><tr>';
+        html += '<th style="width:86px;">状态</th><th>OE号</th><th>品牌</th><th>品牌号</th>';
+        html += '<th>原厂号</th><th>其他号</th><th style="width:64px;">上传</th><th>将更新产品</th>';
+        html += '</tr></thead><tbody>';
+
+        for (var j = 0; j < items.length; j++) {
+            var it = items[j];
+            var pending = it.status === '待更新';
+            html += '<tr>';
+            html += '<td><span class="crm-check-tag ' + (pending ? 'to_create' : 'rn-blocked') + '">' + escapeHtml(pending ? '待更新' : it.status) + '</span></td>';
+            html += '<td>' + escapeHtml(it.oe) + '</td>';
+            html += '<td>' + escapeHtml(it.brand) + '</td>';
+            html += '<td>' + escapeHtml(it.brand_number) + '</td>';
+            html += '<td><textarea class="rn-num-input" data-idx="' + j + '" data-field="original"' + (pending ? '' : ' readonly') + '>' + escapeHtml(it.original_numbers || '') + '</textarea></td>';
+            html += '<td><textarea class="rn-num-input" data-idx="' + j + '" data-field="other"' + (pending ? '' : ' readonly') + '>' + escapeHtml(it.other_numbers || '') + '</textarea></td>';
+            html += '<td><select class="rn-upload-select" data-idx="' + j + '"' + (pending ? '' : ' disabled') + '>';
+            html += '<option value="1"' + (parseInt(it.is_upload, 10) === 1 ? ' selected' : '') + '>1</option>';
+            html += '<option value="0"' + (parseInt(it.is_upload, 10) !== 1 ? ' selected' : '') + '>0</option>';
+            html += '</select></td>';
+            var productLines = (it.products || []).map(function (p) {
+                var line = p.number + '/' + p.brand_name;
+                return '<div class="rn-product-line" title="' + escapeHtml(line) + '">' + escapeHtml(line) + '</div>';
+            }).join('');
+            html += '<td>' + (productLines || '—') + '</td>';
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+
+        var statsMsg = '匹配完成：待更新 ' + matchedCount + ' 行，未匹配/异常 ' + unmatchedCount + ' 行。';
+        statsMsg += '原厂号与其他号可编辑，仅"上传=1"的行会更新，核对后点击右下角开始更新。';
+        document.getElementById('rnCheckStats').textContent = statsMsg;
+        document.getElementById('rnCheckTableWrap').innerHTML = html;
+
+        // 进入核对阶段：底部按钮变红色"开始更新"，上传框隐藏（重置后恢复）
+        rnStage = 'checked';
+        updateConfirmBtnState();
+        document.getElementById('rnCheckArea').style.display = 'block';
+        setUploadZoneVisible('replace_number', false);
+    }
+
+    // ====== 阶段二：确认后批量更新替换号 ======
+    function startReplaceNumberUpdate() {
+        var confirmBtn = document.getElementById('confirmProcessBtn');
+        if (!rnCheckTaskId) {
+            layer.msg('请先完成匹配检查', {icon: 2});
+            return;
+        }
+
+        // 从核对表格收集编辑后的替换号（data-idx 对应 rnCheckItems 索引）
+        var submitItems = [];
+        for (var i = 0; i < rnCheckItems.length; i++) {
+            var it = rnCheckItems[i];
+            if (it.status !== '待更新') continue;
+            var select = document.querySelector('.rn-upload-select[data-idx="' + i + '"]');
+            if (!select || parseInt(select.value, 10) !== 1) continue;
+
+            var origInput = document.querySelector('.rn-num-input[data-idx="' + i + '"][data-field="original"]');
+            var otherInput = document.querySelector('.rn-num-input[data-idx="' + i + '"][data-field="other"]');
+            var newOriginal = splitNumbers(origInput ? origInput.value : '');
+            var newOther = splitNumbers(otherInput ? otherInput.value : '');
+
+            var products = [];
+            (it.products || []).forEach(function (p) {
+                // 原厂系品牌取原厂号，其他品牌取其他号，与产品已有替换号合并去重
+                var base = (it.original_brands || []).indexOf(p.brand_name) >= 0 ? newOriginal : newOther;
+                var finalNumbers = (p.display_numbers || []).slice();
+                base.forEach(function (n) {
+                    if (finalNumbers.indexOf(n) < 0) finalNumbers.push(n);
+                });
+                if (finalNumbers.length > 0) {
+                    products.push({product_id: p.product_id, numbers: finalNumbers});
+                }
+            });
+            if (products.length > 0) {
+                submitItems.push({row_index: it.row_index, products: products});
+            }
+        }
+
+        if (!submitItems.length) {
+            layer.msg('没有可更新的数据，请勾选需要上传的行', {icon: 2});
+            return;
+        }
+
+        confirmBtn.disabled = true;
+        var enableBtn = function () {
+            confirmBtn.disabled = false;
+            updateConfirmBtnState();
+        };
+        var loadingIndex = layer.load(1, { shade: [0.1, '#fff'] });
+        fetch('/api/excel/async/replace_number_confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                check_task_id: rnCheckTaskId,
+                items: submitItems
+            })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.code !== 0) {
+                layer.close(loadingIndex);
+                enableBtn();
+                layer.msg('提交失败: ' + result.msg, {icon: 2});
+                return;
+            }
+
+            var taskId = result.data.task_id;
+            layer.msg('任务已提交，处理中...', {icon: 1});
+
+            var progressLayerIndex = createProgressLayer('rnUpdateProgressContent', 'rnUpdateProgressText');
+            pollExcelTask(taskId, loadingIndex, progressLayerIndex, 'rnUpdateProgressText', function (tId, resultData) {
+                currentTaskId = tId;
+                currentTaskData = resultData || {};
+                document.getElementById('rnCheckArea').style.display = 'none';
+                // 处理完成：退出核对阶段，按钮恢复"开始处理"（需重置后重新走流程）
+                rnStage = '';
+                rnCheckItems = [];
+                enableBtn();
+                var sc = currentTaskData.success_count || 0;
+                var fc = currentTaskData.fail_count || 0;
+                document.getElementById('replaceNumberResultMsg').textContent = '处理完成：成功 ' + sc + ' 行，失败 ' + fc + ' 行';
+                document.getElementById('replaceNumberResultArea').style.display = 'block';
+            }, enableBtn);
+        })
+        .catch(error => {
+            layer.close(loadingIndex);
+            enableBtn();
             layer.msg('提交失败: ' + error.message, {icon: 2});
         });
     }
