@@ -7,6 +7,10 @@ from flask import Blueprint, jsonify, render_template, session, request
 from functools import wraps
 
 from app.services.cass_inquiry_service import CassInquiryQueryService
+from app.services.cass_inquiry_service.price_compare_service import (
+    list_stores as list_compare_stores,
+    query_price_compare,
+)
 from app.services.cass_inquiry_service.price_edit_service import (
     search_products_by_replacement,
     update_cass_prices,
@@ -100,6 +104,47 @@ def filter_values():
         return jsonify({'code': 1, 'msg': str(e)}), 400
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'查询失败: {e}'}), 500
+
+
+@bp.route('/api/cass_inquiry/price_compare/stores')
+@login_required
+@permission_required
+def price_compare_stores():
+    """
+    供应商价格对比 · 供应商候选（全表去重，排除巴博瑞自身）
+
+    返回：{'code': 0, 'data': {'stores': [...]}}
+    """
+    try:
+        return jsonify(list_compare_stores())
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'查询供应商失败: {e}'}), 500
+
+
+@bp.route('/api/cass_inquiry/price_compare')
+@login_required
+@permission_required
+def price_compare():
+    """
+    供应商价格对比 · 分页查询（与巴博瑞按译码OE号比对，价格取卖家价格）
+
+    参数：store_name（必填）、page、page_size、sort_column、sort_dir
+    返回：{'code': 0, 'data': {'list': [...], 'total': n, 'page': p, 'page_size': s}}
+          每行含 compare_status: higher/lower/equal/no_bbri
+    """
+    try:
+        result = query_price_compare(
+            store_name=request.args.get('store_name'),
+            page=request.args.get('page', 1),
+            page_size=request.args.get('page_size') or request.args.get('limit', 20),
+            sort_column=request.args.get('sort_column'),
+            sort_dir=request.args.get('sort_dir'),
+        )
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'code': 1, 'msg': str(e)}), 400
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'比对查询失败: {e}'}), 500
 
 
 @bp.route('/api/cass_inquiry/crm_products')

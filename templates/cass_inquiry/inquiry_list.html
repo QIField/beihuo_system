@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='js/handsontable/handsontable.full.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/purchase_plan/common.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/cass_inquiry/price_edit.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cass_inquiry/price_compare.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.css') }}">
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script src="{{ url_for('static', filename='js/handsontable/handsontable.full.min.js') }}"></script>
@@ -18,6 +19,7 @@
     <script src="{{ url_for('static', filename='js/purchase_plan/common.js') }}"></script>
     <script src="{{ url_for('static', filename='js/date-range-picker.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cass_inquiry/price_edit_dialog.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cass_inquiry/price_compare.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cass_inquiry/inquiry_list.js') }}"></script>
     <style>
         /* 页面级模块布局（与询比价模块一致） */
@@ -122,6 +124,10 @@
     <div class="purchase-plan-page">
         <div class="page-header">
             <h2>修理厂询价单</h2>
+            <div class="page-tabs">
+                <button type="button" class="page-tab active" data-tab="quotes">报价数据</button>
+                <button type="button" class="page-tab" data-tab="compare">供应商价格对比</button>
+            </div>
         </div>
 
         <div class="main-layout">
@@ -154,14 +160,39 @@
                 </div>
             </aside>
 
-            <!-- 右侧内容区 -->
+            <!-- 右侧内容区：小标签页切换 -->
             <main class="content-area">
-                <div class="data-container">
-                    <div class="data-header">
-                        <span>修理厂询单报价数据</span>
+                <!-- Tab 1：报价数据（现有主表格） -->
+                <div class="tab-pane active" id="tab-quotes">
+                    <div class="data-container">
+                        <div class="data-header">
+                            <span>修理厂询单报价数据</span>
+                        </div>
+                        <div id="handsontable-container"></div>
+                        <div id="mainPaginationBar"></div>
                     </div>
-                    <div id="handsontable-container"></div>
-                    <div id="mainPaginationBar"></div>
+                </div>
+
+                <!-- Tab 2：供应商价格对比（按译码OE号与巴博瑞比对） -->
+                <div class="tab-pane" id="tab-compare">
+                    <div class="compare-toolbar">
+                        <span class="toolbar-label">供应商</span>
+                        <div class="store-select">
+                            <input type="text" class="text-input" id="compareStoreInput"
+                                   placeholder="输入名称过滤或直接选择" autocomplete="off">
+                            <span class="store-arrow"></span>
+                            <div class="store-options" id="compareStoreOptions"></div>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="compareStartBtn">开始比对</button>
+                        <span class="toolbar-tip">与「佛山巴博瑞汽配」按译码OE号比对，价格取卖家价格；基准为巴博瑞同OE最低价</span>
+                    </div>
+                    <div class="data-container compare-data-container">
+                        <div class="data-header">
+                            <span id="compareResultTitle">价格对比结果</span>
+                        </div>
+                        <div id="compare-handsontable-container"></div>
+                        <div id="comparePaginationBar"></div>
+                    </div>
                 </div>
             </main>
         </div>
