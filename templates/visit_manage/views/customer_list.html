@@ -1,0 +1,515 @@
+<!-- 客户列表：M1（01-主设计文档 第六节）
+     数据接口：GET /new/api/visit/customers（分页 + 客户类型/拿货渠道筛选 + 客户名称/地址关键词搜索）、
+               GET /new/api/visit/filter-options（筛选下拉选项，取库中实际数据动态生成；
+               两个下拉末项的「无」为前端固定项，值 __empty__ 表示筛字段为空）；
+     关联CRM：M8 客户绑定（03-高德客户档案与客户绑定模块设计.md 3.2），绑定弹窗内可查看/解绑/追加：
+               GET    /new/api/visit/relations（当前已绑定列表，按 POI 查询，1:N），
+               POST   /new/api/visit/relations（追加绑定），
+               DELETE /new/api/visit/relations（解绑，物理删除绑定行，全部解绑后状态回落未关联）；
+     等级/拿货渠道/CRM名/最近订单时间等 CRM 侧数据依赖详情聚合，本期列表不展示；
+     数据权限（预留）：无 visit:view_all 权限仅返回本人客户的限制后续接入。 -->
+<style>
+    /* 列表顶部搜索框（客户名称/地址模糊搜索，尺寸对齐 .v-select） */
+    .cust-search {
+        height: 28px; width: 240px; padding: 0 10px; font-size: 12px; color: var(--v-text);
+        border: 1px solid #d1d5db; border-radius: 4px; background: #fff; outline: none;
+    }
+    .cust-search:focus { border-color: var(--v-primary); }
+    .cust-search-btn { height: 28px; padding: 0 14px; font-size: 12px; }
+    /* 关联CRM弹窗表单 */
+    .bind-cust { padding: 10px 12px; background: #f9fafb; border: 1px solid var(--v-border); border-radius: 6px; margin-bottom: 14px; }
+    .bind-cust .bcn { font-weight: 600; font-size: 14px; }
+    .bind-cust .bcs { font-size: 12px; color: var(--v-text-3); margin-top: 2px; }
+    .bind-label { display: block; font-size: 12px; color: var(--v-text-2); margin-bottom: 6px; }
+    .bind-label em { font-style: normal; color: #ef4444; margin-right: 2px; }
+    .bind-search { display: flex; gap: 8px; margin-bottom: 8px; }
+    .bind-search input {
+        flex: 1; height: 30px; padding: 0 10px; font-size: 12px; color: var(--v-text);
+        border: 1px solid #d1d5db; border-radius: 4px; outline: none;
+    }
+    .bind-search input:focus { border-color: var(--v-primary); }
+    .bind-search button {
+        height: 30px; padding: 0 14px; font-size: 12px; background: var(--v-primary); color: #fff;
+        border: none; border-radius: 4px; cursor: pointer;
+    }
+    .bind-search button:hover { opacity: .9; }
+    .bind-candidates { max-height: 180px; overflow-y: auto; border: 1px solid var(--v-border); border-radius: 6px; }
+    .bind-candidate { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+    .bind-candidate:last-child { border-bottom: none; }
+    .bind-candidate:hover { background: #f3f4f6; }
+    .bind-candidate.selected { background: #eff6ff; }
+    .bind-candidate .bc-name { font-size: 13px; font-weight: 500; }
+    .bind-candidate .bc-name small { font-weight: 400; color: var(--v-text-3); }
+    .bind-candidate .bc-sub { font-size: 12px; color: var(--v-text-3); margin-top: 2px; }
+    .bind-empty { padding: 16px; text-align: center; font-size: 12px; color: var(--v-text-3); }
+    .bind-remark {
+        width: 100%; box-sizing: border-box; height: 56px; padding: 8px 10px; font-size: 12px;
+        color: var(--v-text); border: 1px solid #d1d5db; border-radius: 4px; outline: none; resize: none;
+    }
+    .bind-remark:focus { border-color: var(--v-primary); }
+    /* 已绑定CRM列表（弹窗内，可解绑） */
+    .bind-current { max-height: 180px; overflow-y: auto; border: 1px solid var(--v-border); border-radius: 6px; }
+    .bind-current-item {
+        display: flex; align-items: center; gap: 8px; justify-content: space-between;
+        padding: 8px 10px; border-bottom: 1px solid #f3f4f6;
+    }
+    .bind-current-item:last-child { border-bottom: none; }
+    .bind-current-item .bc-name { font-size: 13px; font-weight: 500; }
+    .bind-current-item .bc-name small { font-weight: 400; color: var(--v-text-3); }
+    .bind-current-item .bc-sub { font-size: 12px; color: var(--v-text-3); margin-top: 2px; }
+    .bind-current-item .unbind-link { flex-shrink: 0; font-size: 12px; }
+</style>
+<div class="v-card">
+    <div class="v-pane-head" style="padding: 14px 20px; margin-bottom: 0;">
+        <h3 class="v-pane-title">客户列表（共<span id="list-total">0</span>家）</h3>
+        <span class="v-tag v-tag--orange" id="unbound-count" style="display:none;"></span>
+    </div>
+    <!-- 筛选栏（客访原型V2：本期接入客户类型/拿货渠道 + 客户名称/地址关键词搜索，其余筛选后续迭代） -->
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--v-border);">
+        <span style="font-size: 13px; color: var(--v-text-2); flex-shrink: 0;">筛选：</span>
+        <select class="v-select" id="cust-type-filter" style="min-width: 130px;" title="客户类型为多值字段，按包含匹配">
+            <option value="">全部类型</option>
+        </select>
+        <select class="v-select" id="purchase-channel-filter" style="min-width: 130px;" title="拿货渠道为多值字段，按包含匹配">
+            <option value="">全部渠道</option>
+        </select>
+        <input type="text" class="cust-search" id="cust-kw" placeholder="搜索客户名称 / 地址" autocomplete="off" title="按高德客户名称或地址模糊搜索">
+        <button type="button" class="v-btn v-btn--primary cust-search-btn" id="cust-search-btn">搜索</button>
+    </div>
+    <div class="v-table-wrap">
+        <table class="v-table">
+            <thead>
+                <tr>
+                    <th>客户名称</th>
+                    <th>客户类型</th>
+                    <th>所属商圈</th>
+                    <th>联系人</th>
+                    <th>拜访状态</th>
+                    <th>最近拜访时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="list-body"></tbody>
+        </table>
+    </div>
+    <div id="list-pager" style="padding: 12px 16px;"></div>
+</div>
+
+<!-- laytpl 模板：客户列表行 -->
+<script type="text/html" id="tpl-customer-row">
+    {% raw %}
+    {{# if (!d.list || !d.list.length) { }}
+    <tr><td colspan="7"><div class="v-empty">{{ d.emptyText || '暂无客户数据，可先到「设置」页导入高德客户Excel' }}</div></td></tr>
+    {{# } }}
+    {{# layui.each(d.list, function (i, r) { }}
+    <tr data-id="{{ r.id }}" data-poi="{{ r.poi }}" data-name="{{ r.customerName }}" data-status="{{ r.status }}">
+        <td>
+            <div class="v-row-main">
+                {{ r.customerName }}
+                {{# if (r.tag) { }}<span class="v-tag v-tag--indigo" style="margin-left: 6px;">{{ r.tag }}</span>{{# } }}
+                {{# if (r.status === 1) { }}<span class="v-tag v-tag--green" style="margin-left: 6px;">已关联CRM</span>{{# } }}
+            </div>
+            <div class="v-row-sub">{{ r.address || '—' }}</div>
+        </td>
+        <td>{{ r.customerType || '—' }}</td>
+        <td>{{ r.businessCircle || '—' }}</td>
+        <td>{{ r.contactPerson || '—' }}</td>
+        <td><span class="v-tag {{ r.visitStatusCls }}">{{ r.visitStatus }}</span></td>
+        <td>{{ r.lastVisitTime || '—' }}</td>
+        <td>
+            <span class="v-link" data-act="detail">查看详情</span>
+            <span class="v-link" data-act="bind" style="margin-left: 8px;">关联CRM</span>
+        </td>
+    </tr>
+    {{# }); }}
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：关联CRM表单（layer 弹窗内容；1:N：上方已关联列表可解绑，下方搜索新增，可连续关联多条） -->
+<script type="text/html" id="tpl-bind-form">
+    {% raw %}
+    <div style="padding: 16px 18px; max-height: 70vh; overflow-y: auto; box-sizing: border-box;">
+        <!-- 高德客户（只读） -->
+        <div class="bind-cust">
+            <div class="bcn">{{ d.customerName }}</div>
+            <div class="bcs">{{ d.address || '—' }}</div>
+        </div>
+        <!-- 当前已绑定CRM列表（打开弹窗时加载，可解绑） -->
+        <div id="bind-current-box"></div>
+        <!-- CRM 客户搜索与选择 -->
+        <label class="bind-label"><em>*</em>搜索并选择CRM客户（客户名称/简称/记忆代码）</label>
+        <div class="bind-search">
+            <input type="text" id="bind-kw" placeholder="输入关键词后点击搜索" autocomplete="off">
+            <button type="button" id="bind-search-btn">搜索</button>
+        </div>
+        <div class="bind-candidates" id="bind-candidates">
+            <div class="bind-empty">请输入关键词搜索CRM客户</div>
+        </div>
+        <!-- 绑定备注 -->
+        <label class="bind-label" style="margin-top: 12px;">绑定备注（高德名与CRM户名差异说明）</label>
+        <textarea class="bind-remark" id="bind-remark" maxlength="255" placeholder="选填，如：高德为分店名，CRM为工商注册名"></textarea>
+    </div>
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：CRM客户候选列表 -->
+<script type="text/html" id="tpl-partner-candidates">
+    {% raw %}
+    {{# if (!d.list || !d.list.length) { }}
+    <div class="bind-empty">未找到匹配的CRM客户（已排除禁用与已关联客户）</div>
+    {{# } }}
+    {{# layui.each(d.list, function (i, p) { }}
+    <div class="bind-candidate" data-pid="{{ p.partner_id }}">
+        <div class="bc-name">{{ p.fullname }}{{# if (p.remenber_code) { }} <small>（{{ p.remenber_code }}）</small>{{# } }}</div>
+        <div class="bc-sub">{{ p.level_name || '等级未知' }} · {{ p.region || '区域未知' }} · 业务员：{{ p.real_name || '—' }}</div>
+    </div>
+    {{# }); }}
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：当前已绑定CRM列表（GET /new/api/visit/relations，每条带「解绑」） -->
+<script type="text/html" id="tpl-bind-current">
+    {% raw %}
+    {{# if (d.list && d.list.length) { }}
+    <label class="bind-label">已关联CRM客户（{{ d.list.length }}）</label>
+    <div class="bind-current" style="margin-bottom: 14px;">
+        {{# layui.each(d.list, function (i, r) { }}
+        <div class="bind-current-item" data-pid="{{ r.partner_id }}">
+            <div>
+                <div class="bc-name">{{ r.fullname }}{{# if (r.remenber_code) { }} <small>（{{ r.remenber_code }}）</small>{{# } }}</div>
+                <div class="bc-sub">{{ r.level_name || '等级未知' }} · {{ r.region || '区域未知' }} · 绑定于 {{ r.bind_time || '—' }}</div>
+            </div>
+            <span class="v-link unbind-link" data-act="unbind">解绑</span>
+        </div>
+        {{# }); }}
+    </div>
+    {{# } }}
+    {% endraw %}
+</script>
+
+<script>
+    layui.use(['jquery', 'laytpl', 'layer', 'laypage'], function () {
+        var $ = layui.jquery;
+        var laytpl = layui.laytpl;
+        var layer = layui.layer;
+        var laypage = layui.laypage;
+
+        var API_BASE = '/new/api/visit/customers';
+        // 「无」选项哨兵值：筛选对应字段为空（NULL 或 ''）的客户，与后端 EMPTY_MULTI 约定一致
+        var EMPTY_FILTER = '__empty__';
+        var state = { page: 1, limit: 10, customerType: '', purchaseChannel: '', keyword: '' };
+
+        function fmtParams(page) {
+            var params = { page: page, limit: state.limit };
+            if (state.customerType) params.customer_type = state.customerType;
+            if (state.purchaseChannel) params.purchase_channels = state.purchaseChannel;
+            if (state.keyword) params.keyword = state.keyword;
+            return params;
+        }
+
+        // ==================== 筛选下拉选项（GET /new/api/visit/filter-options，随库中实际数据动态生成） ====================
+        function loadFilterOptions() {
+            $.ajax({
+                url: '/new/api/visit/filter-options',
+                type: 'GET',
+                dataType: 'json',
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) return;
+                    fillSelect($('#cust-type-filter'), '全部类型', res.data.customer_types, true);
+                    fillSelect($('#purchase-channel-filter'), '全部渠道', res.data.purchase_channels, true);
+                }
+            });
+        }
+
+        // 填充下拉：首项为"全部"，末项固定追加「无」选项（筛字段为空）
+        function fillSelect($sel, allLabel, options, withEmpty) {
+            $sel.empty();
+            $('<option></option>').val('').text(allLabel).appendTo($sel);
+            $.each(options || [], function (i, t) {
+                $('<option></option>').val(t).text(t).appendTo($sel);
+            });
+            if (withEmpty) {
+                $('<option></option>').val(EMPTY_FILTER).text('无').appendTo($sel);
+            }
+        }
+
+        // 切换筛选 → 重置到第 1 页重新查询
+        $('#cust-type-filter').on('change', function () {
+            state.customerType = $(this).val();
+            loadList(1);
+        });
+        $('#purchase-channel-filter').on('change', function () {
+            state.purchaseChannel = $(this).val();
+            loadList(1);
+        });
+
+        // ==================== 关键词搜索（客户名称/地址模糊匹配） ====================
+        // 搜索/清空关键词 → 重置到第 1 页重新查询（与筛选下拉同一交互）
+        function doSearch() {
+            state.keyword = $('#cust-kw').val().trim();
+            loadList(1);
+        }
+        $('#cust-search-btn').on('click', doSearch);
+        $('#cust-kw').on('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+        });
+
+        // ==================== 加载列表 ====================
+        function loadList(page) {
+            state.page = page;
+            var loadIdx = layer.load(2);
+            $.ajax({
+                url: API_BASE,
+                type: 'GET',
+                data: fmtParams(page),
+                dataType: 'json',
+                success: function (res) {
+                    layer.close(loadIdx);
+                    if (res.code !== 200 || !res.data) {
+                        layer.msg(res.msg || '客户列表查询失败');
+                        return;
+                    }
+                    render(res.data);
+                },
+                error: function (xhr) {
+                    layer.close(loadIdx);
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    layer.msg(msg);
+                }
+            });
+        }
+
+        // ==================== 渲染 ====================
+        function render(data) {
+            var rows = (data.list || []).map(function (r) {
+                return {
+                    id: r.id,
+                    poi: r.poi,
+                    customerName: r.customer_name,
+                    tag: r.tag,
+                    status: r.status,
+                    address: r.address,
+                    customerType: r.customer_type,
+                    businessCircle: r.business_circle,
+                    contactPerson: r.contact_person,
+                    visitStatus: r.visit_status_label,
+                    visitStatusCls: r.visit_status_cls,
+                    lastVisitTime: r.last_visit_time
+                };
+            });
+            laytpl($('#tpl-customer-row').html()).render({ list: rows }, function (html) {
+                $('#list-body').html(html);
+            });
+            $('#list-total').text(data.total);
+            if (data.unbound_count > 0) {
+                $('#unbound-count').text('未关联CRM ' + data.unbound_count + ' 家').show();
+            } else {
+                $('#unbound-count').hide();
+            }
+            laypage.render({
+                elem: 'list-pager',
+                count: data.total,
+                curr: state.page,
+                limit: state.limit,
+                limits: [5,10,20, 50, 100],
+                layout: ['count', 'prev', 'page', 'next', 'limit', 'skip'],
+                jump: function (obj, first) {
+                    if (first) return;
+                    state.limit = obj.limit;
+                    loadList(obj.curr);
+                }
+            });
+        }
+
+        // 仅点击「查看详情」→ 客户详情（hash 路由，主页面接管；末段为 visit_amap_customer 主键 id）
+        $('#list-body').on('click', '.v-link[data-act="detail"]', function () {
+            var id = $(this).closest('tr').data('id');
+            location.hash = '#/customer_detail/visit' + (id ? '/' + id : '');
+        });
+
+        // ==================== 关联CRM（M8，03 文档 3.2；1:N 追加式） ====================
+        var bindCtx = { poi: null, customerName: '', selectedPartner: null };
+
+        // 点击「关联CRM」→ 打开绑定弹窗（1:N：上方已关联列表可解绑，下方搜索新增）
+        $('#list-body').on('click', '.v-link[data-act="bind"]', function () {
+            var $tr = $(this).closest('tr');
+            openBindDialog(
+                String($tr.data('poi')),
+                $tr.data('name'),
+                $tr.find('.v-row-sub').text().trim()
+            );
+        });
+
+        function openBindDialog(poi, customerName, address) {
+            bindCtx = { poi: poi, customerName: customerName || '', selectedPartner: null };
+            laytpl($('#tpl-bind-form').html()).render(
+                { customerName: bindCtx.customerName, address: address || '' },
+                function (html) {
+                    layer.open({
+                        type: 1,
+                        title: '关联CRM客户',
+                        area: '480px',
+                        content: html,
+                        btn: ['确认关联', '取消'],
+                        yes: submitBind,
+                        success: function (layero) {
+                            // 当前已关联CRM列表（打开弹窗即加载，弹窗内可解绑）
+                            loadBindCurrent(layero);
+                            // 搜索：按钮点击 / 输入框回车
+                            layero.on('click', '#bind-search-btn', function () { searchPartners(layero); });
+                            layero.on('keydown', '#bind-kw', function (e) {
+                                if (e.key === 'Enter') { e.preventDefault(); searchPartners(layero); }
+                            });
+                            // 候选点击 → 选中（高亮，可换选）
+                            layero.on('click', '.bind-candidate', function () {
+                                layero.find('.bind-candidate').removeClass('selected');
+                                $(this).addClass('selected');
+                                bindCtx.selectedPartner = {
+                                    partner_id: $(this).data('pid'),
+                                    fullname: $(this).find('.bc-name').text().trim()
+                                };
+                            });
+                            // 已关联条目「解绑」点击（bc-name 内不含记忆码 small）
+                            layero.on('click', '.bind-current-item .unbind-link', function () {
+                                var $item = $(this).closest('.bind-current-item');
+                                var pid = $item.data('pid');
+                                var name = $item.find('.bc-name').clone().children('small').remove().end().text().trim();
+                                if (!pid) return;
+                                submitUnbind(layero, pid, name);
+                            });
+                            setTimeout(function () { layero.find('#bind-kw').focus(); }, 200);
+                        }
+                    });
+                }
+            );
+        }
+
+        // 当前已绑定CRM列表（GET /new/api/visit/relations，1:N 按绑定时间倒序）
+        function loadBindCurrent(layero) {
+            var $box = layero.find('#bind-current-box');
+            $.ajax({
+                url: '/new/api/visit/relations',
+                type: 'GET',
+                data: { amap_customer_id: bindCtx.poi },
+                dataType: 'json',
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        $box.html('<div class="bind-empty">' + (res.msg || '已关联列表查询失败') + '</div>');
+                        return;
+                    }
+                    laytpl($('#tpl-bind-current').html()).render({ list: res.data.list }, function (html) {
+                        $box.html(html);
+                    });
+                },
+                error: function () {
+                    $box.html('<div class="bind-empty">网络异常，已关联列表加载失败</div>');
+                }
+            });
+        }
+
+        // 解绑（DELETE /new/api/visit/relations，物理删除绑定行）：确认后刷新弹窗内列表 + 列表页关联状态
+        function submitUnbind(layero, partnerId, partnerName) {
+            layer.confirm('确定解绑「' + $('<div>').text(partnerName).html() + '」？解绑后可在本弹窗重新搜索关联',
+                { title: '解绑CRM客户' }, function (idx) {
+                layer.close(idx);
+                var loadIdx = layer.load(2);
+                $.ajax({
+                    url: '/new/api/visit/relations',
+                    type: 'DELETE',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ amap_customer_id: bindCtx.poi, partner_id: partnerId }),
+                    dataType: 'json',
+                    success: function (res) {
+                        layer.close(loadIdx);
+                        if (res.code !== 200) {
+                            layer.msg(res.msg || '解绑失败');
+                            return;
+                        }
+                        layer.msg('已解绑', { icon: 1 });
+                        loadBindCurrent(layero); // 刷新弹窗内已关联列表
+                        loadList(state.page);    // 刷新列表页「已关联CRM」标签与未关联计数
+                    },
+                    error: function (xhr) {
+                        layer.close(loadIdx);
+                        var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                        layer.msg(msg);
+                    }
+                });
+            });
+        }
+
+        // CRM 客户搜索（GET /new/api/visit/partners/search）
+        function searchPartners(layero) {
+            var kw = layero.find('#bind-kw').val().trim();
+            if (!kw) { layer.msg('请输入搜索关键词'); return; }
+            var $box = layero.find('#bind-candidates');
+            $box.html('<div class="bind-empty">搜索中…</div>');
+            $.ajax({
+                url: '/new/api/visit/partners/search',
+                type: 'GET',
+                data: { keyword: kw, limit: 20 },
+                dataType: 'json',
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        $box.html('<div class="bind-empty">' + (res.msg || '搜索失败') + '</div>');
+                        return;
+                    }
+                    bindCtx.selectedPartner = null; // 新搜索后清空已选
+                    laytpl($('#tpl-partner-candidates').html()).render({ list: res.data.list }, function (html) {
+                        $box.html(html);
+                    });
+                },
+                error: function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    $box.html('<div class="bind-empty">' + msg + '</div>');
+                }
+            });
+        }
+
+        // 提交绑定（POST /new/api/visit/relations）；成功后不关闭弹窗，复位表单可连续关联多条（1:N）
+        function submitBind(index) {
+            var layero = $('#layui-layer' + index);
+            if (!bindCtx.selectedPartner) {
+                layer.msg('请先搜索并选择CRM客户');
+                return;
+            }
+            var loadIdx = layer.load(2);
+            $.ajax({
+                url: '/new/api/visit/relations',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    amap_customer_id: bindCtx.poi,
+                    partner_id: bindCtx.selectedPartner.partner_id,
+                    bind_remark: layero.find('#bind-remark').val().trim()
+                }),
+                dataType: 'json',
+                success: function (res) {
+                    layer.close(loadIdx);
+                    if (res.code !== 200) {
+                        layer.msg(res.msg || '关联失败');
+                        return;
+                    }
+                    layer.msg('关联成功', { icon: 1 });
+                    // 复位搜索表单，继续关联下一条
+                    bindCtx.selectedPartner = null;
+                    layero.find('#bind-kw').val('');
+                    layero.find('#bind-remark').val('');
+                    layero.find('#bind-candidates').html('<div class="bind-empty">请输入关键词搜索CRM客户</div>');
+                    loadBindCurrent(layero); // 刷新已关联列表（新绑定出现在列表顶部）
+                    loadList(state.page);    // 刷新列表页「已关联CRM」标签与未关联计数
+                    layero.find('#bind-kw').focus();
+                },
+                error: function (xhr) {
+                    layer.close(loadIdx);
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    layer.msg(msg);
+                }
+            });
+        }
+
+        // 初始加载
+        loadFilterOptions();
+        loadList(1);
+    });
+</script>

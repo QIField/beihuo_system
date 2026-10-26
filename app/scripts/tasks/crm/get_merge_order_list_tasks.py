@@ -9,7 +9,7 @@ from app.models.orm_models.crm.crm_sales_order import CrmSalesOrder
 from app.scripts.spiders.pipeline_clean.crm_gzbbr_clean import crm_sales_order_clear
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.scripts.spiders.pipeline_clean.get_mergeOrderList_clean import remove_duplicate
-from app.models.orm_models.merge_order_list import MergeOrderList
+
 from app.utils.orm.session import orm_session
 from config.config_list_manager.config_cache import get_config_value
 from sqlalchemy.dialects.mysql import insert

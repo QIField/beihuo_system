@@ -63,6 +63,9 @@ common_web_bp.register_blueprint(picking_shipping_web_bp)
 from .notepad_web import notepad_web_bp
 common_web_bp.register_blueprint(notepad_web_bp)
 
+from .visit_manage_web import visit_manage_web_bp
+common_web_bp.register_blueprint(visit_manage_web_bp)
+
 
 
 __all__ = ['general_web_bp','customer_quota_manager_web_bp','report_wx_quote_data_web_bp','warehouse_manager_web_bp','common_web_bp','excel_download_bp','pp_alias_manager_web_bp','niche_web_bp']

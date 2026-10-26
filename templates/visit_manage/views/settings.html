@@ -1,0 +1,203 @@
+<!-- 设置：数据接入（高德导出Excel上传：一个文件两个sheet）
+     接口：POST /new/api/visit/amap-customers/import_excel
+     "标记位置"sheet → 客户档案 upsert visit_amap_customer
+     "记录"sheet → 拜访记录 upsert visit_record（位置+时间唯一键，数据库自动插入/更新） -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:stretch;">
+
+    <!-- 左上：Excel上传 -->
+    <div class="v-card" style="margin:0;">
+        <div class="v-pane-head" style="padding: 14px 20px; margin-bottom: 0;">
+            <h3 class="v-pane-title">数据上传（高德导出Excel）</h3>
+        </div>
+        <div style="border-top: 1px solid var(--v-border); padding: 20px;">
+            <!-- 上传区 -->
+            <div id="upload-area"
+                 style="border: 1px dashed #c9cdd4; border-radius: 8px; background: #f9fafb; padding: 36px 16px; text-align: center; cursor: pointer;">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                     style="width: 40px; height: 40px; color: #9ca3af; margin-bottom: 8px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                          d="M7 16a4 4 0 01-.88-7.9A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <div style="font-size: 14px; color: #374151;">点击选择Excel文件，或拖拽文件到此处</div>
+                <div style="font-size: 12px; color: var(--v-text-3); margin-top: 6px;">
+                    支持高德地图导出文件（.xlsx / .xls），同时解析"标记位置"（客户档案）与"记录"（拜访记录）两个 sheet
+                </div>
+                <input type="file" id="amap-excel-input" accept=".xlsx,.xls" style="display: none;">
+            </div>
+
+            <!-- 已选文件 + 操作 -->
+            <div id="file-row" style="display: none; margin-top: 16px; align-items: center; gap: 12px;">
+                <span class="v-tag v-tag--blue" id="file-name"></span>
+                <button class="v-btn v-btn--primary" id="btn-upload">开始导入</button>
+                <button class="v-btn" id="btn-clear">重新选择</button>
+            </div>
+
+            <!-- 导入结果 -->
+            <div id="import-result" style="display: none; margin-top: 16px;"></div>
+
+            <!-- 说明 -->
+            <div style="margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--v-border); font-size: 12px; color: var(--v-text-3); line-height: 1.9;">
+                <div>1. 文件来源：高德地图 App 导出的Excel（"标记位置" sheet = 客户档案，"记录" sheet = 拜访记录）。</div>
+                <div>2. 幂等规则：客户档案按"位置编码"去重，已存在则更新档案字段；拜访记录按"位置编码+记录时间"去重，重复导入自动更新照片/记录人。</div>
+                <div>3. 新导入客户为"未关联CRM"，可在客户列表中绑定CRM客户；已绑定的客户导入不会改变其绑定状态。</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右上：占位 -->
+    <div class="v-card" style="margin:0;">
+        <div class="v-pane-head" style="padding: 14px 20px; margin-bottom: 0;">
+            <h3 class="v-pane-title">预留区域</h3>
+        </div>
+        <div style="border-top: 1px solid var(--v-border); padding: 20px; min-height: 120px;"></div>
+    </div>
+
+    <!-- 左下：占位 -->
+    <div class="v-card" style="margin:0;">
+        <div class="v-pane-head" style="padding: 14px 20px; margin-bottom: 0;">
+            <h3 class="v-pane-title">预留区域</h3>
+        </div>
+        <div style="border-top: 1px solid var(--v-border); padding: 20px; min-height: 120px;"></div>
+    </div>
+
+    <!-- 右下：占位 -->
+    <div class="v-card" style="margin:0;">
+        <div class="v-pane-head" style="padding: 14px 20px; margin-bottom: 0;">
+            <h3 class="v-pane-title">预留区域</h3>
+        </div>
+        <div style="border-top: 1px solid var(--v-border); padding: 20px; min-height: 120px;"></div>
+    </div>
+
+</div>
+
+<script>
+    layui.use(['jquery', 'layer'], function () {
+        var $ = layui.jquery;
+        var layer = layui.layer;
+
+        var $input = $('#amap-excel-input');
+        var $fileRow = $('#file-row');
+        var $result = $('#import-result');
+
+        // 点击上传区/重新选择 → 打开文件选择（原生 click() 派发，jQuery trigger 对隐藏 file input 无效）
+        $('#upload-area').on('click', function () {
+            $input[0].value = '';
+            $input[0].click();
+        });
+        $('#btn-clear').on('click', function () {
+            $input.val('');
+            $fileRow.hide();
+            $result.hide();
+        });
+
+        // 选中文件后展示文件名
+        $input.on('change', function () {
+            var f = this.files && this.files[0];
+            if (!f) return;
+            if (!/\.(xlsx|xls)$/i.test(f.name)) {
+                layer.msg('仅支持 .xlsx / .xls 文件');
+                this.value = '';
+                return;
+            }
+            $('#file-name').text(f.name + '（' + (f.size / 1024).toFixed(1) + ' KB）');
+            $fileRow.css('display', 'flex');
+            $result.hide();
+        });
+
+        // 拖拽上传
+        var $area = $('#upload-area');
+        $area.on('dragover', function (e) { e.preventDefault(); e.stopPropagation(); });
+        $area.on('drop', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var f = e.originalEvent.dataTransfer.files && e.originalEvent.dataTransfer.files[0];
+            if (!f) return;
+            $input[0].files = e.originalEvent.dataTransfer.files;
+            $input.trigger('change');
+        });
+
+        // 提交导入
+        $('#btn-upload').on('click', function () {
+            var f = $input[0].files && $input[0].files[0];
+            if (!f) { layer.msg('请先选择Excel文件'); return; }
+
+            var $btn = $(this);
+            var loadIdx = layer.load(2);
+            $btn.prop('disabled', true);
+            var formData = new FormData();
+            formData.append('file', f);
+
+            $.ajax({
+                url: '/new/api/visit/amap-customers/import_excel',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (res) {
+                    layer.close(loadIdx);
+                    $btn.prop('disabled', false);
+                    renderResult(res);
+                },
+                error: function (xhr) {
+                    layer.close(loadIdx);
+                    $btn.prop('disabled', false);
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    $result.show().html(
+                        '<div class="v-tag v-tag--red" style="font-size:13px;padding:8px 12px;white-space:normal;">导入失败：' + msg + '</div>'
+                    );
+                }
+            });
+        });
+
+        function tag(cls, text) {
+            return '<span class="v-tag v-tag--' + cls + '" style="font-size:12px;padding:4px 8px;">' + text + '</span>';
+        }
+
+        function errBlock(title, rows) {
+            var items = rows.slice(0, 20).map(function (r) {
+                return '<div>第 ' + r.row + ' 行：' + r.reason + '</div>';
+            }).join('');
+            if (rows.length > 20) items += '<div>…等共 ' + rows.length + ' 行</div>';
+            return '<div style="background:#fef2f2;border-radius:6px;padding:10px 12px;font-size:12px;color:#dc2626;line-height:1.8;margin-bottom:8px;">'
+                 + '<b>' + title + '：</b>' + items + '</div>';
+        }
+
+        // 渲染导入结果（data 分 marker 客户档案 / record 拜访记录两段）
+        function renderResult(res) {
+            $result.show();
+            if (res.code !== 200 || !res.data) {
+                $result.html('<div class="v-tag v-tag--red" style="font-size:13px;padding:8px 12px;white-space:normal;">导入失败：' + (res.msg || '未知错误') + '</div>');
+                return;
+            }
+            var m = res.data.marker || {};
+            var r = res.data.record || {};
+            var html = ''
+                + '<div style="margin-bottom:10px;">'
+                +   '<div style="font-size:12px;color:var(--v-text-3);margin-bottom:6px;">客户档案</div>'
+                +   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                +     tag('green', '新增 ' + (m.insert_count || 0) + ' 条')
+                +     tag('blue', '更新 ' + (m.update_count || 0) + ' 条')
+                +     tag('gray', '跳过空行 ' + (m.empty_rows || 0) + ' 行')
+                +     (m.manual_generated ? tag('orange', '生成伪编码 ' + m.manual_generated + ' 条') : '')
+                +   '</div>'
+                + '</div>'
+                + '<div style="margin-bottom:10px;">'
+                +   '<div style="font-size:12px;color:var(--v-text-3);margin-bottom:6px;">拜访记录</div>'
+                +   '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                +     tag('green', '导入 ' + (r.import_count || 0) + ' 条（重复的按键自动更新）')
+                +     tag('blue', '写入客户 ' + (r.customer_count || 0) + ' 家')
+                +   '</div>'
+                + '</div>';
+
+            var errHtml = '';
+            if (m.error_rows && m.error_rows.length) errHtml += errBlock('客户档案未导入', m.error_rows);
+            if (r.error_rows && r.error_rows.length) errHtml += errBlock('拜访记录未导入', r.error_rows);
+            if (errHtml) {
+                html += errHtml;
+            } else {
+                html += '<div style="font-size:12px;color:var(--v-text-3);">' + res.msg + '</div>';
+            }
+            $result.html(html);
+        }
+    });
+</script>

@@ -42,30 +42,20 @@ def update_inquiry_customer(weixin_decoding_result_id, inquiry_customer_id, inqu
 def get_crm_customer(crm_customer_name):
     """
     获取CRM客户
-    根据客户名称在 PartnerList（合作伙伴表）中进行模糊搜索
+    根据客户名称在 partner_list（合作伙伴表）中进行模糊搜索
     只匹配 fullname（全名）
     
     :param crm_customer_name: 客户名称关键词
     :return: 匹配的客户列表，包含 partner_id、fullname、short_name 等字段
     """
-    from app.models.orm_models.partner_list import PartnerList
+    from app.dao.crm import partner_list_dao
     from app.utils.orm.session import orm_session
     
     if not crm_customer_name:
         return []
     
     with orm_session() as session:
-        query = session.query(
-            PartnerList.partner_id,
-            PartnerList.fullname,
-            PartnerList.short_name,
-            PartnerList.contacts,
-            PartnerList.contacts_phone
-        ).filter(
-            PartnerList.fullname.like(f"%{crm_customer_name}%")
-        ).order_by(
-            PartnerList.fullname
-        ).limit(10).all()
+        query = partner_list_dao.search_by_fullname(session, crm_customer_name)
         
         result = []
         for row in query:

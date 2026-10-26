@@ -85,6 +85,126 @@ def dashboard_crm_wms_data(start_date, end_date, keyword='', status=''):
         return result
 
 
+def get_customer_total_price_sum(session,
+                                 page=1, limit=20,
+                                 start_time=None, end_time=None,
+                                 customer_name=None,
+                                 level_id=None,
+                                 payment_description=None,
+                                 total_price_min=None, total_price_max=None):
+    """
+    客户额度管理-交易金额统计（按客户分组：订单数/订单金额/实发金额/未结算金额）
+
+    口径自旧 merge_order_list 统计查询原样平移（2026-10-22 额度管理切换数据源）：
+    - 关联键：crm_sales_order.customer_id = partner_list.partner_id
+      （实测该表 customer_id 与 partner_id 两字段值完全相同，保持旧口径减少变动）；
+    - 不含 status 过滤，与旧口径一致；
+    - 数据源说明：crm_sales_order 由每日 02:00 全量 + 看板心跳增量维护
+      （旧表 merge_order_list 每周二全量已停更，仅保留表数据与 ORM）。
+
+    :param session: SQLAlchemy Session 对象
+    :return: (总记录数, 当前页字典列表)
+    """
+    page = max(1, int(page))
+    limit = max(1, min(int(limit), 100))
+    offset = (page - 1) * limit
+
+    sql = text("""
+               SELECT t.customer_id,
+                      t.order_count,
+                      t.total_price_sum,
+                      t.sfje_sum,
+                      t.no_receive_amount_sum,
+                      p.level_id,
+                      p.level_name,
+                      p.fullname,
+                      p.contacts_phone,
+                      p.payment_description,
+                      p.payment_method,
+                      p.real_name,
+                      p.sap_no,
+                      p.street
+               FROM (SELECT customer_id,
+                            COUNT(*)               AS order_count,
+                            SUM(total_price)       AS total_price_sum,
+                            SUM(sfje)              AS sfje_sum,
+                            SUM(no_receive_amount) AS no_receive_amount_sum
+                     FROM crm_sales_order m
+                     WHERE 1 = 1
+                       AND (:start_time IS NULL OR m.create_date >= :start_time)
+                       AND (:end_time IS NULL OR m.create_date <= :end_time)
+                       AND (:customer_name IS NULL OR m.fullname LIKE :customer_name)
+                     GROUP BY customer_id
+                     HAVING 1 = 1
+                       AND (:total_price_min IS NULL OR SUM(total_price) >= :total_price_min)
+                       AND (:total_price_max IS NULL OR SUM(total_price) <= :total_price_max)) t
+                        INNER JOIN (
+                            SELECT partner_id,
+                                   level_id,
+                                   level_name,
+                                   fullname,
+                                   contacts_phone,
+                                   payment_description,
+                                   payment_method,
+                                   real_name,
+                                   sap_no,
+                                   street
+                            FROM partner_list
+                            WHERE 1 = 1
+                              AND (:payment_description IS NULL OR payment_description = :payment_description)
+                              AND (:level_id IS NULL OR level_id = :level_id)
+                        ) p ON t.customer_id = p.partner_id
+               ORDER BY p.level_id DESC,
+                        p.payment_description DESC,
+                        t.total_price_sum DESC LIMIT :limit
+               OFFSET :offset
+               """)
+
+    count_sql = text("""
+                     SELECT COUNT(*)
+                     FROM (SELECT customer_id
+                           FROM crm_sales_order m
+                           WHERE 1 = 1
+                             AND (:start_time IS NULL OR m.create_date >= :start_time)
+                             AND (:end_time IS NULL OR m.create_date <= :end_time)
+                             AND (:customer_name IS NULL OR m.fullname LIKE :customer_name)
+                           GROUP BY customer_id
+                           HAVING 1 = 1
+                             AND (:total_price_min IS NULL OR SUM(total_price) >= :total_price_min)
+                             AND (:total_price_max IS NULL OR SUM(total_price) <= :total_price_max)) t
+                                INNER JOIN (
+                                    SELECT partner_id,
+                                           level_id,
+                                           payment_description
+                                    FROM partner_list
+                                    WHERE  1 = 1
+                                      AND (:payment_description IS NULL OR payment_description = :payment_description)
+                                      AND (:level_id IS NULL OR level_id = :level_id)
+                                ) p ON t.customer_id = p.partner_id
+                     """)
+
+    params = {
+        "start_time": start_time,
+        "end_time": end_time,
+        "customer_name": f"%{customer_name}%" if customer_name else None,
+        "level_id": level_id,
+        "payment_description": payment_description,
+        "total_price_min": total_price_min,
+        "total_price_max": total_price_max,
+        "limit": limit,
+        "offset": offset,
+    }
+
+    total = session.execute(count_sql, params).scalar() or 0
+    rows = session.execute(sql, params).mappings().all()
+    # Decimal/Numeric 统一转 float，保证接口可 JSON 序列化
+    result = [
+        {k: (float(v) if hasattr(v, "real") and hasattr(v, "imag") else v) for k, v in dict(row).items()}
+        for row in rows
+    ]
+    return total, result
+
+
 def get_pono_list(start_date, end_date, keyword=''):
     """
     获取CRM有，没有WMS的订单号列表

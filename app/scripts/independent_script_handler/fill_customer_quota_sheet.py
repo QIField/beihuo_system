@@ -6,7 +6,7 @@
 # @Software: PyCharm
 
 from app.utils.orm.session import orm_session
-from app.models.orm_models.partner_list import PartnerList
+from app.dao.crm import partner_list_dao
 from app.models.orm_models.customer_quota_model import CustomerQuota
 
 
@@ -25,7 +25,7 @@ def fill_customer_quota(batch_size=100):
     
     with orm_session() as session:
         # 1. 先统计总记录数
-        total_count = session.query(PartnerList).count()
+        total_count = partner_list_dao.count_all(session)
         print(f"[统计] partner_list 表总共有 {total_count} 条记录")
         print(f"[配置] 每批处理 {batch_size} 条记录")
         
@@ -50,7 +50,7 @@ def fill_customer_quota(batch_size=100):
             print(f"  - 批次大小: {batch_size}")
             
             # 读取当前批次的数据
-            partners = session.query(PartnerList).offset(offset).limit(batch_size).all()
+            partners = partner_list_dao.list_by_page(session, offset, batch_size)
             print(f"  - 本批读取到 {len(partners)} 条记录")
             
             # 准备要插入的数据（先检查是否已存在）

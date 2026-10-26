@@ -97,6 +97,10 @@ api_bp.register_blueprint(user_lark_mapping_bp)
 from .picking_shipping_api import picking_shipping_bp
 api_bp.register_blueprint(picking_shipping_bp)
 
+# 注册客访管理 API（app/api/visit/ 包：列表/导入/绑定/拜访记录 + 客户详情聚合）
+from .visit import visit_bp
+api_bp.register_blueprint(visit_bp)
+
 
 # 注册 CRM 零件品牌别名 API
 from . import pp_alias_api

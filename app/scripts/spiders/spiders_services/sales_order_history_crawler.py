@@ -24,7 +24,7 @@ from sqlalchemy.dialects.mysql import insert
 
 from app.utils.orm.session import orm_session
 from app.models.orm_models.crm.sales_order_history import SalesOrderHistory
-from app.models.orm_models.partner_list import PartnerList
+
 from app.models.orm_models.customer_quota_model import CustomerQuota
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.scripts.spiders.pipeline_clean.crm_gzbbr_clean import clean_sales_order_history
