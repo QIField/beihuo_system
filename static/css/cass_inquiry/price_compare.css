@@ -1,0 +1,211 @@
+/* 供应商价格对比标签页（tab 切换 + 工具行 + 结果徽标） */
+
+/* ===== 小标签页（位于深蓝 page-header 内，紧贴大标题右侧同行） ===== */
+.page-header h2 {
+    margin-right: 14px;
+}
+
+.page-header .page-tabs {
+    margin-right: auto; /* 吸收剩余空间，抵消 page-header 的 space-between，让标签贴左 */
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.page-header .page-tab {
+    padding: 4px 14px;
+    font-size: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 3px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.page-header .page-tab:hover {
+    color: #fff;
+    border-color: #fff;
+}
+
+.page-header .page-tab.active {
+    background: #fff;
+    border-color: #fff;
+    color: #1e3a8a;
+    font-weight: 600;
+}
+
+/* ===== tab 内容区（flex 撑满，隐藏非激活页） ===== */
+.tab-pane {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.tab-pane.active {
+    display: flex;
+}
+
+/* ===== 对比工具行 ===== */
+.compare-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+    flex-shrink: 0;
+}
+
+.compare-toolbar .toolbar-label {
+    font-size: 13px;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.compare-toolbar .toolbar-tip {
+    font-size: 12px;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+/* 供应商搜索下拉（input + 可过滤选项浮层） */
+.store-select {
+    position: relative;
+    width: 280px;
+}
+
+.store-select .text-input {
+    width: 100%;
+    padding: 6px 26px 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    font-size: 13px;
+    color: #1e293b;
+    outline: none;
+}
+
+.store-select .text-input:focus {
+    border-color: #1e3a8a;
+}
+
+.store-select .store-arrow {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-right: 1.5px solid #64748b;
+    border-bottom: 1.5px solid #64748b;
+    transform: translateY(-70%) rotate(45deg);
+    pointer-events: none;
+}
+
+.store-options {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    /* 层级约定见 common.css：--z-above-table 须压过 ht_clone_top(160) */
+    z-index: var(--z-above-table);
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.store-options.open {
+    display: block;
+}
+
+.store-options .store-option {
+    padding: 7px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    color: #1e293b;
+}
+
+.store-options .store-option:hover {
+    background: #eff6ff;
+    color: #1e3a8a;
+}
+
+.store-options .store-option.empty {
+    color: #94a3b8;
+    cursor: default;
+}
+
+.store-options .store-option.empty:hover {
+    background: none;
+    color: #94a3b8;
+}
+
+/* ===== 对比结果列渲染 ===== */
+.compare-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 2px;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.compare-badge.status-higher {
+    color: #dc2626;
+    background: #fef2f2;
+}
+
+.compare-badge.status-lower {
+    color: #16a34a;
+    background: #f0fdf4;
+}
+
+.compare-badge.status-equal {
+    color: #475569;
+    background: #f1f5f9;
+}
+
+.compare-badge.status-no_bbri {
+    color: #94a3b8;
+    background: #f8fafc;
+}
+
+.diff-cell.positive {
+    color: #dc2626;
+}
+
+.diff-cell.negative {
+    color: #16a34a;
+}
+
+.diff-cell.zero {
+    color: #475569;
+}
+
+/* 行内修改价格按钮（点击打开 CRM 开思价弹窗） */
+.price-edit-btn {
+    padding: 2px 10px;
+    font-size: 12px;
+    background: #fff;
+    border: 1px solid #1e3a8a;
+    color: #1e3a8a;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+}
+
+.price-edit-btn:hover {
+    background: #1e3a8a;
+    color: #fff;
+}

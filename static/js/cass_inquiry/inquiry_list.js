@@ -212,10 +212,30 @@ var CassInquiryList = (function() {
         });
     }
 
+    /**
+     * 小标签页切换：报价数据 / 供应商价格对比
+     * 对比页隐藏左侧筛选面板，并在首次显示时通知对比模块加载供应商候选
+     */
+    function bindTabs() {
+        var tabs = document.querySelectorAll('.page-tab[data-tab]');  // 仅真正的切换标签（排除"数据采集"等动作按钮）
+        tabs.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tab = btn.getAttribute('data-tab');
+                tabs.forEach(function (b) { b.classList.toggle('active', b === btn); });
+                document.getElementById('tab-quotes').classList.toggle('active', tab === 'quotes');
+                document.getElementById('tab-compare').classList.toggle('active', tab === 'compare');
+                document.getElementById('filterPanel').style.display = tab === 'quotes' ? 'flex' : 'none';
+                if (tab === 'compare' && window.CassPriceCompare) CassPriceCompare.onTabShown();
+            });
+        });
+    }
+
     function init() {
         initDateRangePicker('inquiryDateRange');
         initBuilder();
         bindFilterActions();
+        if (window.CassPriceCompare) CassPriceCompare.init();
+        bindTabs();
     }
 
     return { init: init };
