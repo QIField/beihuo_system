@@ -5,6 +5,7 @@
 """
 from flask import Blueprint, jsonify, render_template, session, request
 from functools import wraps
+import datetime
 
 from app.services.cass_inquiry_service import CassInquiryQueryService
 from app.services.cass_inquiry_service.price_compare_service import (
@@ -12,6 +13,7 @@ from app.services.cass_inquiry_service.price_compare_service import (
     query_price_compare,
     filter_values as price_compare_filter_values,
 )
+from app.services.cass_inquiry_service.crawler import cass_crawl_service
 from app.services.cass_inquiry_service.price_edit_service import (
     search_products_by_replacement,
     update_cass_prices,
@@ -210,3 +212,53 @@ def update_price():
         return jsonify({'code': 0, 'data': {'results': results}})
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'更新失败: {e}'}), 500
+
+
+@bp.route('/api/cass_inquiry/crawl/start', methods=['POST'])
+@login_required
+@permission_required
+def crawl_start():
+    """
+    启动卡思商城报价爬取任务（后台线程执行）
+
+    请求体：{'start_date': 'YYYY-MM-DD', 'end_date': 'YYYY-MM-DD', 'cookie': '...'}
+    cookie 仅存内存用于本次任务，不落库不落日志
+    返回：{'code': 0, 'data': {'task_id': '...'}}
+    """
+    body = request.get_json(silent=True) or {}
+    start_date = (body.get('start_date') or '').strip()
+    end_date = (body.get('end_date') or '').strip()
+    cookie = (body.get('cookie') or '').strip()
+    if not start_date or not end_date or not cookie:
+        return jsonify({'code': 1, 'msg': '请填写日期范围与 cookie'}), 400
+    for value, name in ((start_date, '开始日期'), (end_date, '结束日期')):
+        try:
+            datetime.datetime.strptime(value, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'code': 1, 'msg': f'{name}格式应为 YYYY-MM-DD'}), 400
+    try:
+        task_id = cass_crawl_service.start_job(start_date, end_date, cookie)
+        return jsonify({'code': 0, 'data': {'task_id': task_id}})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'任务启动失败: {e}'}), 500
+
+
+@bp.route('/api/cass_inquiry/crawl/status')
+@login_required
+@permission_required
+def crawl_status():
+    """
+    查询爬取任务进度/结果
+
+    参数：task_id
+    返回：{'code': 0, 'data': {'status': 'running|done|failed', 'page': n, 'total_pages': n,
+            'inquiry_done': n, 'rows_collected': n, 'rows_saved': n,
+            'failed': [...], 'result': {...} | None, 'error': str | None}}
+    """
+    task_id = (request.args.get('task_id') or '').strip()
+    if not task_id:
+        return jsonify({'code': 1, 'msg': '缺少 task_id'}), 400
+    job = cass_crawl_service.get_job(task_id)
+    if not job:
+        return jsonify({'code': 1, 'msg': '任务不存在或已被清理'}), 404
+    return jsonify({'code': 0, 'data': job})

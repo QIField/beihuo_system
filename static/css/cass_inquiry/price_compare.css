@@ -115,8 +115,8 @@
     border: 1px solid #cbd5e1;
     border-radius: 3px;
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
-    /* 需压过 Handsontable 克隆表头层 .ht_clone_top(z-index:160)，否则表头会盖住浮层中段 */
-    z-index: 200;
+    /* 层级约定见 common.css：--z-above-table 须压过 ht_clone_top(160) */
+    z-index: var(--z-above-table);
     max-height: 260px;
     overflow-y: auto;
 }

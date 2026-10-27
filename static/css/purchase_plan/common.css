@@ -1,5 +1,16 @@
 /* 采购计划模块 - 公共样式 */
 
+/* ===== 页面层级约定（新增浮层/弹窗必须照表取值，禁止随手写 z-index） =====
+   Handsontable 克隆表头层固定 .ht_clone_bottom=130 / .ht_clone_top=160（库内部，不可低于）：
+   --z-above-table: 200   页面内浮层（下拉、气泡等，须压过克隆表头层）
+   --z-modal:       500   页面级弹窗遮罩
+   --z-top:        1000   全局弹窗/最高层（盖过以上所有） */
+:root {
+    --z-above-table: 200;
+    --z-modal: 500;
+    --z-top: 1000;
+}
+
 /* 基础样式 */
 * {
     margin: 0;
@@ -491,7 +502,7 @@ body {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    z-index: var(--z-top);
     justify-content: center;
     align-items: center;
 }

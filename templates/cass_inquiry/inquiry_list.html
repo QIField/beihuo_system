@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/purchase_plan/common.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/cass_inquiry/price_edit.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/cass_inquiry/price_compare.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cass_inquiry/crawl_dialog.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='js/components/grid-column-menu/grid-column-menu.css') }}">
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script src="{{ url_for('static', filename='js/handsontable/handsontable.full.min.js') }}"></script>
@@ -127,6 +128,7 @@
             <div class="page-tabs">
                 <button type="button" class="page-tab active" data-tab="quotes">报价数据</button>
                 <button type="button" class="page-tab" data-tab="compare">供应商价格对比</button>
+                <button type="button" class="page-tab" id="crawlDialogBtn">数据采集</button>
             </div>
         </div>
 
@@ -197,5 +199,40 @@
             </main>
         </div>
     </div>
+
+    <!-- 数据采集弹窗 -->
+    <div class="crawl-mask" id="crawlMask" style="display:none;">
+        <div class="crawl-dialog">
+            <div class="crawl-dialog-header">
+                <span>数据采集（卡思商城报价爬取）</span>
+                <button type="button" class="crawl-close" id="crawlCloseBtn">&times;</button>
+            </div>
+            <div class="crawl-dialog-body">
+                <div class="crawl-form-row">
+                    <label>开始日期</label>
+                    <input type="date" id="crawlStartDate">
+                </div>
+                <div class="crawl-form-row">
+                    <label>结束日期</label>
+                    <input type="date" id="crawlEndDate">
+                </div>
+                <div class="crawl-form-row">
+                    <label>Cookie</label>
+                    <textarea id="crawlCookie" rows="4" placeholder="粘贴卡思商城登录 Cookie（仅本次采集使用，不保存）"></textarea>
+                </div>
+                <div class="crawl-progress" id="crawlProgress" style="display:none;">
+                    <div class="crawl-progress-text" id="crawlProgressText">准备中...</div>
+                    <div class="crawl-progress-bar"><div class="crawl-progress-inner" id="crawlProgressBar"></div></div>
+                    <div class="crawl-failed-list" id="crawlFailedList"></div>
+                </div>
+                <div class="crawl-result" id="crawlResult" style="display:none;"></div>
+            </div>
+            <div class="crawl-dialog-footer">
+                <button type="button" class="crawl-btn-primary" id="crawlStartBtn">开始爬取</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/cass_inquiry/crawl_dialog.js') }}"></script>
 </body>
 </html>

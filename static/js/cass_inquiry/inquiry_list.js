@@ -217,7 +217,7 @@ var CassInquiryList = (function() {
      * 对比页隐藏左侧筛选面板，并在首次显示时通知对比模块加载供应商候选
      */
     function bindTabs() {
-        var tabs = document.querySelectorAll('.page-tab');
+        var tabs = document.querySelectorAll('.page-tab[data-tab]');  // 仅真正的切换标签（排除"数据采集"等动作按钮）
         tabs.forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var tab = btn.getAttribute('data-tab');
