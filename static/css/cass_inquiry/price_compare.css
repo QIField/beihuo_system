@@ -1,16 +1,15 @@
 /* 供应商价格对比标签页（tab 切换 + 工具行 + 结果徽标） */
 
-/* ===== 小标签页（位于深蓝 page-header 内，紧跟大标题之后） ===== */
-/* 覆盖 common.css 的两端对齐，使标签贴着 h2 排列 */
-.page-header {
-    justify-content: flex-start;
+/* ===== 小标签页（位于深蓝 page-header 内，紧贴大标题右侧同行） ===== */
+.page-header h2 {
+    margin-right: 14px;
 }
 
 .page-header .page-tabs {
+    margin-right: auto; /* 吸收剩余空间，抵消 page-header 的 space-between，让标签贴左 */
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    margin-left: 16px;
 }
 
 .page-header .page-tab {
