@@ -10,6 +10,7 @@ from app.services.cass_inquiry_service import CassInquiryQueryService
 from app.services.cass_inquiry_service.price_compare_service import (
     list_stores as list_compare_stores,
     query_price_compare,
+    filter_values as price_compare_filter_values,
 )
 from app.services.cass_inquiry_service.price_edit_service import (
     search_products_by_replacement,
@@ -128,7 +129,7 @@ def price_compare():
     """
     供应商价格对比 · 分页查询（与巴博瑞按译码OE号比对，价格取卖家价格）
 
-    参数：store_name（必填）、page、page_size、sort_column、sort_dir
+    参数：store_name（必填）、page、page_size、sort_column、sort_dir、column_filters
     返回：{'code': 0, 'data': {'list': [...], 'total': n, 'page': p, 'page_size': s}}
           每行含 compare_status: higher/lower/equal/no_bbri
     """
@@ -139,12 +140,36 @@ def price_compare():
             page_size=request.args.get('page_size') or request.args.get('limit', 20),
             sort_column=request.args.get('sort_column'),
             sort_dir=request.args.get('sort_dir'),
+            column_filters=request.args.get('column_filters'),
         )
         return jsonify(result)
     except ValueError as e:
         return jsonify({'code': 1, 'msg': str(e)}), 400
     except Exception as e:
         return jsonify({'code': 1, 'msg': f'比对查询失败: {e}'}), 500
+
+
+@bp.route('/api/cass_inquiry/price_compare/filter_values')
+@login_required
+@permission_required
+def price_compare_filter_values_api():
+    """
+    供应商价格对比 · 列头菜单筛选候选值（去重+计数，按其他列已生效筛选级联）
+
+    参数：store_name（必填）、column（筛选列）、column_filters（级联条件，已排除本列）
+    返回：{'code': 0, 'data': {'values': [{'value': v, 'count': n}, ...]}}
+    """
+    try:
+        result = price_compare_filter_values(
+            column=request.args.get('column'),
+            store_name=request.args.get('store_name'),
+            column_filters=request.args.get('column_filters'),
+        )
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'code': 1, 'msg': str(e)}), 400
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': f'查询筛选候选值失败: {e}'}), 500
 
 
 @bp.route('/api/cass_inquiry/crm_products')

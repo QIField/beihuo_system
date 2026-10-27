@@ -102,6 +102,25 @@ var CassPriceCompare = (function () {
     ];
 
     /**
+     * 获取列筛选候选值（服务端去重+计数，按其他列已生效筛选级联）
+     * params 由 Builder 组装：store_name + column=列名 + column_filters（已排除本列）
+     */
+    function getFilterValues(colId, callback, params) {
+        var query = Object.keys(params || {})
+            .filter(function (key) { return params[key] !== undefined && params[key] !== null && params[key] !== ''; })
+            .map(function (key) { return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]); })
+            .join('&');
+        fetch('/api/cass_inquiry/price_compare/filter_values' + (query ? '?' + query : ''), {
+            credentials: 'same-origin'
+        })
+            .then(function (resp) { return resp.json(); })
+            .then(function (result) {
+                callback(result && result.code === 0 ? (result.data.values || []) : []);
+            })
+            .catch(function () { callback([]); });
+    }
+
+    /**
      * 创建对比表格（Builder 服务端分页模式，与主表格一致）
      */
     function initBuilder() {
@@ -111,6 +130,7 @@ var CassPriceCompare = (function () {
             paramsBuilder: function () {
                 return selectedStore ? { store_name: selectedStore } : {};
             },
+            getFilterValues: getFilterValues,
             readOnly: true,
             pageKey: 'cass_price_compare',
             gridKey: 'cass_price_compare_v1',
@@ -119,7 +139,7 @@ var CassPriceCompare = (function () {
                 doubleClickCopy: true,
                 copyToast: true,
                 columnMenu: { persist: true },
-                pagination: { container: '#comparePaginationBar', pageSizeOptions: [20, 50, 100], defaultPageSize: 20 },
+                pagination: { container: '#comparePaginationBar', pageSizeOptions: [50, 100, 200], defaultPageSize: 50 },
                 ellipsisText: true
             },
             handsontableOptions: {

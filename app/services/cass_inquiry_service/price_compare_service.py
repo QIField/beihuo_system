@@ -6,6 +6,8 @@
 连接方式：PyMySQL db_cursor，与 query_service 同源（跟随启动菜单选库）。
 """
 
+import json
+
 from app.utils.database_connection import db_cursor
 
 # 巴博瑞供应商名（与前端 BBRI_STORE_NAME 一致）
@@ -15,6 +17,20 @@ BBRI_STORE_NAME = '佛山巴博瑞汽配'
 NUMERIC_SORT_COLUMNS = {'seller_price', 'bbri_price', 'diff', 'num'}
 TEXT_SORT_COLUMNS = {'decode_num', 'brand_name', 'parts_name', 'quality_name'}
 SORTABLE_COLUMNS = NUMERIC_SORT_COLUMNS | TEXT_SORT_COLUMNS
+
+# 允许列头菜单筛选的列（含计算列 compare_status，中文案与表格显示一致）
+FILTERABLE_COLUMNS = {'decode_num', 'brand_name', 'parts_name', 'quality_name', 'num', 'compare_status'}
+
+# 对比结果状态码与中文文案映射（筛选值用中文，比对时映射回状态码）
+COMPARE_STATUS_TEXT = {
+    'higher': '高于巴博瑞',
+    'lower': '低于巴博瑞',
+    'equal': '与巴博瑞持平',
+    'no_bbri': '巴博瑞无同OE报价',
+}
+STATUS_CODE_BY_TEXT = {text: code for code, text in COMPARE_STATUS_TEXT.items()}
+# 状态码固定展示顺序
+COMPARE_STATUS_ORDER = list(COMPARE_STATUS_TEXT.keys())
 
 
 def list_stores() -> list:
@@ -57,7 +73,8 @@ def _build_baseline() -> dict:
     return baseline
 
 
-def query_price_compare(store_name=None, page=1, page_size=20, sort_column=None, sort_dir=None):
+def query_price_compare(store_name=None, page=1, page_size=20, sort_column=None, sort_dir=None,
+                        column_filters=None):
     """
     分页查询供应商与巴博瑞的价格对比
 
@@ -66,6 +83,7 @@ def query_price_compare(store_name=None, page=1, page_size=20, sort_column=None,
     :param page_size: 每页条数
     :param sort_column: 排序列（白名单内，含计算列 bbri_price/diff；白名单外回落默认排序）
     :param sort_dir: 排序方向（asc/desc），空值行恒排最后
+    :param column_filters: 列头菜单筛选 JSON（如 {"brand_name": ["博世"]}，列间 AND，白名单外忽略）
     :return: {'code': 0, 'data': {'list': [...], 'total': n, 'page': p, 'page_size': s}}
              每行含 decode_num/brand_name/parts_name/quality_name/num/seller_price/
              bbri_price/diff/compare_status（higher/lower/equal/no_bbri）
@@ -81,6 +99,7 @@ def query_price_compare(store_name=None, page=1, page_size=20, sort_column=None,
     rows = _fetch_store_quotes(store)
     baseline = _build_baseline()
     items = [_build_compare_row(row, baseline) for row in rows]
+    items = _apply_column_filters(items, _parse_column_filters(column_filters))
     items = _sort_items(items, sort_column, sort_dir)
 
     total = len(items)
@@ -95,6 +114,102 @@ def query_price_compare(store_name=None, page=1, page_size=20, sort_column=None,
             'page_size': page_size,
         }
     }
+
+
+def filter_values(column, store_name, column_filters=None):
+    """
+    查询某列的全量去重候选值及出现次数（供列头菜单筛选勾选）
+
+    候选值按"其他列已生效筛选"级联（本列自身条件不参与，由前端排除后传入）
+
+    :return: {'code': 0, 'data': {'values': [{'value': v, 'count': n}, ...]}}
+    """
+    if column not in FILTERABLE_COLUMNS:
+        raise ValueError(f'不支持的筛选列: {column}')
+    store = (store_name or '').strip()
+    if not store:
+        raise ValueError('请选择供应商')
+
+    rows = _fetch_store_quotes(store)
+    filters = _parse_column_filters(column_filters)
+    filters.pop(column, None)  # 兜底排除本列（本列条件不缩小自己的候选）
+    groups = {}
+
+    if column == 'compare_status':
+        # 计算列：构建比对行后按状态码计数，候选值为中文文案、按固定顺序输出
+        baseline = _build_baseline()
+        items = [_build_compare_row(row, baseline) for row in rows]
+        items = _apply_column_filters(items, filters)
+        counts = {}
+        for item in items:
+            counts[item['compare_status']] = counts.get(item['compare_status'], 0) + 1
+        values = [
+            {'value': COMPARE_STATUS_TEXT[code], 'count': counts[code]}
+            for code in COMPARE_STATUS_ORDER if code in counts
+        ]
+        return {'code': 0, 'data': {'values': values}}
+
+    for row in rows:
+        item = dict(zip(
+            ('decode_num', 'brand_name', 'parts_name', 'quality_name', 'num', 'seller_price'),
+            row,
+        ))
+        if not _match_column_filters(item, filters):
+            continue
+        value = item.get(column)
+        if value is None or str(value).strip() == '':
+            continue
+        key = str(value)
+        groups[key] = groups.get(key, 0) + 1
+
+    values = [{'value': key, 'count': count} for key, count in sorted(groups.items())]
+    return {'code': 0, 'data': {'values': values}}
+
+
+def _parse_column_filters(column_filters):
+    """
+    解析列头菜单筛选 JSON（列间 AND，白名单外字段忽略）
+
+    :return: {列名: [值, ...]}，解析失败或为空返回 {}
+    """
+    if not column_filters:
+        return {}
+    try:
+        raw = json.loads(column_filters)
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    filters = {}
+    for col, values in raw.items():
+        col = str(col)
+        if col not in FILTERABLE_COLUMNS or not isinstance(values, list):
+            continue
+        cleaned = [str(v) for v in values if v is not None]
+        if not cleaned:
+            continue
+        if col == 'compare_status':
+            # 中文文案映射回状态码（兼容直接传状态码）
+            filters[col] = [STATUS_CODE_BY_TEXT.get(v, v) for v in cleaned]
+        else:
+            filters[col] = cleaned
+    return filters
+
+
+def _apply_column_filters(items, filters):
+    """应用列头菜单筛选（列间 AND，白名单外字段已在解析时忽略）"""
+    if not filters:
+        return items
+    return [item for item in items if _match_column_filters(item, filters)]
+
+
+def _match_column_filters(item, filters):
+    """单行匹配：所有筛选列的值均需命中候选列表（str 口径，空值不命中）"""
+    for col, allowed in filters.items():
+        value = item.get(col)
+        if value is None or str(value) not in allowed:
+            return False
+    return True
 
 
 def _fetch_store_quotes(store):
