@@ -1,0 +1,190 @@
+<!-- M4 Tab-拜访历史（01-主设计文档 第六节）
+     数据接口：GET /new/api/visit/records?amap_customer_id=<poi>（按记录时间倒序，本期一次拉取单页 200 条）
+     说明：
+       1. 数据源 visit_record（本期唯一写入渠道为 Excel 导入），展示字段：
+          记录人 / 记录时间 / 记录文字 / 照片（拜访类型、费用为高德同步契约字段
+          2.1，实现同步时再补列，前端占位已移除）；
+       2. 照片存 visit_record.images TEXT（Excel 照片列原样字符串，url 逗号分隔）；
+       3. 拜访记录只能作废不能改内容（保真实性），作废操作入口
+          （PUT /api/visit/records/<id>/void）预留，未在原型中体现。 -->
+<div class="v-pane">
+    <div class="v-pane-head">
+        <h3 class="v-pane-title">历史拜访记录（共<span id="visit-total">0</span>条）</h3>
+    </div>
+
+    <div class="v-timeline">
+        <div class="v-timeline-line"></div>
+        <div id="visit-timeline"></div>
+    </div>
+</div>
+
+<style>
+    #visit-timeline .v-photo { overflow: hidden; cursor: zoom-in; }
+    #visit-timeline .v-photo img { width: 100%; height: 100%; object-fit: cover; }
+</style>
+
+<!-- laytpl 模板：拜访时间轴项 -->
+<script type="text/html" id="tpl-visit-item">
+    {% raw %}
+    {{# layui.each(d.records, function (i, r) { }}
+    <div class="v-timeline-item">
+        <div class="v-timeline-dot"></div>
+        <div class="v-timeline-head">
+            <span class="v-avatar-s {{ r.avatarCls }}">{{ r.avatar }}</span>
+            <span class="v-timeline-name">{{ r.visitor }}</span>
+            <span class="v-timeline-time">{{ r.time }}</span>
+            {{# if (r.converted) { }}
+            <span class="v-tag v-tag--green" title="关联订单：{{ r.convertedTitle }}">已转化订单</span>
+            {{# } }}
+        </div>
+        {{# if (r.content) { }}<div class="v-timeline-body">{{ r.content }}</div>{{# } }}
+        {{# if (r.photos.length) { }}
+        <div class="v-timeline-photos">
+            {{# layui.each(r.photos, function (j, p) { }}
+            <div class="v-photo"><img src="{{ p }}" alt="拜访照片"></div>
+            {{# }); }}
+        </div>
+        {{# } }}
+    </div>
+    {{# }); }}
+    {{# if (!d.records.length) { }}
+    <div class="v-empty">暂无拜访记录</div>
+    {{# } }}
+    {% endraw %}
+</script>
+
+<script>
+    layui.use(['jquery', 'laytpl', 'layer'], function () {
+        var $ = layui.jquery;
+        var laytpl = layui.laytpl;
+        var layer = layui.layer;
+
+        var AVATAR_CLS = ['v-avatar-s--orange', 'v-avatar-s--blue', 'v-avatar-s--green'];
+        var PAGE_LIMIT = 200; // 接口单页上限，详情时间轴一次拉取
+
+        // ==================== 工具 ====================
+        // hash 结构：#/customer_detail/visit/<id>，末段为 visit_amap_customer 主键 id
+        function parseCustomerId() {
+            var parts = location.hash.replace(/^#\/?/, '').split('/');
+            return parts[2] ? decodeURIComponent(parts[2]) : '';
+        }
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // images TEXT：Excel 照片列原样字符串（url 逗号分隔），拆分为 url 数组
+        function parseImages(images) {
+            if (!images) return [];
+            var urls = String(images).split(/[,，]/), out = [];
+            for (var i = 0; i < urls.length; i++) {
+                var u = urls[i].trim();
+                if (u) out.push(u);
+            }
+            return out;
+        }
+
+        // ==================== 渲染 ====================
+        function buildRow(r, i) {
+            var name = r.recorder || '未知记录人';
+            var convertedOrders = r.converted_orders || [];
+            return {
+                index: i,
+                visitor: esc(name),
+                avatar: esc(name.charAt(0) || '访'),
+                avatarCls: AVATAR_CLS[(name.charCodeAt(0) || 0) % AVATAR_CLS.length],
+                time: (r.visit_time || '').substring(0, 16),
+                content: esc(r.content),
+                photos: parseImages(r.images).map(esc),
+                // 已转化订单（M4，05-订单拜访关联模块设计.md）：关联订单号列表 title 提示
+                converted: !!r.converted,
+                convertedTitle: esc(convertedOrders.join('、'))
+            };
+        }
+
+        function render(rows, total) {
+            laytpl($('#tpl-visit-item').html()).render({ records: rows }, function (html) {
+                $('#visit-timeline').html(html);
+            });
+            $('#visit-total').text(total);
+        }
+
+        function showEmpty(msg) {
+            $('#visit-timeline').html('<div class="v-empty">' + esc(msg) + '</div>');
+            $('#visit-total').text(0);
+        }
+
+        // 点击照片：layer 相册预览（当前记录内左右切换）
+        $('#visit-timeline').on('click', '.v-photo', function () {
+            var $imgs = $(this).closest('.v-timeline-item').find('.v-photo img');
+            if (!$imgs.length) return;
+            var album = { start: $imgs.index($(this).find('img')), data: [] };
+            $imgs.each(function () {
+                album.data.push({ alt: '拜访照片', src: this.getAttribute('src') });
+            });
+            layer.photos({ photos: album, anim: 5 });
+        });
+
+        // ==================== 数据加载 ====================
+        function fetchRecords(customerId, poi) {
+            // Tab 切换复用：与详情聚合相同的一次拉取 + window 缓存机制
+            var cache = window.__visitRecordsCache;
+            if (cache && cache.id === customerId) {
+                render(cache.rows, cache.total);
+                return;
+            }
+            $.ajax({
+                url: '/new/api/visit/records',
+                type: 'GET',
+                dataType: 'json',
+                data: { amap_customer_id: poi, page: 1, limit: PAGE_LIMIT },
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        layer.msg(res.msg || '拜访记录查询失败');
+                        showEmpty('暂无拜访记录');
+                        return;
+                    }
+                    var rows = [];
+                    for (var i = 0; i < res.data.list.length; i++) {
+                        rows.push(buildRow(res.data.list[i], i));
+                    }
+                    window.__visitRecordsCache = { id: customerId, total: res.data.total, rows: rows };
+                    render(rows, res.data.total);
+                },
+                error: function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    layer.msg(msg);
+                    showEmpty('加载失败');
+                }
+            });
+        }
+
+        // 等待详情聚合写入 window.__visitDetailCache（取 customer.poi 作为 records 接口筛选键）；
+        // 详情片段与 Tab 片段并行加载，短轮询对齐（最长约 5s）
+        function waitForDetail() {
+            var customerId = parseCustomerId();
+            if (!customerId) {
+                showEmpty('未选择客户');
+                return;
+            }
+            var tries = 0;
+            (function check() {
+                var cache = window.__visitDetailCache;
+                var poi = (cache && cache.id === customerId && cache.data.customer) ? cache.data.customer.poi : '';
+                if (poi) {
+                    fetchRecords(customerId, poi);
+                    return;
+                }
+                if (++tries > 25) {
+                    showEmpty('客户信息加载失败，请刷新重试');
+                    return;
+                }
+                setTimeout(check, 200);
+            })();
+        }
+
+        waitForDetail();
+    });
+</script>

@@ -1,0 +1,330 @@
+<!-- M5 Tab-拿货订单（01-主设计文档 第六节）
+     数据接口：GET /new/api/visit/customers/orders?id=<visit_amap_customer主键>&page=&limit=
+              （汇总卡 + 订单分页列表，服务层见 customer_order_service.py）
+     加载时机：本片段由主页面在切到「拿货订单」Tab 时才加载执行（进入详情页默认拜访历史 Tab，不发请求）；
+              片段重载（切走再切回）优先命中 window.__visitOrderCache，同客户同页不重复请求；
+              翻页/切页大小时更新缓存并重新渲染（汇总卡随响应一并返回）。
+     说明：
+       1. 订单金额为明细级 → 订单级聚合（orders_id/ddno GROUP BY），服务层完成，禁止明细直接求和；
+       2. "订单渠道"列 = "线上/线下-客户等级"（如 线上-开思、线下-维修厂），按订单所属 CRM 客户等级
+          level_name 判定（开思或"线上"开头=线上）；
+          "订单类型"列 = 常规订单/退货订单（order_type_name）；销售额口径仅统计常规订单（排除退货）；
+          "CRM客户"列 = 订单所属 CRM 客户名称（1:N 绑定区分用）；
+       3. "订单号"列展示发货金蝶号（deliverysapno），空值回退 ddno；
+       4. "原厂件占比"按件数统计 = 常规订单中品牌名含"原厂"的明细 quantity 合计 ÷ 总件数
+          （业务口径 2026-10-22，服务层 fetch_oem_qty_stats）；
+       5. 汇总卡共 4 张（当前欠款卡已按业务要求删除，欠款数据源 account_receivable_list 表未建）；
+       6. "关联拜访"列（05-订单拜访关联模块设计.md）：visitRef 非空显示"MM.DD 拜访"标签（点击改绑/取消）；
+          无关联订单显示"关联拜访"入口（常规/退货均可关联，业务确认 2026-10-24）；
+          无发货金蝶号的订单恒显示"无"；
+          关联接口 PUT / DELETE /new/api/visit/order-refs（body: orders_id=发货金蝶号, record_id）。 -->
+<div class="v-pane">
+    <!-- 订单汇总卡（4列，复用主页面指标卡栅格样式） -->
+    <div class="v-metric-grid v-metric-grid--4 v-mb16" id="order-summary"></div>
+
+    <!-- 订单列表 -->
+    <div style="border: 1px solid var(--v-border); border-radius: 6px; overflow: hidden;">
+        <table class="v-table">
+            <thead>
+                <tr>
+                    <th>订单号</th>
+                    <th>下单时间</th>
+                    <th>CRM客户</th>
+                    <th>订单渠道</th>
+                    <th>订单类型</th>
+                    <th>配件品类</th>
+                    <th class="v-num-right">金额</th>
+                    <th>状态</th>
+                    <th>关联拜访</th>
+                </tr>
+            </thead>
+            <tbody id="order-body"></tbody>
+        </table>
+    </div>
+    <div id="order-pager" style="padding: 12px 4px 0;"></div>
+</div>
+
+<!-- laytpl 模板：订单汇总卡（复用主页面指标卡栅格样式，5列） -->
+<script type="text/html" id="tpl-order-summary">
+    {% raw %}
+    {{# layui.each(d.list, function (i, m) { }}
+    <div class="v-metric {{ m.panelCls || '' }}">
+        {{# if (m.sub) { }}
+        <div class="v-metric-row">
+            <span class="v-metric-label">{{ m.label }}</span>
+            <span class="v-metric-sub {{ m.subCls || '' }}">{{ m.sub }}</span>
+        </div>
+        {{# } else { }}
+        <div class="v-metric-label">{{ m.label }}</div>
+        {{# } }}
+        <div class="v-metric-value v-metric-value--lg {{ m.valueCls || '' }}">{{ m.value }}</div>
+    </div>
+    {{# }); }}
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：订单行 -->
+<script type="text/html" id="tpl-order-row">
+    {% raw %}
+    {{# if (!d.list || !d.list.length) { }}
+    <tr><td colspan="9"><div class="v-empty">{{ d.emptyText || '暂无订单数据' }}</div></td></tr>
+    {{# } }}
+    {{# layui.each(d.list, function (i, o) { }}
+    <tr>
+        <td><span class="v-link">{{ o.ddno }}</span></td>
+        <td>{{ o.time }}</td>
+        <td class="v-crm-name" title="{{ o.crmName }}">{{ o.crmName }}</td>
+        <td><span class="v-tag {{ o.orderChannelCls }}">{{ o.orderChannel }}</span></td>
+        <td><span class="v-tag {{ o.orderTypeCls }}">{{ o.orderType }}</span></td>
+        <td title="{{ o.items }}">{{ o.items }}</td>
+        <td class="v-num-right">{{ o.amount }}</td>
+        <td class="{{ o.statusCls }}">{{ o.status }}</td>
+        <td>
+            {{# if (o.visitRef) { }}
+            {{# var vt = o.visitRef.visitTime || ''; }}
+            <span class="v-tag v-tag--green v-link" data-act="ref" data-orders="{{ o.ordersId }}"
+                  title="{{ o.visitRef.recorder || '' }} {{ vt }}，点击可改绑/取消">{{ vt.substring(5, 7) }}.{{ vt.substring(8, 10) }} 拜访</span>
+            {{# } else if (o.ordersId) { }}
+            <span class="v-link" data-act="ref" data-orders="{{ o.ordersId }}">关联拜访</span>
+            {{# } else { }}
+            <span class="v-tag v-tag--muted">无</span>
+            {{# } }}
+        </td>
+    </tr>
+    {{# }); }}
+    {% endraw %}
+</script>
+
+<script>
+    layui.use(['jquery', 'laytpl', 'layer', 'laypage'], function () {
+        var $ = layui.jquery;
+        var laytpl = layui.laytpl;
+        var layer = layui.layer;
+        var laypage = layui.laypage;
+
+        // hash 结构：#/customer_detail/<tab>/<id>，末段为 visit_amap_customer 主键 id，与详情头部一致
+        function parseCustomerId() {
+            var parts = location.hash.replace(/^#\/?/, '').split('/');
+            return parts[2] ? decodeURIComponent(parts[2]) : '';
+        }
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        var state = { id: parseCustomerId(), page: 1, limit: 10 };
+
+        // ==================== 渲染 ====================
+        function renderData(data) {
+            state.amapCustomerId = data.amapCustomerId || state.amapCustomerId || ''; // 关联拜访弹层取本客户拜访用
+            laytpl($('#tpl-order-summary').html()).render({ list: data.summary || [] }, function (html) {
+                $('#order-summary').html(html);
+            });
+            laytpl($('#tpl-order-row').html()).render({ list: data.list || [] }, function (html) {
+                $('#order-body').html(html);
+            });
+            renderPager(data);
+        }
+
+        function renderPager(data) {
+            laypage.render({
+                elem: 'order-pager',
+                count: data.total || 0,
+                curr: data.page || state.page,
+                limit: data.limit || state.limit,
+                limits: [10, 20, 50, 100],
+                layout: ['count', 'prev', 'page', 'next', 'limit', 'skip'],
+                jump: function (obj, first) {
+                    if (first) return; // 首次渲染由 loadData 驱动，避免死循环
+                    state.limit = obj.limit;
+                    loadData(obj.curr);
+                }
+            });
+        }
+
+        function renderFail(msg) {
+            $('#order-summary').html('');
+            $('#order-body').html('<tr><td colspan="7"><div class="v-empty">' + esc(msg) + '</div></td></tr>');
+            $('#order-pager').empty();
+        }
+
+        // ==================== 加载（片段执行即本 Tab 已激活；同客户同页命中缓存不重复请求） ====================
+        function loadData(page) {
+            state.page = page || 1;
+            var cache = window.__visitOrderCache;
+            if (cache && cache.id === state.id && cache.page === state.page && cache.limit === state.limit && cache.data) {
+                renderData(cache.data);
+                return;
+            }
+            var loadIdx = layer.load(2);
+            $.ajax({
+                url: '/new/api/visit/customers/orders',
+                type: 'GET',
+                data: { id: state.id, page: state.page, limit: state.limit },
+                dataType: 'json',
+                success: function (res) {
+                    layer.close(loadIdx);
+                    if (res.code !== 200 || !res.data) {
+                        renderFail(res.msg || '订单数据查询失败');
+                        return;
+                    }
+                    window.__visitOrderCache = { id: state.id, page: state.page, limit: state.limit, data: res.data };
+                    renderData(res.data);
+                },
+                error: function (xhr) {
+                    layer.close(loadIdx);
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    renderFail(msg);
+                }
+            });
+        }
+
+        if (!state.id) {
+            renderFail('未选择客户');
+            return;
+        }
+
+        // ==================== 关联拜访（05-订单拜访关联模块设计.md 第三节） ====================
+        var VISIT_PAGE_LIMIT = 200; // 与拜访时间轴一致，一次拉取
+
+        function currentRow(ordersId) {
+            var cache = window.__visitOrderCache;
+            if (!cache || !cache.data || !cache.data.list) return null;
+            for (var i = 0; i < cache.data.list.length; i++) {
+                if (cache.data.list[i].ordersId === ordersId) return cache.data.list[i];
+            }
+            return null;
+        }
+
+        function reloadAfterRef() {
+            window.__visitOrderCache = null; // 关联/取消后失效缓存，重拉当前页
+            loadData(state.page);
+        }
+
+        function fetchVisits(cb) {
+            var cache = window.__visitOrderRefVisitCache;
+            if (cache && cache.poi === state.amapCustomerId && cache.rows) { cb(cache.rows); return; }
+            $.ajax({
+                url: '/new/api/visit/records',
+                type: 'GET',
+                dataType: 'json',
+                data: { amap_customer_id: state.amapCustomerId, page: 1, limit: VISIT_PAGE_LIMIT },
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) { layer.msg(res.msg || '拜访记录查询失败'); return; }
+                    var rows = res.data.list || [];
+                    window.__visitOrderRefVisitCache = { poi: state.amapCustomerId, rows: rows };
+                    cb(rows);
+                },
+                error: function (xhr) {
+                    layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试');
+                }
+            });
+        }
+
+        function doUnbind(ordersId, done) {
+            $.ajax({
+                url: '/new/api/visit/order-refs',
+                type: 'DELETE',
+                dataType: 'json',
+                contentType: 'application/json',
+                data: JSON.stringify({ orders_id: ordersId }),
+                success: function (res) {
+                    if (res.code !== 200) { layer.msg(res.msg || '取消关联失败'); return; }
+                    layer.msg('已取消关联', { icon: 1 });
+                    done();
+                },
+                error: function (xhr) {
+                    layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '取消关联失败，请稍后重试');
+                }
+            });
+        }
+
+        function openRefDialog(ordersId) {
+            if (!state.amapCustomerId) { layer.msg('缺少客户标识'); return; }
+            fetchVisits(function (rows) {
+                if (!rows.length) { layer.msg('该客户暂无拜访记录，请先导入拜访'); return; }
+                var row = currentRow(ordersId);
+                var curRef = row && row.visitRef ? row.visitRef.recordId : null;
+
+                var html = '<div style="padding:16px 20px;">';
+                html += '<div style="margin-bottom:8px;color:#888;font-size:12px;">为订单 <b>' + esc(ordersId)
+                    + '</b> 选择一次拜访（一次拜访可关联多张订单）</div>';
+                html += '<div id="vref-list" style="border:1px solid #eee;border-radius:4px;max-height:340px;overflow:auto;">';
+                for (var i = 0; i < rows.length; i++) {
+                    var v = rows[i];
+                    var checked = (curRef === v.id) ? ' checked' : '';
+                    var snippet = (v.content || '').substring(0, 40);
+                    html += '<label style="display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid #f2f2f2;'
+                        + 'cursor:pointer;align-items:flex-start;">'
+                        + '<input type="radio" name="vref-record" value="' + v.id + '"' + checked + ' style="margin-top:3px;">'
+                        + '<span><b>' + esc((v.visit_time || '').substring(0, 16)) + '</b> <span style="color:#888;">'
+                        + esc(v.recorder || '') + '</span>'
+                        + (snippet ? '<div style="color:#999;font-size:12px;">' + esc(snippet) + '</div>' : '')
+                        + '</span></label>';
+                }
+                html += '</div>';
+                html += '<input id="vref-remarks" placeholder="关联备注（选填）" '
+                    + 'style="width:100%;height:32px;margin-top:10px;border:1px solid #ddd;border-radius:4px;'
+                    + 'padding:0 8px;box-sizing:border-box;">';
+                html += '</div>';
+
+                var opts = {
+                    type: 1,
+                    title: '关联拜访',
+                    area: ['540px', '580px'],
+                    content: html,
+                    btn: ['确定', '取消'],
+                    yes: function (idx) {
+                        var sel = $('input[name="vref-record"]:checked');
+                        if (!sel.length) { layer.msg('请选择一次拜访'); return; }
+                        $.ajax({
+                            url: '/new/api/visit/order-refs',
+                            type: 'PUT',
+                            dataType: 'json',
+                            contentType: 'application/json',
+                            data: JSON.stringify({
+                                orders_id: ordersId,
+                                record_id: parseInt(sel.val(), 10),
+                                remarks: $('#vref-remarks').val() || ''
+                            }),
+                            success: function (res) {
+                                if (res.code !== 200) { layer.msg(res.msg || '关联失败'); return; }
+                                layer.close(idx);
+                                layer.msg('关联成功', { icon: 1 });
+                                reloadAfterRef();
+                            },
+                            error: function (xhr) {
+                                layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '关联失败，请稍后重试');
+                            }
+                        });
+                    },
+                    btn2: function () { }
+                };
+                // 已关联订单：弹层追加"取消关联"（物理删除，业务确认 2026-10-24）
+                if (curRef) {
+                    opts.btn.push('取消关联');
+                    opts.btn3 = function (idx) {
+                        layer.confirm('确定取消该订单的关联拜访？', function (cidx) {
+                            layer.close(cidx);
+                            doUnbind(ordersId, function () {
+                                layer.close(idx);
+                                reloadAfterRef();
+                            });
+                        });
+                        return false; // 阻止自动关闭，由确认框控制
+                    };
+                }
+                layer.open(opts);
+            });
+        }
+
+        // "关联拜访"列点击（委托：标签=改绑/取消，无关联=指定）
+        $('#order-body').on('click', '[data-act="ref"]', function () {
+            openRefDialog($(this).attr('data-orders'));
+        });
+
+        loadData(1);
+    });
+</script>

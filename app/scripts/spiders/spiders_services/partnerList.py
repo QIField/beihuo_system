@@ -8,7 +8,7 @@ import sys
 
 import pandas as pd
 
-from app.models.orm_models.partner_list import PartnerList
+from app.dao.crm.partner_list_dao import bulk_upsert
 from app.scripts.spiders.pipeline_clean.partnerList_clean import remove_duplicate
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 from app.utils.orm import orm_session
@@ -49,7 +49,7 @@ def partnerList(token, page_num=None):
         if filtered_data_list:
             print(f"开始入库第{current_page}页数据...")
             with orm_session() as session:
-                count = PartnerList.bulk_upsert(session, filtered_data_list)
+                count = bulk_upsert(session, filtered_data_list)
                 print(f"第{current_page}页成功入库 {count} 条数据（插入或更新）")
 
 

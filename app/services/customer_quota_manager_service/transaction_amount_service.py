@@ -4,7 +4,9 @@
 # @Project : beihuo_system
 # @File    : transaction_amount.py
 # @Software: PyCharm
-from app.models.orm_models import MergeOrderList
+# 数据源说明：2026-10-22 起从旧表 merge_order_list（每周二全量，已停更）切换到
+# crm_sales_order（每日 02:00 全量 + 看板心跳增量）；旧表数据与 ORM 模型保留但不再读取。
+from app.dao.crm import crm_sales_order_dao
 from app.utils.common_util_module.time_conversion_util import get_border_month_timestamp
 from app.utils.orm import orm_session
 
@@ -50,7 +52,8 @@ def time_transaction_sum(page,limit,
         total_price_max = float(total_price_max)
 
     with orm_session() as session:
-        total,result = MergeOrderList.get_customer_total_price_sum(
+        # DAO 内已返回 (总数, 字典列表)，Decimal 已转 float
+        total, result = crm_sales_order_dao.get_customer_total_price_sum(
             session,
             page=page,
             limit=limit,
@@ -62,9 +65,6 @@ def time_transaction_sum(page,limit,
             total_price_min=total_price_min,
             total_price_max=total_price_max
         )
-
-        result=MergeOrderList.list_to_dict_list(result)
-
 
         data={
             "total": total,

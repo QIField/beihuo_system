@@ -1,0 +1,299 @@
+<!-- M7 Tab-跟进记录（04-跟进记录模块设计.md）
+     数据接口（URL 不带路径参数：客户 id 走 query、跟进记录 id 走 JSON body）：
+       GET  /new/api/visit/customers/follows?id=<客户主键>  跟进记录时间轴（分页 + 渠道筛选）
+       POST /new/api/visit/follows                 新增跟进
+       PUT  /new/api/visit/follows                 编辑跟进（body: id + 待更新字段）
+       PUT  /new/api/visit/follows/void            作废跟进（body: id）
+     说明：
+       1. 跟进记录与拜访记录完全独立，纯手动维护（唯一写入渠道为后台表单）；
+       2. channel 固定枚举：微信/电话/线上平台/上门/其他，channel_desc 为时间轴标题；
+       3. 作废走 status=0 软删（时间轴排除），本期不提供恢复。 -->
+<div class="v-pane">
+    <div class="v-pane-head">
+        <h3 class="v-pane-title">全渠道跟进记录（共<span id="follow-total">0</span>条）</h3>
+        <div>
+            <select id="follow-channel-filter" style="height: 28px; border: 1px solid #e2e6ef; border-radius: 4px; margin-right: 10px; padding: 0 6px; color: #5a6478;">
+                <option value="">全部渠道</option>
+            </select>
+            <button class="v-btn--link" id="btn-add-follow" style="font-size: 14px;">+ 新增跟进</button>
+        </div>
+    </div>
+
+    <div class="v-timeline">
+        <div class="v-timeline-line"></div>
+        <div id="follow-timeline"></div>
+    </div>
+</div>
+
+<!-- laytpl 模板：跟进时间轴项 -->
+<script type="text/html" id="tpl-follow-item">
+    {% raw %}
+    {{# layui.each(d.records, function (i, r) { }}
+    <div class="v-timeline-item">
+        <div class="v-timeline-dot {{ r.dotCls }}"></div>
+        <div class="v-timeline-head">
+            <span class="v-avatar-s {{ r.avatarCls }}">{{ r.avatar }}</span>
+            <span class="v-timeline-name">{{ r.title }}</span>
+            <span class="v-timeline-time">{{ r.time }}</span>
+            <span class="v-tag {{ r.channelCls }}">{{ r.channel }}</span>
+            {{# if (!r.isVisit) { }}<span style="color: #9aa3b5; font-size: 12px; margin-left: 4px;">{{ r.creator }} 记录</span>{{# } }}
+            {{# if (!r.isVisit) { }}<span style="margin-left: auto;">
+                <span class="v-link" data-act="edit" data-id="{{ r.id }}">编辑</span>
+                <span class="v-link" data-act="void" data-id="{{ r.id }}" style="color: #e6a23c;">作废</span>
+            </span>{{# } }}
+        </div>
+        <div class="v-timeline-body" style="margin-bottom: 0; white-space: pre-wrap;">{{ r.content }}{{# if (r.isVisit) { }} <span class="v-link" data-act="view-visit">查看完整拜访详情 →</span>{{# } }}</div>
+    </div>
+    {{# }); }}
+    {{# if (!d.records.length) { }}
+    <div class="v-empty">暂无跟进记录</div>
+    {{# } }}
+    {% endraw %}
+</script>
+
+<!-- 新增/编辑跟进表单（layer 弹窗） -->
+<script type="text/html" id="tpl-follow-form">
+    <div style="padding: 18px 20px 6px;">
+        <div style="margin-bottom: 12px;">
+            <label style="display:block; margin-bottom: 4px; font-size: 13px; color: #5a6478;">跟进渠道 <span style="color:#f56c6c;">*</span></label>
+            <select id="ff-channel" style="width: 100%; height: 34px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 0 8px; box-sizing: border-box;"></select>
+        </div>
+        <div style="margin-bottom: 12px;">
+            <label style="display:block; margin-bottom: 4px; font-size: 13px; color: #5a6478;">时间轴标题 <span style="color:#9aa3b5;">留空按渠道自动生成</span></label>
+            <input type="text" id="ff-desc" maxlength="100" placeholder="如：微信沟通" style="width: 100%; height: 34px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 0 8px; box-sizing: border-box;">
+        </div>
+        <div style="margin-bottom: 12px;">
+            <label style="display:block; margin-bottom: 4px; font-size: 13px; color: #5a6478;">跟进时间 <span style="color:#9aa3b5;">默认当前时间，不能晚于当前时间</span></label>
+            <input type="text" id="ff-time" readonly placeholder="选择日期时间" style="width: 100%; height: 34px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 0 8px; box-sizing: border-box;">
+        </div>
+        <div style="margin-bottom: 4px;">
+            <label style="display:block; margin-bottom: 4px; font-size: 13px; color: #5a6478;">跟进内容 <span style="color:#f56c6c;">*</span></label>
+            <textarea id="ff-content" maxlength="2000" rows="5" placeholder="沟通对象、沟通内容、后续动作..." style="width: 100%; border: 1px solid #dcdfe6; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: vertical;"></textarea>
+        </div>
+    </div>
+</script>
+
+<script>
+    layui.use(['jquery', 'laytpl', 'layer', 'laydate'], function () {
+        var $ = layui.jquery;
+        var laytpl = layui.laytpl;
+        var layer = layui.layer;
+        var laydate = layui.laydate;
+
+        var PAGE_LIMIT = 200; // 接口单页上限，详情时间轴一次拉取
+
+        // 渠道配色（其他/未知走默认样式；拜访同步=只读合并条目）
+        var CHANNEL_CLS = {
+            '微信':   { tag: 'v-tag--green',   avatar: 'v-avatar-s--green',   dot: 'v-timeline-dot--green' },
+            '电话':   { tag: 'v-tag--blue',    avatar: 'v-avatar-s--blue',    dot: '' },
+            '线上平台': { tag: 'v-tag--indigo', avatar: 'v-avatar-s--indigo',  dot: 'v-timeline-dot--indigo' },
+            '上门':   { tag: 'v-tag--orange',  avatar: 'v-avatar-s--orange',  dot: 'v-timeline-dot--orange' },
+            '拜访同步': { tag: 'v-tag--blue',  avatar: 'v-avatar-s--orange',  dot: 'v-timeline-dot--purple' },
+            '其他':   { tag: '',               avatar: '',                    dot: '' }
+        };
+        var channels = []; // 渠道值域（接口返回，用于筛选与表单下拉）
+
+        // ==================== 工具 ====================
+        // hash 结构：#/customer_detail/follow/<id>，末段为 visit_amap_customer 主键 id
+        function parseCustomerId() {
+            var parts = location.hash.replace(/^#\/?/, '').split('/');
+            return parts[2] ? decodeURIComponent(parts[2]) : '';
+        }
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function channelCls(channel) {
+            return CHANNEL_CLS[channel] || CHANNEL_CLS['其他'];
+        }
+
+        // ==================== 渲染 ====================
+        function buildRow(r) {
+            var cls = channelCls(r.channel);
+            var creator = r.creator_name || '未知';
+            return {
+                id: r.id,
+                isVisit: !!r.is_visit, // 拜访同步条目：只读，不可编辑/作废
+                title: esc(r.channel_desc || r.channel || '跟进'),
+                avatar: esc((creator.charAt(0) || '跟')),
+                avatarCls: cls.avatar,
+                time: (r.follow_time || '').substring(0, 16),
+                channel: esc(r.channel || '其他'),
+                channelCls: cls.tag,
+                dotCls: cls.dot,
+                creator: esc(creator),
+                content: esc(r.content)
+            };
+        }
+
+        function renderRows(rows, total, raws) {
+            laytpl($('#tpl-follow-item').html()).render({ records: rows }, function (html) {
+                $('#follow-timeline').html(html);
+            });
+            // 按行挂原始数据，供编辑弹窗回填
+            var $items = $('#follow-timeline .v-timeline-item');
+            $items.each(function (i) {
+                $(this).data('raw', raws[i]);
+            });
+            $('#follow-total').text(total);
+        }
+
+        function renderChannelOptions($select, selected) {
+            // 筛选项 = 拜访同步（只读合并类型）+ 手动渠道枚举
+            var html = '<option value="">全部渠道</option>';
+            html += '<option value="拜访同步"' + ('拜访同步' === selected ? ' selected' : '') + '>拜访同步</option>';
+            layui.each(channels, function (i, c) {
+                html += '<option value="' + esc(c) + '"' + (c === selected ? ' selected' : '') + '>' + esc(c) + '</option>';
+            });
+            $select.html(html);
+        }
+
+        // ==================== 数据加载 ====================
+        function fetchList() {
+            var customerId = parseCustomerId();
+            if (!customerId) {
+                renderRows([], 0);
+                return;
+            }
+            $.ajax({
+                url: '/new/api/visit/customers/follows',
+                type: 'GET',
+                dataType: 'json',
+                data: { id: customerId, page: 1, limit: PAGE_LIMIT, channel: $('#follow-channel-filter').val() || '' },
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        layer.msg(res.msg || '跟进记录查询失败');
+                        renderRows([], 0);
+                        return;
+                    }
+                    channels = res.data.channels || Object.keys(CHANNEL_CLS);
+                    renderChannelOptions($('#follow-channel-filter'), $('#follow-channel-filter').val());
+                    var rows = [];
+                    for (var i = 0; i < res.data.list.length; i++) {
+                        rows.push(buildRow(res.data.list[i]));
+                    }
+                    renderRows(rows, res.data.total, res.data.list);
+                },
+                error: function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    layer.msg(msg);
+                    renderRows([], 0);
+                }
+            });
+        }
+
+        // ==================== 新增/编辑弹窗 ====================
+        function openFormWin(mode, row) {
+            var isEdit = mode === 'edit';
+            laytpl($('#tpl-follow-form').html()).render({}, function (html) {
+                layer.open({
+                    type: 1,
+                    title: isEdit ? '编辑跟进' : '新增跟进',
+                    area: ['460px', 'auto'],
+                    btn: ['保存', '取消'],
+                    content: html,
+                    success: function () {
+                        // 渠道下拉（表单用全量枚举）
+                        var opts = '';
+                        layui.each(channels, function (i, c) {
+                            opts += '<option value="' + esc(c) + '">' + esc(c) + '</option>';
+                        });
+                        $('#ff-channel').html(opts);
+                        if (isEdit && row) {
+                            $('#ff-channel').val(row.channel);
+                            $('#ff-desc').val(row.channel_desc || '');
+                            $('#ff-time').val((row.follow_time || '').substring(0, 16));
+                            $('#ff-content').val(row.content || '');
+                        }
+                        laydate.render({
+                            elem: '#ff-time',
+                            type: 'datetime',
+                            format: 'yyyy-MM-dd HH:mm',
+                            max: 0 // 不允许晚于当前时间（预约式跟进本期不支持）
+                        });
+                    },
+                    yes: function (index) {
+                        var payload = {
+                            channel: $('#ff-channel').val(),
+                            channel_desc: $.trim($('#ff-desc').val()),
+                            follow_time: $.trim($('#ff-time').val()),
+                            content: $.trim($('#ff-content').val())
+                        };
+                        if (!payload.channel) { layer.msg('请选择跟进渠道'); return; }
+                        if (!payload.content) { layer.msg('请填写跟进内容'); return; }
+                        var req = isEdit
+                            ? { url: '/new/api/visit/follows', type: 'PUT',
+                                data: JSON.stringify($.extend({ id: row.id }, payload)) }
+                            : { url: '/new/api/visit/follows', type: 'POST',
+                                data: JSON.stringify($.extend({ amap_customer_id: parseCustomerId() }, payload)) };
+                        $.ajax($.extend(req, {
+                            contentType: 'application/json; charset=utf-8',
+                            dataType: 'json',
+                            success: function (res) {
+                                if (res.code !== 200) {
+                                    layer.msg(res.msg || '保存失败');
+                                    return;
+                                }
+                                layer.close(index);
+                                layer.msg(res.msg || '已保存');
+                                fetchList();
+                            },
+                            error: function (xhr) {
+                                layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试');
+                            }
+                        }));
+                    }
+                });
+            });
+        }
+
+        // ==================== 事件 ====================
+        $('#btn-add-follow').on('click', function () {
+            if (!parseCustomerId()) { layer.msg('未选择客户'); return; }
+            openFormWin('add', null);
+        });
+
+        $('#follow-channel-filter').on('change', fetchList);
+
+        // 拜访同步条目：跳转拜访历史 Tab 查看完整详情
+        $('#follow-timeline').on('click', '[data-act="view-visit"]', function () {
+            var customerId = parseCustomerId();
+            location.hash = '#/customer_detail/visit' + (customerId ? '/' + encodeURIComponent(customerId) : '');
+        }).on('click', '[data-act="edit"]', function () {
+            var id = $(this).data('id');
+            var $item = $(this).closest('.v-timeline-item');
+            // 从渲染行还原原始数据（渲染时挂在 DOM data 上）
+            openFormWin('edit', $item.data('raw'));
+        }).on('click', '[data-act="void"]', function () {
+            var id = $(this).data('id');
+            layer.confirm('作废后时间轴不再展示且不可恢复，确认作废该条跟进？', { title: '作废跟进' }, function (index) {
+                $.ajax({
+                    url: '/new/api/visit/follows/void',
+                    type: 'PUT',
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify({ id: id }),
+                    dataType: 'json',
+                    success: function (res) {
+                        layer.close(index);
+                        if (res.code !== 200) {
+                            layer.msg(res.msg || '作废失败');
+                            return;
+                        }
+                        layer.msg(res.msg || '已作废');
+                        fetchList();
+                    },
+                    error: function (xhr) {
+                        layer.close(index);
+                        layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试');
+                    }
+                });
+            });
+        });
+
+        // ==================== 初始化 ====================
+        fetchList();
+    });
+</script>

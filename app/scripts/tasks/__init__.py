@@ -22,12 +22,8 @@ def expansion_tasks(task_manager):
     
    
 
-    # 注册合并订单列表定时任务（订单列表爬虫，关联额度管理）
-    from app.scripts.tasks.get_mergeOrderList_tasks import merge_order_list_register
-    merge_order_list_register(task_manager)
-
     # 注册合作伙伴列表定时任务
-    from app.scripts.tasks.partnerList_tasks import partner_list_register
+    from app.scripts.tasks.crm.partnerList_tasks import partner_list_register
     partner_list_register(task_manager)
 
 
@@ -38,7 +34,11 @@ def expansion_tasks(task_manager):
     # 注册crm销售订单表定时任务
     from app.scripts.tasks.crm.get_merge_order_list_tasks import get_merge_order_list_by_all_updata_register
     get_merge_order_list_by_all_updata_register()
-    
+
+    # 注册crm销售订单表每周六02:00全量拉取定时任务
+    from app.scripts.tasks.crm.get_merge_order_list_full_tasks import get_merge_order_list_full_register
+    get_merge_order_list_full_register()
+
     # 注册wms拣货订单定时任务
     from app.scripts.tasks.wms.get_status_orders_tasks import get_wms_picking_list_by_pages5_register
     get_wms_picking_list_by_pages5_register()

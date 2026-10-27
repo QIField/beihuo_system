@@ -1,0 +1,191 @@
+<!-- 客户详情：M2 详情头部 + M3 指标卡（01-主设计文档 第六节）
+     数据接口：
+       GET /new/api/visit/customers/detail?id=<id>  详情聚合（头部 + 档案，已接入；id 为 visit_amap_customer 主键，取路由 hash 第三段）
+       GET /new/api/visit/customers/stats?id=<id>   指标卡 + 近30天动态（已接入，统一渲染契约；未接入指标服务端固定返回"暂时无数据"）
+       GET /new/api/visit/customers/orders?id=<id>  拿货订单 Tab（切到该 Tab 时才加载，由主页面 Tab 片段请求）
+     注意：
+       1. 指标金额基于 sales_order_history 按 orders_id 订单级聚合，避免明细重复累加；
+       2. 拜访转化率已按业务要求删除（2026-10-22）；
+       3. “创建拜访任务”按钮依赖 visit_task 表，本期不做（01 文档第十一节）。 -->
+<div class="v-card v-pane" id="customer-detail-head">
+    <div class="v-detail-top">
+        <div>
+            <!-- 双名称核心展示 -->
+            <div class="v-names-row">
+                <h1 class="v-detail-name"></h1>
+                <span class="v-name-chip">高德端名称</span>
+            </div>
+            <div class="v-detail-meta" id="detail-meta"></div>
+            <div class="v-detail-addr">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span id="detail-addr"></span>
+            </div>
+        </div>
+        <div class="v-detail-actions">
+            <!-- M8：编辑高德客户资料（含经纬度/围栏半径），PUT /api/visit/amap-customers/<id> -->
+            <button class="v-btn v-btn--primary" id="btn-edit-customer">编辑客户</button>
+        </div>
+    </div>
+
+    <!-- 核心指标卡（8列；累计拜访次数合并拜访转化率，原转化率位置为欠款余额） -->
+    <div class="v-metric-grid v-mt16" id="metric-grid"></div>
+
+    <!-- 客户需求动态（近30天）：成交总金额 → 毛利额 → 退货总金额 → 最近成交时间；
+         平台询价类指标本期数据源未接入，UI 槽位留空（01 文档第十一节 / 02 拓展文档 3.2） -->
+    <div class="v-mt16" style="border-top: 1px solid #f3f4f6; padding-top: 16px;">
+        <h3 class="v-section-title">客户需求动态（近30天）</h3>
+        <div class="v-metric-grid" id="dynamic-grid"></div>
+    </div>
+</div>
+
+<!-- laytpl 模板：指标卡栅格（核心指标 / 近30天动态共用） -->
+<script type="text/html" id="tpl-metric-grid">
+    {% raw %}
+    {{# layui.each(d.list, function (i, m) { }}
+    <div class="v-metric {{ m.panelCls || '' }}">
+        {{# if (m.badge) { }}<span class="v-metric-extra {{ m.badge.cls }}">{{ m.badge.text }}</span>{{# } }}
+        {{# if (m.sub) { }}
+        <div class="v-metric-row">
+            <span class="v-metric-label">{{ m.label }}</span>
+            <span class="v-metric-sub {{ m.subCls || '' }}">{{ m.sub }}</span>
+        </div>
+        {{# } else { }}
+        <div class="v-metric-label">{{ m.label }}</div>
+        {{# } }}
+        <div class="v-metric-value {{ m.valueCls || '' }}">{{ m.value }}</div>
+    </div>
+    {{# }); }}
+    {% endraw %}
+</script>
+
+<!-- 详情页内容 Tab 栏容器（Tab 栏与 Tab 内容均由主页面路由渲染/加载） -->
+<div class="v-card v-mt20">
+    <div class="v-tabbar" id="detail-tab-bar"></div>
+    <div id="detail-tab-content"></div>
+</div>
+
+<script>
+    layui.use(['jquery', 'laytpl', 'layer'], function () {
+        var $ = layui.jquery;
+        var laytpl = layui.laytpl;
+        var layer = layui.layer;
+
+        // ==================== 工具 ====================
+        // hash 结构：#/customer_detail/<tab>/<id>，末段为 visit_amap_customer 主键 id，由客户列表「查看详情」写入
+        function parseCustomerId() {
+            var parts = location.hash.replace(/^#\/?/, '').split('/');
+            return parts[2] ? decodeURIComponent(parts[2]) : '';
+        }
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // ==================== 指标卡（真实数据：GET /new/api/visit/customers/stats?id=<主键>） ====================
+        // 核心指标 + 近30天动态统一由 stats 接口返回渲染契约（label/value/valueCls），
+        // 数据源未接入的指标服务端固定返回"暂时无数据"；拜访转化率已按业务要求删除。
+        // 进入详情页加载一次，与详情头部并行请求，切 Tab 不重复请求。
+
+        // ==================== 渲染 ====================
+        function renderMetricGrid(tplId, list, $target) {
+            laytpl($('#' + tplId).html()).render({ list: list }, function (html) {
+                $target.html(html);
+            });
+        }
+
+        // 指标卡加载失败不打断详情页（详情头部已有统一报错提示），保持空态
+        function loadStats() {
+            var customerId = parseCustomerId();
+            if (!customerId) {
+                return;
+            }
+            $.ajax({
+                url: '/new/api/visit/customers/stats?id=' + encodeURIComponent(customerId),
+                type: 'GET',
+                dataType: 'json',
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        return;
+                    }
+                    renderMetricGrid('tpl-metric-grid', res.data.metrics || [], $('#metric-grid'));
+                    renderMetricGrid('tpl-metric-grid', res.data.dynamics || [], $('#dynamic-grid'));
+                }
+            });
+        }
+
+        // ==================== 详情头部（真实数据：GET /new/api/visit/customers/<poi>） ====================
+        // crmList 为 1:N 绑定的 CRM 客户列表（按绑定时间倒序）；多条时头部名称显示「等N家」，
+        // 等级/片区等单值字段仅单条绑定时展示，避免多条归属不同片区时误导
+        function renderHeader(c, crmList) {
+            crmList = crmList || [];
+            var first = crmList[0] || null;
+            $('#customer-detail-head').find('.v-detail-name').text(c.customer_name || '—');
+            $('#detail-addr').text(c.address || '—');
+
+            // 第二行元信息（CRM 侧字段依赖绑定关系，未关联/绑定失效时隐藏对应段）
+            var segs = [];
+            if (first && first.fullname) {
+                var nameText = crmList.length > 1 ? first.fullname + ' 等' + crmList.length + '家' : first.fullname;
+                segs.push('<span>CRM端名称：' + esc(nameText) + '</span>');
+            }
+            if (Number(c.status) === 1) {
+                segs.push('<span><i class="v-dot v-dot--green"></i>已关联CRM</span>');
+            } else {
+                segs.push('<span>' + esc(c.status_label || '') + '</span>');
+            }
+            if (first && first.level_name && crmList.length === 1) {
+                segs.push('<span>' + esc(first.level_name) + '</span>');
+            }
+            var typeBrand = [c.customer_type, c.main_repair_brands ? '主修' + c.main_repair_brands : '']
+                .filter(function (v) { return v; }).join(' · ');
+            if (typeBrand) {
+                segs.push('<span>' + esc(typeBrand) + '</span>');
+            }
+            if (first && first.region && crmList.length === 1) {
+                segs.push('<span>所属片区：' + esc(first.region) + '</span>');
+            } else if (c.business_circle) {
+                segs.push('<span>所属商圈：' + esc(c.business_circle) + '</span>');
+            }
+            $('#detail-meta').html(segs.join('<i class="v-divider"></i>'));
+        }
+
+        function loadDetail() {
+            var customerId = parseCustomerId();
+            if (!customerId) {
+                $('#customer-detail-head').find('.v-detail-name').text('未选择客户');
+                return;
+            }
+            $.ajax({
+                url: '/new/api/visit/customers/detail?id=' + encodeURIComponent(customerId),
+                type: 'GET',
+                dataType: 'json',
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        layer.msg(res.msg || '客户详情查询失败');
+                        return;
+                    }
+                    // 详情数据只在此处拉取一次并缓存，供 Tab 片段复用（切 Tab 不重复请求）
+                    window.__visitDetailCache = { id: customerId, data: res.data };
+                    renderHeader(res.data.customer, res.data.crm_list);
+                },
+                error: function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    layer.msg(msg);
+                }
+            });
+        }
+
+        // 编辑客户（M8 档案编辑，表单弹窗后续接入）
+        $('#btn-edit-customer').on('click', function () {
+            layer.msg('预留：编辑高德客户资料（M8）');
+        });
+
+        loadDetail();
+        loadStats();
+    });
+</script>

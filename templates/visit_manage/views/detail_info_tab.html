@@ -1,0 +1,214 @@
+<!-- M6 Tab-基础档案（01-主设计文档 第六节）
+     数据接口：GET /new/api/visit/customers/detail?id=<id>
+              （详情聚合，与详情头部共用一次请求：详情头部拉取后缓存于 window.__visitDetailCache，
+                本片段切 Tab 重载时命中缓存直接渲染，仅缓存缺失时兜底请求；
+                id 为 visit_amap_customer 主键，取路由 hash 第三段）
+     说明：
+       1. 左侧高德端采集信息来自 visit_amap_customer（采集原文透传，多值字段以 | 分隔展示）；
+       2. 右侧 CRM端销售信息来自 partner_list（只读，经 visit_customer_relation 绑定桥接）；
+          1:N 绑定：一条高德客户可关联多条CRM客户，每条绑定渲染为一张卡片（按绑定时间倒序）；
+          绑定客户被 partner_list 周刷新删除时后端跳过该条，全部失效按未关联降级展示（03 专项文档 第五节）；
+          账期标准/信用额度/最近回款本期不做（01 文档第十一节）；
+       3. 编辑入口走 M8：PUT /api/visit/amap-customers/<id>（详情头部“编辑客户”按钮）。 -->
+<style>
+    /* CRM 绑定卡片（1:N，每条绑定一张卡片） */
+    .crm-block { padding: 10px 12px; border: 1px solid var(--v-border); border-radius: 6px; margin-bottom: 10px; }
+    .crm-block:last-child { margin-bottom: 0; }
+    .crm-block-head {
+        display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+        padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px dashed var(--v-border);
+    }
+    .crm-block-name { font-size: 13px; font-weight: 600; color: var(--v-text); }
+    .crm-block-sub { font-size: 12px; color: var(--v-text-3); }
+</style>
+<div class="v-pane">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- 左：高德端采集信息（字段多，行高决定整行高度） -->
+        <div style="display: flex; flex-direction: column;">
+            <h3 class="v-section-title">高德端采集信息</h3>
+            <div class="v-info-panel" id="amap-info" style="flex: 1;"></div>
+        </div>
+        <!-- 右：CRM端销售信息（1:N 绑定卡片，行均匀拉开与左列上下对齐对称） -->
+        <div style="display: flex; flex-direction: column;">
+            <h3 class="v-section-title v-section-title--green">CRM端销售信息</h3>
+            <div class="v-info-panel" id="crm-info" style="flex: 1; align-content: space-between;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- laytpl 模板：档案信息行 -->
+<script type="text/html" id="tpl-info-row">
+    {% raw %}
+    {{# layui.each(d.fields, function (i, f) { }}
+    <div class="v-info-row">
+        <span class="v-info-label">{{ f.label }}：</span>
+        <span class="v-info-value {{ f.valueCls || '' }}">{{ f.value }}</span>
+    </div>
+    {{# }); }}
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：CRM绑定卡片列表（1:N，每条绑定一张卡片） -->
+<script type="text/html" id="tpl-crm-blocks">
+    {% raw %}
+    {{# layui.each(d.blocks, function (i, b) { }}
+    <div class="crm-block">
+        <div class="crm-block-head">
+            <span class="crm-block-name">{{ b.title }}</span>
+            {{# if (b.subtitle) { }}<span class="crm-block-sub">{{ b.subtitle }}</span>{{# } }}
+        </div>
+        {{# layui.each(b.fields, function (j, f) { }}
+        <div class="v-info-row">
+            <span class="v-info-label">{{ f.label }}：</span>
+            <span class="v-info-value {{ f.valueCls || '' }}">{{ f.value }}</span>
+        </div>
+        {{# }); }}
+    </div>
+    {{# }); }}
+    {% endraw %}
+</script>
+
+<script>
+    layui.use(['jquery', 'laytpl'], function () {
+        var $ = layui.jquery;
+        var laytpl = layui.laytpl;
+
+        // hash 结构：#/customer_detail/<tab>/<id>，末段为 visit_amap_customer 主键 id，与详情头部一致
+        function parseCustomerId() {
+            var parts = location.hash.replace(/^#\/?/, '').split('/');
+            return parts[2] ? decodeURIComponent(parts[2]) : '';
+        }
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // 多值字段（| 分隔，如 purchase_channels="线下|开思"）展示为 "a | b"；空值返回 ''
+        function fmtMulti(v) {
+            var parts = String(v == null ? '' : v).split('|')
+                .map(function (s) { return s.trim(); }).filter(Boolean);
+            return parts.join(' | ');
+        }
+
+        function dash(v) { return v ? v : '—'; }
+
+        // ==================== 字段拼装（高德端：visit_amap_customer 采集原文） ====================
+        function buildAmapFields(a) {
+            return [
+                { label: '客户名称', value: a.customer_name },
+                { label: '门店地址', value: a.address },
+                { label: '采购负责人', value: a.contact_person },
+                { label: '客户类型', value: a.customer_type },
+                { label: '员工数量', value: a.staff_count },
+                { label: '工位数量', value: a.station_count },
+                { label: '拿货方式', value: fmtMulti(a.purchase_channels) },
+                { label: '用货习惯', value: fmtMulti(a.goods_habit) },
+                { label: '常合作商家', value: a.coop_merchants },
+                { label: '客户侧重点', value: fmtMulti(a.focus_points) },
+                { label: '主修车型', value: a.main_repair_brands },
+                { label: '信息补充', value: a.remark }
+            ].map(function (f) {
+                f.value = dash(esc(f.value));
+                return f;
+            });
+        }
+
+        // ==================== 字段拼装（CRM端：partner_list 只读，1:N 绑定卡片列表） ====================
+        function buildCrmBlocks(crmList) {
+            if (!crmList || !crmList.length) {
+                // 未关联CRM（或绑定客户已被周刷新删除全部失效）：降级展示
+                return [{
+                    title: '未关联CRM客户',
+                    subtitle: '',
+                    fields: [
+                        { label: 'CRM客户名', value: '未关联CRM客户（可在客户列表中关联）' },
+                        { label: '客户等级', value: '—' },
+                        { label: '联系电话', value: '—' },
+                        { label: '负责业务员', value: '—' },
+                        { label: '所属片区', value: '—' },
+                        { label: '付款说明', value: '—' },
+                        { label: '创建时间', value: '—' },
+                        { label: '累计订单数', value: '—' }
+                    ]
+                }];
+            }
+            return crmList.map(function (c) {
+                var subParts = [];
+                if (c.remenber_code) subParts.push('记忆码 ' + c.remenber_code);
+                if (c.bind_time) subParts.push('绑定于 ' + c.bind_time);
+                var fields = [
+                    { label: '客户等级', value: c.level_name, valueCls: 'v-red' },
+                    { label: '联系电话', value: c.contacts_phone },
+                    { label: '负责业务员', value: c.real_name },
+                    { label: '所属片区', value: c.region },
+                    { label: '付款说明', value: c.payment_description },
+                    { label: '创建时间', value: c.create_time },
+                    { label: '累计订单数', value: (c.order_count === 0 || c.order_count) ? c.order_count + ' 笔' : '' }
+                ];
+                if (c.bind_remark) {
+                    fields.push({ label: '绑定备注', value: c.bind_remark });
+                }
+                return {
+                    title: c.fullname || '—',
+                    subtitle: subParts.join(' · '),
+                    fields: fields.map(function (f) {
+                        f.value = dash(esc(f.value));
+                        return f;
+                    })
+                };
+            });
+        }
+
+        function renderFields($target, fields) {
+            laytpl($('#tpl-info-row').html()).render({ fields: fields }, function (html) {
+                $target.html(html);
+            });
+        }
+
+        function renderFail(msg) {
+            var html = '<div class="v-empty">' + esc(msg) + '</div>';
+            $('#amap-info').html(html);
+            $('#crm-info').html(html);
+        }
+
+        // ==================== 渲染（优先取详情头部缓存，切 Tab 不重复请求） ====================
+        function renderData(data) {
+            renderFields($('#amap-info'), buildAmapFields(data.amap || {}));
+            laytpl($('#tpl-crm-blocks').html()).render(
+                { blocks: buildCrmBlocks(data.crm_list) },
+                function (html) { $('#crm-info').html(html); });
+        }
+
+        var customerId = parseCustomerId();
+        if (!customerId) {
+            renderFail('未选择客户');
+            return;
+        }
+        var cache = window.__visitDetailCache;
+        if (cache && cache.id === customerId && cache.data) {
+            renderData(cache.data);
+            return;
+        }
+        $('#amap-info').html('<div class="v-empty">加载中…</div>');
+        $('#crm-info').html('<div class="v-empty">加载中…</div>');
+        $.ajax({
+            url: '/new/api/visit/customers/detail?id=' + encodeURIComponent(customerId),
+            type: 'GET',
+            dataType: 'json',
+            success: function (res) {
+                if (res.code !== 200 || !res.data) {
+                    renderFail(res.msg || '客户档案查询失败');
+                    return;
+                }
+                window.__visitDetailCache = { id: customerId, data: res.data };
+                renderData(res.data);
+            },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                renderFail(msg);
+            }
+        });
+    });
+</script>

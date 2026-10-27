@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>汽配客访管理系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui/css/layui.css') }}">
+    <style>
+        /* ==================== 全局（宿主页共用样式，子页面片段复用） ==================== */
+        :root {
+            --v-primary: #2563eb;
+            --v-primary-dark: #1d4ed8;
+            --v-text: #1f2937;
+            --v-text-2: #6b7280;
+            --v-text-3: #9ca3af;
+            --v-border: #e5e7eb;
+            --v-bg: #f5f6f8;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body.v-body {
+            font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+            background-color: var(--v-bg);
+            color: var(--v-text);
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ==================== 顶部：唯一导航（页面切换走 #header-tabs） ==================== */
+        .v-header { position: sticky; top: 0; z-index: 30; background: #fff; border-bottom: 1px solid var(--v-border); }
+        .v-header-row1 {
+            max-width: 1680px; margin: 0 auto; padding: 0 16px; height: 56px;
+            display: flex; align-items: center; justify-content: space-between; gap: 24px;
+        }
+        .v-brand { font-size: 18px; font-weight: 700; color: var(--v-primary); flex-shrink: 0; }
+        .v-brand-sub { font-size: 14px; font-weight: 400; color: var(--v-text-2); margin-left: 8px; }
+        .v-header-tabs { flex: 1; display: flex; align-items: stretch; height: 56px; }
+        .v-header-tab {
+            display: flex; align-items: center; padding: 0 16px; font-size: 14px;
+            color: var(--v-text-2); text-decoration: none; position: relative; cursor: pointer;
+        }
+        .v-header-tab:hover { color: var(--v-text); }
+        .v-header-tab.active { color: var(--v-primary); font-weight: 600; }
+        .v-header-tab.active::after {
+            content: ''; position: absolute; left: 14px; right: 14px; bottom: 0;
+            height: 2px; border-radius: 2px; background: var(--v-primary);
+        }
+        .v-user { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--v-text-2); flex-shrink: 0; }
+        .v-user-avatar {
+            width: 32px; height: 32px; border-radius: 50%; background: #dbeafe; color: var(--v-primary);
+            display: inline-flex; align-items: center; justify-content: center; font-size: 14px;
+        }
+
+        /* 下拉选择（详情页拜访类型筛选等使用） */
+        .v-select {
+            height: 28px; padding: 0 8px; font-size: 12px; color: var(--v-text);
+            border: 1px solid #d1d5db; border-radius: 4px; background: #fff; outline: none; cursor: pointer;
+        }
+        .v-select:focus { border-color: var(--v-primary); }
+
+        /* ==================== 主内容区（页面级视图出口） ==================== */
+        .v-main { max-width: 1680px; margin: 0 auto; padding: 24px 16px; }
+
+        /* ==================== 通用组件样式（详情/列表子页面复用） ==================== */
+        .v-card { background: #fff; border: 1px solid var(--v-border); border-radius: 8px; box-shadow: 0 1px 2px rgba(0, 0, 0, .04); }
+        .v-empty { padding: 48px 0; text-align: center; font-size: 14px; color: var(--v-text-3); }
+
+        .v-btn {
+            display: inline-flex; align-items: center; padding: 6px 12px; font-size: 14px;
+            border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: var(--v-text);
+            cursor: pointer; line-height: 1.4;
+        }
+        .v-btn:hover { background: #f9fafb; }
+        .v-btn--primary { background: var(--v-primary); border-color: var(--v-primary); color: #fff; }
+        .v-btn--primary:hover { background: var(--v-primary-dark); }
+        .v-btn--link { border: none; background: none; color: var(--v-primary); padding: 0; }
+        .v-btn--link:hover { background: none; color: var(--v-primary-dark); }
+
+        .v-tag { display: inline-block; font-size: 12px; line-height: 1.2; padding: 3px 6px; border-radius: 4px; white-space: nowrap; }
+        .v-tag--blue   { background: #eff6ff; color: #2563eb; }
+        .v-tag--purple { background: #f5f3ff; color: #7c3aed; }
+        .v-tag--orange { background: #fff7ed; color: #ea580c; }
+        .v-tag--green  { background: #f0fdf4; color: #16a34a; }
+        .v-tag--red    { background: #fef2f2; color: #dc2626; }
+        .v-tag--indigo { background: #eef2ff; color: #4f46e5; }
+        .v-tag--gray   { background: #f3f4f6; color: #4b5563; }
+        .v-tag--muted  { background: #f3f4f6; color: var(--v-text-3); }
+        .v-tag--warn   { background: #fee2e2; color: #dc2626; font-weight: 600; }
+
+        .v-metric-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 16px; }
+        .v-metric-grid--5 { grid-template-columns: repeat(5, 1fr); }
+        .v-metric-grid--4 { grid-template-columns: repeat(4, 1fr); }
+        .v-metric { position: relative; background: #f9fafb; border-radius: 6px; padding: 12px; }
+        .v-metric--green  { background: #f0fdf4; }
+        .v-metric--blue   { background: #eff6ff; }
+        .v-metric--orange { background: #fff7ed; }
+        .v-metric-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+        /* 8列窄卡放不下 label+sub 同行：允许 sub 换行并截断省略，防止 label 被挤成竖排
+           （4列/5列宽卡不受影响，同行展示保持原有视觉） */
+        .v-metric-grid:not(.v-metric-grid--4):not(.v-metric-grid--5) .v-metric-row { flex-wrap: wrap; gap: 2px 8px; }
+        .v-metric-grid:not(.v-metric-grid--4):not(.v-metric-grid--5) .v-metric-row .v-metric-sub {
+            flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: right;
+        }
+        .v-metric-label { font-size: 12px; color: #111827; margin-bottom: 4px; }
+        .v-metric-row .v-metric-label { margin-bottom: 0; }
+        .v-metric-sub { font-size: 12px; color: var(--v-primary); white-space: nowrap; }
+        .v-metric-sub--gray { color: var(--v-text-2); }
+        .v-metric-value { font-size: 18px; font-weight: 600; color: #111827; }
+        .v-metric-value--lg { font-size: 20px; }
+        .v-green   { color: #16a34a; }
+        .v-emerald { color: #059669; }
+        .v-red     { color: #ef4444; }
+        .v-orange  { color: #ea580c; }
+        .v-blue    { color: var(--v-primary); }
+        .v-metric-extra { position: absolute; top: 8px; right: 8px; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
+        .v-metric-extra--red { background: #fef2f2; color: #ef4444; }
+
+        .v-section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 14px; font-weight: 500; color: #111827; }
+        .v-section-title::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--v-primary); }
+        .v-section-title--green::before { background: #16a34a; }
+
+        .v-divider { display: inline-block; width: 1px; height: 12px; background: #d1d5db; }
+        .v-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+        .v-dot--green { background: #22c55e; }
+
+        /* 时间轴 */
+        .v-timeline { position: relative; padding-left: 8px; }
+        .v-timeline-line { position: absolute; left: 16px; top: 0; bottom: 0; width: 2px; background: var(--v-border); }
+        .v-timeline-item { position: relative; padding-left: 44px; padding-bottom: 24px; }
+        .v-timeline-item:last-child { padding-bottom: 4px; }
+        .v-timeline-dot {
+            position: absolute; left: 10px; top: 6px; width: 14px; height: 14px; border-radius: 50%;
+            background: #3b82f6; border: 2px solid #fff; box-shadow: 0 0 0 2px #3b82f6;
+        }
+        .v-timeline-dot--purple { background: #a855f7; box-shadow: 0 0 0 2px #a855f7; }
+        .v-timeline-dot--orange { background: #f97316; box-shadow: 0 0 0 2px #f97316; }
+        .v-timeline-dot--green  { background: #22c55e; box-shadow: 0 0 0 2px #22c55e; }
+        .v-timeline-dot--indigo { background: #6366f1; box-shadow: 0 0 0 2px #6366f1; }
+        .v-timeline-dot--gray   { background: #9ca3af; box-shadow: 0 0 0 2px #9ca3af; }
+        .v-timeline-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+        .v-timeline-name { font-size: 14px; font-weight: 500; }
+        .v-timeline-time { font-size: 12px; color: var(--v-text-3); }
+        .v-timeline-body { font-size: 14px; color: #4b5563; margin: 0 0 8px 36px; }
+        .v-timeline-photos { display: flex; gap: 8px; margin-left: 36px; flex-wrap: wrap; }
+        .v-photo {
+            width: 112px; height: 80px; border: 1px solid var(--v-border); border-radius: 6px;
+            background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; color: var(--v-text-2);
+        }
+        .v-avatar-s {
+            display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+            width: 28px; height: 28px; border-radius: 50%; font-size: 12px;
+        }
+        .v-avatar-s--orange { background: #ffedd5; color: #ea580c; }
+        .v-avatar-s--blue   { background: #dbeafe; color: var(--v-primary); }
+        .v-avatar-s--green  { background: #dcfce7; color: #16a34a; }
+        .v-avatar-s--indigo { background: #e0e7ff; color: #4f46e5; }
+
+        /* 表格 */
+        .v-table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; }
+        .v-table th {
+            text-align: left; padding: 10px 16px; font-weight: 500;
+            background: #f9fafb; color: #4b5563; border-bottom: 1px solid var(--v-border); white-space: nowrap;
+        }
+        .v-table td { padding: 12px 16px; border-bottom: 1px solid var(--v-border); }
+        /* 拿货订单列表"CRM客户"列：1:N 绑定下客户名较长，截断省略 + title 悬浮全称 */
+        .v-crm-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .v-table tbody tr:last-child td { border-bottom: none; }
+        .v-table .v-num-right { text-align: right; }
+        .v-row-click { cursor: pointer; }
+        .v-row-click:hover td { background: #f9fafb; }
+        .v-row-main { font-weight: 500; color: #111827; }
+        .v-row-sub { font-size: 12px; color: var(--v-text-3); margin-top: 2px; }
+        .v-link { color: var(--v-primary); text-decoration: none; cursor: pointer; }
+        .v-link:hover { text-decoration: underline; }
+
+        /* 面板头 / 详情内 Tab 栏 */
+        .v-pane { padding: 20px; }
+        .v-pane-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .v-pane-title { margin: 0; font-size: 14px; font-weight: 500; color: #111827; }
+        .v-tabbar { display: flex; gap: 24px; padding: 0 20px; border-bottom: 1px solid var(--v-border); }
+        .v-tab-btn {
+            position: relative; padding: 12px 0; font-size: 14px; line-height: 1.4;
+            border: none; background: none; color: var(--v-text-2); cursor: pointer;
+        }
+        .v-tab-btn:hover { color: #374151; }
+        .v-tab-btn.active { color: var(--v-primary); font-weight: 600; }
+        .v-tab-btn.active::after {
+            content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+            height: 2px; background: var(--v-primary);
+        }
+
+        /* 档案信息面板 */
+        .v-info-panel { background: #f9fafb; border-radius: 6px; padding: 16px; display: grid; gap: 12px; font-size: 14px; align-content: start; }
+        .v-info-row { display: flex; }
+        .v-info-label { width: 96px; flex-shrink: 0; color: var(--v-text-2); }
+        .v-info-value { flex: 1; }
+
+        .v-detail-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+        .v-names-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+        .v-detail-name { margin: 0; font-size: 20px; font-weight: 700; color: #111827; }
+        .v-name-chip { font-size: 12px; padding: 2px 8px; border-radius: 4px; background: #f3f4f6; color: var(--v-text-2); }
+        .v-detail-meta { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--v-text-2); flex-wrap: wrap; }
+        .v-detail-addr { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 14px; color: var(--v-text-2); }
+        .v-detail-addr svg { width: 16px; height: 16px; }
+        .v-detail-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .v-mt16 { margin-top: 16px; }
+        .v-mt20 { margin-top: 20px; }
+        .v-mb16 { margin-bottom: 16px; }
+    </style>
+</head>
+<body class="v-body">
+    <!-- 顶部：全局导航 + 搜索筛选（页面切换唯一入口 = #header-tabs，不引入侧边栏等其他导航） -->
+    <header class="v-header">
+        <!-- 第一行：系统标识 + 页面切换 Tab + 用户 -->
+        <div class="v-header-row1">
+            <div class="v-brand">汽配客访管理系统<span class="v-brand-sub" id="page-crumb"></span></div>
+
+            <!-- 标签页切换 Tab（页面级切换，对应原型 #header-tabs 预留位） -->
+            <div class="v-header-tabs" id="header-tabs"></div>
+
+            <!-- 右侧用户 -->
+            <div class="v-user">
+                <span>区域经理</span>
+                <span class="v-user-avatar">经</span>
+            </div>
+        </div>
+
+        <!-- 第二行：筛选栏（M1 筛选与全局搜索暂不实现，已下线） -->
+    </header>
+
+    <!-- 页面级视图出口：子页面片段按 hash 挂载于此 -->
+    <main class="v-main">
+        <div id="main-view"></div>
+    </main>
+
+    <!-- laytpl 模板：头部页面切换 Tab -->
+    <script type="text/html" id="tpl-header-tabs">
+        {% raw %}
+        {{# layui.each(d.pages, function (i, p) { }}
+        <a class="v-header-tab{{ d.active === p.key ? ' active' : '' }}" href="#/{{ p.key }}">{{ p.title }}</a>
+        {{# }); }}
+        {% endraw %}
+    </script>
+
+    <!-- laytpl 模板：客户详情页内部 Tab 栏（挂载于详情片段 #detail-tab-bar） -->
+    <script type="text/html" id="tpl-detail-tabs">
+        {% raw %}
+        {{# layui.each(d.tabs, function (i, t) { }}
+        <button class="v-tab-btn{{ d.active === t.key ? ' active' : '' }}" data-tab="{{ t.key }}">{{ t.title }}</button>
+        {{# }); }}
+        {% endraw %}
+    </script>
+
+    <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
+    <script>
+        layui.use(['jquery', 'laytpl'], function () {
+            var $ = layui.jquery;
+            var laytpl = layui.laytpl;
+
+            // ==================== 路由与模板配置 ====================
+            // 子页面为 HTML 片段（多文件拆分），由本主页面按 hash 按需加载并渲染。
+            // 接入后端时仅需把 FRAGMENT_BASE 改为后端片段路由前缀，片段文件本身不需要改动。
+            var FRAGMENT_BASE = 'views/';
+
+            // 页面级路由（对应头部 #header-tabs，页面切换唯一入口）
+            var PAGES = [
+                { key: 'customer_list', title: '客户列表', file: 'customer_list.html' },
+                {
+                    key: 'customer_detail', title: '客户详情', file: 'customer_detail.html',
+                    defaultTab: 'visit',
+                    tabs: [
+                        { key: 'visit',  title: '拜访历史', file: 'detail_visit_tab.html' },
+                        { key: 'order',  title: '拿货订单', file: 'detail_order_tab.html' },
+                        { key: 'info',   title: '基础档案', file: 'detail_info_tab.html' },
+                        { key: 'follow', title: '跟进记录', file: 'detail_follow_tab.html' }
+                    ]
+                },
+                { key: 'settings', title: '设置', file: 'settings.html' }
+            ];
+
+            function renderTpl(tplId, data, $target) {
+                laytpl($('#' + tplId).html()).render(data, function (html) {
+                    $target.html(html);
+                });
+            }
+
+            function findBy(list, key, field) {
+                field = field || 'key';
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i][field] === key) return list[i];
+                }
+                return null;
+            }
+
+            var currentPageKey = null;
+
+            function parseHash() {
+                var parts = location.hash.replace(/^#\/?/, '').split('/');
+                return { page: parts[0] || '', tab: parts[1] || '' };
+            }
+
+            function render() {
+                var h = parseHash();
+                var page = findBy(PAGES, h.page) || findBy(PAGES, 'customer_detail');
+                var tab = null;
+                if (page.tabs) {
+                    tab = findBy(page.tabs, h.tab) || findBy(page.tabs, page.defaultTab);
+                }
+
+                // 头部 Tab 与面包屑同步
+                renderTpl('tpl-header-tabs', { pages: PAGES, active: page.key }, $('#header-tabs'));
+                $('#page-crumb').text('/ ' + page.title);
+
+                // 同页仅切换 Tab，不重复加载页面片段
+                if (currentPageKey === page.key) {
+                    if (page.tabs) renderDetailTabs(page, tab);
+                    return;
+                }
+                currentPageKey = page.key;
+                $('#main-view').load(FRAGMENT_BASE + page.file, function (resp, status) {
+                    if (status === 'error') {
+                        currentPageKey = null;
+                        $('#main-view').html('<div class="v-empty">页面加载失败：' + page.file + '</div>');
+                        return;
+                    }
+                    if (page.tabs) renderDetailTabs(page, tab);
+                });
+            }
+
+            // 渲染详情页 Tab 栏 + 加载当前 Tab 片段（容器由 customer_detail.html 提供）
+            function renderDetailTabs(page, tab) {
+                var $bar = $('#detail-tab-bar');
+                var $content = $('#detail-tab-content');
+                if (!$bar.length || !$content.length) return;
+                renderTpl('tpl-detail-tabs', { tabs: page.tabs, active: tab.key }, $bar);
+                $content.load(FRAGMENT_BASE + tab.file, function (resp, status) {
+                    if (status === 'error') {
+                        $content.html('<div class="v-empty">内容加载失败：' + tab.file + '</div>');
+                    }
+                });
+            }
+
+            // 详情页 Tab 点击（事件委托：Tab 片段可随时重载；保留第三段客户POI，供详情片段按需取用）
+            $(document).on('click', '#detail-tab-bar .v-tab-btn', function () {
+                var poi = location.hash.replace(/^#\/?/, '').split('/')[2];
+                location.hash = '#/customer_detail/' + $(this).data('tab') + (poi ? '/' + poi : '');
+            });
+
+            // 初始化：hash 路由
+            window.addEventListener('hashchange', render);
+            render();
+        });
+    </script>
+</body>
+</html>

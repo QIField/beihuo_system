@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>汽配客访管理系统 - 客户详情</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 时间轴样式 */
+        .timeline-line {
+            position: absolute;
+            left: 16px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: #e5e7eb;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: 10px;
+            top: 6px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: #3b82f6;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 2px #3b82f6;
+        }
+        .timeline-item {
+            position: relative;
+            padding-left: 44px;
+            padding-bottom: 24px;
+        }
+        .tab-active {
+            color: #2563eb;
+            border-bottom: 2px solid #2563eb;
+            font-weight: 600;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        /* 搜索下拉 */
+        .search-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            z-index: 20;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .search-wrap:focus-within .search-dropdown {
+            display: block;
+        }
+        .search-item:hover {
+            background-color: #f3f4f6;
+        }
+        .tag-type {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .tag-warn-red {
+            font-size:12px;
+            padding:2px 6px;
+            border-radius:4px;
+            background-color:#fee2e2;
+            color:#dc2626;
+            font-weight:600;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <!-- 顶部全局导航 + 搜索筛选 -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <!-- 第一行：主导航 + 全局搜索 -->
+        <div class="max-w-[1680px] mx-auto px-4 h-14 flex items-center justify-between gap-6">
+            <!-- 左侧系统标识 -->
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <span class="text-lg font-bold text-blue-600">汽配客访管理系统</span>
+                <span class="text-gray-400">/</span>
+                <span class="text-gray-600 text-sm">客户详情</span>
+            </div>
+
+            <!-- 标签页切换 Tab（预留） -->
+            <div class="flex-1 flex items-center" id="header-tabs"></div>
+
+            <!-- 右侧用户 -->
+            <div class="flex items-center gap-4 text-sm text-gray-600 flex-shrink-0">
+                <span>区域经理</span>
+                <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">经</div>
+            </div>
+        </div>
+
+        <!-- 第二行：筛选栏 -->
+        <div class="border-t border-gray-100 bg-gray-50">
+            <div class="max-w-[1680px] mx-auto px-4 h-11 flex items-center gap-4 text-sm">
+                <span class="text-gray-500 flex-shrink-0">筛选：</span>
+
+                <!-- 区域筛选 -->
+                <select class="h-7 px-2 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:border-blue-500">
+                    <option>全部区域</option>
+                    <option>禅城西区</option>
+                    <option>禅城东区</option>
+                    <option>南海桂城</option>
+                    <option>南海大沥</option>
+                    <option>顺德北滘</option>
+                    <option>三水西南</option>
+                </select>
+
+                <!-- 客户等级 -->
+                <select class="h-7 px-2 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:border-blue-500">
+                    <option>全部等级</option>
+                    <option>A类（年销10万+）</option>
+                    <option>B类（年销5-10万）</option>
+                    <option>C类（年销1-5万）</option>
+                    <option>D类（新开发）</option>
+                    <option>流失客户</option>
+                </select>
+
+                <!-- 客户类型 -->
+                <select class="h-7 px-2 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:border-blue-500">
+                    <option>全部类型</option>
+                    <option>综合修理厂</option>
+                    <option>杂修店</option>
+                    <option>快保快修店</option>
+                    <option>轮胎专项店</option>
+                    <option>新能源专修</option>
+                </select>
+
+                <!-- 拿货渠道 -->
+                <select class="h-7 px-2 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:border-blue-500">
+                    <option>全部渠道</option>
+                    <option>仅线下</option>
+                    <option>仅线上（开思）</option>
+                    <option>线上+线下</option>
+                </select>
+
+                <!-- 拜访状态 -->
+                <select class="h-7 px-2 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:border-blue-500">
+                    <option>全部拜访状态</option>
+                    <option>超期未拜访</option>
+                    <option>30天内已拜访</option>
+                    <option>待回访</option>
+                </select>
+
+                <!-- 全局搜索框 -->
+                <div class="flex-1 max-w-2xl relative search-wrap">
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <input type="text"
+                                placeholder="搜索客户名称、地址（高德/CRM名称均可搜索）"
+                                class="w-full pl-10 pr-4 h-7 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <!-- 搜索下拉建议 -->
+                    <div class="search-dropdown">
+                        <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-100">最近访问</div>
+                        <div class="search-item px-3 py-2.5 cursor-pointer border-b border-gray-50">
+                            <div class="text-sm font-medium">华泰汽车修理厂 <span class="text-gray-400 font-normal">/ 华泰汽车维修服务部</span></div>
+                            <div class="text-xs text-gray-400">五峰四路轻工南六街7号 · A类客户</div>
+                        </div>
+                        <div class="search-item px-3 py-2.5 cursor-pointer border-b border-gray-50">
+                            <div class="text-sm font-medium">顺通汽车维修中心 <span class="text-gray-400 font-normal">/ 顺通汽修服务有限公司</span></div>
+                            <div class="text-xs text-gray-400">张槎一路12号 · B类客户</div>
+                        </div>
+                        <div class="px-3 py-2 text-xs text-blue-600 cursor-pointer hover:bg-gray-50">查看全部搜索结果 →</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1680px] mx-auto px-4 py-6">
+        <!-- 客户详情头部 - 双名称展示 + 核心指标 -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5 mb-5">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <!-- 双名称核心展示 + 流失预警标签 -->
+                    <div class="flex items-center gap-3 mb-2">
+                        <h1 class="text-xl font-bold text-gray-900">华泰汽车修理厂</h1>
+                        <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">高德端名称</span>
+                        <!-- 客户流失预警标签：超N天未下单标红 -->
+                        <span class="tag-warn-red">流失预警：超42天未下单</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-sm text-gray-500">
+                        <span>CRM端名称：华泰汽车维修服务部</span>
+                        <span class="w-px h-3 bg-gray-300"></span>
+                        <span class="inline-flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                            线下合作客户
+                        </span>
+                        <span class="w-px h-3 bg-gray-300"></span>
+                        <span>A类客户</span>
+                        <span class="w-px h-3 bg-gray-300"></span>
+                        <span>杂修店 · 主修大众</span>
+                        <span class="w-px h-3 bg-gray-300"></span>
+                        <span>所属片区：禅城西区</span>
+                    </div>
+                    <div class="flex items-center gap-1 text-sm text-gray-500 mt-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        五峰四路轻工南六街7号
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button class="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">创建拜访任务</button>
+                    <button class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">编辑客户</button>
+                </div>
+            </div>
+
+            <!-- 核心指标卡（8列，修改：累计拜访次数合并拜访转化率；拜访转化率位置改为欠款余额） -->
+            <div class="grid grid-cols-8 gap-4">
+                <div class="bg-gray-50 rounded p-3">
+                    <div class="flex justify-between items-center mb-1">
+                        <div class="text-xs text-gray-900">累计拜访次数</div>
+                        <div class="text-xs text-blue-600">拜访转化率67%</div>
+                    </div>
+                    <div class="text-lg font-semibold">6 次</div>
+                </div>
+                <div class="bg-gray-50 rounded p-3">
+                    <div class="text-xs text-gray-900 mb-1">最近拜访时间</div>
+                    <div class="text-lg font-semibold">2026-09-15</div>
+                </div>
+                <div class="bg-gray-50 rounded p-3">
+                    <div class="text-xs text-gray-900 mb-1">累计拿货额</div>
+                    <div class="text-lg font-semibold text-green-600">¥ 142,380</div>
+                </div>
+                <div class="bg-gray-50 rounded p-3 relative">
+                    <div class="absolute top-2 right-2 text-xs bg-red-50 text-red-500 px-1.5 py-0.5 rounded">退货率：0.23%</div>
+                    <div class="text-xs text-gray-900 mb-1">累计退货金额</div>
+                    <div class="text-lg font-semibold text-red-500">¥ 320</div>
+                </div>
+                <div class="bg-gray-50 rounded p-3">
+                    <div class="text-xs text-gray-900 mb-1">累计利润</div>
+                    <div class="text-lg font-semibold text-emerald-600">¥ 38,620</div>
+                </div>
+                <div class="bg-gray-50 rounded p-3">
+                    <div class="text-xs text-gray-900 mb-1">线上订单占比</div>
+                    <div class="text-lg font-semibold">45%</div>
+                </div>
+                <div class="bg-gray-50 rounded p-3">
+                    <div class="text-xs text-gray-900 mb-1">累计拜访投入</div>
+                    <div class="text-lg font-semibold text-orange-600">¥ 1,580</div>
+                </div>
+                <!-- 原拜访转化率 → 修改为欠款余额 -->
+                <div class="bg-gray-50 rounded p-3">
+                    <div class="text-xs text-gray-900 mb-1">欠款余额</div>
+                    <div class="text-lg font-semibold text-red-600">¥7,300</div>
+                </div>
+            </div>
+
+            <!-- 客户需求动态 调整顺序：成交总金额后面放毛利额，再退货总金额、最近成交时间、询价转成交率 -->
+            <div class="mt-5 pt-4 border-t border-gray-100">
+                <h3 class="font-medium text-sm mb-3 flex items-center gap-2">
+                    <span class="w-1 h-4 bg-blue-600 rounded"></span>
+                    客户需求动态（近30天）
+                </h3>
+                <div class="grid grid-cols-8 gap-4">
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">平台询价次数</div>
+                        <div class="text-lg font-semibold">5 次</div>
+                    </div>
+                    <!-- 询价转成交率 -->
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">平台询价转化率</div>
+                        <div class="text-lg font-semibold text-blue-600">40%</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">平台成交次数</div>
+                        <div class="text-lg font-semibold">2 笔</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">线下成交次数</div>
+                        <div class="text-lg font-semibold">3 笔</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-gray-900">成交金额</span>
+                            <span class="text-xs text-gray-600">线上18% 线下82%</span>
+                        </div>
+                        <div class="text-lg font-semibold text-green-600">¥ 21,750</div>
+                    </div>
+                    <!-- 【调整位置】毛利额放到成交总金额后面 -->
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">毛利额</div>
+                        <div class="text-lg font-semibold text-emerald-600">¥5,240</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">退货金额</div>
+                        <div class="text-lg font-semibold text-red-500">¥ 320</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">最近成交时间</div>
+                        <div class="text-lg font-semibold">2026-09-18</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 导航 -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="border-b border-gray-200 px-5">
+                <div class="flex gap-6 text-sm">
+                    <button class="tab-btn tab-active py-3" data-tab="visit">拜访历史</button>
+                    <button class="tab-btn py-3 text-gray-500 hover:text-gray-700" data-tab="order">拿货订单</button>
+                    <button class="tab-btn py-3 text-gray-500 hover:text-gray-700" data-tab="info">基础档案</button>
+                    <button class="tab-btn py-3 text-gray-500 hover:text-gray-700" data-tab="follow">跟进记录</button>
+                </div>
+            </div>
+
+            <!-- Tab内容：拜访历史 -->
+            <div id="visit" class="tab-content active p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-medium">历史拜访记录（共6条）</h3>
+                    <div class="flex gap-2 text-sm">
+                        <select class="border border-gray-300 rounded px-2 py-1 text-gray-600">
+                            <option>全部类型</option>
+                            <option>日常回访</option>
+                            <option>新品铺货</option>
+                            <option>催款对账</option>
+                            <option>新客开发</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 时间轴 -->
+                <div class="relative pl-2">
+                    <div class="timeline-line"></div>
+
+                    <!-- 案例1：新品铺货拜访 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-purple-500" style="box-shadow: 0 0 0 2px #a855f7;"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs">业</div>
+                            <span class="text-sm font-medium">在天真无邪的法拉利</span>
+                            <span class="text-xs text-gray-400">2026-09-15 10:32</span>
+                            <span class="tag-type bg-purple-50 text-purple-600">新品铺货</span>
+                            <span class="tag-type bg-orange-50 text-orange-600">样品费 ¥320</span>
+                            <span class="tag-type bg-green-50 text-green-600">已转化订单</span>
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2 ml-9">
+                            主推新款陶瓷刹车片，现场放了4套样品，讲解质保政策和拿货价。老板担心粉尘问题，当场试车测试，反馈制动效果比原来的好，约定先拿10套试卖。前台确认下月起开思平台上架该型号。
+                        </div>
+                        <div class="flex gap-2 ml-9">
+                            <div class="w-28 h-20 bg-gray-100 rounded border border-gray-200 overflow-hidden">
+                                <div class="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-xs text-gray-500">刹车片样品照</div>
+                            </div>
+                            <div class="w-28 h-20 bg-gray-100 rounded border border-gray-200 overflow-hidden">
+                                <div class="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-xs text-gray-500">货架陈列照</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 案例2：逾期催款拜访 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-orange-500" style="box-shadow: 0 0 0 2px #f97316;"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs">业</div>
+                            <span class="text-sm font-medium">在天真无邪的法拉利</span>
+                            <span class="text-xs text-gray-400">2026-09-02 15:10</span>
+                            <span class="tag-type bg-orange-50 text-orange-600">催款对账</span>
+                            <span class="tag-type bg-red-50 text-red-600">逾期 ¥12300</span>
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2 ml-9">
+                            上门核对8月账单，共12300元逾期7天。老板说资金周转紧张，协商先付5000，剩下一周内结清。同步反馈了上次机油滤芯包装破损的问题，已登记售后补发。
+                        </div>
+                    </div>
+
+                    <!-- 案例3：日常回访客情 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs">业</div>
+                            <span class="text-sm font-medium">在天真无邪的法拉利</span>
+                            <span class="text-xs text-gray-400">2026-08-26 16:20</span>
+                            <span class="tag-type bg-blue-50 text-blue-600">日常回访</span>
+                            <span class="tag-type bg-orange-50 text-orange-600">客情 ¥280</span>
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2 ml-9">
+                            该修理厂品牌有跟我们拿，但是主要喜欢用原厂件，原厂件我们没给他质保，他都是走开思平台上面要质保。该修理厂对我们公司讲熟悉。
+                        </div>
+                        <div class="flex gap-2 ml-9">
+                            <div class="w-28 h-20 bg-gray-100 rounded border border-gray-200 overflow-hidden">
+                                <div class="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-xs text-gray-500">门店门头照</div>
+                            </div>
+                            <div class="w-28 h-20 bg-gray-100 rounded border border-gray-200 overflow-hidden">
+                                <div class="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-xs text-gray-500">工位现场照</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 案例4：新客户首次拜访 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-green-500" style="box-shadow: 0 0 0 2px #22c55e;"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">珊</div>
+                            <span class="text-sm font-medium">珊珊</span>
+                            <span class="text-xs text-gray-400">2025-07-28 11:18</span>
+                            <span class="tag-type bg-green-50 text-green-600">新客开发</span>
+                            <span class="tag-type bg-gray-100 text-gray-600">资料费 ¥120</span>
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2 ml-9">
+                            高德POI挖掘的新客户，首次上门拜访。递交产品画册和报价单，介绍常用易损件供货价格和配送时效。老板表示之前主要从广州拿货，本地配送有优势，可以先试拿一批机油滤芯。互留微信，约定一周后跟进。
+                        </div>
+                        <div class="flex gap-2 ml-9">
+                            <div class="w-28 h-20 bg-gray-100 rounded border border-gray-200 overflow-hidden">
+                                <div class="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-xs text-gray-500">门店全景照</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作记录 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-gray-400" style="box-shadow: 0 0 0 2px #9ca3af;"></div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <div class="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs">业</div>
+                            <span class="text-sm font-medium">在天真无邪的法拉利</span>
+                            <span class="text-xs text-gray-400">2026-08-26 16:16</span>
+                        </div>
+                        <div class="text-sm text-gray-500 ml-9">
+                            <span class="text-blue-600">[编辑位置]</span> 校准了门店经纬度，围栏半径调整为80米
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab内容：拿货订单 -->
+            <div id="order" class="tab-content p-5">
+                <!-- 订单汇总：标签右侧显示线上线下占比 -->
+                <div class="grid grid-cols-5 gap-4 mb-5">
+                    <div class="bg-green-50 rounded p-3">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-gray-900">累计销售额</span>
+                            <span class="text-xs text-gray-600">线上45% · 线下55%</span>
+                        </div>
+                        <div class="text-xl font-semibold text-green-600">¥ 142,380</div>
+                    </div>
+                    <div class="bg-green-50 rounded p-3">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-gray-900">本年销售额</span>
+                            <span class="text-xs text-gray-600">线上45% · 线下55%</span>
+                        </div>
+                        <div class="text-xl font-semibold text-green-600">¥ 126,200</div>
+                    </div>
+                    <div class="bg-blue-50 rounded p-3">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-gray-900">本月销售额</span>
+                            <span class="text-xs text-gray-600">线上18% · 线下82%</span>
+                        </div>
+                        <div class="text-xl font-semibold text-blue-600">¥ 21,750</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">原厂件占比</div>
+                        <div class="text-xl font-semibold">66%</div>
+                    </div>
+                    <div class="bg-orange-50 rounded p-3">
+                        <div class="text-xs text-gray-900 mb-1">当前欠款</div>
+                        <div class="text-xl font-semibold text-orange-600">¥ 7,300</div>
+                    </div>
+                </div>
+
+                <!-- 订单列表 -->
+                <div class="border border-gray-200 rounded">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="text-left px-4 py-2.5 font-medium">订单号</th>
+                                <th class="text-left px-4 py-2.5 font-medium">下单时间</th>
+                                <th class="text-left px-4 py-2.5 font-medium">订单渠道</th>
+                                <th class="text-left px-4 py-2.5 font-medium">配件品类</th>
+                                <th class="text-right px-4 py-2.5 font-medium">金额</th>
+                                <th class="text-left px-4 py-2.5 font-medium">状态</th>
+                                <th class="text-left px-4 py-2.5 font-medium">关联拜访</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-4 py-3 text-blue-600">DD20260918002</td>
+                                <td class="px-4 py-3">2026-09-18 09:22</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-blue-50 text-blue-600">线上-开思</span>
+                                </td>
+                                <td class="px-4 py-3">陶瓷刹车片10套</td>
+                                <td class="px-4 py-3 text-right">¥ 3,850</td>
+                                <td class="px-4 py-3 text-green-600">已完成</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-green-50 text-green-600">9.15铺货拜访</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 text-blue-600">DD20260905001</td>
+                                <td class="px-4 py-3">2026-09-05 14:05</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-gray-100 text-gray-600">线下转账</span>
+                                </td>
+                                <td class="px-4 py-3">还款（8月账单部分）</td>
+                                <td class="px-4 py-3 text-right">¥ 5,000</td>
+                                <td class="px-4 py-3 text-green-600">已到账</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-green-50 text-green-600">9.2催款拜访</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 text-blue-600">DD20260828001</td>
+                                <td class="px-4 py-3">2026-08-28 10:15</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-blue-50 text-blue-600">线上-开思</span>
+                                </td>
+                                <td class="px-4 py-3">大众原厂机油滤芯</td>
+                                <td class="px-4 py-3 text-right">¥ 2,860</td>
+                                <td class="px-4 py-3 text-green-600">已完成</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-green-50 text-green-600">8.26日常回访</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 text-blue-600">DD20260820003</td>
+                                <td class="px-4 py-3">2026-08-20 14:30</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-gray-100 text-gray-600">线下开单</span>
+                                </td>
+                                <td class="px-4 py-3">配套刹车片套装</td>
+                                <td class="px-4 py-3 text-right">¥ 5,420</td>
+                                <td class="px-4 py-3 text-green-600">已完成</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-gray-100 text-gray-500">无</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 text-blue-600">DD20250803001</td>
+                                <td class="px-4 py-3">2025-08-03 11:20</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-gray-100 text-gray-600">线下开单</span>
+                                </td>
+                                <td class="px-4 py-3">机油滤芯20个、空气滤芯15个</td>
+                                <td class="px-4 py-3 text-right">¥ 2,180</td>
+                                <td class="px-4 py-3 text-green-600">已完成</td>
+                                <td class="px-4 py-3">
+                                    <span class="tag-type bg-green-50 text-green-600">7.28新客拜访</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab内容：基础档案 -->
+            <div id="info" class="tab-content p-5">
+                <div class="grid grid-cols-2 gap-6">
+                    <!-- 高德端信息 -->
+                    <div>
+                        <h3 class="font-medium mb-3 flex items-center gap-2">
+                            <span class="w-1 h-4 bg-blue-600 rounded"></span>
+                            高德端采集信息
+                        </h3>
+                        <div class="bg-gray-50 rounded p-4 space-y-3 text-sm">
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">客户名称：</span>
+                                <span>华泰汽车修理厂</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">门店地址：</span>
+                                <span>五峰四路轻工南六街7号</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">采购负责人：</span>
+                                <span>师傅鹏哥</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">客户类型：</span>
+                                <span>杂修店</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">员工数量：</span>
+                                <span>8人以上</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">工位数量：</span>
+                                <span>6工位以上</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">拿货方式：</span>
+                                <span>线下 | 开思</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">用货习惯：</span>
+                                <span>原厂 | 配套 | 其他</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">常合作商家：</span>
+                                <span>原厂开思，品牌线下</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">客户侧重点：</span>
+                                <span>售后 | 价格 | 质量</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">信息补充：</span>
+                                <span class="flex-1">师傅鹏哥和前台拿货，前台小姐姐在开思下单，师傅在线下。修大众车比较多。</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CRM端信息 -->
+                    <div>
+                        <h3 class="font-medium mb-3 flex items-center gap-2">
+                            <span class="w-1 h-4 bg-green-600 rounded"></span>
+                            CRM端销售信息
+                        </h3>
+                        <div class="bg-gray-50 rounded p-4 space-y-3 text-sm">
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">CRM客户名：</span>
+                                <span>华泰汽车维修服务部</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">客户等级：</span>
+                                <span class="text-red-600">A类（年销10万+）</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">负责业务员：</span>
+                                <span>张业务</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">所属片区：</span>
+                                <span>禅城西区</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">合作起始：</span>
+                                <span>2025-08-03</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">账期标准：</span>
+                                <span>月结30天</span>
+                            </div>
+                            <div class="flex">
+                                <span class="（gray-500 w-24 flex-shrink-0">信用额度：</span>
+                                <span>¥ 20,000</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">主修车型：</span>
+                                <span>大众、丰田</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">累计订单数：</span>
+                                <span>52 笔</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">客单价：</span>
+                                <span>¥ 2,738</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24 flex-shrink-0">最近回款：</span>
+                                <span>2026-09-05</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab内容：跟进记录（全渠道） -->
+            <div id="follow" class="tab-content p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-medium">全渠道跟进记录（共11条）</h3>
+                    <button class="text-sm text-blue-600 hover:text-blue-700">+ 新增跟进</button>
+                </div>
+
+                <div class="relative pl-2">
+                    <div class="timeline-line"></div>
+
+                    <!-- 跟进1：微信 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-green-500" style="box-shadow: 0 0 0 2px #22c55e;"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs">微</div>
+                            <span class="text-sm font-medium">微信沟通</span>
+                            <span class="text-xs text-gray-400">2026-09-20 14:25</span>
+                            <span class="tag-type bg-green-50 text-green-600">微信</span>
+                        </div>
+                        <div class="text-sm text-gray-600 ml-9">
+                            前台小姐姐微信询问新款空气滤芯价格，已发报价表，对方说下周考虑进货。
+                        </div>
+                    </div>
+
+                    <!-- 跟进2：拜访自动同步 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-purple-500" style="box-shadow: 0 0 0 2px #a855f7;"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs">业</div>
+                            <span class="text-sm font-medium">新品铺货拜访</span>
+                            <span class="text-xs text-gray-400">2026-09-15 10:32</span>
+                            <span class="tag-type bg-blue-50 text-blue-600">拜访同步</span>
+                            <span class="tag-type bg-orange-50 text-orange-600">投入 ¥320</span>
+                        </div>
+                        <div class="text-sm text-gray-600 ml-9">
+                            上门铺陶瓷刹车片样品，老板约定试拿10套。<span class="text-blue-600 cursor-pointer">查看完整拜访详情 →</span>
+                        </div>
+                    </div>
+
+                    <!-- 跟进3：电话 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-blue-500" style="box-shadow: 0 0 0 2px #3b82f6;"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">电</div>
+                            <span class="text-sm font-medium">电话沟通</span>
+                            <span class="text-xs text-gray-400">2026-09-10 09:12</span>
+                            <span class="tag-type bg-blue-50 text-blue-600">电话</span>
+                        </div>
+                        <div class="text-sm text-gray-600 ml-9">
+                            电话提醒剩余欠款7300元本周内结清，对方确认没问题。
+                        </div>
+                    </div>
+
+                    <!-- 跟进4：拜访自动同步 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-orange-500" style="box-shadow: 0 0 0 2px #f97316;"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs">业</div>
+                            <span class="text-sm font-medium">催款对账拜访</span>
+                            <span class="text-xs text-gray-400">2026-09-02 15:10</span>
+                            <span class="tag-type bg-blue-50 text-blue-600">拜访同步</span>
+                        </div>
+                        <div class="text-sm text-gray-600 ml-9">
+                            上门核对8月账单，协商分期还款。<span class="text-blue-600 cursor-pointer">查看完整拜访详情 →</span>
+                        </div>
+                    </div>
+
+                    <!-- 跟进5：线上平台 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot bg-indigo-500" style="box-shadow: 0 0 0 2px #6366f1;"></div>
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">平</div>
+                            <span class="text-sm font-medium">开思平台咨询</span>
+                            <span class="text-xs text-gray-400">2026-08-30 16:40</span>
+                            <span class="tag-type bg-indigo-50 text-indigo-600">线上平台</span>
+                        </div>
+                        <div class="text-sm text-gray-600 ml-9">
+                            开思后台咨询原厂变速箱油质保政策，已回复。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Tab切换功能
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+
+                // 切换按钮状态
+                tabBtns.forEach(b => {
+                    b.classList.remove('tab-active');
+                    b.classList.add('text-gray-500');
+                });
+                btn.classList.add('tab-active');
+                btn.classList.remove('text-gray-500');
+
+                // 切换内容
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(tab).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -58,4 +58,3 @@ def partner_list_register(task_manager):
 
     except Exception as e:
         print(f"[合作伙伴列表] 注册失败: {e}")
-
