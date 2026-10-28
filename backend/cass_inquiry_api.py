@@ -131,10 +131,11 @@ def price_compare():
     """
     供应商价格对比 · 分页查询（与巴博瑞按译码OE号+品牌一对一比对，价格取卖家价格）
 
-    参数：store_name（必填）、page、page_size、sort_column、sort_dir、column_filters、
-          start_date/end_date（询单日期范围 YYYY-MM-DD，可空=全部）
+    参数：store_name（必填）、status（必填 higher/lower，上下两表各查一个方向）、page、page_size、
+          sort_column、sort_dir、column_filters、start_date/end_date（询单日期范围 YYYY-MM-DD，可空=全部）
     返回：{'code': 0, 'data': {'list': [...], 'total': n, 'page': p, 'page_size': s}}
-          每行含 compare_status: higher/lower/equal
+          每行含 decode_num/merchant_parts_num/brand_name/parts_name/quality_name/num/
+          warehouse/seller_price/bbri_price/diff
     """
     try:
         result = query_price_compare(
@@ -146,6 +147,7 @@ def price_compare():
             column_filters=request.args.get('column_filters'),
             start_date=request.args.get('start_date'),
             end_date=request.args.get('end_date'),
+            status=request.args.get('status'),
         )
         return jsonify(result)
     except ValueError as e:
@@ -161,8 +163,8 @@ def price_compare_filter_values_api():
     """
     供应商价格对比 · 列头菜单筛选候选值（去重+计数，按其他列已生效筛选级联）
 
-    参数：store_name（必填）、column（筛选列）、column_filters（级联条件，已排除本列）、
-          start_date/end_date（询单日期范围 YYYY-MM-DD，可空=全部）
+    参数：store_name（必填）、status（必填 higher/lower）、column（筛选列）、
+          column_filters（级联条件，已排除本列）、start_date/end_date（询单日期范围 YYYY-MM-DD，可空=全部）
     返回：{'code': 0, 'data': {'values': [{'value': v, 'count': n}, ...]}}
     """
     try:
@@ -172,6 +174,7 @@ def price_compare_filter_values_api():
             column_filters=request.args.get('column_filters'),
             start_date=request.args.get('start_date'),
             end_date=request.args.get('end_date'),
+            status=request.args.get('status'),
         )
         return jsonify(result)
     except ValueError as e:

@@ -89,6 +89,30 @@
     outline: none;
 }
 
+/* ===== 结果区上下两块（高于/低于）：高度由页面内联样式的 flex 布局控制，各占一半 ===== */
+.compare-result-block {
+    min-width: 0;
+}
+
+.compare-block-title {
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-left: 4px solid #1e3a8a;
+    background: #f8fafc;
+    margin-bottom: 8px;
+}
+
+.compare-block-title.higher {
+    border-left-color: #b91c1c;
+    color: #b91c1c;
+}
+
+.compare-block-title.lower {
+    border-left-color: #15803d;
+    color: #15803d;
+}
+
 .store-select .text-input:focus {
     border-color: #1e3a8a;
 }

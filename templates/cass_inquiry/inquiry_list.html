@@ -119,6 +119,35 @@
         #mainPaginationBar {
             flex-shrink: 0;
         }
+
+        /* 对比页：上下两表各占一半，表格内部滚动 */
+        .compare-data-container {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .compare-result-block {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0;
+        }
+
+        .compare-result-block + .compare-result-block {
+            margin-top: 10px;
+        }
+
+        .compare-result-block .compare-block-title,
+        .compare-result-block > div[id$="Pagination"] {
+            flex-shrink: 0;
+        }
+
+        .compare-result-block > div[id$="Container"] {
+            flex: 1;
+            min-height: 0;
+        }
     </style>
 </head>
 <body>
@@ -196,8 +225,16 @@
                         <div class="data-header">
                             <span id="compareResultTitle">价格对比结果</span>
                         </div>
-                        <div id="compare-handsontable-container"></div>
-                        <div id="comparePaginationBar"></div>
+                        <div class="compare-result-block">
+                            <div class="compare-block-title higher">高于佛山巴博瑞</div>
+                            <div id="compareHigherContainer"></div>
+                            <div id="compareHigherPagination"></div>
+                        </div>
+                        <div class="compare-result-block">
+                            <div class="compare-block-title lower">低于佛山巴博瑞</div>
+                            <div id="compareLowerContainer"></div>
+                            <div id="compareLowerPagination"></div>
+                        </div>
                     </div>
                 </div>
             </main>
