@@ -147,6 +147,9 @@ def read_ks_statement(filepath):
     """
     df = pd.read_excel(filepath, sheet_name=0, header=KS_STMT_HEADER_ROW)
     df = df.dropna(how="all").copy()          # 去掉全空行（分隔线等）
+    # 新版对账单把「发票类型」列改名为「需要发票」，值域不变（不开票/无需发票等），改回统一列名
+    if "发票类型" not in df.columns and "需要发票" in df.columns:
+        df = df.rename(columns={"需要发票": "发票类型"})
     key_col = _find_key_col(df, [KS_STMT_KEY], KS_STMT_FILE)
     df["_merge_key"] = df[key_col].map(_normalize_order_no)
     return df

@@ -5,20 +5,23 @@ ks_coupon_reconcile.py —— 开思券对账（独立脚本）
 输入：
   1. 开思券账单（Excel，首行即列名）
   2. 开思电子对账单（Excel，第 5 行为列名，第 6 行起数据）
+  3. 订单结算明细（Excel，首行即列名）
+  4. 金蝶应收单（Excel，首行即列名）
 
 输出：
   开思券对账_YYYYMMDD_HHMM.xlsx
-  仅含一个 sheet：
-    - 开思券对账：以开思电子对账单为主表，仅保留「开思劵(¥) > 0」的行，找出
-        1) 在券账单文件中不存在的订单；
-        2) 与券账单券金额不一致的订单；
-        3) 公式成立的对上订单。
-      并写明状态。
+  仅含一个 sheet：开思券对账
+
+以「开思券账单」为主表，按订单号聚合后：
+  - 左连接「开思电子对账单」（列加「对账单-」前缀）
+  - 左连接「订单结算明细」（列加「结算明细-」前缀）
+  - 按 (客户代码, 价税合计) 与「应收单」严格 1:1 配对（列加「应收单-」前缀）
+并标识状态。
 
 状态：
-    - 正常：有券且公式成立
-    - 券账单无此订单：电子对账单有券，券账单无该订单
-    - 券金额不一致：两边都有券，但开思劵(¥) 对不上
+  - 正常：电子对账单有此订单且公式成立
+  - 电子对账单无此订单：券账单有，但电子对账单没有
+  - 券金额不一致：电子对账单有此订单，但开思劵(¥) * (1 + 开思券税率) ≠ 应收金额(￥)
 """
 import os
 import datetime
@@ -27,34 +30,53 @@ import pandas as pd
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = BASE_DIR                            # 输入文件目录
-OUTPUT_DIR = os.path.join(BASE_DIR, "data")    # 输出文件目录
+DATA_DIR = BASE_DIR
+OUTPUT_DIR = os.path.join(BASE_DIR, "data")
 
+# ---- 输入 1：开思券账单（主表） ----
 COUPON_FILE_KEYWORD = "开思券账单"
 COUPON_FILE_FALLBACK = "开思券账单.xlsx"
 COUPON_KEY = "订单/退货单号"
+COUPON_HEADER_ROW = 0
 
+# ---- 输入 2：开思电子对账单 ----
 STMT_FILE_KEYWORD = "开思电子对账单"
 STMT_FILE_FALLBACK = "开思电子对账单.xlsx"
 STMT_KEY = "订单/退货编号"
 STMT_HEADER_ROW = 4
 
+# ---- 输入 3：订单结算明细 ----
+DETAIL_FILE_KEYWORD = "订单结算明细"
+DETAIL_FILE_FALLBACK = "订单结算明细.xlsx"
+DETAIL_KEY = "订单/退单编号"
+
+# ---- 输入 4：金蝶应收单 ----
+AR_FILE_KEYWORD = "应收单"
+AR_FILE_FALLBACK = "应收单.xlsx"
+
 OUTPUT_PREFIX = "开思券对账"
 
 TOLERANCE = 0.01
 
+# ---- 金蝶自动化 sheet 配置 ----
+KINGDEE_SHEET = "金蝶写入数据源"
+KINGDEE_STATUS_COLUMN = "是否写入金蝶"
+KINGDEE_STATUS_DONE = "已写入金蝶"
 
-# ======================================================================
+
+# ==============================================================================
 # 工具函数
-# ======================================================================
+# ==============================================================================
 
 def _find_input_file(directory, keyword, fallback):
-    """优先标准文件名，否则按关键字包含匹配首个 .xlsx"""
+    """优先标准文件名，否则按关键字包含匹配首个 .xlsx（兼容带时间戳文件名）"""
     std = os.path.join(directory, fallback)
     if os.path.exists(std):
         return std
     try:
         for f in os.listdir(directory):
+            if f.startswith("~$") or f.startswith("."):
+                continue
             if keyword in f and f.endswith(".xlsx"):
                 return os.path.join(directory, f)
     except OSError:
@@ -81,37 +103,48 @@ def _to_num(series):
     """金额列转数值：去掉 ¥/￥、逗号、空白，解析失败按 0"""
     s = series.astype(str).str.replace(r"[¥￥,，]", "", regex=True)
     s = s.str.replace(r"[\s\u00a0]", "", regex=True)
-    return pd.to_numeric(s, errors="coerce").fillna(0.0)  # pyright: ignore[reportAttributeAccessIssue]
+    return pd.to_numeric(s, errors="coerce").fillna(0.0)
 
 
 def _parse_rate(val):
-    """解析税率字符串，如 '4.0%' -> 0.04；空/非法返回 0"""
+    """解析税率：'4.0%' -> 0.04；0.04 -> 0.04；空/非法返回 0"""
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return 0.0
-    s = str(val).strip().replace("%", "")
+    raw = str(val).strip()
+    s = raw.replace("%", "")
     if s == "":
         return 0.0
     try:
-        return float(s) / 100
+        num = float(s)
+        if "%" in raw or num > 1:
+            return num / 100
+        return num
     except ValueError:
-        return None
+        return 0.0
 
 
 def _now_str():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M")
 
 
-# ======================================================================
-# 读取两张表
-# ======================================================================
+# ==============================================================================
+# 读取三张表
+# ==============================================================================
 
 def read_coupon_bill(filepath):
     """读取开思券账单（首行即列名）"""
-    df = pd.read_excel(filepath, sheet_name=0, header=0)
+    df = pd.read_excel(filepath, sheet_name=0, header=COUPON_HEADER_ROW)
     df = df.dropna(how="all").copy()
-    if COUPON_KEY not in df.columns:
-        raise KeyError(f"券账单缺少字段 '{COUPON_KEY}'，实际列：{list(df.columns)}")
+
+    required = [COUPON_KEY, "开票类型", "开思券税率", "交易金额(￥)", "应收金额(￥)"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise KeyError(f"券账单缺少字段 {missing}，实际列：{list(df.columns)}")
+
     df["_order_no"] = df[COUPON_KEY].map(_normalize_order_no)
+    df["交易金额(￥)"] = _to_num(df["交易金额(￥)"]).round(2)
+    df["应收金额(￥)"] = _to_num(df["应收金额(￥)"]).round(2)
+    df["_rate_raw"] = df["开思券税率"].map(_parse_rate)
     return df
 
 
@@ -119,93 +152,211 @@ def read_ks_statement(filepath):
     """读取开思电子对账单（第 5 行为列名）"""
     df = pd.read_excel(filepath, sheet_name=0, header=STMT_HEADER_ROW)
     df = df.dropna(how="all").copy()
+
     if STMT_KEY not in df.columns:
         raise KeyError(f"电子对账单缺少字段 '{STMT_KEY}'，实际列：{list(df.columns)}")
+
     df["_order_no"] = df[STMT_KEY].map(_normalize_order_no)
-    # 数值化金额列（避免字符串比较）；列不存在则跳过
-    for col in ["对账金额(¥)", "开思劵(¥)", "平台已结算金额（¥）", "价税合计"]:
+
+    for col in ["对账金额(¥)", "开思劵(¥)"]:
         if col in df.columns:
-            df[col] = _to_num(df[col]).round(2)  # pyright: ignore[reportAttributeAccessIssue]
+            df[col] = _to_num(df[col]).round(2)
     return df
 
 
-# ======================================================================
-# 计算与核对
-# ======================================================================
+def read_settle_detail(filepath):
+    """读取订单结算明细（首行即列名）"""
+    df = pd.read_excel(filepath, sheet_name=0, header=0)
+    df = df.dropna(how="all").copy()
 
-def build_coupon_reconcile(coupon_path=None, stmt_path=None):
+    if DETAIL_KEY not in df.columns:
+        raise KeyError(f"订单结算明细缺少字段 '{DETAIL_KEY}'，实际列：{list(df.columns)}")
+
+    df["_order_no"] = df[DETAIL_KEY].map(_normalize_order_no)
+
+    if "平台已结算金额（¥）" in df.columns:
+        df["平台已结算金额（¥）"] = _to_num(df["平台已结算金额（¥）"]).round(2)
+    return df
+
+
+def read_ar_data(filepath):
+    """读取金蝶应收单列表（首行即列名，剔除合计行），计算开思客户代码。"""
+    df = pd.read_excel(filepath, sheet_name=0, header=0)
+    df = df.dropna(how="all").copy()
+
+    required = ["单据编号", "客户编码", "价税合计", "已收款金额"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise KeyError(f"应收单缺少字段 {missing}，实际列：{list(df.columns)}")
+
+    ar = df[required].copy()
+    ar = ar.dropna(subset=["单据编号"]).copy()
+
+    for col in ("价税合计", "已收款金额"):
+        ar[col] = pd.to_numeric(ar[col], errors="coerce")
+
+    # 金蝶客户编码 -> 开思客户代码：取最后一个 '-' 之后的部分
+    ar["开思客户代码"] = (
+        ar["客户编码"].astype(str).str.strip().str.rsplit("-", n=1).str[-1].str.strip()
+    )
+    return ar
+
+
+# ==============================================================================
+# 计算与核对
+# ==============================================================================
+
+def _agg_by_order_no(df, key_cols, prefix):
+    """
+    按 _order_no 聚合，只保留 key_cols 中的列，并重命名为加 prefix 前缀。
+    数值列求和，非数值列取第一个。
+    """
+    missing = [c for c in key_cols if c not in df.columns]
+    if missing:
+        raise KeyError(f"{prefix} 表缺少字段 {missing}，实际列：{list(df.columns)}")
+
+    agg_dict = {}
+    for col in key_cols:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            agg_dict[col] = "sum"
+        else:
+            agg_dict[col] = "first"
+
+    return (
+        df.groupby("_order_no", as_index=False)
+        .agg(agg_dict)
+        .rename(columns={col: f"{prefix}{col}" for col in key_cols})
+    )
+
+
+def build_coupon_reconcile(coupon_path=None, stmt_path=None, detail_path=None, ar_path=None):
     """
     核心流程：
-      1. 以开思电子对账单为主表，按订单号聚合（金额列求和，其他列取首个）；
-      2. 按订单号汇总券账单（券金额求和、税率取首个）；
-      3. 仅保留「开思劵(¥) > 0」的行，并显示状态：
-         - 正常：有券且公式成立；
-         - 券账单无此订单：电子对账单有券，券账单无；
-         - 券金额不一致：两边都有券，但开思劵(¥) 不一致。
-      4. 返回有券的所有行。
+      1. 以开思券账单为主表，按订单号聚合；
+      2. 电子对账单、订单结算明细分别按订单号聚合并加前缀；
+      3. 按 (客户代码, 价税合计) 与应收单严格 1:1 配对；
+      4. 按公式核对状态。
     """
     if coupon_path is None:
         coupon_path = _find_input_file(DATA_DIR, COUPON_FILE_KEYWORD, COUPON_FILE_FALLBACK)
     if stmt_path is None:
         stmt_path = _find_input_file(DATA_DIR, STMT_FILE_KEYWORD, STMT_FILE_FALLBACK)
+    if detail_path is None:
+        detail_path = _find_input_file(DATA_DIR, DETAIL_FILE_KEYWORD, DETAIL_FILE_FALLBACK)
+    if ar_path is None:
+        ar_path = _find_input_file(DATA_DIR, AR_FILE_KEYWORD, AR_FILE_FALLBACK)
 
-    for p in (coupon_path, stmt_path):
+    for p in (coupon_path, stmt_path, detail_path, ar_path):
         if not os.path.exists(p):
             raise FileNotFoundError(f"找不到输入文件：{p}")
 
     coupon = read_coupon_bill(coupon_path)
     stmt = read_ks_statement(stmt_path)
+    detail = read_settle_detail(detail_path)
+    ar_full = read_ar_data(ar_path)
 
-    # ---- 电子对账单按订单号聚合 ----
-    stmt_agg_dict = {}
-    for col in stmt.columns:
-        if col == "_order_no":
-            continue
-        if pd.api.types.is_numeric_dtype(stmt[col]):
-            stmt_agg_dict[col] = "sum"
-        else:
-            stmt_agg_dict[col] = "first"
-    stmt = stmt.groupby("_order_no", as_index=False).agg(stmt_agg_dict)
-
-    # ---- 券账单计算列 ----
-    coupon["_rate_raw"] = coupon["开思券税率"].map(_parse_rate)
-    coupon["应收金额(￥)"] = _to_num(coupon["应收金额(￥)"]).round(2)  # pyright: ignore[reportAttributeAccessIssue]
-
-    # ---- 按订单号汇总券账单 ----
-    coupon_agg = (  # pyright: ignore[reportCallIssue]
+    # ---- 主表：券账单聚合 ----
+    coupon_agg = (
         coupon.groupby("_order_no", as_index=False)
-        .agg({"_rate_raw": "first", "应收金额(￥)": "sum"})
-        .rename(columns={
-            "_rate_raw": "开思券税率_券账单",
-            "应收金额(￥)": "应收金额_券账单",
+        .agg({
+            "开票类型": "first",
+            "_rate_raw": "first",
+            "交易金额(￥)": "sum",
+            "应收金额(￥)": "sum",
         })
+        .rename(columns={"_rate_raw": "开思券税率"})
     )
 
-    # ---- 电子对账单为主，左连接券账单汇总 ----
-    merged = stmt.merge(coupon_agg, how="left", on="_order_no")
+    # ---- 辅表 1：电子对账单 ----
+    stmt_agg = _agg_by_order_no(
+        stmt,
+        ["客户名称", "客户代码", "对账金额(¥)", "开思劵(¥)"],
+        "对账单-",
+    )
+
+    # ---- 辅表 2：订单结算明细 ----
+    detail_agg = _agg_by_order_no(
+        detail,
+        ["平台已结算金额（¥）", "结算状态（含冻结）", "收款信息"],
+        "结算明细-",
+    )
+
+    # ---- 主表左连接两张辅表 ----
+    merged = coupon_agg.merge(stmt_agg, how="left", on="_order_no")
+    merged = merged.merge(detail_agg, how="left", on="_order_no")
+
+    # ---- 辅表 3：应收单严格 1:1 配对 ----
+    # 价税合计 = 对账金额 + 开思劵；按 (客户代码, 价税合计) 分组，
+    # 仅两侧数量一致的分组才配对（与 payment_bill.py 的 rule1 一致），
+    # 组内开思按订单号、应收单按单据编号排序后一一对应。
+    ar = ar_full.drop_duplicates(subset=["单据编号"]).copy()
+    ar["价税合计"] = ar["价税合计"].round(2)
+
+    merged["_price_total"] = (merged["对账单-对账金额(¥)"] + merged["对账单-开思劵(¥)"]).round(2)
+
+    def _fmt_price(x):
+        return f"{float(x):.2f}"
+
+    merged["_match_key"] = (
+        merged["对账单-客户代码"].fillna("").astype(str)
+        + "|"
+        + merged["_price_total"].map(_fmt_price, na_action="ignore")
+    )
+    ar["_match_key"] = (
+        ar["开思客户代码"].astype(str) + "|" + ar["价税合计"].map(_fmt_price)
+    )
+
+    # rule1：仅两侧数量一致的分组参与配对
+    ks_counts = merged.groupby("_match_key").size()
+    ar_counts = ar.groupby("_match_key").size()
+    counts = pd.concat([ks_counts, ar_counts], axis=1).fillna(0)
+    counts.columns = ["ks", "ar"]
+    balanced_keys = counts[counts["ks"] == counts["ar"]].index
+
+    merged_balanced = merged[merged["_match_key"].isin(balanced_keys)].copy()
+    ar_balanced = ar[ar["_match_key"].isin(balanced_keys)].copy()
+
+    # 组内排序并生成配对序号
+    merged_balanced = merged_balanced.sort_values(["_match_key", "_order_no"], kind="stable")
+    ar_balanced = ar_balanced.sort_values(["_match_key", "单据编号"], kind="stable")
+    merged_balanced["_pair"] = merged_balanced.groupby("_match_key", sort=False).cumcount()
+    ar_balanced["_pair"] = ar_balanced.groupby("_match_key", sort=False).cumcount()
+
+    # 1:1 配对
+    merged_balanced = merged_balanced.merge(
+        ar_balanced[["单据编号", "价税合计", "已收款金额", "_match_key", "_pair"]],
+        on=["_match_key", "_pair"],
+        how="left",
+        suffixes=("", "_ar"),
+    )
+    merged_balanced = merged_balanced.rename(columns={
+        "单据编号": "应收单-单据编号",
+        "价税合计": "应收单-价税合计",
+        "已收款金额": "应收单-已收款金额",
+    })
+
+    # 不平衡分组保持空值
+    merged_unbalanced = merged[~merged["_match_key"].isin(balanced_keys)].copy()
+    merged = pd.concat([merged_balanced, merged_unbalanced], ignore_index=True)
 
     # ---- 生成状态列 ----
-    # 所有行都显示状态；有券行按公式核对，无券行标记为正常
-    # 核对公式：开思劵(¥) * (1 + 开思券税率) == 应收金额(￥)
+    stmt_coupon_col = "对账单-开思劵(¥)"
+    receivable_col = "应收金额(￥)"
+    rate_col = "开思券税率"
+
     def _make_status(row):
-        stmt_coupon = row.get("开思劵(¥)", 0)
+        stmt_coupon = row.get(stmt_coupon_col)
         if pd.isna(stmt_coupon):
-            stmt_coupon = 0.0
-        stmt_coupon = float(stmt_coupon)
+            return "电子对账单无此订单"
 
-        if stmt_coupon <= 0.001:
-            return "正常"
-
-        bill_receivable = row.get("应收金额_券账单")
-        if pd.isna(bill_receivable):
-            return "券账单无此订单"
-
-        rate = row.get("开思券税率_券账单")
+        rate = row.get(rate_col)
         if pd.isna(rate):
             return "券金额不一致"
 
         multiplier = round(1 + float(rate), 2)
-        expected_receivable = round(stmt_coupon * multiplier, 2)
+        expected_receivable = round(float(stmt_coupon) * multiplier, 2)
+        bill_receivable = row.get(receivable_col) or 0.0
+
         if abs(expected_receivable - float(bill_receivable)) > TOLERANCE:
             return "券金额不一致"
 
@@ -213,41 +364,103 @@ def build_coupon_reconcile(coupon_path=None, stmt_path=None):
 
     merged["状态"] = merged.apply(_make_status, axis=1)
 
-    # 只保留「开思劵(¥) > 0」的行；无券行不显示
-    merged = merged[merged["开思劵(¥)"] > 0.001].copy()
+    # ---- 对账状态 ----
+    def _make_reconcile_status(row):
+        ar_paid = row.get("应收单-已收款金额")
+        ar_total = row.get("应收单-价税合计")
+        coupon = row.get("对账单-开思劵(¥)")
 
-    # 删除临时辅助列
-    merged = merged.drop(columns=[c for c in ["_order_no"] if c in merged.columns], errors="ignore")
+        # 能拿到应收单金额时才判断三种状态；拿不到（未匹配到应收单）也归到「其他」
+        if pd.notna(ar_paid) and pd.notna(ar_total):
+            paid = float(ar_paid)
+            total = float(ar_total)
 
-    return merged
+            if abs(paid - total) <= TOLERANCE:
+                return "完全核销"
+            if abs(paid - (total - float(coupon or 0))) <= TOLERANCE:
+                return "只缺开思卷"
+            if abs(paid) <= TOLERANCE:
+                return "未收款"
+
+        return "人工核对"
+
+    merged["对账状态"] = merged.apply(_make_reconcile_status, axis=1)
+
+    # ---- 整理列名与顺序 ----
+    merged = merged.rename(columns={"_order_no": "订单/退货单号"})
+    merged = merged.drop(
+        columns=[c for c in ["_match_key", "_pair", "_price_total", "对账单-对账金额(¥)"] if c in merged.columns],
+        errors="ignore",
+    )
+
+    final_cols = [
+        "订单/退货单号",
+        "开票类型",
+        "开思券税率",
+        "交易金额(￥)",
+        "应收金额(￥)",
+        "对账单-客户名称",
+        "对账单-客户代码",
+        "对账单-开思劵(¥)",
+        "应收单-单据编号",
+        "应收单-价税合计",
+        "应收单-已收款金额",
+        "对账状态",
+        "结算明细-平台已结算金额（¥）",
+        "结算明细-结算状态（含冻结）",
+        "结算明细-收款信息",
+        "状态",
+    ]
+    existing_cols = [c for c in final_cols if c in merged.columns]
+    return merged[existing_cols]
 
 
-# ======================================================================
+# ==============================================================================
 # Excel 输出
-# ======================================================================
+# ==============================================================================
 
-def save_coupon_reconcile(merged, output_path=None):
-    """保存对账结果到 Excel（仅生成一个 sheet）"""
+def save_coupon_reconcile(merged, push_df=None, output_path=None):
+    """保存对账结果到 Excel（主 sheet + 可选的金蝶写入数据源 sheet）"""
     if output_path is None:
         output_path = _build_path(f"{OUTPUT_PREFIX}_{_now_str()}.xlsx")
 
-    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:  # pyright: ignore[reportAbstractUsage]
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         merged.to_excel(writer, sheet_name="开思券对账", index=False)
+        if push_df is not None and not push_df.empty:
+            push_df.to_excel(writer, sheet_name=KINGDEE_SHEET, index=False)
 
     return output_path
 
 
-# ======================================================================
+# ==============================================================================
 # 入口
-# ======================================================================
+# ==============================================================================
 
 def main():
     merged = build_coupon_reconcile()
-    out_path = save_coupon_reconcile(merged)
+
+    # 仅「只缺开思卷」的行需要下推金蝶
+    push_cols = [
+        "应收单-单据编号",
+        "订单/退货单号",
+        "对账单-客户代码",
+        "对账单-开思劵(¥)",
+        "开票类型",
+        "应收单-价税合计",
+        "应收单-已收款金额",
+    ]
+    existing_push_cols = [c for c in push_cols if c in merged.columns]
+    push_df = merged[merged["对账状态"] == "只缺开思卷"][existing_push_cols].copy()
+    if not push_df.empty:
+        push_df[KINGDEE_STATUS_COLUMN] = ""
+
+    out_path = save_coupon_reconcile(merged, push_df)
     abnormal_count = len(merged[merged["状态"] != "正常"])
     print(f"开思券对账完成：{out_path}")
     print(f"  总记录数：{len(merged)}")
     print(f"  异常记录数：{abnormal_count}")
+    if not push_df.empty:
+        print(f"  金蝶待写入：{len(push_df)} 行")
 
 
 if __name__ == "__main__":

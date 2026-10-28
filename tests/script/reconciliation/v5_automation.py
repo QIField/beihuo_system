@@ -625,5 +625,5 @@ def run_v5_automation(url=None, username=None, password=None, skd_date=None):
 
 if __name__ == "__main__":
     # 在这里修改收款单/退款单的业务日期，如 "2025/9/30"
-    skd_date = "2026/9/29"
+    skd_date = "2026/10/22"
     run_v5_automation(skd_date=skd_date)
