@@ -15,8 +15,8 @@ from app.utils.orm import orm_session
 from config.config_list_manager.config_cache import get_config_value
 
 
-def partnerList(token, page_num=None):
-    spider = CrmGzbbrSpider(token=token)
+def partnerList(page_num=None):
+    spider = CrmGzbbrSpider()
     limit = 200
     data_total_count = 0  # 存储所有客户数据总计
     current_page = 1
@@ -80,8 +80,7 @@ def partnerList(token, page_num=None):
 def partnerList_service():
     print("="*100)
     print("partnerList_service执行开始")
-    token = get_config_value("customer_quota_manager").get("WMS_TOKEN")
-    partnerList(token, page_num=None)
+    partnerList(page_num=None)
     print("partnerList_service执行结束")
     print("=" * 100)
 
