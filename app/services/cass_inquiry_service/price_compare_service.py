@@ -18,11 +18,11 @@ BBRI_STORE_NAME = '佛山巴博瑞汽配'
 
 # 允许排序的列白名单（数值列按 float 比较，文本列按字符串比较；bbri_price/diff 为计算列，内存排序）
 NUMERIC_SORT_COLUMNS = {'seller_price', 'bbri_price', 'diff', 'num'}
-TEXT_SORT_COLUMNS = {'decode_num', 'brand_name', 'parts_name', 'quality_name'}
+TEXT_SORT_COLUMNS = {'decode_num', 'merchant_parts_num', 'brand_name', 'parts_name', 'quality_name'}
 SORTABLE_COLUMNS = NUMERIC_SORT_COLUMNS | TEXT_SORT_COLUMNS
 
 # 允许列头菜单筛选的列（含计算列 compare_status，中文案与表格显示一致）
-FILTERABLE_COLUMNS = {'decode_num', 'brand_name', 'parts_name', 'quality_name', 'num', 'compare_status'}
+FILTERABLE_COLUMNS = {'decode_num', 'merchant_parts_num', 'brand_name', 'parts_name', 'quality_name', 'num', 'compare_status'}
 
 # 对比结果状态码与中文文案映射（筛选值用中文，比对时映射回状态码）
 COMPARE_STATUS_TEXT = {
@@ -123,7 +123,7 @@ def query_price_compare(store_name=None, page=1, page_size=20, sort_column=None,
     :param start_date: 询单日期下限 YYYY-MM-DD（可空=不限，两端同口径过滤）
     :param end_date: 询单日期上限 YYYY-MM-DD（可空=不限）
     :return: {'code': 0, 'data': {'list': [...], 'total': n, 'page': p, 'page_size': s}}
-             每行含 decode_num/brand_name/parts_name/quality_name/num/seller_price/
+             每行含 decode_num/merchant_parts_num/brand_name/parts_name/quality_name/num/seller_price/
              bbri_price/diff/compare_status（higher/lower/equal）；无基准行不返回
     """
     store = (store_name or '').strip()
@@ -264,7 +264,7 @@ def _fetch_store_quotes(store, start_date=None, end_date=None):
     使计算列（巴博瑞基准价/价差）也能参与排序
     """
     sql = """
-        SELECT decode_num, brand_name, parts_name, quality_name, num, seller_price
+        SELECT decode_num, merchant_parts_num, brand_name, parts_name, quality_name, num, seller_price
         FROM cass_inquiry_quote
         WHERE store_name = %s AND decode_num IS NOT NULL AND decode_num != ''
         {date_cond}
@@ -310,7 +310,7 @@ def _build_compare_row(row, baseline):
 
     巴博瑞无同 OE+品牌 基准，或任一价格非法时返回 None（该行不比对、不展示）
     """
-    decode_num, brand_name, parts_name, quality_name, num, seller_price = row
+    decode_num, merchant_parts_num, brand_name, parts_name, quality_name, num, seller_price = row
     price = _to_float(seller_price)
     base = baseline.get((str(decode_num).strip(), (brand_name or '').strip()))
 
@@ -328,6 +328,7 @@ def _build_compare_row(row, baseline):
 
     return {
         'decode_num': decode_num,
+        'merchant_parts_num': merchant_parts_num,
         'brand_name': brand_name,
         'parts_name': parts_name,
         'quality_name': quality_name,

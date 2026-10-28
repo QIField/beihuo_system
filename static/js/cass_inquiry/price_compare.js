@@ -89,6 +89,7 @@ var CassPriceCompare = (function () {
     var columns = [
         { data: '_rowno', title: '行号', width: 60, readOnly: true, className: 'ht-col-rowno', renderer: rowNumberRenderer },
         { data: 'decode_num', title: '译码OE号', width: 150, readOnly: true, className: 'ht-col-oe' },
+        { data: 'merchant_parts_num', title: '商家替换号', width: 120, readOnly: true },
         { data: 'brand_name', title: '品牌', width: 110, readOnly: true, className: 'ht-col-brand' },
         { data: 'parts_name', title: '零件名称', width: 150, readOnly: true },
         { data: 'quality_name', title: '品质', width: 90, readOnly: true },
