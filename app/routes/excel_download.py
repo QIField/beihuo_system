@@ -9,16 +9,34 @@
 #            存放目录统一为 static/exports/
 
 import os
+import re
+from pathlib import Path
+
 from flask import Blueprint, send_file, abort
 
 excel_download_bp = Blueprint('excel_download', __name__)
 
-# Excel 导出文件统一存放目录
-EXPORT_DIR = os.path.join('static', 'exports')
+# Excel 导出文件统一存放目录（锚定项目根目录，避免依赖启动时的 cwd）
+EXPORT_DIR = os.path.join(str(Path(__file__).resolve().parents[2]), 'static', 'exports')
 
 # 线上环境下载基础 URL，供其他服务生成推送链接时使用
 # 示例：http://x.fsbbr.net/web/download_excel/{category}/{company}/{date_str}
 DOWNLOAD_BASE_URL = "http://x.fsbbr.net"
+
+
+def _safe_export_path(category, company, date_str):
+    """
+    校验路径参数防目录穿越，返回导出文件路径；非法参数一律 404
+
+    :param category: 业务分类，仅允许字母数字下划线
+    :param company: 门店/组织代号，仅允许字母数字下划线
+    :param date_str: 日期字符串，仅允许 8 位数字
+    """
+    if not (re.fullmatch(r'\w+', category or '')
+            and re.fullmatch(r'\w+', company or '')
+            and re.fullmatch(r'\d{8}', date_str or '')):
+        abort(404)
+    return os.path.join(EXPORT_DIR, f'{category}_{company}_{date_str}.xlsx')
 
 
 @excel_download_bp.route('/download_excel/<category>/<company>/<date_str>')
@@ -33,7 +51,7 @@ def download_excel(category, company, date_str):
     :param company: 门店/组织代号
     :param date_str: 日期字符串
     """
-    file_path = os.path.join(EXPORT_DIR, f'{category}_{company}_{date_str}.xlsx')
+    file_path = _safe_export_path(category, company, date_str)
     if not os.path.exists(file_path):
         abort(404)
     return send_file(file_path, as_attachment=True)
@@ -46,7 +64,7 @@ def download_inventory(company, date_str):
     历史推送消息中已写死该 URL，保留以避免链接失效。
     新业务请使用通用路由 /download_excel/<category>/<company>/<date_str>。
     """
-    file_path = os.path.join(EXPORT_DIR, f'inventory_{company}_{date_str}.xlsx')
+    file_path = _safe_export_path('inventory', company, date_str)
     if not os.path.exists(file_path):
         abort(404)
     return send_file(file_path, as_attachment=True)
