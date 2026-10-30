@@ -212,12 +212,13 @@
 
     <!-- 批量处理弹窗模板 -->
     <script type="text/html" id="batchProcessTemplate">
-        <div style="padding: 20px;">
-            <div id="batchLoading" style="text-align: center; padding: 50px;">
+        <!-- flex 布局使内容区高度自适应弹窗拉伸 -->
+        <div style="padding: 20px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column;">
+            <div id="batchLoading" style="text-align: center; padding: 50px; flex-shrink: 0;">
                 <i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop" style="font-size: 50px; color: #1E9FFF;"></i>
                 <p style="margin-top: 20px; font-size: 16px;">正在加载数据...</p>
             </div>
-            <div id="batchContent" style="display: none;">
+            <div id="batchContent" style="display: none; flex: 1; overflow-y: auto; box-sizing: border-box; min-height: 0;">
                 <table class="layui-table" lay-skin="line">
                     <thead>
                         <tr>
@@ -226,6 +227,7 @@
                             <th>商品id</th>
                             <th>商品名称</th>
                             <th>品牌</th>
+                            <th>crmOE编号</th>
                             <th style="width: 100px;">开思原始价格</th>
                             <th style="width: 110px;">CRM价格</th>
                             <th>数量</th>
@@ -437,7 +439,10 @@
                 var layerIndex = layer.open({
                     title: '批量处理',
                     type: 1,
-                    area: ['1200px', '750px'],
+                    area: ['1500px', '750px'],
+                    // 开启拖动右下角调整弹窗大小
+                    resize: true,
+                    maxmin: true,
                     content: getTpl,
                     success: function(layero, index){
                         // 存储所有选中行的数据和获取的商品信息
@@ -516,6 +521,8 @@
                                 html += '<td>' + (product.productId || '-') + '</td>';
                                 html += '<td>' + (product.productName || '-') + '</td>';
                                 html += '<td>' + (product.productBrandName || '-') + '</td>';
+                                // crmOE编号：CRM取价所使用的OE号，取自主表格行数据
+                                html += '<td>' + (row.number || '-') + '</td>';
                                 html += '<td>' + (product.defaultPrice || '-') + '</td>';
                                 html += '<td><input type="number" step="0.01" class="' + priceInputClass + '" data-index="' + i + '" value="' + (state.crmPrice > 0 ? state.crmPrice : '') + '" placeholder="请输入价格"></td>';
                                 html += '<td>' + (row.needqty || '-') + '</td>';
