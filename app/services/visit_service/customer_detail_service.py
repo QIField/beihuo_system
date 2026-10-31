@@ -11,8 +11,9 @@
 
 from datetime import datetime
 
-from app.dao.visit_dao import visit_amap_customer_dao, visit_customer_relation_dao
+from app.dao.visit_dao import visit_amap_customer_dao, visit_customer_owner_dao, visit_customer_relation_dao
 from app.models.orm_models.crm.partner_list import PartnerList
+from app.models.orm_models.system_models.crmapp_users import CrmappUsers
 from app.services.visit_service.amap_customer_service import STATUS_LABELS
 from app.utils.orm.session import orm_session
 
@@ -69,6 +70,16 @@ def get_customer_detail(customer_id):
                 PartnerList.partner_id.in_([r.partner_id for r in relations])).all()
             partner_map = {p.partner_id: p for p in partners}
 
+        # 负责人展示（多对多联 crmapp_users，逗号分割，07-负责人绑定.md 查询场景）
+        owner_rows = visit_customer_owner_dao.list_by_customer_id(session, row.id)
+        owner_names = ""
+        if owner_rows:
+            users = session.query(CrmappUsers).filter(
+                CrmappUsers.id.in_({r.user_id for r in owner_rows})).all()
+            user_map = {u.id: u.username for u in users}
+            owner_names = ",".join(
+                user_map[r.user_id] for r in owner_rows if r.user_id in user_map)
+
         # 会话内完成序列化，避免会话关闭后访问过期实例（DetachedInstanceError）
         customer = {
             "id": row.id,
@@ -81,6 +92,7 @@ def get_customer_detail(customer_id):
             "customer_type": row.customer_type,
             "main_repair_brands": row.main_repair_brands,
             "business_circle": row.business_circle,
+            "owner_names": owner_names,
             "last_visit_time": _fmt_datetime(row.last_visit_time),
         }
         amap = {

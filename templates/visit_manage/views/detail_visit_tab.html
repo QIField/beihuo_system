@@ -6,7 +6,8 @@
           2.1，实现同步时再补列，前端占位已移除）；
        2. 照片存 visit_record.images TEXT（Excel 照片列原样字符串，url 逗号分隔）；
        3. 拜访记录只能作废不能改内容（保真实性），作废操作入口
-          （PUT /api/visit/records/<id>/void）预留，未在原型中体现。 -->
+          （PUT /api/visit/records/<id>/void）预留，未在原型中体现；
+       4. 费用入口统一在【跟进记录 Tab】（包括拜访同步条目和手动跟进条目），本 Tab 不再重复提供。 -->
 <div class="v-pane">
     <div class="v-pane-head">
         <h3 class="v-pane-title">历史拜访记录（共<span id="visit-total">0</span>条）</h3>
@@ -98,7 +99,6 @@
                 time: (r.visit_time || '').substring(0, 16),
                 content: esc(r.content),
                 photos: parseImages(r.images).map(esc),
-                // 已转化订单（M4，05-订单拜访关联模块设计.md）：关联订单号列表 title 提示
                 converted: !!r.converted,
                 convertedTitle: esc(convertedOrders.join('、'))
             };

@@ -5,7 +5,7 @@ import pandas as pd
 from app.scripts.spiders.spider_entities.crm_gzbbr import CrmGzbbrSpider
 
 
-def oe_price_clean(product_list, number: str, brand_name: str):
+def oe_price_clean(product_list, number: str, brand_name: str, match_number: bool = True):
     """
     OE 价格清理服务
 
@@ -15,6 +15,7 @@ def oe_price_clean(product_list, number: str, brand_name: str):
     :param product_list: 爬虫返回的原始 JSON 数据（已解析为字典）
     :param number: 输入的 OE 号，用于精确匹配
     :param brand_name: 输入的品牌名称，用于精确匹配
+    :param match_number: 是否按 OE 号精确匹配；False 时跳过 OE 匹配（降级为仅按品牌匹配）
     :return: 清洗后的产品列表，每个元素包含 name、stock、number、price、product_id、brand_name
     """
     # 参数校验：检查输入数据是否有效
@@ -46,12 +47,14 @@ def oe_price_clean(product_list, number: str, brand_name: str):
         return []
 
     # 精确匹配 OE 号：将 number 字段转为字符串并去除空格后与输入 OE 号严格比较
-    df['number'] = df['number'].astype(str).str.strip()
-    df = df[df['number'] == number.strip()].copy()
+    # match_number=False 时跳过 OE 匹配（降级规则：仅按品牌匹配）
+    if match_number:
+        df['number'] = df['number'].astype(str).str.strip()
+        df = df[df['number'] == number.strip()].copy()
 
-    # 匹配后为空检查
-    if df.empty:
-        return []
+        # 匹配后为空检查
+        if df.empty:
+            return []
 
     # 精确匹配品牌名称：将 brand_name 字段转为字符串并去除空格后与输入品牌名称严格比较
     # 如果 brand_name 为空或 None，则跳过品牌过滤
@@ -82,19 +85,38 @@ def oe_price_clean(product_list, number: str, brand_name: str):
 def crm_get_oe_price_data(spider: CrmGzbbrSpider,number: str,brand_name: str):
     """
     CRM OE 价格爬虫服务
+
+    取价规则：
+    1. 优先按 OE号 + 品牌精确匹配，取第一条的价格
+    2. 若精确匹配无数据，或价格为空/0，则降级：跳过 OE 号精确匹配，仅按品牌精确匹配，
+       结果保持接口返回顺序，默认取最上面（第一条）的价格
     """
-    #number清理格式化 
+    #number清理格式化
     number = number.strip().split()[0].replace(' ', '')
 
 
     # 调用爬虫方法获取产品列表
     product_list = spider.get_product_product_list(number=number).json()  # pyright: ignore[reportOptionalMemberAccess]
-    # print(product_list)
-    # 清理产品列表
-    product_list = oe_price_clean(product_list,number=number,brand_name=brand_name)
-    wms_price = product_list[0].get('price')
-    # print(product_list)
-    return wms_price
+
+    # 第一步：OE号 + 品牌精确匹配
+    clean_list = oe_price_clean(product_list,number=number,brand_name=brand_name)
+    if clean_list:
+        wms_price = clean_list[0].get('price')
+        # 价格有效（非空且大于0）时直接返回
+        try:
+            if wms_price is not None and float(wms_price) > 0:
+                return wms_price
+        except (ValueError, TypeError):
+            pass
+
+    # 第二步：降级规则 —— 精确匹配无数据或价格为空/0时，不按 OE 号精确匹配，仅按品牌精确匹配
+    # 多条结果（多个 xxxx + 品牌）时保持接口返回顺序，默认取最上面一条的价格
+    fallback_list = oe_price_clean(product_list,number=number,brand_name=brand_name,match_number=False)
+    if fallback_list:
+        return fallback_list[0].get('price')
+
+    # 两种匹配均无有效数据，返回 None（上层会将 crm_price 置为 None）
+    return None
   
 
 

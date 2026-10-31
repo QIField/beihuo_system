@@ -1,0 +1,823 @@
+<!-- 费用分析页（设计文档 doc/客访管理/09-费用分析.md）
+     路由 hash: #/expense
+     数据接口：
+       GET  /new/api/visit/expenses           明细列表（筛选+分页）
+       POST /new/api/visit/expenses           单条新增（+ 加费用）
+       PUT  /new/api/visit/expenses/<id>      编辑/作废/恢复
+       GET  /new/api/visit/expenses/summary   汇总+类型占比+趋势 -->
+<style>
+    /* === 费用分析页样式（隔离作用域） === */
+    .v-pane--expense { background: transparent; }
+
+    /* 顶部：时间窗口 + 操作 */
+    .v-expense-head {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 16px;
+    }
+    .v-expense-head-left { display: flex; align-items: center; gap: 12px; }
+
+    /* 汇总卡 */
+    .v-expense-summary {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+        margin-bottom: 20px;
+    }
+    .v-summary-card {
+        background: #fff; border-radius: 10px; padding: 18px 20px;
+        border: 1px solid #f3f4f6; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        transition: box-shadow .2s, transform .2s;
+    }
+    .v-summary-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        transform: translateY(-1px);
+    }
+    .v-summary-card--primary { border-left: 3px solid var(--v-primary, #2563eb); }
+    .v-summary-card--success { border-left: 3px solid #10b981; }
+    .v-summary-card--warn   { border-left: 3px solid #f59e0b; }
+    .v-summary-label { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
+    .v-summary-value { font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.5px; }
+    .v-summary-sub { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+
+    /* 区域标题 */
+    .v-expense-section { margin-bottom: 20px; background: #fff; border-radius: 10px; padding: 18px 20px; border: 1px solid #f3f4f6; }
+    .v-section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .v-section-title { font-size: 14px; font-weight: 600; color: #111827; margin: 0; }
+    .v-filter-row { display: flex; gap: 8px; align-items: center; }
+
+    /* 类型占比 */
+    .v-type-breakdown { display: grid; gap: 10px; }
+    .v-type-item { display: grid; grid-template-columns: 100px 1fr 110px; gap: 12px; align-items: center; }
+    .v-type-label { font-size: 13px; color: #374151; font-weight: 500; }
+    .v-type-bar-bg { background: #f3f4f6; border-radius: 10px; height: 8px; overflow: hidden; }
+    .v-type-bar { height: 100%; background: linear-gradient(90deg, var(--v-primary, #2563eb), #60a5fa); border-radius: 10px; transition: width .4s; }
+    .v-type-value { font-size: 12px; color: #6b7280; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* 表格样式 */
+    .v-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .v-table thead th { background: #fafafa; color: #374151; font-weight: 600; padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 12px; }
+    .v-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; }
+    .v-table tbody tr:hover { background: #fafbff; }
+    .v-row--void td { color: #9ca3af; text-decoration: line-through; }
+    .v-row--void td:first-child::before { content: ''; }
+
+    /* 分页 */
+    .v-pager { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 14px; }
+    .v-pager-btn { padding: 4px 14px; border: 1px solid #e5e7eb; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all .2s; }
+    .v-pager-btn:hover { border-color: var(--v-primary); color: var(--v-primary); }
+    .v-pager-btn--active { background: var(--v-primary); border-color: var(--v-primary); color: #fff; pointer-events: none; }
+    .v-pager-btn:hover { border-color: var(--v-primary, #2563eb); color: var(--v-primary, #2563eb); }
+    .v-pager-info { font-size: 12px; color: #6b7280; }
+
+    /* 链接按钮（表格内操作） */
+    .v-link { background: none; border: none; color: var(--v-primary, #2563eb); cursor: pointer; font-size: 12px; padding: 2px 6px; transition: color .15s; }
+    .v-link:hover { color: var(--v-primary-dark, #1d4ed8); text-decoration: underline; }
+    .v-link--danger { color: #dc2626; }
+    .v-link--danger:hover { color: #b91c1c; }
+    .v-link--success { color: #059669; }
+    .v-link--success:hover { color: #047857; }
+</style>
+
+<div class="v-pane v-pane--expense">
+    <!-- 顶部 -->
+    <div class="v-expense-head">
+        <div class="v-expense-head-left">
+            <h3 class="v-pane-title">费用分析</h3>
+            <select id="expense-window" class="v-select" style="padding:4px 10px;font-size:12px;">
+                <option value="month">本月</option>
+                <option value="year" selected>本年</option>
+                <option value="all">全部</option>
+            </select>
+        </div>
+        <button class="v-btn v-btn--primary" id="expense-add" style="font-size:12px;padding:6px 14px;">＋ 添加费用</button>
+    </div>
+
+    <!-- 汇总卡 -->
+    <div class="v-expense-summary">
+        <div class="v-summary-card v-summary-card--primary">
+            <div class="v-summary-label">费用投入合计</div>
+            <div class="v-summary-value" id="s-expense">¥0.00</div>
+            <div class="v-summary-sub">费用笔数 <span id="s-count">0</span></div>
+        </div>
+        <div class="v-summary-card v-summary-card--success">
+            <div class="v-summary-label">涉及客户数</div>
+            <div class="v-summary-value" id="s-customers">0</div>
+            <div class="v-summary-sub">时间窗口内有费用的客户</div>
+        </div>
+        <div class="v-summary-card v-summary-card--warn">
+            <div class="v-summary-label">本月新增</div>
+            <div class="v-summary-value" id="s-month">¥0.00</div>
+            <div class="v-summary-sub">当月费用环比</div>
+        </div>
+    </div>
+
+    <!-- 费用类型占比 -->
+    <div class="v-expense-section">
+        <div class="v-section-head">
+            <h4 class="v-section-title">费用类型占比</h4>
+        </div>
+        <div class="v-type-breakdown" id="type-breakdown"></div>
+    </div>
+
+    <!-- 费用明细 -->
+    <div class="v-expense-section">
+        <div class="v-section-head">
+            <h4 class="v-section-title">费用明细</h4>
+            <div class="v-filter-row">
+                <input type="text" id="flt-keyword" class="v-input" placeholder="搜索高德客户名称" style="padding:4px 10px;font-size:12px;">
+                <button class="v-btn" id="btn-search" style="padding:4px 14px;font-size:12px;">查询</button>
+                <select id="flt-limit" class="v-select" style="padding:4px 10px;font-size:12px;">
+                    <option value="10" selected>10 条/页</option>
+                    <option value="20">20 条/页</option>
+                    <option value="50">50 条/页</option>
+                    <option value="100">100 条/页</option>
+                </select>
+            </div>
+        </div>
+        <table class="v-table" id="expense-table">
+            <thead>
+                <tr>
+                    <th style="width:100px;">日期</th>
+                    <th style="width:140px;">客户</th>
+                    <th style="width:120px;">费用类型</th>
+                    <th style="width:100px;text-align:right;">金额</th>
+                    <th>说明</th>
+                    <th style="width:90px;">关联来源</th>
+                    <th style="width:120px;text-align:right;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="expense-tbody">
+                <tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:30px;">加载中...</td></tr>
+            </tbody>
+        </table>
+        <div class="v-pager" id="expense-pager"></div>
+    </div>
+</div>
+
+<!-- laytpl 模板：费用类型占比 -->
+<script type="text/html" id="tpl-type-breakdown">
+    {% raw %}
+    {{# layui.each(d.list, function(i, t){ }}
+    <div class="v-type-item">
+        <div class="v-type-label">{{ t.type }}</div>
+        <div class="v-type-bar-bg"><div class="v-type-bar" style="width:{{ (t.ratio * 100).toFixed(1) }}%"></div></div>
+        <div class="v-type-value">¥{{ t.amount.toFixed(2) }} · {{ (t.ratio * 100).toFixed(1) }}%</div>
+    </div>
+    {{# }); }}
+    {{# if (!d.list.length) { }}
+    <div style="text-align:center;color:#9ca3af;padding:20px;">暂无费用数据</div>
+    {{# } }}
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：费用明细行 -->
+<script type="text/html" id="tpl-expense-row">
+    {% raw %}
+    {{# layui.each(d.list, function(i, r){ }}
+    <tr class="{{ r.status === 0 ? 'v-row--void' : '' }}">
+        <td>{{ r.expense_date }}</td>
+        <td>{{ r.customer_name || r.amap_customer_id }}</td>
+        <td>{{ r.expense_type }}</td>
+        <td style="text-align:right;font-weight:600;">¥{{ r.amount.toFixed(2) }}</td>
+        <td>{{ r.description || '' }}</td>
+        <td>{{ r.source_type === 1 ? '拜访' : (r.source_type === 2 ? '跟进' : (r.source_type === 3 ? '订单' : '手动')) }}</td>
+        <td style="text-align:right;">
+            {{# if (r.status === 1) { }}
+            <button class="v-link" data-action="edit" data-id="{{ r.id }}">编辑</button>
+            <button class="v-link v-link--danger" data-action="void" data-id="{{ r.id }}">作废</button>
+            {{# } else { }}
+            <button class="v-link v-link--success" data-action="restore" data-id="{{ r.id }}">恢复</button>
+            {{# } }}
+        </td>
+    </tr>
+    {{# }); }}
+    {{# if (!d.list.length) { }}
+    <tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:30px;">暂无费用记录</td></tr>
+    {{# } }}
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：费用 Modal（新增/编辑共用，美化版） -->
+<script type="text/html" id="tpl-expense-modal">
+    {% raw %}
+    <style>
+        .eamodal-body { padding: 22px 24px 18px; }
+        .eamodal-field { margin-bottom: 16px; }
+        .eamodal-field:last-of-type { margin-bottom: 22px; }
+        .eamodal-label { display: block; margin-bottom: 6px; font-size: 12px; color: #4b5563; font-weight: 600; letter-spacing: 0.3px; }
+        .eamodal-label .eamodal-req { color: #dc2626; margin-left: 2px; }
+        .eamodal-label .eamodal-opt { color: #9ca3af; font-weight: 400; }
+        .eamodal-input {
+            width: 100%; height: 36px; padding: 0 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 13px; color: #1f2937;
+            background: #fff; transition: border-color .18s, box-shadow .18s;
+            box-sizing: border-box; outline: none;
+        }
+        .eamodal-input:focus {
+            border-color: var(--v-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .eamodal-input--amount { padding-left: 28px; font-weight: 600; }
+        .eamodal-input--wrap { position: relative; }
+        .eamodal-input--wrap::before {
+            content: '¥'; position: absolute; left: 12px; top: 50%;
+            transform: translateY(-50%); color: #9ca3af;
+            font-size: 14px; font-weight: 600; pointer-events: none;
+        }
+        .eamodal-input::placeholder { color: #d1d5db; }
+        .eamodal-textarea {
+            width: 100%; min-height: 72px; padding: 8px 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 13px; color: #1f2937; font-family: inherit;
+            background: #fff; resize: vertical;
+            transition: border-color .18s, box-shadow .18s;
+            box-sizing: border-box; outline: none; line-height: 1.5;
+        }
+        .eamodal-textarea:focus {
+            border-color: var(--v-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .eamodal-textarea::placeholder { color: #d1d5db; }
+        .eamodal-footer {
+            display: flex; justify-content: flex-end; gap: 10px;
+            padding-top: 14px; border-top: 1px solid #f3f4f6;
+        }
+        .eamodal-btn {
+            padding: 8px 20px; font-size: 13px; font-weight: 500;
+            border-radius: 8px; border: 1px solid #e5e7eb;
+            background: #fff; color: #4b5563; cursor: pointer;
+            transition: all .18s;
+        }
+        .eamodal-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+        .eamodal-btn--primary {
+            background: var(--v-primary); border-color: var(--v-primary); color: #fff;
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+        }
+        .eamodal-btn--primary:hover { background: var(--v-primary-dark); border-color: var(--v-primary-dark); }
+        /* 客户/订单搜索下拉 */
+        .eamodal-field--customer, .eamodal-field--order { position: relative; }
+        select.eamodal-input { cursor: pointer; }
+        .exp-cus-list {
+            position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; z-index: 10;
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+            max-height: 200px; overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .exp-cus-item { padding: 8px 12px; cursor: pointer; transition: background .12s; }
+        .exp-cus-item:hover { background: #f0f6ff; }
+        .exp-cus-name { font-size: 13px; color: #1f2937; font-weight: 500; }
+        .exp-cus-sub {
+            font-size: 11px; color: #9ca3af; margin-top: 2px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .exp-cus-empty { padding: 12px; text-align: center; font-size: 12px; color: #9ca3af; }
+        .exp-cus-rel { font-size: 11px; color: #059669; margin-top: 6px; line-height: 1.5; }
+        .eamodal-hint {
+            font-size: 11px; color: #9ca3af; margin-bottom: 14px;
+            padding: 8px 12px; background: #f9fafb; border-radius: 6px;
+            border-left: 3px solid var(--v-primary);
+        }
+    </style>
+    <div class="eamodal-body">
+        {{# if (d.mode === 'create') { }}
+        <div class="eamodal-hint">📝 录入费用：可选择关联拜访/跟进/订单，或手动独立记账</div>
+        {{# } else { }}
+        <div class="eamodal-hint">✏️ 修改这笔费用</div>
+        {{# } }}
+
+        {{# if (d.mode === 'create') { }}
+        <div class="eamodal-field">
+            <label class="eamodal-label">关联来源 <span class="eamodal-req">*</span></label>
+            <select id="exp-source-type" class="eamodal-input">
+                <option value="4" selected>手动输入（独立记账）</option>
+                <option value="3">关联订单（如退货索赔）</option>
+                <option value="1">关联拜访记录</option>
+                <option value="2">关联跟进记录</option>
+            </select>
+        </div>
+        <div class="eamodal-field" id="exp-field-source-id" style="display:none;">
+            <label class="eamodal-label">关联记录 <span class="eamodal-req">*</span></label>
+            <select id="exp-record" class="eamodal-input">
+                <option value="">请先选择客户</option>
+            </select>
+        </div>
+        <div class="eamodal-field eamodal-field--order" id="exp-field-order" style="display:none;">
+            <label class="eamodal-label">关联订单 <span class="eamodal-req">*</span></label>
+            <input id="exp-order" type="text" class="eamodal-input" placeholder="输入发货金蝶号/订单号搜索" autocomplete="off">
+            <div id="exp-order-list" class="exp-cus-list" style="display:none;"></div>
+        </div>
+        <div class="eamodal-field eamodal-field--customer" id="exp-field-customer">
+            <label class="eamodal-label">高德客户 <span class="eamodal-req">*</span></label>
+            <input id="exp-customer" type="text" class="eamodal-input" placeholder="输入高德客户名称搜索" autocomplete="off">
+            <div id="exp-customer-list" class="exp-cus-list" style="display:none;"></div>
+            <div id="exp-customer-rel" class="exp-cus-rel" style="display:none;"></div>
+        </div>
+        {{# } }}
+
+        <div class="eamodal-field">
+            <label class="eamodal-label">费用日期</label>
+            <input id="exp-date" type="date" class="eamodal-input" value="{{ d.expense_date || '' }}">
+        </div>
+
+        <div class="eamodal-field">
+            <label class="eamodal-label">费用类型 <span class="eamodal-req">*</span></label>
+            <!-- 费用类型枚举下拉：与后端 visit_expense_service.EXPENSE_TYPES 严格一致 -->
+            <select id="exp-type" class="eamodal-input">
+                <option value="">请选择费用类型</option>
+                <option value="拜访投入">拜访投入</option>
+                <option value="礼品物料投入">礼品物料投入</option>
+                <option value="接待投入">接待投入</option>
+                <option value="服务投入">服务投入</option>
+                <option value="索赔">索赔</option>
+                <option value="其他">其他</option>
+            </select>
+        </div>
+
+        <div class="eamodal-field">
+            <label class="eamodal-label">金额 <span class="eamodal-req">*</span></label>
+            <div class="eamodal-input--wrap">
+                <input id="exp-amount" type="number" step="0.01" min="0" class="eamodal-input eamodal-input--amount" placeholder="0.00" value="{{ d.amount || '' }}">
+            </div>
+        </div>
+
+        <div class="eamodal-field">
+            <label class="eamodal-label">说明 <span class="eamodal-opt">（选填）</span></label>
+            <textarea id="exp-desc" class="eamodal-textarea" placeholder="备注具体用途、沟通对象等...">{{ d.description || '' }}</textarea>
+        </div>
+
+        <div class="eamodal-footer">
+            <button type="button" class="eamodal-btn" onclick="layer.closeAll()">取消</button>
+            <button type="button" class="eamodal-btn eamodal-btn--primary" id="exp-save">{{ d.mode === 'edit' ? '✓ 保存修改' : '✓ 保存费用' }}</button>
+        </div>
+    </div>
+    {% endraw %}
+</script>
+
+<script>
+    layui.use(['jquery', 'laytpl', 'layer'], function () {
+        var $ = layui.jquery;
+        var laytpl = layui.laytpl;
+        var layer = layui.layer;
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function fmtMoney(v) { return '¥' + Number(v || 0).toFixed(2); }
+
+        // ==================== 汇总 ====================
+        function loadSummary() {
+            $.ajax({
+                url: '/new/api/visit/expenses/summary',
+                type: 'GET', dataType: 'json',
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) return;
+                    var m = res.data.metrics;
+                    $('#s-expense').text(fmtMoney(m.visit_expense));
+                    $('#s-count').text(m.expense_count);
+                    $('#s-customers').text(m.customer_count);
+
+                    // 本月新增
+                    $.ajax({
+                        url: '/new/api/visit/expenses/summary',
+                        type: 'GET', data: { month: new Date().toISOString().slice(0, 7) },
+                        success: function (r) {
+                            if (r.code === 200) $('#s-month').text(fmtMoney(r.data.metrics.visit_expense));
+                        }
+                    });
+
+                    laytpl($('#tpl-type-breakdown').html()).render(
+                        { list: res.data.type_breakdown || [] },
+                        function (html) { $('#type-breakdown').html(html); }
+                    );
+                },
+                error: function () { /* 静默 */ }
+            });
+        }
+
+        // ==================== 列表 ====================
+        var currentPage = 1, currentLimit = 10;
+
+        function loadList() {
+            $.ajax({
+                url: '/new/api/visit/expenses',
+                type: 'GET', dataType: 'json',
+                data: {
+                    page: currentPage, limit: currentLimit,
+                    keyword: $('#flt-keyword').val(),
+                },
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        $('#expense-tbody').html('<tr><td colspan="7" style="text-align:center;color:#dc2626;padding:30px;">加载失败</td></tr>');
+                        return;
+                    }
+                    var items = res.data.list.map(function (r) {
+                        return {
+                            id: r.id,
+                            expense_date: r.expense_date,
+                            expense_type: esc(r.expense_type),
+                            amount: r.amount,
+                            description: esc(r.description),
+                            source_type: r.source_type,
+                            source_id: r.source_id,
+                            status: r.status,
+                            amap_customer_id: esc(r.amap_customer_id),
+                            customer_name: esc((r.customer_name || r.amap_customer_id || ''))
+                        };
+                    });
+                    laytpl($('#tpl-expense-row').html()).render({ list: items },
+                        function (html) { $('#expense-tbody').html(html); });
+                    renderPager(res.data.total);
+                },
+                error: function (xhr) {
+                    // 401/403 等业务错误响应：优先展示后端返回的 msg（权限问题由主页面统一改写为友好文案）
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常';
+                    $('#expense-tbody').html('<tr><td colspan="7" style="text-align:center;color:#dc2626;padding:30px;">' + esc(msg) + '</td></tr>');
+                }
+            });
+        }
+
+        function renderPager(total) {
+            var totalPages = Math.max(1, Math.ceil(total / currentLimit));
+            var html = '';
+            if (currentPage > 1) html += '<button class="v-pager-btn" data-page="' + (currentPage - 1) + '">上一页</button>';
+            // 页码按钮：窗口式，最多显示 7 个
+            var start = Math.max(1, Math.min(currentPage - 3, totalPages - 6));
+            var end = Math.min(totalPages, start + 6);
+            for (var p = start; p <= end; p++) {
+                html += '<button class="v-pager-btn' + (p === currentPage ? ' v-pager-btn--active' : '') + '" data-page="' + p + '">' + p + '</button>';
+            }
+            if (currentPage < totalPages) html += '<button class="v-pager-btn" data-page="' + (currentPage + 1) + '">下一页</button>';
+            html += '<span class="v-pager-info">共 ' + total + ' 条</span>';
+            $('#expense-pager').html(html);
+        }
+
+        $('#expense-pager').on('click', '.v-pager-btn', function () { currentPage = parseInt($(this).data('page')); loadList(); });
+        $('#btn-search').on('click', function () { currentPage = 1; loadList(); });
+        // 回车触发客户名称搜索
+        $('#flt-keyword').on('keydown', function (e) {
+            if (e.key === 'Enter') { currentPage = 1; loadList(); }
+        });
+        // 切换每页条数：回到第一页重新加载
+        $('#flt-limit').on('change', function () {
+            currentLimit = parseInt($(this).val(), 10) || 10;
+            currentPage = 1;
+            loadList();
+        });
+
+        // ==================== 行操作 ====================
+        $('#expense-tbody').on('click', '[data-action]', function () {
+            var action = $(this).data('action');
+            var id = $(this).data('id');
+            var $tr = $(this).closest('tr');
+
+            if (action === 'edit') {
+                // 用 modal 编辑
+                var cells = $tr.find('td');
+                openExpenseModal({
+                    mode: 'edit', id: id,
+                    expense_date: cells.eq(0).text().trim(),
+                    expense_type: cells.eq(2).text().trim(),
+                    amount: parseFloat(cells.eq(3).text().replace(/[¥,]/g, '')),
+                    description: cells.eq(4).text().trim()
+                });
+            } else if (action === 'void') {
+                layer.confirm('确认作废此笔费用？', { icon: 3, title: '提示' }, function (idx) {
+                    $.ajax({
+                        url: '/new/api/visit/expenses/' + id + '/void', type: 'PUT',
+                        success: function (r) {
+                            layer.close(idx);
+                            if (r.code === 200) { layer.msg('已作废', { icon: 1 }); loadSummary(); loadList(); }
+                            else layer.msg(r.msg || '操作失败', { icon: 2 });
+                        }
+                    });
+                });
+            } else if (action === 'restore') {
+                $.ajax({
+                    url: '/new/api/visit/expenses/' + id + '/restore', type: 'PUT',
+                    success: function (r) {
+                        if (r.code === 200) { layer.msg('已恢复', { icon: 1 }); loadSummary(); loadList(); }
+                        else layer.msg(r.msg || '操作失败', { icon: 2 });
+                    }
+                });
+            }
+        });
+
+        // ==================== 新增费用 Modal ====================
+        $('#expense-add').on('click', function () { openExpenseModal({ mode: 'create' }); });
+
+        function openExpenseModal(data) {
+            laytpl($('#tpl-expense-modal').html()).render(data, function (modalHtml) {
+                layer.open({
+                    type: 1,
+                    title: data.mode === 'edit' ? '编辑费用' : '添加费用',
+                    area: ['400px', 'auto'],
+                    shadeClose: true,
+                    content: modalHtml,
+                    success: function (layero, index) {
+                        // 日期默认今天
+                        if (data.mode === 'create') {
+                            layero.find('#exp-date').val(new Date().toISOString().slice(0, 10));
+                        } else {
+                            // 编辑模式：费用类型下拉回填原值（旧数据不在枚举内时回落到"请选择"，须重选）
+                            layero.find('#exp-type').val(data.expense_type || '');
+                        }
+
+                        // ==================== 高德客户搜索选择（按名称） ====================
+                        var selectedCustomer = null; // { poi, name }
+                        var $cusInput = layero.find('#exp-customer');
+                        var $cusList = layero.find('#exp-customer-list');
+                        var $cusRel = layero.find('#exp-customer-rel');
+                        var searchTimer = null;
+
+                        function hideCusList() { $cusList.hide(); }
+
+                        function searchCustomers(kw) {
+                            $.ajax({
+                                url: '/new/api/visit/customers',
+                                type: 'GET', dataType: 'json',
+                                data: { keyword: kw, limit: 20 },
+                                success: function (res) {
+                                    if (res.code !== 200 || !res.data) return;
+                                    var list = res.data.list || [];
+                                    if (!list.length) {
+                                        $cusList.html('<div class="exp-cus-empty">未找到匹配的客户</div>').show();
+                                        return;
+                                    }
+                                    $cusList.html(list.map(function (c) {
+                                        return '<div class="exp-cus-item" data-poi="' + esc(c.poi) + '" data-name="' + esc(c.customer_name) + '" data-id="' + (c.id || '') + '">'
+                                            + '<div class="exp-cus-name">' + esc(c.customer_name) + '</div>'
+                                            + '<div class="exp-cus-sub">' + esc(c.address || '') + '</div>'
+                                            + '</div>';
+                                    }).join('')).show();
+                                }
+                            });
+                        }
+
+                        // 选中后展示该高德客户当前关联的 CRM 客户
+                        function showRelatedPartners(poi) {
+                            $.ajax({
+                                url: '/new/api/visit/relations',
+                                type: 'GET', dataType: 'json',
+                                data: { amap_customer_id: poi },
+                                success: function (res) {
+                                    if (res.code !== 200 || !res.data) return;
+                                    var names = (res.data.list || []).map(function (x) { return esc(x.fullname); });
+                                    $cusRel.text(names.length ? '已关联客户：' + names.join('、') : '该高德客户暂未关联CRM客户').show();
+                                }
+                            });
+                        }
+
+                        $cusInput.on('input', function () {
+                            selectedCustomer = null;
+                            $cusRel.hide();
+                            resetRecordSelect();
+                            var kw = $(this).val().trim();
+                            clearTimeout(searchTimer);
+                            if (!kw) { hideCusList(); return; }
+                            searchTimer = setTimeout(function () { searchCustomers(kw); }, 300);
+                        });
+
+                        $cusList.on('mousedown', '.exp-cus-item', function (e) {
+                            e.preventDefault();
+                            selectedCustomer = {
+                                poi: $(this).attr('data-poi'),
+                                name: $(this).attr('data-name'),
+                                id: $(this).attr('data-id'),
+                            };
+                            $cusInput.val(selectedCustomer.name);
+                            hideCusList();
+                            showRelatedPartners(selectedCustomer.poi);
+                            // 关联拜访/跟进时，带出该客户的记录供选择
+                            loadCustomerRecords();
+                        });
+
+                        // ==================== 关联来源切换 ====================
+                        // 1-拜访 2-跟进（选客户后带出记录下拉）；3-订单（搜订单+选客户）；4-手动输入（选客户）
+                        var $sourceSel = layero.find('#exp-source-type');
+                        var $recordSel = layero.find('#exp-record');
+
+                        function currentSourceType() { return parseInt($sourceSel.val(), 10); }
+
+                        function resetRecordSelect() {
+                            $recordSel.html('<option value="">请先选择客户</option>');
+                        }
+
+                        // 拉取选中客户的拜访(1)/跟进(2)记录，填充关联记录下拉
+                        function loadCustomerRecords() {
+                            var st = currentSourceType();
+                            if (st !== 1 && st !== 2) return;
+                            if (!selectedCustomer) { resetRecordSelect(); return; }
+
+                            $recordSel.html('<option value="">加载中...</option>');
+                            if (st === 1) {
+                                // 拜访记录：按客户 POI 查
+                                $.ajax({
+                                    url: '/new/api/visit/records',
+                                    type: 'GET', dataType: 'json',
+                                    data: { amap_customer_id: selectedCustomer.poi, limit: 200 },
+                                    success: function (res) {
+                                        if (res.code !== 200 || !res.data) return;
+                                        fillRecordSelect((res.data.list || []).map(function (r) {
+                                            return { id: r.id, label: (r.visit_time || '').substring(0, 16) + ' 拜访 #' + r.id };
+                                        }), '该客户暂无拜访记录');
+                                    }
+                                });
+                            } else {
+                                // 跟进记录：按客户主键查时间轴，过滤掉"拜访同步"条目（is_visit=true）
+                                $.ajax({
+                                    url: '/new/api/visit/customers/follows',
+                                    type: 'GET', dataType: 'json',
+                                    data: { id: selectedCustomer.id, limit: 200 },
+                                    success: function (res) {
+                                        if (res.code !== 200 || !res.data) return;
+                                        fillRecordSelect((res.data.list || [])
+                                            .filter(function (r) { return !r.is_visit; })
+                                            .map(function (r) {
+                                                return { id: r.id, label: (r.follow_time || '').substring(0, 16) + ' [' + (r.channel || '跟进') + '] #' + r.id };
+                                            }), '该客户暂无跟进记录');
+                                    }
+                                });
+                            }
+                        }
+
+                        function fillRecordSelect(records, emptyText) {
+                            if (!records.length) {
+                                $recordSel.html('<option value="">' + esc(emptyText) + '</option>');
+                                return;
+                            }
+                            $recordSel.html('<option value="">请选择记录（共 ' + records.length + ' 条）</option>'
+                                + records.map(function (r) {
+                                    return '<option value="' + r.id + '">' + esc(r.label) + '</option>';
+                                }).join(''));
+                        }
+
+                        function toggleSourceFields() {
+                            var st = $sourceSel.val();
+                            layero.find('#exp-field-source-id').toggle(st === '1' || st === '2');
+                            layero.find('#exp-field-order').toggle(st === '3');
+                            // 客户搜索：所有来源都需要（1/2 用于带出记录，3/4 用于客户归属）
+                            layero.find('#exp-field-customer').show();
+                        }
+                        $sourceSel.on('change', function () {
+                            // 切换来源时清空已选的关联对象
+                            selectedOrder = null;
+                            layero.find('#exp-order').val('');
+                            hideOrderList();
+                            resetRecordSelect();
+                            toggleSourceFields();
+                            // 若已选客户且切到拜访/跟进，直接带出记录
+                            loadCustomerRecords();
+                        });
+                        toggleSourceFields();
+
+                        // ==================== 订单搜索选择（source_type=3） ====================
+                        var selectedOrder = null; // { oid }
+                        var $orderInput = layero.find('#exp-order');
+                        var $orderList = layero.find('#exp-order-list');
+                        var orderTimer = null;
+
+                        function hideOrderList() { $orderList.hide(); }
+
+                        function searchOrders(kw) {
+                            $.ajax({
+                                url: '/new/api/visit/orders/search',
+                                type: 'GET', dataType: 'json',
+                                data: { keyword: kw, limit: 20 },
+                                success: function (res) {
+                                    if (res.code !== 200 || !res.data) return;
+                                    var list = res.data || [];
+                                    if (!list.length) {
+                                        $orderList.html('<div class="exp-cus-empty">未找到匹配的订单</div>').show();
+                                        return;
+                                    }
+                                    $orderList.html(list.map(function (o) {
+                                        // 主行显示发货金蝶号（同拿货订单 Tab 口径，空值回退订单号/订单ID），副行补充订单号
+                                        var mainNo = o.deliverysapno || o.ddno || ('订单ID ' + o.orders_id);
+                                        var subHtml = o.deliverysapno && o.ddno
+                                            ? '<div class="exp-cus-sub">订单号: ' + esc(o.ddno) + '</div>'
+                                            : '';
+                                        return '<div class="exp-cus-item" data-oid="' + o.orders_id + '" data-no="' + esc(mainNo) + '">'
+                                            + '<div class="exp-cus-name">' + esc(mainNo) + '</div>'
+                                            + subHtml
+                                            + '</div>';
+                                    }).join('')).show();
+                                }
+                            });
+                        }
+
+                        $orderInput.on('input', function () {
+                            selectedOrder = null;
+                            hideOrderList();
+                            var kw = $(this).val().trim();
+                            clearTimeout(orderTimer);
+                            if (!kw) return;
+                            orderTimer = setTimeout(function () { searchOrders(kw); }, 300);
+                        });
+
+                        $orderList.on('mousedown', '.exp-cus-item', function (e) {
+                            e.preventDefault();
+                            selectedOrder = { oid: $(this).attr('data-oid') };
+                            // 回显所选订单号（发货金蝶号优先，缺失回退订单号/订单ID）
+                            $orderInput.val($(this).attr('data-no') || ('订单ID ' + selectedOrder.oid));
+                            hideOrderList();
+                        });
+
+                        layero.on('mousedown', function (e) {
+                            if (!$(e.target).closest('.eamodal-field--customer, .eamodal-field--order').length) {
+                                hideCusList();
+                                hideOrderList();
+                            }
+                        });
+
+                        layero.find('#exp-save').on('click', function () {
+                            var payload;
+                            if (data.mode === 'create') {
+                                // 关联来源必传：1-拜访 2-跟进 3-订单 4-手动输入
+                                var st = currentSourceType();
+                                payload = {
+                                    source_type: st,
+                                    expense_date: layero.find('#exp-date').val(),
+                                    expense_type: layero.find('#exp-type').val().trim(),
+                                    amount: parseFloat(layero.find('#exp-amount').val()),
+                                    description: layero.find('#exp-desc').val().trim() || null,
+                                };
+                                if (st === 1 || st === 2) {
+                                    // 关联拜访/跟进记录：先选客户（带出记录下拉），再选具体记录
+                                    if (!selectedCustomer) { layer.msg('请先选择客户'); return; }
+                                    var sid = parseInt($recordSel.val(), 10);
+                                    if (!sid || sid <= 0) { layer.msg('请选择关联的' + (st === 1 ? '拜访' : '跟进') + '记录'); return; }
+                                    payload.source_id = sid;
+                                    payload.amap_customer_id = selectedCustomer.poi;
+                                } else if (st === 3) {
+                                    // 关联订单：搜订单 + 显式选客户
+                                    if (!selectedOrder) { layer.msg('请搜索并选择关联订单'); return; }
+                                    if (!selectedCustomer) { layer.msg('请输入客户名称并从列表中选择'); return; }
+                                    payload.source_id = parseInt(selectedOrder.oid, 10);
+                                    payload.amap_customer_id = selectedCustomer.poi;
+                                } else {
+                                    // 手动输入：客户必选
+                                    if (!selectedCustomer) { layer.msg('请输入客户名称并从列表中选择'); return; }
+                                    payload.amap_customer_id = selectedCustomer.poi;
+                                }
+                            } else {
+                                payload = {
+                                    expense_date: layero.find('#exp-date').val(),
+                                    expense_type: layero.find('#exp-type').val().trim(),
+                                    amount: parseFloat(layero.find('#exp-amount').val()),
+                                    description: layero.find('#exp-desc').val().trim() || null,
+                                };
+                            }
+                            if (!payload.expense_type) { layer.msg('请选择费用类型'); return; }
+                            if (!payload.amount || payload.amount <= 0) { layer.msg('金额必须是正数'); return; }
+
+                            var url = data.mode === 'edit'
+                                ? '/new/api/visit/expenses/' + data.id
+                                : '/new/api/visit/expenses';
+                            var method = data.mode === 'edit' ? 'PUT' : 'POST';
+
+                            $.ajax({
+                                url: url, type: method,
+                                contentType: 'application/json',
+                                data: JSON.stringify(payload),
+                                success: function (res) {
+                                    if (res.code === 200) {
+                                        layer.close(index);
+                                        layer.msg(data.mode === 'edit' ? '已更新' : '保存成功', { icon: 1, time: 1200 });
+                                        loadSummary(); loadList();
+                                    } else {
+                                        layer.msg(res.msg || '操作失败', { icon: 2 });
+                                    }
+                                },
+                                error: function (xhr) {
+                                    // 优先展示后端 msg（权限问题由主页面统一改写为友好文案）
+                                    layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络错误', { icon: 2 });
+                                }
+                            });
+                        });
+                    }
+                });
+            });
+        }
+
+        // ==================== 初始化 ====================
+        loadSummary();
+        loadList();
+
+        // URL 客户参数回填（客户详情跳转过来时）
+        try {
+            var hash = location.hash;
+            var qIdx = hash.indexOf('?');
+            if (qIdx > -1) {
+                var params = new URLSearchParams(hash.substring(qIdx + 1));
+                var poi = params.get('customer');
+                if (poi) {
+                    $('#flt-keyword').val(poi);
+                    currentPage = 1;
+                    loadList();
+                }
+            }
+        } catch (e) { /* 静默 */ }
+    });
+</script>

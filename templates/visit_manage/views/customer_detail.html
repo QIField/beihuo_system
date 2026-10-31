@@ -6,7 +6,38 @@
      注意：
        1. 指标金额基于 sales_order_history 按 orders_id 订单级聚合，避免明细重复累加；
        2. 拜访转化率已按业务要求删除（2026-10-22）；
-       3. “创建拜访任务”按钮依赖 visit_task 表，本期不做（01 文档第十一节）。 -->
+       3. “创建拜访任务”按钮依赖 visit_task 表，本期不做（01 文档第十一节）。
+       4. 负责人展示与管理（07-负责人绑定.md）：
+          GET    /new/api/visit/customer-owners?visit_amap_customer_id=<主键>  当前负责人列表
+          POST   /new/api/visit/customer-owners                                绑定负责人
+          DELETE /new/api/visit/customer-owners                                解绑负责人（物理删除）
+          GET    /new/api/visit/owner-candidates                               负责人下拉数据源（crmapp_users 全量） -->
+<style>
+    /* 负责人展示行（对齐 .v-detail-addr 视觉） */
+    .v-detail-owners { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 14px; color: var(--v-text-2); flex-wrap: wrap; }
+    /* 负责人管理弹层（类名与 customer_list.html 绑定弹窗一致，两片段不同时挂载，样式互不影响） */
+    .bind-cust { padding: 10px 12px; background: #f9fafb; border: 1px solid var(--v-border); border-radius: 6px; margin-bottom: 14px; }
+    .bind-cust .bcn { font-weight: 600; font-size: 14px; }
+    .bind-cust .bcs { font-size: 12px; color: var(--v-text-3); margin-top: 2px; }
+    .bind-label { display: block; font-size: 12px; color: var(--v-text-2); margin-bottom: 6px; }
+    .bind-label em { font-style: normal; color: #ef4444; margin-right: 2px; }
+    .bind-search { display: flex; gap: 8px; margin-bottom: 8px; }
+    .bind-search button {
+        height: 30px; padding: 0 14px; font-size: 12px; background: var(--v-primary); color: #fff;
+        border: none; border-radius: 4px; cursor: pointer;
+    }
+    .bind-search button:hover { opacity: .9; }
+    .bind-empty { padding: 16px; text-align: center; font-size: 12px; color: var(--v-text-3); }
+    .bind-current { max-height: 180px; overflow-y: auto; border: 1px solid var(--v-border); border-radius: 6px; }
+    .bind-current-item {
+        display: flex; align-items: center; gap: 8px; justify-content: space-between;
+        padding: 8px 10px; border-bottom: 1px solid #f3f4f6;
+    }
+    .bind-current-item:last-child { border-bottom: none; }
+    .bind-current-item .bc-name { font-size: 13px; font-weight: 500; }
+    .bind-current-item .bc-sub { font-size: 12px; color: var(--v-text-3); margin-top: 2px; }
+    .bind-current-item .unbind-link { flex-shrink: 0; font-size: 12px; }
+</style>
 <div class="v-card v-pane" id="customer-detail-head">
     <div class="v-detail-top">
         <div>
@@ -22,6 +53,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 </svg>
                 <span id="detail-addr"></span>
+            </div>
+            <!-- 负责人展示（07-负责人绑定.md 查询场景：逗号分割，如"张三,李四"）；管理 = 绑定/解绑弹层 -->
+            <div class="v-detail-owners">
+                <span>负责人：</span>
+                <span id="detail-owner-names">—</span>
+                <span class="v-link" id="btn-manage-owners" style="margin-left: 8px; font-size: 12px;">管理</span>
             </div>
         </div>
         <div class="v-detail-actions">
@@ -61,6 +98,50 @@
     {% endraw %}
 </script>
 
+<!-- laytpl 模板：负责人管理弹层（上方当前负责人可解绑，下方搜索新负责人，点击候选即绑定） -->
+<script type="text/html" id="tpl-owner-form">
+    {% raw %}
+    <div style="padding: 16px 18px; max-height: 70vh; overflow-y: auto; box-sizing: border-box;">
+        <!-- 高德客户（只读） -->
+        <div class="bind-cust">
+            <div class="bcn">{{ d.customerName }}</div>
+        </div>
+        <!-- 当前负责人列表（打开弹窗时加载，可解绑） -->
+        <div id="owner-current-box"></div>
+        <!-- 负责人选择（来源 crmapp_users，数据量小，一次性全量下拉） -->
+        <label class="bind-label"><em>*</em>选择负责人</label>
+        <div class="bind-search">
+            <select id="owner-select" class="v-select" style="flex: 1; height: 30px;">
+                <option value="">加载中…</option>
+            </select>
+            <button type="button" id="owner-add-btn">添加</button>
+        </div>
+    </div>
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：当前负责人列表（GET /new/api/visit/customer-owners，每条带「解绑」） -->
+<script type="text/html" id="tpl-owner-current">
+    {% raw %}
+    {{# if (d.list && d.list.length) { }}
+    <label class="bind-label">当前负责人（{{ d.list.length }}）</label>
+    <div class="bind-current" style="margin-bottom: 14px;">
+        {{# layui.each(d.list, function (i, r) { }}
+        <div class="bind-current-item" data-uid="{{ r.user_id }}">
+            <div>
+                <div class="bc-name">{{ r.username }}</div>
+                <div class="bc-sub">{{ r.department || '部门未知' }}{{ r.job_level ? ' · ' + r.job_level : '' }} · 绑定于 {{ r.bind_time || '—' }}</div>
+            </div>
+            <span class="v-link unbind-link" data-act="unbind">解绑</span>
+        </div>
+        {{# }); }}
+    </div>
+    {{# } else { }}
+    <div class="bind-empty" style="margin-bottom: 14px;">暂无负责人，请在下方下拉选择添加</div>
+    {{# } }}
+    {% endraw %}
+</script>
+
 <!-- 详情页内容 Tab 栏容器（Tab 栏与 Tab 内容均由主页面路由渲染/加载） -->
 <div class="v-card v-mt20">
     <div class="v-tabbar" id="detail-tab-bar"></div>
@@ -85,6 +166,9 @@
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
+
+        // 详情页上下文（负责人管理弹层弹头展示用）
+        var detailCtx = { customerName: '' };
 
         // ==================== 指标卡（真实数据：GET /new/api/visit/customers/stats?id=<主键>） ====================
         // 核心指标 + 近30天动态统一由 stats 接口返回渲染契约（label/value/valueCls），
@@ -124,8 +208,11 @@
         function renderHeader(c, crmList) {
             crmList = crmList || [];
             var first = crmList[0] || null;
+            detailCtx.customerName = c.customer_name || '';
             $('#customer-detail-head').find('.v-detail-name').text(c.customer_name || '—');
             $('#detail-addr').text(c.address || '—');
+            // 负责人展示（逗号分割，如"张三,李四"；空态展示占位，绑定入口常驻）
+            $('#detail-owner-names').text(c.owner_names || '暂无，点击右侧「管理」添加');
 
             // 第二行元信息（CRM 侧字段依赖绑定关系，未关联/绑定失效时隐藏对应段）
             var segs = [];
@@ -184,6 +271,156 @@
         $('#btn-edit-customer').on('click', function () {
             layer.msg('预留：编辑高德客户资料（M8）');
         });
+
+        // ==================== 负责人管理（07-负责人绑定.md；多对多，绑定/解绑弹层） ====================
+
+        // 「管理」→ 打开负责人弹层（上方当前负责人可解绑，下方搜索新负责人，点击候选即绑定）
+        $('#btn-manage-owners').on('click', function () {
+            var customerId = parseCustomerId();
+            if (!customerId) { layer.msg('未选择客户'); return; }
+            laytpl($('#tpl-owner-form').html()).render({ customerName: detailCtx.customerName }, function (html) {
+                layer.open({
+                    type: 1,
+                    title: '管理负责人',
+                    area: '480px',
+                    content: html,
+                    btn: ['关闭'],
+                    success: function (layero) {
+                        loadOwnerData(layero);
+                        // 下拉选择负责人 → 点击「添加」绑定（后端同对幂等，已绑定项已禁用）
+                        layero.on('click', '#owner-add-btn', function () {
+                            var $sel = layero.find('#owner-select');
+                            var uid = $sel.val();
+                            if (!uid) { layer.msg('请先在下拉中选择负责人'); return; }
+                            var name = $sel.find('option:selected').text().replace(/（已绑定）$/, '');
+                            submitBindOwner(layero, uid, name);
+                        });
+                        // 当前负责人「解绑」点击
+                        layero.on('click', '.bind-current-item .unbind-link', function () {
+                            var $item = $(this).closest('.bind-current-item');
+                            submitUnbindOwner(layero, $item.data('uid'), $item.find('.bc-name').text().trim());
+                        });
+                    }
+                });
+            });
+        });
+
+        // 负责人数据加载（弹层）：先取当前负责人列表（含解绑），再全量加载用户下拉（已绑定项禁用）
+        function loadOwnerData(layero) {
+            var $box = layero.find('#owner-current-box');
+            $.ajax({
+                url: '/new/api/visit/customer-owners',
+                type: 'GET',
+                data: { visit_amap_customer_id: parseCustomerId() },
+                dataType: 'json',
+                success: function (res) {
+                    var boundIds = [];
+                    if (res.code === 200 && res.data) {
+                        boundIds = (res.data.list || []).map(function (r) { return r.user_id; });
+                        laytpl($('#tpl-owner-current').html()).render({ list: res.data.list }, function (html) {
+                            $box.html(html);
+                        });
+                    } else {
+                        $box.html('<div class="bind-empty">' + (res.msg || '负责人列表查询失败') + '</div>');
+                    }
+                    loadOwnerOptions(layero, boundIds);
+                },
+                error: function () {
+                    $box.html('<div class="bind-empty">网络异常，负责人列表加载失败</div>');
+                    loadOwnerOptions(layero, []);
+                }
+            });
+        }
+
+        // 负责人下拉（GET /new/api/visit/owner-candidates，全量一次性加载；已绑定用户禁用）
+        function loadOwnerOptions(layero, boundIds) {
+            var $sel = layero.find('#owner-select');
+            $.ajax({
+                url: '/new/api/visit/owner-candidates',
+                type: 'GET',
+                data: { limit: 100 },
+                dataType: 'json',
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        $sel.html('<option value="">' + (res.msg || '用户加载失败') + '</option>');
+                        return;
+                    }
+                    $sel.empty();
+                    $('<option></option>').val('').text('请选择负责人').appendTo($sel);
+                    $.each(res.data.list || [], function (i, u) {
+                        var text = u.username + (u.department ? '（' + u.department + '）' : '');
+                        var $opt = $('<option></option>').val(u.user_id).text(
+                            boundIds.indexOf(u.user_id) !== -1 ? text + '（已绑定）' : text);
+                        if (boundIds.indexOf(u.user_id) !== -1) $opt.prop('disabled', true);
+                        $opt.appendTo($sel);
+                    });
+                },
+                error: function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，用户加载失败';
+                    $sel.html('<option value="">' + msg + '</option>');
+                }
+            });
+        }
+
+        // 绑定负责人（POST /new/api/visit/customer-owners）：成功后刷新弹层下拉/列表 + 头部负责人展示
+        function submitBindOwner(layero, userId, userName) {
+            if (!userId) return;
+            var loadIdx = layer.load(2);
+            $.ajax({
+                url: '/new/api/visit/customer-owners',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ visit_amap_customer_id: parseCustomerId(), user_id: userId }),
+                dataType: 'json',
+                success: function (res) {
+                    layer.close(loadIdx);
+                    if (res.code !== 200) {
+                        layer.msg(res.msg || '绑定失败');
+                        return;
+                    }
+                    layer.msg('已绑定「' + $('<div>').text(userName).html() + '」', { icon: 1 });
+                    layero.find('#owner-select').val('');
+                    loadOwnerData(layero);      // 刷新弹层内当前负责人列表与下拉（已绑定项禁用）
+                    loadDetail();               // 刷新头部负责人展示
+                },
+                error: function (xhr) {
+                    layer.close(loadIdx);
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                    layer.msg(msg);
+                }
+            });
+        }
+
+        // 解绑负责人（DELETE /new/api/visit/customer-owners，物理删除）：确认后刷新弹层 + 头部
+        function submitUnbindOwner(layero, userId, userName) {
+            layer.confirm('确定解绑「' + $('<div>').text(userName).html() + '」的负责人身份？',
+                { title: '解绑负责人' }, function (idx) {
+                layer.close(idx);
+                var loadIdx = layer.load(2);
+                $.ajax({
+                    url: '/new/api/visit/customer-owners',
+                    type: 'DELETE',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ visit_amap_customer_id: parseCustomerId(), user_id: userId }),
+                    dataType: 'json',
+                    success: function (res) {
+                        layer.close(loadIdx);
+                        if (res.code !== 200) {
+                            layer.msg(res.msg || '解绑失败');
+                            return;
+                        }
+                        layer.msg('已解绑', { icon: 1 });
+                        loadOwnerData(layero);      // 刷新弹层内当前负责人列表与下拉
+                        loadDetail();               // 刷新头部负责人展示
+                    },
+                    error: function (xhr) {
+                        layer.close(loadIdx);
+                        var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试';
+                        layer.msg(msg);
+                    }
+                });
+            });
+        }
 
         loadDetail();
         loadStats();

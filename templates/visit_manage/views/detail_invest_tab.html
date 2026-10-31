@@ -1,0 +1,708 @@
+<!-- M8 Tab-客户累计投入（费用分析简化版，数据口径 = 该客户全部历史费用）
+     数据接口：
+       GET  /new/api/visit/expenses/summary?amap_customer_id=<poi>&all=1  汇总 + 类型占比（all=1 不限时间窗口，累计口径）
+       GET  /new/api/visit/expenses?amap_customer_id=<poi>&page=&limit=   明细分页（默认只含正常状态）
+       POST /new/api/visit/expenses                                       新增费用（来源=拜访/跟进/订单/手动）
+       PUT  /new/api/visit/expenses/<id>                                  编辑费用（日期/类型/金额/说明）
+       PUT  /new/api/visit/expenses/<id>/void                             作废费用
+     说明：
+       1. 本 Tab 为费用分析页的客户维度简化版：合计 / 类型占比 / 费用明细 三个区块；
+       2. 汇总走 all=1 累计口径（全部历史），明细列表默认 status=1（已作废不展示，故不提供恢复入口）；
+       3. 客户 poi 复用详情聚合缓存 window.__visitDetailCache，短轮询对齐（最长约 5s），与拜访历史 Tab 同一机制；
+       4. 新增/编辑/作废入口在本 Tab 内闭环，客户固定为当前详情客户（无需客户搜索）。 -->
+<div class="v-pane v-pane--invest">
+    <!-- 汇总卡：费用投入合计 + 笔数 -->
+    <div class="v-invest-summary">
+        <div class="v-summary-card v-summary-card--primary">
+            <div class="v-summary-label">费用投入合计</div>
+            <div class="v-summary-value" id="invest-total">¥0.00</div>
+            <div class="v-summary-sub">费用笔数 <span id="invest-count">0</span></div>
+        </div>
+    </div>
+
+    <!-- 费用类型占比 -->
+    <div class="v-invest-section">
+        <div class="v-invest-section-head">
+            <h4 class="v-invest-section-title">费用类型占比</h4>
+        </div>
+        <div class="v-type-breakdown" id="invest-breakdown">
+            <div style="text-align:center;color:#9ca3af;padding:20px;">加载中...</div>
+        </div>
+    </div>
+
+    <!-- 费用明细 -->
+    <div class="v-invest-section">
+        <div class="v-invest-section-head">
+            <h4 class="v-invest-section-title">费用明细</h4>
+            <button class="iex-btn-add" id="invest-add">＋ 添加费用</button>
+        </div>
+        <table class="v-table">
+            <thead>
+                <tr>
+                    <th style="width:110px;">日期</th>
+                    <th style="width:130px;">费用类型</th>
+                    <th style="width:110px;text-align:right;">金额</th>
+                    <th>说明</th>
+                    <th style="width:90px;">关联来源</th>
+                    <th style="width:110px;text-align:right;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="invest-tbody">
+                <tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:30px;">加载中...</td></tr>
+            </tbody>
+        </table>
+        <div class="v-pager" id="invest-pager"></div>
+    </div>
+</div>
+
+<style>
+    /* === 客户累计投入 Tab 样式（隔离作用域，仅在详情页 Tab 容器内生效） === */
+    .v-pane--invest { background: transparent; }
+
+    /* 汇总卡（与费用分析页同风格） */
+    .v-invest-summary { margin-bottom: 20px; }
+    .v-invest-summary .v-summary-card {
+        background: #fff; border-radius: 10px; padding: 18px 20px;
+        border: 1px solid #f3f4f6; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .v-invest-summary .v-summary-card--primary { border-left: 3px solid var(--v-primary, #2563eb); }
+    .v-invest-summary .v-summary-label { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
+    .v-invest-summary .v-summary-value { font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.5px; }
+    .v-invest-summary .v-summary-sub { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+
+    /* 区域卡片 */
+    .v-invest-section {
+        margin-bottom: 20px; background: #fff; border-radius: 10px;
+        padding: 18px 20px; border: 1px solid #f3f4f6;
+    }
+    .v-invest-section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .v-invest-section-title { font-size: 14px; font-weight: 600; color: #111827; margin: 0; }
+
+    /* 添加费用按钮 */
+    .iex-btn-add {
+        padding: 5px 14px; font-size: 12px; cursor: pointer;
+        background: var(--v-primary, #2563eb); color: #fff;
+        border: none; border-radius: 6px; transition: background .18s;
+    }
+    .iex-btn-add:hover { background: var(--v-primary-dark, #1d4ed8); }
+
+    /* 表格内操作链接 */
+    .iex-link {
+        background: none; border: none; cursor: pointer; font-size: 12px;
+        padding: 2px 6px; color: var(--v-primary, #2563eb); transition: color .15s;
+    }
+    .iex-link:hover { color: var(--v-primary-dark, #1d4ed8); text-decoration: underline; }
+    .iex-link--danger { color: #dc2626; }
+    .iex-link--danger:hover { color: #b91c1c; }
+
+    /* 类型占比条 */
+    .v-type-breakdown { display: grid; gap: 10px; }
+    .v-type-item { display: grid; grid-template-columns: 100px 1fr 130px; gap: 12px; align-items: center; }
+    .v-type-label { font-size: 13px; color: #374151; font-weight: 500; }
+    .v-type-bar-bg { background: #f3f4f6; border-radius: 10px; height: 8px; overflow: hidden; }
+    .v-type-bar { height: 100%; background: linear-gradient(90deg, var(--v-primary, #2563eb), #60a5fa); border-radius: 10px; transition: width .4s; }
+    .v-type-value { font-size: 12px; color: #6b7280; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* 明细表格 */
+    .v-invest-section .v-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .v-invest-section .v-table thead th {
+        background: #fafafa; color: #374151; font-weight: 600; padding: 10px 12px;
+        text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 12px;
+    }
+    .v-invest-section .v-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; color: #1f2937; }
+    .v-invest-section .v-table tbody tr:hover { background: #fafbff; }
+
+    /* 分页 */
+    .v-pager { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 14px; }
+    .v-pager-btn {
+        padding: 4px 14px; border: 1px solid #e5e7eb; background: #fff; border-radius: 6px;
+        cursor: pointer; font-size: 12px; transition: all .2s;
+    }
+    .v-pager-btn--active { background: var(--v-primary); border-color: var(--v-primary); color: #fff; pointer-events: none; }
+    .v-pager-btn:hover { border-color: var(--v-primary, #2563eb); color: var(--v-primary, #2563eb); }
+    .v-pager-info { font-size: 12px; color: #6b7280; }
+</style>
+
+<!-- laytpl 模板：费用类型占比 -->
+<script type="text/html" id="tpl-invest-breakdown">
+    {% raw %}
+    {{# layui.each(d.list, function(i, t){ }}
+    <div class="v-type-item">
+        <div class="v-type-label">{{ t.type }}</div>
+        <div class="v-type-bar-bg"><div class="v-type-bar" style="width:{{ (t.ratio * 100).toFixed(1) }}%"></div></div>
+        <div class="v-type-value">¥{{ t.amount.toFixed(2) }} · {{ (t.ratio * 100).toFixed(1) }}%</div>
+    </div>
+    {{# }); }}
+    {{# if (!d.list.length) { }}
+    <div style="text-align:center;color:#9ca3af;padding:20px;">暂无费用数据</div>
+    {{# } }}
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：费用明细行 -->
+<script type="text/html" id="tpl-invest-row">
+    {% raw %}
+    {{# layui.each(d.list, function(i, r){ }}
+    <tr>
+        <td>{{ r.expense_date }}</td>
+        <td>{{ r.expense_type }}</td>
+        <td style="text-align:right;font-weight:600;">¥{{ r.amountText }}</td>
+        <td>{{ r.description || '' }}</td>
+        <td>{{ r.sourceText }}</td>
+        <td style="text-align:right;">
+            <button class="iex-link" data-action="edit" data-id="{{ r.id }}">编辑</button>
+            <button class="iex-link iex-link--danger" data-action="void" data-id="{{ r.id }}">作废</button>
+        </td>
+    </tr>
+    {{# }); }}
+    {{# if (!d.list.length) { }}
+    <tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:30px;">暂无费用记录</td></tr>
+    {{# } }}
+    {% endraw %}
+</script>
+
+<!-- laytpl 模板：新增/编辑费用 Modal（客户固定为当前详情客户） -->
+<script type="text/html" id="tpl-invest-expense-modal">
+    {% raw %}
+    <style>
+        .iex-modal-body { padding: 20px 22px 16px; }
+        .iex-field { margin-bottom: 14px; }
+        .iex-field:last-of-type { margin-bottom: 20px; }
+        .iex-label { display: block; margin-bottom: 6px; font-size: 12px; color: #4b5563; font-weight: 600; }
+        .iex-label .iex-req { color: #dc2626; margin-left: 2px; }
+        .iex-label .iex-opt { color: #9ca3af; font-weight: 400; }
+        .iex-input {
+            width: 100%; height: 36px; padding: 0 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 13px; color: #1f2937; background: #fff;
+            transition: border-color .18s, box-shadow .18s;
+            box-sizing: border-box; outline: none;
+        }
+        .iex-input:focus { border-color: var(--v-primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+        .iex-input--amount { padding-left: 28px; font-weight: 600; }
+        .iex-input::placeholder { color: #d1d5db; }
+        .iex-wrap { position: relative; }
+        .iex-wrap::before {
+            content: '¥'; position: absolute; left: 12px; top: 50%;
+            transform: translateY(-50%); color: #9ca3af;
+            font-size: 14px; font-weight: 600; pointer-events: none;
+        }
+        .iex-textarea {
+            width: 100%; min-height: 64px; padding: 8px 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 13px; color: #1f2937; font-family: inherit;
+            background: #fff; resize: vertical; line-height: 1.5;
+            box-sizing: border-box; outline: none;
+        }
+        .iex-textarea:focus { border-color: var(--v-primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+        .iex-textarea::placeholder { color: #d1d5db; }
+        .iex-field--order { position: relative; }
+        .iex-order-list {
+            position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; z-index: 10;
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+            max-height: 200px; overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .iex-order-item { padding: 8px 12px; cursor: pointer; transition: background .12s; }
+        .iex-order-item:hover { background: #f0f6ff; }
+        .iex-order-name { font-size: 13px; color: #1f2937; font-weight: 500; }
+        .iex-order-sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+        .iex-order-empty { padding: 12px; text-align: center; font-size: 12px; color: #9ca3af; }
+        .iex-hint {
+            font-size: 11px; color: #9ca3af; margin-bottom: 14px;
+            padding: 8px 12px; background: #f9fafb; border-radius: 6px;
+            border-left: 3px solid var(--v-primary);
+        }
+        .iex-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 14px; border-top: 1px solid #f3f4f6; }
+        .iex-btn {
+            padding: 8px 20px; font-size: 13px; font-weight: 500;
+            border-radius: 8px; border: 1px solid #e5e7eb;
+            background: #fff; color: #4b5563; cursor: pointer; transition: all .18s;
+        }
+        .iex-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+        .iex-btn--primary {
+            background: var(--v-primary); border-color: var(--v-primary); color: #fff;
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+        }
+        .iex-btn--primary:hover { background: var(--v-primary-dark); border-color: var(--v-primary-dark); }
+    </style>
+    <div class="iex-modal-body">
+        {{# if (d.mode === 'create') { }}
+        <div class="iex-hint">📝 客户：<b>{{ d.customerName }}</b>，费用将计入该客户累计投入</div>
+        <div class="iex-field">
+            <label class="iex-label">关联来源 <span class="iex-req">*</span></label>
+            <select id="iex-source-type" class="iex-input">
+                <option value="4" selected>手动输入（独立记账）</option>
+                <option value="3">关联订单（如退货索赔）</option>
+                <option value="1">关联拜访记录</option>
+                <option value="2">关联跟进记录</option>
+            </select>
+        </div>
+        <div class="iex-field" id="iex-field-record" style="display:none;">
+            <label class="iex-label">关联记录 <span class="iex-req">*</span></label>
+            <select id="iex-record" class="iex-input"><option value="">加载中...</option></select>
+        </div>
+        <div class="iex-field iex-field--order" id="iex-field-order" style="display:none;">
+            <label class="iex-label">关联订单 <span class="iex-req">*</span></label>
+            <input id="iex-order" type="text" class="iex-input" placeholder="输入发货金蝶号/订单号搜索" autocomplete="off">
+            <div id="iex-order-list" class="iex-order-list" style="display:none;"></div>
+        </div>
+        {{# } else { }}
+        <div class="iex-hint">✏️ 修改这笔费用（金额/类型/日期/说明）</div>
+        {{# } }}
+
+        <div class="iex-field">
+            <label class="iex-label">费用日期</label>
+            <input id="iex-date" type="date" class="iex-input">
+        </div>
+        <div class="iex-field">
+            <label class="iex-label">费用类型 <span class="iex-req">*</span></label>
+            <!-- 费用类型枚举下拉：与后端 visit_expense_service.EXPENSE_TYPES 严格一致 -->
+            <select id="iex-type" class="iex-input">
+                <option value="">请选择费用类型</option>
+                <option value="拜访投入">拜访投入</option>
+                <option value="礼品物料投入">礼品物料投入</option>
+                <option value="接待投入">接待投入</option>
+                <option value="服务投入">服务投入</option>
+                <option value="索赔">索赔</option>
+                <option value="其他">其他</option>
+            </select>
+        </div>
+        <div class="iex-field">
+            <label class="iex-label">金额 <span class="iex-req">*</span></label>
+            <div class="iex-wrap">
+                <input id="iex-amount" type="number" step="0.01" min="0" class="iex-input iex-input--amount" placeholder="0.00">
+            </div>
+        </div>
+        <div class="iex-field">
+            <label class="iex-label">说明 <span class="iex-opt">（选填）</span></label>
+            <textarea id="iex-desc" class="iex-textarea" placeholder="备注具体用途、沟通对象等..."></textarea>
+        </div>
+        <div class="iex-footer">
+            <button type="button" class="iex-btn" onclick="layer.closeAll()">取消</button>
+            <button type="button" class="iex-btn iex-btn--primary" id="iex-save">{{ d.mode === 'edit' ? '✓ 保存修改' : '✓ 保存费用' }}</button>
+        </div>
+    </div>
+    {% endraw %}
+</script>
+
+<script>
+    layui.use(['jquery', 'laytpl', 'layer'], function () {
+        var $ = layui.jquery;
+        var laytpl = layui.laytpl;
+        var layer = layui.layer;
+
+        var currentPage = 1;
+        var currentLimit = 10;
+        var currentPoi = '';      // 高德客户 POI，费用接口筛选键
+        var currentCustomerId = ''; // visit_amap_customer 主键（跟进记录接口用）
+        var listCache = [];       // 当页原始行数据（编辑回填用）
+
+        // 关联来源文案映射（1-拜访 2-跟进 3-订单 4-手动）
+        var SOURCE_TEXT = { 1: '拜访', 2: '跟进', 3: '订单', 4: '手动' };
+
+        // ==================== 工具 ====================
+        // hash 结构：#/customer_detail/invest/<id>，末段为 visit_amap_customer 主键 id
+        function parseCustomerId() {
+            var parts = location.hash.replace(/^#\/?/, '').split('/');
+            return parts[2] ? decodeURIComponent(parts[2]) : '';
+        }
+
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function fmtMoney(v) { return '¥' + Number(v || 0).toFixed(2); }
+
+        // 本地日期（toISOString 走 UTC，凌晨会偏移一天）
+        function todayStr() {
+            var d = new Date();
+            return d.getFullYear() + '-' +
+                String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                String(d.getDate()).padStart(2, '0');
+        }
+
+        // ==================== 汇总 + 类型占比（累计口径） ====================
+        function loadSummary() {
+            $.ajax({
+                url: '/new/api/visit/expenses/summary',
+                type: 'GET', dataType: 'json',
+                data: { amap_customer_id: currentPoi, all: 1 },
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) return;
+                    var m = res.data.metrics || {};
+                    $('#invest-total').text(fmtMoney(m.visit_expense));
+                    $('#invest-count').text(m.expense_count || 0);
+
+                    laytpl($('#tpl-invest-breakdown').html()).render(
+                        { list: res.data.type_breakdown || [] },
+                        function (html) { $('#invest-breakdown').html(html); }
+                    );
+                },
+                error: function () { /* 静默，区块保留占位 */ }
+            });
+        }
+
+        // ==================== 费用明细（分页） ====================
+        function loadList() {
+            $.ajax({
+                url: '/new/api/visit/expenses',
+                type: 'GET', dataType: 'json',
+                data: { amap_customer_id: currentPoi, page: currentPage, limit: currentLimit },
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) {
+                        $('#invest-tbody').html('<tr><td colspan="6" style="text-align:center;color:#dc2626;padding:30px;">加载失败</td></tr>');
+                        return;
+                    }
+                    listCache = res.data.list || [];
+                    var items = listCache.map(function (r) {
+                        return {
+                            id: r.id,
+                            expense_date: r.expense_date,
+                            expense_type: esc(r.expense_type),
+                            amountText: Number(r.amount || 0).toFixed(2),
+                            description: esc(r.description),
+                            sourceText: SOURCE_TEXT[r.source_type] || '手动'
+                        };
+                    });
+                    laytpl($('#tpl-invest-row').html()).render({ list: items },
+                        function (html) { $('#invest-tbody').html(html); });
+                    renderPager(res.data.total || 0);
+                },
+                error: function (xhr) {
+                    // 401/403 等业务错误响应：优先展示后端返回的 msg（权限问题由主页面统一改写为友好文案）
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常';
+                    $('#invest-tbody').html('<tr><td colspan="6" style="text-align:center;color:#dc2626;padding:30px;">' + esc(msg) + '</td></tr>');
+                }
+            });
+        }
+
+        function renderPager(total) {
+            var totalPages = Math.max(1, Math.ceil(total / currentLimit));
+            var html = '';
+            if (currentPage > 1) html += '<button class="v-pager-btn" data-page="' + (currentPage - 1) + '">上一页</button>';
+            // 页码按钮：窗口式，最多显示 7 个
+            var start = Math.max(1, Math.min(currentPage - 3, totalPages - 6));
+            var end = Math.min(totalPages, start + 6);
+            for (var p = start; p <= end; p++) {
+                html += '<button class="v-pager-btn' + (p === currentPage ? ' v-pager-btn--active' : '') + '" data-page="' + p + '">' + p + '</button>';
+            }
+            if (currentPage < totalPages) html += '<button class="v-pager-btn" data-page="' + (currentPage + 1) + '">下一页</button>';
+            html += '<span class="v-pager-info">共 ' + total + ' 条</span>';
+            $('#invest-pager').html(html);
+        }
+
+        $('#invest-pager').on('click', '.v-pager-btn', function () {
+            currentPage = parseInt($(this).data('page'));
+            loadList();
+        });
+
+        // 刷新：汇总 + 明细一起（增删改后口径联动）
+        function reloadAll() {
+            loadSummary();
+            loadList();
+        }
+
+        // ==================== 新增/编辑费用 Modal ====================
+        $('#invest-add').on('click', function () {
+            if (!currentPoi) { layer.msg('客户信息未加载，请稍后重试'); return; }
+            openExpenseModal({ mode: 'create' });
+        });
+
+        // 行内操作：编辑 / 作废（列表只含正常状态，无恢复入口）
+        $('#invest-tbody').on('click', '[data-action]', function () {
+            var action = $(this).data('action');
+            var id = $(this).data('id');
+            if (action === 'edit') {
+                // 从当页缓存按 id 还原原始数据回填表单
+                var row = null;
+                for (var i = 0; i < listCache.length; i++) {
+                    if (listCache[i].id === id) { row = listCache[i]; break; }
+                }
+                if (!row) { layer.msg('数据已过期，请刷新重试'); return; }
+                openExpenseModal({
+                    mode: 'edit', id: id,
+                    expense_date: row.expense_date,
+                    expense_type: row.expense_type,
+                    amount: row.amount,
+                    description: row.description
+                });
+            } else if (action === 'void') {
+                layer.confirm('确认作废此笔费用？作废后不再计入累计投入。', { icon: 3, title: '作废费用' }, function (idx) {
+                    $.ajax({
+                        url: '/new/api/visit/expenses/' + id + '/void', type: 'PUT', dataType: 'json',
+                        success: function (r) {
+                            layer.close(idx);
+                            if (r.code === 200) { layer.msg('已作废', { icon: 1 }); reloadAll(); }
+                            else layer.msg(r.msg || '操作失败', { icon: 2 });
+                        },
+                        error: function (xhr) { layer.close(idx); layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络错误', { icon: 2 }); }
+                    });
+                });
+            }
+        });
+
+        function openExpenseModal(data) {
+            // 客户名从详情聚合缓存取（头部已渲染），仅用于提示文案
+            var cache = window.__visitDetailCache;
+            var customerName = (cache && cache.data && cache.data.customer) ? (cache.data.customer.customer_name || '') : '';
+            data.customerName = esc(customerName);
+
+            laytpl($('#tpl-invest-expense-modal').html()).render(data, function (html) {
+                layer.open({
+                    type: 1,
+                    title: data.mode === 'edit' ? '编辑费用' : '添加费用',
+                    area: ['420px', 'auto'],
+                    shadeClose: true,
+                    content: html,
+                    success: function (layero) {
+                        var $root = layero;
+
+                        // 新增模式：日期默认今天；编辑模式：JS 回填原始值（不走模板插值，避免 HTML 注入）
+                        if (data.mode === 'create') {
+                            $root.find('#iex-date').val(todayStr());
+                        } else {
+                            $root.find('#iex-date').val(data.expense_date || '');
+                            $root.find('#iex-type').val(data.expense_type || '');
+                            $root.find('#iex-amount').val(data.amount != null ? data.amount : '');
+                            $root.find('#iex-desc').val(data.description || '');
+                        }
+
+                        if (data.mode === 'create') {
+                            // ---------- 关联来源切换（1-拜访 2-跟进 3-订单 4-手动） ----------
+                            var $sourceSel = $root.find('#iex-source-type');
+                            var $recordField = $root.find('#iex-field-record');
+                            var $orderField  = $root.find('#iex-field-order');
+                            var $recordSel   = $root.find('#iex-record');
+                            var selectedOrder = null;
+
+                            function fillRecordSelect(records, emptyText) {
+                                if (!records.length) {
+                                    $recordSel.html('<option value="">' + esc(emptyText) + '</option>');
+                                    return;
+                                }
+                                $recordSel.html('<option value="">请选择记录（共 ' + records.length + ' 条）</option>'
+                                    + records.map(function (r) {
+                                        return '<option value="' + r.id + '">' + esc(r.label) + '</option>';
+                                    }).join(''));
+                            }
+
+                            // 拉取当前客户的拜访(1)/跟进(2)记录，填充关联记录下拉
+                            function loadRecords(st) {
+                                $recordSel.html('<option value="">加载中...</option>');
+                                if (st === 1) {
+                                    // 拜访记录：按 POI 查
+                                    $.ajax({
+                                        url: '/new/api/visit/records',
+                                        type: 'GET', dataType: 'json',
+                                        data: { amap_customer_id: currentPoi, page: 1, limit: 200 },
+                                        success: function (res) {
+                                            if (res.code !== 200 || !res.data) return;
+                                            fillRecordSelect((res.data.list || []).map(function (r) {
+                                                return { id: r.id, label: (r.visit_time || '').substring(0, 16) + ' 拜访 #' + r.id };
+                                            }), '该客户暂无拜访记录');
+                                        }
+                                    });
+                                } else {
+                                    // 跟进记录：按客户主键查，过滤掉"拜访同步"条目（is_visit=true）
+                                    $.ajax({
+                                        url: '/new/api/visit/customers/follows',
+                                        type: 'GET', dataType: 'json',
+                                        data: { id: currentCustomerId, limit: 200 },
+                                        success: function (res) {
+                                            if (res.code !== 200 || !res.data) return;
+                                            fillRecordSelect((res.data.list || [])
+                                                .filter(function (r) { return !r.is_visit; })
+                                                .map(function (r) {
+                                                    return { id: r.id, label: (r.follow_time || '').substring(0, 16) + ' [' + (r.channel || '跟进') + '] #' + r.id };
+                                                }), '该客户暂无跟进记录');
+                                        }
+                                    });
+                                }
+                            }
+
+                            function toggleSourceFields() {
+                                var st = parseInt($sourceSel.val(), 10);
+                                $recordField.toggle(st === 1 || st === 2);
+                                $orderField.toggle(st === 3);
+                                if (st === 1 || st === 2) loadRecords(st);
+                            }
+
+                            $sourceSel.on('change', function () {
+                                selectedOrder = null;
+                                $root.find('#iex-order').val('');
+                                $root.find('#iex-order-list').hide();
+                                toggleSourceFields();
+                            });
+                            toggleSourceFields();
+
+                            // ---------- 订单搜索选择（source_type=3） ----------
+                            // 仅搜索当前客户绑定 CRM 客户名下的订单；关键词只匹配订单号（CRM订单号/金蝶单号）
+                            var $orderInput = $root.find('#iex-order');
+                            var $orderList  = $root.find('#iex-order-list');
+                            var orderTimer = null;
+
+                            function searchOrders(kw) {
+                                $.ajax({
+                                    url: '/new/api/visit/orders/search',
+                                    type: 'GET', dataType: 'json',
+                                    data: { keyword: kw, limit: 20, amap_customer_id: currentPoi },
+                                    success: function (res) {
+                                        if (res.code !== 200 || !res.data) return;
+                                        var list = res.data || [];
+                                        if (!list.length) {
+                                            $orderList.html('<div class="iex-order-empty">未找到匹配的订单（仅搜索当前客户关联的CRM订单）</div>').show();
+                                            return;
+                                        }
+                                        $orderList.html(list.map(function (o) {
+                                            // 主行显示发货金蝶号（同拿货订单 Tab 口径，空值回退订单号/订单ID），副行补充订单号
+                                            var mainNo = o.deliverysapno || o.ddno || ('订单ID ' + o.orders_id);
+                                            var subHtml = o.deliverysapno && o.ddno
+                                                ? '<div class="iex-order-sub">订单号: ' + esc(o.ddno) + '</div>'
+                                                : '';
+                                            return '<div class="iex-order-item" data-oid="' + o.orders_id + '" data-no="' + esc(mainNo) + '">'
+                                                + '<div class="iex-order-name">' + esc(mainNo) + '</div>'
+                                                + subHtml
+                                                + '</div>';
+                                        }).join('')).show();
+                                    }
+                                });
+                            }
+
+                            $orderInput.on('input', function () {
+                                selectedOrder = null;
+                                $orderList.hide();
+                                var kw = $(this).val().trim();
+                                clearTimeout(orderTimer);
+                                if (!kw) return;
+                                orderTimer = setTimeout(function () { searchOrders(kw); }, 300);
+                            });
+
+                            $orderList.on('mousedown', '.iex-order-item', function (e) {
+                                e.preventDefault();
+                                selectedOrder = { oid: $(this).attr('data-oid') };
+                                // 回显所选订单号（发货金蝶号优先，缺失回退订单号/订单ID）
+                                $orderInput.val($(this).attr('data-no') || ('订单ID ' + selectedOrder.oid));
+                                $orderList.hide();
+                            });
+
+                            // 点击弹窗其他区域收起订单下拉
+                            $root.on('mousedown', function (e) {
+                                if (!$(e.target).closest('.iex-field--order').length) $orderList.hide();
+                            });
+
+                            // ---------- 保存（新增） ----------
+                            $root.find('#iex-save').on('click', function () {
+                                var st = parseInt($sourceSel.val(), 10);
+                                var payload = {
+                                    source_type: st,
+                                    expense_date: $root.find('#iex-date').val(),
+                                    expense_type: $root.find('#iex-type').val().trim(),
+                                    amount: parseFloat($root.find('#iex-amount').val()),
+                                    description: $root.find('#iex-desc').val().trim() || null,
+                                    amap_customer_id: currentPoi
+                                };
+                                if (st === 1 || st === 2) {
+                                    var sid = parseInt($recordSel.val(), 10);
+                                    if (!sid || sid <= 0) { layer.msg('请选择关联的' + (st === 1 ? '拜访' : '跟进') + '记录'); return; }
+                                    payload.source_id = sid;
+                                } else if (st === 3) {
+                                    if (!selectedOrder) { layer.msg('请搜索并选择关联订单'); return; }
+                                    payload.source_id = parseInt(selectedOrder.oid, 10);
+                                }
+                                if (!payload.expense_type) { layer.msg('请选择费用类型'); return; }
+                                if (!payload.amount || payload.amount <= 0) { layer.msg('金额必须是正数'); return; }
+
+                                $.ajax({
+                                    url: '/new/api/visit/expenses',
+                                    type: 'POST',
+                                    contentType: 'application/json; charset=utf-8',
+                                    data: JSON.stringify(payload),
+                                    dataType: 'json',
+                                    success: function (res) {
+                                        if (res.code === 200) {
+                                            layer.closeAll();
+                                            layer.msg('保存成功', { icon: 1, time: 1200 });
+                                            reloadAll();
+                                        } else {
+                                            layer.msg(res.msg || '保存失败', { icon: 2 });
+                                        }
+                                    },
+                                    error: function (xhr) {
+                                        // 优先展示后端 msg（权限问题由主页面统一改写为友好文案）
+                                        layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络错误', { icon: 2 });
+                                    }
+                                });
+                            });
+                        } else {
+                            // ---------- 保存（编辑：仅日期/类型/金额/说明） ----------
+                            $root.find('#iex-save').on('click', function () {
+                                var payload = {
+                                    expense_date: $root.find('#iex-date').val(),
+                                    expense_type: $root.find('#iex-type').val().trim(),
+                                    amount: parseFloat($root.find('#iex-amount').val()),
+                                    description: $root.find('#iex-desc').val().trim() || null
+                                };
+                                if (!payload.expense_type) { layer.msg('请选择费用类型'); return; }
+                                if (!payload.amount || payload.amount <= 0) { layer.msg('金额必须是正数'); return; }
+
+                                $.ajax({
+                                    url: '/new/api/visit/expenses/' + data.id,
+                                    type: 'PUT',
+                                    contentType: 'application/json; charset=utf-8',
+                                    data: JSON.stringify(payload),
+                                    dataType: 'json',
+                                    success: function (res) {
+                                        if (res.code === 200) {
+                                            layer.closeAll();
+                                            layer.msg('已更新', { icon: 1, time: 1200 });
+                                            reloadAll();
+                                        } else {
+                                            layer.msg(res.msg || '操作失败', { icon: 2 });
+                                        }
+                                    },
+                                    error: function (xhr) {
+                                        // 优先展示后端 msg（权限问题由主页面统一改写为友好文案）
+                                        layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络错误', { icon: 2 });
+                                    }
+                                });
+                            });
+                        }
+                    }
+                });
+            });
+        }
+
+        // ==================== 初始化 ====================
+        currentCustomerId = parseCustomerId();
+        // 等待详情聚合写入 window.__visitDetailCache（取 customer.poi 作为费用接口筛选键）；
+        // 详情片段与 Tab 片段并行加载，短轮询对齐（最长约 5s）
+        function waitForDetail() {
+            if (!currentCustomerId) {
+                $('#invest-breakdown').html('<div style="text-align:center;color:#9ca3af;padding:20px;">未选择客户</div>');
+                $('#invest-tbody').html('<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:30px;">未选择客户</td></tr>');
+                return;
+            }
+            var tries = 0;
+            (function check() {
+                var cache = window.__visitDetailCache;
+                var poi = (cache && cache.id === currentCustomerId && cache.data.customer) ? cache.data.customer.poi : '';
+                if (poi) {
+                    currentPoi = poi;
+                    reloadAll();
+                    return;
+                }
+                if (++tries > 25) {
+                    $('#invest-breakdown').html('<div style="text-align:center;color:#9ca3af;padding:20px;">客户信息加载失败，请刷新重试</div>');
+                    $('#invest-tbody').html('<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:30px;">客户信息加载失败，请刷新重试</td></tr>');
+                    return;
+                }
+                setTimeout(check, 200);
+            })();
+        }
+
+        waitForDetail();
+    });
+</script>

@@ -1,7 +1,11 @@
 <!-- 客户列表：M1（01-主设计文档 第六节）
-     数据接口：GET /new/api/visit/customers（分页 + 客户类型/拿货渠道筛选 + 客户名称/地址关键词搜索）、
+     数据接口：GET /new/api/visit/customers（分页 + 客户类型/拿货渠道筛选 + 客户名称/地址关键词搜索
+               + 省/市/区县/镇街地址筛选）、
                GET /new/api/visit/filter-options（筛选下拉选项，取库中实际数据动态生成；
-               两个下拉末项的「无」为前端固定项，值 __empty__ 表示筛字段为空）；
+               两个下拉末项的「无」为前端固定项，值 __empty__ 表示筛字段为空）、
+               GET /new/api/visit/region-options（市/区/镇 3级级联选择器选项，
+               服务端解析 address 原文动态生成；选择后逐级对地址 LIKE 模糊匹配，
+               省固定默认广东省，不出现在级联中）；
      关联CRM：M8 客户绑定（03-高德客户档案与客户绑定模块设计.md 3.2），绑定弹窗内可查看/解绑/追加：
                GET    /new/api/visit/relations（当前已绑定列表，按 POI 查询，1:N），
                POST   /new/api/visit/relations（追加绑定），
@@ -16,6 +20,15 @@
     }
     .cust-search:focus { border-color: var(--v-primary); }
     .cust-search-btn { height: 28px; padding: 0 14px; font-size: 12px; }
+    /* 高级筛选输入框（拜访天数 / 金额范围，窄版） */
+    .cust-filter-num {
+        height: 28px; width: 72px; padding: 0 8px; font-size: 12px; color: var(--v-text);
+        border: 1px solid #d1d5db; border-radius: 4px; background: #fff; outline: none;
+        text-align: right;
+    }
+    .cust-filter-num:focus { border-color: var(--v-primary); }
+    .cust-filter-num--wider { width: 88px; }
+    .cust-filter-label { font-size: 12px; color: var(--v-text-2); white-space: nowrap; }
     /* 关联CRM弹窗表单 */
     .bind-cust { padding: 10px 12px; background: #f9fafb; border: 1px solid var(--v-border); border-radius: 6px; margin-bottom: 14px; }
     .bind-cust .bcn { font-weight: 600; font-size: 14px; }
@@ -58,14 +71,35 @@
     .bind-current-item .bc-name small { font-weight: 400; color: var(--v-text-3); }
     .bind-current-item .bc-sub { font-size: 12px; color: var(--v-text-3); margin-top: 2px; }
     .bind-current-item .unbind-link { flex-shrink: 0; font-size: 12px; }
+    /* 地址级联选择器（市/区/镇 3级；省固定默认广东省，不在界面出现） */
+    .v-cascader { position: relative; }
+    .v-cascader .cust-search { cursor: pointer; }
+    .v-cascader .rc-panel {
+        display: none; position: absolute; top: 32px; left: 0; z-index: 100;
+        width: 420px; background: #fff; border: 1px solid var(--v-border); border-radius: 6px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    }
+    .v-cascader.rc-open .rc-panel { display: block; }
+    .rc-cols { display: flex; }
+    .rc-col {
+        flex: 1; min-height: 180px; max-height: 264px; overflow-y: auto;
+        border-right: 1px solid #f3f4f6;
+    }
+    .rc-col:last-child { border-right: none; }
+    .rc-item { padding: 7px 12px; font-size: 12px; color: var(--v-text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rc-item:hover { background: #f9fafb; }
+    .rc-item.active { background: #eff6ff; color: var(--v-primary); font-weight: 600; }
+    .rc-empty { padding: 16px 12px; font-size: 12px; color: var(--v-text-3); text-align: center; }
+    .rc-footer { border-top: 1px solid #f3f4f6; padding: 6px 10px; text-align: right; }
+    .rc-footer .v-link { font-size: 12px; }
 </style>
 <div class="v-card">
     <div class="v-pane-head" style="padding: 14px 20px; margin-bottom: 0;">
         <h3 class="v-pane-title">客户列表（共<span id="list-total">0</span>家）</h3>
         <span class="v-tag v-tag--orange" id="unbound-count" style="display:none;"></span>
     </div>
-    <!-- 筛选栏（客访原型V2：本期接入客户类型/拿货渠道 + 客户名称/地址关键词搜索，其余筛选后续迭代） -->
-    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--v-border);">
+    <!-- 筛选栏（客户类型/拿货渠道 + 关键词搜索 + 拜访时间筛选 + 累计拿货额筛选） -->
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--v-border); flex-wrap: wrap;">
         <span style="font-size: 13px; color: var(--v-text-2); flex-shrink: 0;">筛选：</span>
         <select class="v-select" id="cust-type-filter" style="min-width: 130px;" title="客户类型为多值字段，按包含匹配">
             <option value="">全部类型</option>
@@ -74,7 +108,42 @@
             <option value="">全部渠道</option>
         </select>
         <input type="text" class="cust-search" id="cust-kw" placeholder="搜索客户名称 / 地址" autocomplete="off" title="按高德客户名称或地址模糊搜索">
-        <button type="button" class="v-btn v-btn--primary cust-search-btn" id="cust-search-btn">搜索</button>
+
+        <!-- 地址筛选：市/区/镇 3级级联选择器（省固定默认广东省，不在界面出现；
+             选项由 GET /new/api/visit/region-options 从库内地址解析生成，
+             选择后点击搜索按所选各级对地址 LIKE 模糊匹配） -->
+        <div class="v-cascader" id="region-cascader">
+            <input type="text" class="cust-search" id="region-cascader-label" placeholder="市 / 区 / 镇街"
+                   readonly title="点击选择 市 / 区 / 镇街（省固定为广东省）">
+            <div class="rc-panel" id="region-cascader-panel">
+                <div class="rc-cols">
+                    <div class="rc-col" data-level="city"></div>
+                    <div class="rc-col" data-level="district"></div>
+                    <div class="rc-col" data-level="town"></div>
+                </div>
+                <div class="rc-footer">
+                    <span class="v-link" id="region-cascader-clear">清除已选</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 高级筛选分隔线 -->
+        <span style="width: 1px; height: 20px; background: var(--v-border); margin: 0 4px;"></span>
+
+        <!-- 拜访时间筛选：超过 X 天未拜访 -->
+        <label class="cust-filter-label">超</label>
+        <input type="number" class="cust-filter-num" id="visit-days-filter" placeholder="天数" min="0" step="1" title="输入天数 X，筛选超过 X 天未拜访的客户；填 0 表示从未拜访">
+        <label class="cust-filter-label">天未拜访</label>
+
+        <!-- 累计拿货额筛选：金额范围 -->
+        <label class="cust-filter-label">拿货额</label>
+        <input type="number" class="cust-filter-num cust-filter-num--wider" id="min-amount-filter" placeholder="下限" min="0" step="1000" title="累计拿货额下限（元），留空不限">
+        <label class="cust-filter-label">~</label>
+        <input type="number" class="cust-filter-num cust-filter-num--wider" id="max-amount-filter" placeholder="上限" min="0" step="1000" title="累计拿货额上限（元），留空不限">
+        <label class="cust-filter-label">元</label>
+
+        <!-- 搜索按钮：margin-left:auto 推到最右边 -->
+        <button type="button" class="v-btn v-btn--primary cust-search-btn" id="cust-search-btn" style="margin-left: auto;">搜索</button>
     </div>
     <div class="v-table-wrap">
         <table class="v-table">
@@ -84,7 +153,7 @@
                     <th>客户类型</th>
                     <th>所属商圈</th>
                     <th>联系人</th>
-                    <th>拜访状态</th>
+                    <th>负责人</th>
                     <th>最近拜访时间</th>
                     <th>操作</th>
                 </tr>
@@ -114,7 +183,7 @@
         <td>{{ r.customerType || '—' }}</td>
         <td>{{ r.businessCircle || '—' }}</td>
         <td>{{ r.contactPerson || '—' }}</td>
-        <td><span class="v-tag {{ r.visitStatusCls }}">{{ r.visitStatus }}</span></td>
+        <td>{{ r.ownerNames || '—' }}</td>
         <td>{{ r.lastVisitTime || '—' }}</td>
         <td>
             <span class="v-link" data-act="detail">查看详情</span>
@@ -197,13 +266,34 @@
         var API_BASE = '/new/api/visit/customers';
         // 「无」选项哨兵值：筛选对应字段为空（NULL 或 ''）的客户，与后端 EMPTY_MULTI 约定一致
         var EMPTY_FILTER = '__empty__';
-        var state = { page: 1, limit: 10, customerType: '', purchaseChannel: '', keyword: '' };
+        // 地址筛选：省固定默认广东省（不出现选择界面，市/区/镇走级联选择器，
+        // 选项来自 GET /new/api/visit/region-options）
+        var DEFAULT_PROVINCE = '广东省';
+        var state = {
+            page: 1, limit: 10,
+            customerType: '', purchaseChannel: '', keyword: '',
+            visitDays: '', minAmount: '', maxAmount: '',
+            province: '', city: '', district: '', town: ''
+        };
+
+        // 判断当前是否有任一高级筛选生效（用于"重置"按钮状态）
+        function hasAdvancedFilter() {
+            return state.visitDays !== '' || state.minAmount !== '' || state.maxAmount !== '';
+        }
 
         function fmtParams(page) {
             var params = { page: page, limit: state.limit };
             if (state.customerType) params.customer_type = state.customerType;
             if (state.purchaseChannel) params.purchase_channels = state.purchaseChannel;
             if (state.keyword) params.keyword = state.keyword;
+            if (state.visitDays !== '') params.visit_days = state.visitDays;
+            if (state.minAmount !== '') params.min_amount = state.minAmount;
+            if (state.maxAmount !== '') params.max_amount = state.maxAmount;
+            // 地址级联筛选：省/市/区县/镇街逐级对地址 LIKE 模糊匹配
+            if (state.province) params.province = state.province;
+            if (state.city) params.city = state.city;
+            if (state.district) params.district = state.district;
+            if (state.town) params.town = state.town;
             return params;
         }
 
@@ -233,25 +323,142 @@
             }
         }
 
-        // 切换筛选 → 重置到第 1 页重新查询
+        // ==================== 地址筛选：市/区/镇 3级级联选择器 ====================
+        // 选项来自 GET /new/api/visit/region-options（服务端解析库内地址生成）；
+        // 省固定默认广东省（DEFAULT_PROVINCE，不出现在级联中），级联从市级开始逐级下钻；
+        // 选择结果存 regionSelection，点击「搜索」时随请求逐级对地址 LIKE 模糊匹配。
+        var regionTree = [];
+        var regionProvinceReady = false;   // 库内存在广东省数据时置 true，搜索固定携带 province=广东省
+        var regionSelection = { city: '', district: '', town: '' };
+
+        // 按名称在选项树节点列表中查找子节点
+        function findRegionNode(list, name) {
+            var hit = null;
+            $.each(list || [], function (i, n) {
+                if (n.name === name) { hit = n; return false; }
+            });
+            return hit;
+        }
+
+        function loadRegionOptions() {
+            $.ajax({
+                url: '/new/api/visit/region-options',
+                type: 'GET',
+                dataType: 'json',
+                success: function (res) {
+                    if (res.code !== 200 || !res.data) return;
+                    regionTree = res.data.provinces || [];
+                    regionProvinceReady = !!findRegionNode(regionTree, DEFAULT_PROVINCE);
+                    refreshCascade();
+                }
+            });
+        }
+
+        // 渲染级联某一列（items: 名称数组或 {name} 节点数组）
+        function renderCascadeCol($col, items, level) {
+            $col.empty();
+            if (!items || !items.length) {
+                $col.html('<div class="rc-empty">暂无数据</div>');
+                return;
+            }
+            $.each(items, function (i, it) {
+                var name = (typeof it === 'string') ? it : it.name;
+                $('<div class="rc-item"></div>')
+                    .attr('data-level', level).attr('data-name', name).text(name)
+                    .toggleClass('active', regionSelection[level] === name)
+                    .appendTo($col);
+            });
+        }
+
+        // 按当前选择重渲染三列 + 触发框路径文案（市 = 广东省的子级，区/镇逐级下钻）
+        function refreshCascade() {
+            var provNode = findRegionNode(regionTree, DEFAULT_PROVINCE);
+            var cities = provNode ? provNode.cities : [];
+            var $panel = $('#region-cascader-panel');
+            renderCascadeCol($panel.find('.rc-col[data-level="city"]'), cities, 'city');
+            var cityNode = findRegionNode(cities, regionSelection.city);
+            renderCascadeCol($panel.find('.rc-col[data-level="district"]'),
+                cityNode ? cityNode.districts : [], 'district');
+            var distNode = cityNode ? findRegionNode(cityNode.districts, regionSelection.district) : null;
+            renderCascadeCol($panel.find('.rc-col[data-level="town"]'),
+                distNode ? distNode.towns : [], 'town');
+            var path = [regionSelection.city, regionSelection.district, regionSelection.town]
+                .filter(function (v) { return v; });
+            $('#region-cascader-label').val(path.join(' / '));
+        }
+
+        // 触发框点击 → 开/收面板；面板内点击阻止冒泡；点面板外收起
+        $('#region-cascader-label').on('click', function (e) {
+            // 阻止冒泡到 document 的"点外部收起"监听，否则面板刚打开就被立即关闭（表现为点击无反应）
+            e.stopPropagation();
+            refreshCascade();
+            $('#region-cascader').toggleClass('rc-open');
+        });
+        $('#region-cascader-panel').on('click', function (e) { e.stopPropagation(); });
+        $(document).on('click', function () { $('#region-cascader').removeClass('rc-open'); });
+
+        // 列项点击：选市→清空区/镇；选区→清空镇；选镇→3级选满自动收起
+        // （仅更新选择，不发起请求，搜索仍由「搜索」按钮统一触发）
+        $('#region-cascader-panel').on('click', '.rc-item', function () {
+            var level = $(this).data('level');
+            var name = $(this).data('name');
+            if (level === 'city') {
+                regionSelection = { city: name, district: '', town: '' };
+            } else if (level === 'district') {
+                regionSelection.district = name;
+                regionSelection.town = '';
+            } else {
+                regionSelection.town = name;
+            }
+            refreshCascade();
+            if (level === 'town') { $('#region-cascader').removeClass('rc-open'); }
+        });
+
+        // 清除已选（回到不限地址）
+        $('#region-cascader-clear').on('click', function () {
+            regionSelection = { city: '', district: '', town: '' };
+            refreshCascade();
+        });
+
+        // ==================== 统一搜索：点击"搜索"按钮或任一输入框回车触发 ====================
+        // 所有筛选控件（下拉/输入框）的值变化只更新 state，不发起请求；
+        // 只有点击"搜索"按钮或在任一输入框按回车键才统一收集全部 state 发起请求。
+        function doSearch() {
+            state.customerType = $('#cust-type-filter').val();
+            state.purchaseChannel = $('#purchase-channel-filter').val();
+            state.keyword = $('#cust-kw').val().trim();
+            state.visitDays = $('#visit-days-filter').val().trim();
+            state.minAmount = $('#min-amount-filter').val().trim();
+            state.maxAmount = $('#max-amount-filter').val().trim();
+            // 地址筛选：省固定默认广东省（库内存在广东省数据时才携带），市/区/镇来自级联选择器
+            state.province = regionProvinceReady ? DEFAULT_PROVINCE : '';
+            state.city = regionSelection.city;
+            state.district = regionSelection.district;
+            state.town = regionSelection.town;
+            loadList(1);
+        }
+
+        $('#cust-search-btn').on('click', doSearch);
+        // 关键词输入框回车
+        $('#cust-kw').on('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+        });
+        // 高级筛选输入框回车也统一触发搜索
+        $('#visit-days-filter').on('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+        });
+        $('#min-amount-filter').on('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+        });
+        $('#max-amount-filter').on('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+        });
+        // 下拉框 change 不自动触发请求，等用户点"搜索"统一发起
         $('#cust-type-filter').on('change', function () {
             state.customerType = $(this).val();
-            loadList(1);
         });
         $('#purchase-channel-filter').on('change', function () {
             state.purchaseChannel = $(this).val();
-            loadList(1);
-        });
-
-        // ==================== 关键词搜索（客户名称/地址模糊匹配） ====================
-        // 搜索/清空关键词 → 重置到第 1 页重新查询（与筛选下拉同一交互）
-        function doSearch() {
-            state.keyword = $('#cust-kw').val().trim();
-            loadList(1);
-        }
-        $('#cust-search-btn').on('click', doSearch);
-        $('#cust-kw').on('keydown', function (e) {
-            if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
         });
 
         // ==================== 加载列表 ====================
@@ -292,8 +499,7 @@
                     customerType: r.customer_type,
                     businessCircle: r.business_circle,
                     contactPerson: r.contact_person,
-                    visitStatus: r.visit_status_label,
-                    visitStatusCls: r.visit_status_cls,
+                    ownerNames: r.owner_names,
                     lastVisitTime: r.last_visit_time
                 };
             });
@@ -401,8 +607,10 @@
                         $box.html(html);
                     });
                 },
-                error: function () {
-                    $box.html('<div class="bind-empty">网络异常，已关联列表加载失败</div>');
+                error: function (xhr) {
+                    // 401/403 等业务错误响应：优先展示后端返回的 msg（权限问题由主页面统一改写为友好文案）
+                    var msg = (xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，已关联列表加载失败';
+                    $box.html('<div class="bind-empty">' + $('<div>').text(msg).html() + '</div>');
                 }
             });
         }
@@ -510,6 +718,7 @@
 
         // 初始加载
         loadFilterOptions();
+        loadRegionOptions();
         loadList(1);
     });
 </script>

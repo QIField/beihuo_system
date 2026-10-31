@@ -15,6 +15,11 @@
 禁止直接对明细 SUM(total_price)（重复累加）；本子查询仅聚合金额所需列，
 不跑 group_concat / 状态列，比拿货订单列表基表更轻。
 件数类口径：明细级直接累加（每行 quantity 即件数，无重复累加问题）。
+利润类口径（06-利润指标设计.md）：成本是明细级属性，比价表 JOIN 必须在订单级
+基表子查询内部完成（每明细行乘各自成本后聚合到订单级）；成本价取
+crmapp_compare_summary.cost_price（备货爬虫维护的现行成本，非历史成本），
+经 frey_no 关联（uk_frey_no_company 唯一索引，两侧同为 utf8mb4_unicode_ci
+无需显式 COLLATE）；成本缺失行不计入利润，缺失行数随查询返回供前端 badge。
 
 数据库操作仅保留实际被 Service 调用的函数；业务口径统一放 Service 层。
 """
@@ -23,11 +28,14 @@ from sqlalchemy import and_, case, func
 
 from app.models.orm_models.crm.crm_sales_order import CrmSalesOrder
 from app.models.orm_models.crm.sales_order_history import SalesOrderHistory
+from app.models.orm_models.crmapp_compare_summary import CrmappCompareSummary
 from app.models.orm_models.visit.visit_record import VisitRecord
 
 # 订单类型：1=常规订单（拿货额口径） 2=退货订单（退货金额/退货率口径）
 ORDER_TYPE_NORMAL = 1
 ORDER_TYPE_REFUND = 2
+# 比价汇总表公司/门店代码（crmapp_compare_summary.company，成本价取 fsbbr 主库）
+COMPARE_SUMMARY_COMPANY = "fsbbr"
 # crm_sales_order 订单类型（StringToIntType 落库为数字）：1=销售订单（欠款余额口径）
 CRM_ORDER_TYPE_SALES = 1
 
@@ -229,3 +237,82 @@ def fetch_unpaid_amount(session, partner_ids):
         CrmSalesOrder.order_type_name == CRM_ORDER_TYPE_SALES,
     ).scalar()
     return float(val or 0)
+
+
+def fetch_profit_stats(session, partner_ids, since_ts):
+    """
+    累计利润 + 近30天毛利额 + 成本缺失明细行数（单次扫描，06-利润指标设计 4.2）
+
+    口径（06-利润指标设计 第三节）：
+    - 利润 = Σ常规订单明细(total_price − quantity × cost_price)，仅常规订单
+      （order_type_id=1），退货订单不计入（与"累计拿货额"口径一致）；
+    - 成本价取 crmapp_compare_summary.cost_price（备货爬虫维护的现行成本价，
+      非历史成本），经 frey_no 关联（uk_frey_no_company 唯一索引，
+      (frey_no, company) 一行，无 JOIN 发散）；两侧同为 utf8mb4_unicode_ci，
+      无需显式 COLLATE（如后续表字符集变更出现 Illegal mix of collations 再补）；
+    - 成本缺失行（frey_no 为空/未命中比价表，或 cost_price 为 0/NULL）不计入
+      利润（利润低估但稳健，缺失行策略待业务最终确认），缺失行数返回供前端 badge；
+    - 近30天窗口按订单级 create_date（同"成交金额"窗口）。
+
+    实现结构：LEFT JOIN 在订单级基表子查询内部完成（成本是明细级属性，
+    每明细行乘各自成本后聚合到订单级，不能在外层订单级再 JOIN），
+    外层按订单类型条件聚合累计/30天窗口/缺失行数三值。
+
+    :param session: SQLAlchemy Session 对象
+    :param partner_ids: CRM客户ID列表（visit_customer_relation 1:N 绑定）
+    :param since_ts: 近30天窗口起始秒级时间戳（毛利额口径）
+    :return: (profit_total 累计利润, profit_30d 近30天毛利额, missing_lines 成本缺失明细行数)
+    """
+    # 成本可用 = LEFT JOIN 命中比价表且 cost_price > 0（NULL/0 视为未维护，06 第六节 5）
+    has_cost = and_(
+        CrmappCompareSummary.frey_no.isnot(None),  # 未命中时 LEFT JOIN 侧为 NULL
+        CrmappCompareSummary.cost_price > 0,
+    )
+    sub = session.query(
+        SalesOrderHistory.orders_id.label("orders_id"),
+        # 同一订单只归属一个类型/客户，MAX 取值唯一（同 _order_amount_subquery）
+        func.max(SalesOrderHistory.order_type_id).label("order_type_id"),
+        func.max(SalesOrderHistory.create_date).label("create_date"),
+        func.sum(SalesOrderHistory.total_price).label("order_amount"),
+        # 订单成本 = 成本可用明细行 quantity × cost_price 之和（成本缺失行计 0，即剔除）
+        func.sum(case(
+            (has_cost, SalesOrderHistory.quantity * CrmappCompareSummary.cost_price), else_=0.0),
+        ).label("order_cost"),
+        # 成本缺失明细行数（frey_no 为空串/NULL 在 JOIN 条件中不会命中，一并计入缺失）
+        func.sum(case((has_cost, 0), else_=1)).label("missing_lines"),
+    ).join(
+        CrmappCompareSummary,
+        and_(
+            CrmappCompareSummary.frey_no == SalesOrderHistory.frey_no,
+            CrmappCompareSummary.company == COMPARE_SUMMARY_COMPANY,
+            # frey_no 为空的明细不参与匹配，避免命中比价表中 frey_no 为空的行（06 第六节 2）
+            SalesOrderHistory.frey_no.isnot(None),
+            SalesOrderHistory.frey_no != "",
+        ),
+        isouter=True,
+    ).filter(
+        SalesOrderHistory.customer_id.in_(partner_ids),
+    ).group_by(
+        SalesOrderHistory.orders_id,
+    ).subquery()
+
+    row = session.query(
+        # 累计利润：常规订单金额 − 成本（退货订单不计入）
+        func.coalesce(func.sum(case(
+            (sub.c.order_type_id == ORDER_TYPE_NORMAL, sub.c.order_amount - sub.c.order_cost), else_=0.0)), 0.0,
+        ),
+        # 近30天毛利额：同口径 + 订单级 create_date 30 天窗口
+        func.coalesce(func.sum(case(
+            (and_(sub.c.order_type_id == ORDER_TYPE_NORMAL, sub.c.create_date >= since_ts),
+             sub.c.order_amount - sub.c.order_cost), else_=0.0)), 0.0,
+        ),
+        # 成本缺失明细行数：仅统计常规订单（与利润口径范围一致）
+        func.coalesce(func.sum(case(
+            (sub.c.order_type_id == ORDER_TYPE_NORMAL, sub.c.missing_lines), else_=0)), 0,
+        ),
+    ).select_from(sub).one()
+    return (
+        round(float(row[0] or 0), 2),
+        round(float(row[1] or 0), 2),
+        int(row[2] or 0),
+    )

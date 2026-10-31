@@ -25,6 +25,30 @@
     </div>
 </div>
 
+<style>
+    /* 费用相关样式 */
+    .v-expense-inline { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+    .v-expense-inline .v-expense-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+    .v-expense-inline .v-expense-tag {
+        font-size: 11px; padding: 2px 6px; border-radius: 10px;
+        background: #fef3c7; color: #b45309; line-height: 1.4;
+    }
+    .v-expense-inline .v-expense-total {
+        font-size: 12px; font-weight: 600; color: #ea580c;
+        background: #fff7ed; padding: 2px 8px; border-radius: 10px;
+    }
+    .v-expense-inline .v-add-expense {
+        font-size: 12px; color: var(--v-primary);
+        padding: 3px 10px; border: 1px dashed var(--v-primary);
+        border-radius: 12px; cursor: pointer; background: transparent;
+        transition: all .2s;
+    }
+    .v-expense-inline .v-add-expense:hover {
+        background: var(--v-primary); color: #fff; border-style: solid;
+    }
+    .v-expense-loading { font-size: 12px; color: var(--v-text-3); }
+</style>
+
 <!-- laytpl 模板：跟进时间轴项 -->
 <script type="text/html" id="tpl-follow-item">
     {% raw %}
@@ -37,6 +61,13 @@
             <span class="v-timeline-time">{{ r.time }}</span>
             <span class="v-tag {{ r.channelCls }}">{{ r.channel }}</span>
             {{# if (!r.isVisit) { }}<span style="color: #9aa3b5; font-size: 12px; margin-left: 4px;">{{ r.creator }} 记录</span>{{# } }}
+            <!-- 费用区：紧跟"admin 记录"/"拜访同步"后面（margin-left:8px，不推到最右） -->
+            <span class="v-expense-inline"
+                  data-expense-block
+                  data-source-type="{{ r.expenseSourceType }}"
+                  data-source-id="{{ r.id }}">
+                <span class="v-expense-loading">...</span>
+            </span>
             {{# if (!r.isVisit) { }}<span style="margin-left: auto;">
                 <span class="v-link" data-act="edit" data-id="{{ r.id }}">编辑</span>
                 <span class="v-link" data-act="void" data-id="{{ r.id }}" style="color: #e6a23c;">作废</span>
@@ -71,6 +102,110 @@
             <textarea id="ff-content" maxlength="2000" rows="5" placeholder="沟通对象、沟通内容、后续动作..." style="width: 100%; border: 1px solid #dcdfe6; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: vertical;"></textarea>
         </div>
     </div>
+</script>
+
+<!-- laytpl 模板：跟进记录费用 Modal（+ 加费用） -->
+<script type="text/html" id="tpl-follow-expense-modal">
+    {% raw %}
+    <style>
+        .fe-modal-body { padding: 22px 24px 18px; }
+        .fe-field { margin-bottom: 16px; }
+        .fe-field:last-of-type { margin-bottom: 22px; }
+        .fe-label {
+            display: block; margin-bottom: 6px; font-size: 12px;
+            color: #4b5563; font-weight: 600; letter-spacing: 0.3px;
+        }
+        .fe-label .fe-req { color: #dc2626; margin-left: 2px; }
+        .fe-label .fe-opt { color: #9ca3af; font-weight: 400; }
+        .fe-input {
+            width: 100%; height: 36px; padding: 0 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 13px; color: #1f2937;
+            background: #fff; transition: border-color .18s, box-shadow .18s;
+            box-sizing: border-box; outline: none;
+        }
+        .fe-input:focus {
+            border-color: var(--v-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .fe-input--amount { padding-left: 28px; font-weight: 600; }
+        .fe-input-wrap { position: relative; }
+        .fe-input-wrap::before {
+            content: '¥'; position: absolute; left: 12px; top: 50%;
+            transform: translateY(-50%); color: #9ca3af;
+            font-size: 14px; font-weight: 600; pointer-events: none;
+        }
+        .fe-input::placeholder { color: #d1d5db; }
+        .fe-textarea {
+            width: 100%; min-height: 72px; padding: 8px 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 13px; color: #1f2937; font-family: inherit;
+            background: #fff; resize: vertical;
+            transition: border-color .18s, box-shadow .18s;
+            box-sizing: border-box; outline: none; line-height: 1.5;
+        }
+        .fe-textarea:focus {
+            border-color: var(--v-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .fe-textarea::placeholder { color: #d1d5db; }
+        .fe-footer {
+            display: flex; justify-content: flex-end; gap: 10px;
+            padding-top: 14px; border-top: 1px solid #f3f4f6;
+        }
+        .fe-btn {
+            padding: 8px 20px; font-size: 13px; font-weight: 500;
+            border-radius: 8px; border: 1px solid #e5e7eb;
+            background: #fff; color: #4b5563; cursor: pointer;
+            transition: all .18s;
+        }
+        .fe-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+        .fe-btn--primary {
+            background: var(--v-primary); border-color: var(--v-primary); color: #fff;
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+        }
+        .fe-btn--primary:hover { background: var(--v-primary-dark); border-color: var(--v-primary-dark); }
+        .fe-hint {
+            font-size: 11px; color: #9ca3af; margin-bottom: 14px;
+            padding: 8px 12px; background: #f9fafb; border-radius: 6px;
+            border-left: 3px solid var(--v-primary);
+        }
+    </style>
+    <div class="fe-modal-body">
+        <div class="fe-hint">💡 此次费用将关联到这条<span id="fe-subject-label"></span>记录，计入费用分析汇总</div>
+
+        <div class="fe-field">
+            <label class="fe-label">费用类型 <span class="fe-req">*</span></label>
+            <!-- 费用类型枚举下拉：与后端 visit_expense_service.EXPENSE_TYPES 严格一致 -->
+            <select id="fe-type" class="fe-input">
+                <option value="">请选择费用类型</option>
+                <option value="拜访投入">拜访投入</option>
+                <option value="礼品物料投入">礼品物料投入</option>
+                <option value="接待投入">接待投入</option>
+                <option value="服务投入">服务投入</option>
+                <option value="索赔">索赔</option>
+                <option value="其他">其他</option>
+            </select>
+        </div>
+
+        <div class="fe-field">
+            <label class="fe-label">金额 <span class="fe-req">*</span></label>
+            <div class="fe-input-wrap">
+                <input id="fe-amount" type="number" step="0.01" min="0" class="fe-input fe-input--amount" placeholder="0.00">
+            </div>
+        </div>
+
+        <div class="fe-field">
+            <label class="fe-label">说明 <span class="fe-opt">（选填）</span></label>
+            <textarea id="fe-desc" class="fe-textarea" placeholder="备注具体用途、沟通对象等..."></textarea>
+        </div>
+
+        <div class="fe-footer">
+            <button type="button" class="fe-btn" onclick="layer.closeAll()">取消</button>
+            <button type="button" class="fe-btn fe-btn--primary" id="fe-save">✓ 保存费用</button>
+        </div>
+    </div>
+    {% endraw %}
 </script>
 
 <script>
@@ -116,7 +251,9 @@
             var creator = r.creator_name || '未知';
             return {
                 id: r.id,
-                isVisit: !!r.is_visit, // 拜访同步条目：只读，不可编辑/作废
+                amap_customer_id: r.amap_customer_id,  // 费用录入冗余字段
+                isVisit: !!r.is_visit,                 // 拜访同步条目？
+                expenseSourceType: !!r.is_visit ? 1 : 2,  // 拜访同步→1(visit_record)，手动跟进→2(visit_follow_record)
                 title: esc(r.channel_desc || r.channel || '跟进'),
                 avatar: esc((creator.charAt(0) || '跟')),
                 avatarCls: cls.avatar,
@@ -133,12 +270,52 @@
             laytpl($('#tpl-follow-item').html()).render({ records: rows }, function (html) {
                 $('#follow-timeline').html(html);
             });
-            // 按行挂原始数据，供编辑弹窗回填
             var $items = $('#follow-timeline .v-timeline-item');
-            $items.each(function (i) {
-                $(this).data('raw', raws[i]);
-            });
+            $items.each(function (i) { $(this).data('raw', raws[i]); });
             $('#follow-total').text(total);
+            // 所有条目异步加载费用（拜访同步和手动跟进都查）
+            rows.forEach(function (r) {
+                loadExpense(r.id, !!r.isVisit ? 1 : 2);
+            });
+        }
+
+        // 异步加载单条记录的费用（sourceType=1 拜访 / 2 跟进）
+        function loadExpense(recordId, sourceType) {
+            var $block = $('#follow-timeline [data-source-id="' + recordId + '"][data-source-type="' + sourceType + '"]');
+            if (!$block.length) return;
+
+            $.ajax({
+                url: '/new/api/visit/records/' + recordId + '/expenses',
+                type: 'GET', dataType: 'json',
+                data: { source_type: sourceType },
+                success: function (res) {
+                    if (res.code === 200 && res.data && res.data.count > 0) {
+                        var tagsHtml = res.data.items.map(function (e) {
+                            return '<span class="v-expense-tag">' + esc(e.expense_type) + ' ¥' + Number(e.amount).toFixed(2) + '</span>';
+                        }).join('');
+                        $block.html(
+                            '<span class="v-expense-tags">' + tagsHtml + '</span>' +
+                            '<span class="v-expense-total">合计 ¥' + Number(res.data.total_amount).toFixed(2) + '</span>' +
+                            '<button class="v-add-expense" ' +
+                                'data-add-source-type="' + sourceType + '" ' +
+                                'data-add-source-id="' + recordId + '">＋ 加费用</button>'
+                        );
+                    } else {
+                        $block.html(
+                            '<button class="v-add-expense" ' +
+                                'data-add-source-type="' + sourceType + '" ' +
+                                'data-add-source-id="' + recordId + '">＋ 加费用</button>'
+                        );
+                    }
+                },
+                error: function () {
+                    $block.html(
+                        '<button class="v-add-expense" ' +
+                            'data-add-source-type="' + sourceType + '" ' +
+                            'data-add-source-id="' + recordId + '">＋ 加费用</button>'
+                    );
+                }
+            });
         }
 
         function renderChannelOptions($select, selected) {
@@ -288,6 +465,65 @@
                     error: function (xhr) {
                         layer.close(index);
                         layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络异常，请稍后重试');
+                    }
+                });
+            });
+        });
+
+        // "+ 加费用"按钮 → 弹出 Modal（source_type 从 data 属性取，1=visit_record / 2=visit_follow_record）
+        $('#follow-timeline').on('click', '.v-add-expense', function () {
+            var sourceType = $(this).data('add-source-type');
+            var sourceId   = $(this).data('add-source-id');
+            var $item      = $(this).closest('.v-timeline-item');
+            var raw        = $item.data('raw') || {};
+            var amapId     = raw.amap_customer_id;
+
+            if (!sourceType || !sourceId) return;
+
+            laytpl($('#tpl-follow-expense-modal').html()).render({}, function (modalHtml) {
+                layer.open({
+                    type: 1,
+                    title: sourceType === 1 ? '添加拜访费用' : '添加跟进费用',
+                    area: ['400px', 'auto'],
+                    shadeClose: true,
+                    content: modalHtml,
+                    success: function (layero, index) {
+                        // 顶部提示文字：拜访 / 跟进
+                        layero.find('#fe-subject-label').text(sourceType === 1 ? '【上门拜访】' : '【跟进】');
+                        layero.find('#fe-save').on('click', function () {
+                            var type   = layero.find('#fe-type').val().trim();
+                            var amount = parseFloat(layero.find('#fe-amount').val());
+                            var desc   = layero.find('#fe-desc').val().trim() || null;
+                            if (!type)   { layer.msg('请选择费用类型'); return; }
+                            if (!amount || amount <= 0) { layer.msg('金额必须是正数'); return; }
+
+                            $.ajax({
+                                url: '/new/api/visit/expenses',
+                                type: 'POST',
+                                contentType: 'application/json',
+                                data: JSON.stringify({
+                                    source_type:       sourceType,
+                                    source_id:         sourceId,
+                                    amap_customer_id:  amapId,
+                                    expense_type:      type,
+                                    amount:            amount,
+                                    description:       desc,
+                                }),
+                                success: function (res) {
+                                    if (res.code === 200) {
+                                        layer.close(index);
+                                        layer.msg('保存成功', { icon: 1, time: 1200 });
+                                        loadExpense(sourceId, sourceType);
+                                    } else {
+                                        layer.msg(res.msg || '保存失败');
+                                    }
+                                },
+                                error: function (xhr) {
+                                    // 优先展示后端 msg（权限问题由主页面统一改写为友好文案）
+                                    layer.msg((xhr.responseJSON && xhr.responseJSON.msg) || '网络错误');
+                                }
+                            });
+                        });
                     }
                 });
             });
