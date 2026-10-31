@@ -57,8 +57,8 @@ def list_quotes():
     分页查询修理厂询单报价数据
 
     参数：page、limit（或 page_size）、inquiry_start、inquiry_end、decode_num、
-          brand_name、store_name、inquiry_id、sort_column、sort_dir、
-          column_filters（列头菜单筛选 JSON，如 {"brand_name": ["博世"]}）
+          brand_name、car_model（车辆品牌/车型模糊匹配）、store_name、inquiry_id、
+          sort_column、sort_dir、column_filters（列头菜单筛选 JSON，如 {"brand_name": ["博世"]}）
     """
     try:
         result = cass_inquiry_query_service.query_quotes(
@@ -68,6 +68,7 @@ def list_quotes():
             inquiry_end=request.args.get('inquiry_end'),
             decode_num=request.args.get('decode_num'),
             brand_name=request.args.get('brand_name'),
+            car_model=request.args.get('car_model'),
             store_name=request.args.get('store_name'),
             inquiry_id=request.args.get('inquiry_id'),
             sort_column=request.args.get('sort_column'),
@@ -89,7 +90,8 @@ def filter_values():
     查询某列的全量去重候选值（列头菜单筛选勾选用）
 
     参数：column（列名，白名单内）、inquiry_start、inquiry_end、decode_num、
-          brand_name、store_name、inquiry_id、column_filters（级联条件，已排除本列）
+          brand_name、car_model（车辆品牌/车型模糊匹配）、store_name、inquiry_id、
+          column_filters（级联条件，已排除本列）
     """
     try:
         result = cass_inquiry_query_service.filter_values(
@@ -98,6 +100,7 @@ def filter_values():
             inquiry_end=request.args.get('inquiry_end'),
             decode_num=request.args.get('decode_num'),
             brand_name=request.args.get('brand_name'),
+            car_model=request.args.get('car_model'),
             store_name=request.args.get('store_name'),
             inquiry_id=request.args.get('inquiry_id'),
             column_filters=request.args.get('column_filters'),
@@ -131,8 +134,9 @@ def price_compare():
     """
     供应商价格对比 · 分页查询（与巴博瑞按译码OE号+品牌一对一比对，价格取卖家价格）
 
-    参数：store_name（必填）、status（必填 higher/lower，上下两表各查一个方向）、page、page_size、
-          sort_column、sort_dir、column_filters、start_date/end_date（询单日期范围 YYYY-MM-DD，可空=全部）
+    参数：store_name（可空=全部供应商，排除巴博瑞）、status（必填 higher/lower，上下两表各查一个方向）、
+          page、page_size、sort_column、sort_dir、column_filters、
+          start_date/end_date（询单日期范围 YYYY-MM-DD，可空=全部）
     返回：{'code': 0, 'data': {'list': [...], 'total': n, 'page': p, 'page_size': s}}
           每行含 decode_num/merchant_parts_num/brand_name/parts_name/quality_name/num/
           warehouse/seller_price/bbri_price/diff
@@ -163,7 +167,7 @@ def price_compare_filter_values_api():
     """
     供应商价格对比 · 列头菜单筛选候选值（去重+计数，按其他列已生效筛选级联）
 
-    参数：store_name（必填）、status（必填 higher/lower）、column（筛选列）、
+    参数：store_name（可空=全部供应商，排除巴博瑞）、status（必填 higher/lower）、column（筛选列）、
           column_filters（级联条件，已排除本列）、start_date/end_date（询单日期范围 YYYY-MM-DD，可空=全部）
     返回：{'code': 0, 'data': {'values': [{'value': v, 'count': n}, ...]}}
     """

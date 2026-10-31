@@ -1,7 +1,7 @@
 /**
  * 供应商价格对比标签页
  *
- * 流程：选择供应商（输入过滤下拉）→ 开始比对 → 调 /api/cass_inquiry/price_compare
+ * 流程：选择供应商（输入过滤下拉，可留空=全部供应商）→ 开始比对 → 调 /api/cass_inquiry/price_compare
  *       （以译码OE号+品牌为比对键、卖家价格为价格口径，基准为巴博瑞同OE同品牌最低价）→
  *       上下两个表格分别展示「高于佛山巴博瑞」「低于佛山巴博瑞」（各自独立分页，
  *       与巴博瑞持平的行不展示）→ 行内「修改价格」按钮调 CassPriceEditDialog.open(译码OE号)
@@ -124,9 +124,10 @@ var CassPriceCompare = (function () {
             columns: columns,
             dataUrl: '/api/cass_inquiry/price_compare',
             paramsBuilder: function () {
-                if (!selectedStore) return {};
-                return Object.assign(
-                    { store_name: selectedStore, status: status }, getDateParams());
+                // 供应商留空=全部供应商（不传 store_name），方向与日期恒传
+                var params = Object.assign({ status: status }, getDateParams());
+                if (selectedStore) params.store_name = selectedStore;
+                return params;
             },
             getFilterValues: function (colId, callback, params) {
                 getFilterValues(colId, callback, Object.assign({ status: status }, params || {}));
@@ -208,12 +209,24 @@ var CassPriceCompare = (function () {
     function startCompare() {
         if (loading) return;
         var input = document.getElementById('compareStoreInput');
-        if (!selectedStore) {
-            layui.layer.msg('请先选择供应商', { icon: 0 });
-            input.focus();
-            return;
+        var typed = input.value.trim();
+        if (typed) {
+            // 有输入时须与候选精确匹配（忽略大小写），未匹配则引导选择或留空查全部
+            var kw = typed.toLowerCase();
+            var hit = null;
+            for (var i = 0; i < stores.length; i++) {
+                if (stores[i].toLowerCase() === kw) { hit = stores[i]; break; }
+            }
+            if (!hit) {
+                layui.layer.msg('未找到该供应商，请从下拉中选择，或留空查询全部供应商', { icon: 0 });
+                input.focus();
+                return;
+            }
+            selectedStore = hit;
+            input.value = hit;
+        } else {
+            selectedStore = '';  // 留空=全部供应商
         }
-        if (input.value.trim() !== selectedStore) input.value = selectedStore;
         if (!inited) {
             higherBuilder = createBuilder('higher', 'compareHigherContainer', 'compareHigherPagination');
             lowerBuilder = createBuilder('lower', 'compareLowerContainer', 'compareLowerPagination');
@@ -227,7 +240,8 @@ var CassPriceCompare = (function () {
         var end = (document.getElementById('compareEndDate').value || '').trim();
         var range = start && end ? start + ' ~ ' + end
             : (start || end ? (start ? start + ' 起' : end + ' 止') : '全部日期');
-        title.textContent = '价格对比结果 — ' + selectedStore + ' vs 佛山巴博瑞汽配（' + range + '）';
+        var storeLabel = selectedStore || '全部供应商';
+        title.textContent = '价格对比结果 — ' + storeLabel + ' vs 佛山巴博瑞汽配（' + range + '）';
     }
 
     // ===== 修改价格按钮（document 级事件委托，与替换号链接同一模式） =====
@@ -255,10 +269,10 @@ var CassPriceCompare = (function () {
     function init() {
         bindStoreSelect();
         document.getElementById('compareStartBtn').addEventListener('click', startCompare);
-        // 日期变更后自动重新比对（已选供应商且表格已初始化时）
+        // 日期变更后自动重新比对（表格已初始化时，供应商留空也生效）
         ['compareStartDate', 'compareEndDate'].forEach(function (id) {
             document.getElementById(id).addEventListener('change', function () {
-                if (inited && selectedStore && !loading) {
+                if (inited && !loading) {
                     higherBuilder.refresh(1);
                     lowerBuilder.refresh(1);
                 }

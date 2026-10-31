@@ -22,6 +22,7 @@ from .data_gzbbr_login_task import register_data_gzbbr_login_tasks
 from .ks_inquiry_summary_tasks import register_ks_inquiry_summary_tasks
 from .qpl_virtual_inventory_import_task import register_qpl_virtual_inventory_import_tasks
 from app.services.ks_merchant_service.task_registration import register_ks_merchant_tasks
+from .oe_diff_scan_task import register_oe_diff_scan_tasks
 
 
 def register_all_tasks(task_manager):
@@ -84,6 +85,9 @@ def register_all_tasks(task_manager):
 
     # 18. 注册OE军备统计月度汇总定时任务（每天02:30）
     register_ks_inquiry_summary_tasks(task_manager)
+
+    # 19. 注册OE替换号差异扫描定时任务（每天08:00）
+    register_oe_diff_scan_tasks(task_manager)
 
 
 __all__ = ['execute_daily_pipeline', 'register_all_tasks']

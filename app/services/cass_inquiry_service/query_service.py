@@ -28,8 +28,8 @@ class CassInquiryQueryService:
     }
 
     def query_quotes(self, page=1, page_size=50, inquiry_start=None, inquiry_end=None,
-                     decode_num=None, brand_name=None, store_name=None, inquiry_id=None,
-                     sort_column=None, sort_dir=None, column_filters=None):
+                     decode_num=None, brand_name=None, car_model=None, store_name=None,
+                     inquiry_id=None, sort_column=None, sort_dir=None, column_filters=None):
         """
         分页查询修理厂询单报价数据
 
@@ -39,6 +39,7 @@ class CassInquiryQueryService:
         :param inquiry_end: 询单日期范围-结束（YYYY-MM-DD）
         :param decode_num: 译码OE号（模糊匹配）
         :param brand_name: 品牌名称（模糊匹配）
+        :param car_model: 车辆品牌/车型（模糊匹配，如"奔驰"命中"奔驰GLS400..."）
         :param store_name: 供应商名称（模糊匹配）
         :param inquiry_id: 询单ID（模糊匹配）
         :param sort_column: 排序列（白名单内）
@@ -50,7 +51,7 @@ class CassInquiryQueryService:
         page_size = min(max(int(page_size or 50), 1), 200)
 
         where_sql, params = self._build_where(inquiry_start, inquiry_end, decode_num,
-                                              brand_name, store_name, inquiry_id,
+                                              brand_name, car_model, store_name, inquiry_id,
                                               column_filters=column_filters)
         order_sql = self._build_order(sort_column, sort_dir)
 
@@ -86,8 +87,8 @@ class CassInquiryQueryService:
             }
         }
 
-    def _build_where(self, inquiry_start, inquiry_end, decode_num, brand_name, store_name, inquiry_id,
-                     column_filters=None, exclude_filter_column=None):
+    def _build_where(self, inquiry_start, inquiry_end, decode_num, brand_name, car_model,
+                     store_name, inquiry_id, column_filters=None, exclude_filter_column=None):
         """
         构建查询条件 SQL 与参数
 
@@ -114,6 +115,9 @@ class CassInquiryQueryService:
         if brand_name:
             conditions.append("brand_name LIKE %s")
             params.append(f"%{brand_name.strip()}%")
+        if car_model:
+            conditions.append("car_model LIKE %s")
+            params.append(f"%{car_model.strip()}%")
         if store_name:
             conditions.append("store_name LIKE %s")
             params.append(f"%{store_name.strip()}%")
@@ -161,7 +165,8 @@ class CassInquiryQueryService:
         return result
 
     def filter_values(self, column, inquiry_start=None, inquiry_end=None, decode_num=None,
-                      brand_name=None, store_name=None, inquiry_id=None, column_filters=None):
+                      brand_name=None, car_model=None, store_name=None, inquiry_id=None,
+                      column_filters=None):
         """
         查询某列的全量去重候选值及出现次数（供列头菜单筛选勾选）
 
@@ -173,7 +178,7 @@ class CassInquiryQueryService:
             raise ValueError(f"不支持的筛选列: {column}")
 
         where_sql, params = self._build_where(inquiry_start, inquiry_end, decode_num,
-                                              brand_name, store_name, inquiry_id,
+                                              brand_name, car_model, store_name, inquiry_id,
                                               column_filters=column_filters,
                                               exclude_filter_column=column)
         sql = (f"SELECT `{column}`, COUNT(*) AS cnt FROM cass_inquiry_quote {where_sql} "
