@@ -12,12 +12,13 @@
 from flask import jsonify, request, session
 
 from . import visit_bp
-from app.core.permission.decorators import require_authentication
+# 权限控制：跟进记录接口统一要求「汽配客访管理」权限（visit:view）
+from app.core.permission.decorators import require_permission
 from app.services.visit_service import follow_record_service
 
 
 @visit_bp.route("/customers/follows", methods=["GET"])
-@require_authentication()
+@require_permission('visit:view')
 def get_customer_follows():
     """跟进记录时间轴（M7：按跟进时间倒序分页，渠道筛选选填）
 
@@ -42,7 +43,7 @@ def get_customer_follows():
 
 
 @visit_bp.route("/follows", methods=["POST"])
-@require_authentication()
+@require_permission('visit:view')
 def add_follow():
     """新增跟进（表单 JSON：amap_customer_id / channel / content 必填，
     follow_time 缺省当前时间、channel_desc 缺省按渠道映射）"""
@@ -65,7 +66,7 @@ def add_follow():
 
 
 @visit_bp.route("/follows", methods=["PUT"])
-@require_authentication()
+@require_permission('visit:view')
 def update_follow():
     """编辑跟进（JSON body：id 必填，待更新字段选填：
     channel / content / follow_time / channel_desc，部分更新）"""
@@ -84,7 +85,7 @@ def update_follow():
 
 
 @visit_bp.route("/follows/void", methods=["PUT"])
-@require_authentication()
+@require_permission('visit:view')
 def void_follow():
     """作废跟进（JSON body：id 必填；status=0 软删，时间轴排除，本期不提供恢复）"""
     try:

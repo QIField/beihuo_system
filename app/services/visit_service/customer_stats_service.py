@@ -24,10 +24,16 @@
 #     不限 30 天窗口（业务口径：客户最近一次拿货时间）；
 #   近30天动态·平台/线下成交次数 —— 一张常规订单 = 一次成交（订单级去重计数），
 #     30 天窗口，按绑定 CRM 客户等级拆分：线上（平台）次数 / 线下次数；
+#   累计利润 / 近30天动态·毛利额 —— sales_order_history 常规订单明细
+#     Σ(total_price − quantity × cost_price)，成本价经 frey_no 关联
+#     crmapp_compare_summary.cost_price（备货爬虫维护的现行成本，非历史成本，
+#     卡片副标题标注"按现行成本估算"）；成本缺失行（frey_no 为空/未命中/成本为0或空）
+#     不计入利润，badge 标注缺失行数（口径与实现见 doc/客访管理/06-利润指标设计.md）；
+#   费用投入合计（原"累计拜访投入"）—— visit_expense 费用明细表
+#     SUM(amount)（status=1，amap_customer_id=POI编码，不限时间窗口），
+#     口径与客户详情"累计投入"Tab 的 all=1 累计口径一致；
 #   拜访转化率已按业务要求删除（visit_record 无 converted 字段，转化由订单数据实时统计）。
 # 未接入指标及原因：
-#   累计利润 / 毛利额 —— sales_order_history 无成本字段；
-#   累计拜访投入 —— visit_record 无费用字段（高德同步契约 2.1 未落地）；
 #   平台询价类 —— 无询价数据源；近30天动态其余指标 —— 数据源/口径待业务确认。
 
 from datetime import datetime, timedelta
@@ -35,6 +41,7 @@ from datetime import datetime, timedelta
 from app.dao.visit_dao import (
     visit_amap_customer_dao,
     visit_customer_relation_dao,
+    visit_expense_dao,
     visit_stats_dao,
 )
 from app.models.orm_models.crm.partner_list import PartnerList
@@ -44,7 +51,8 @@ from app.utils.orm.session import orm_session
 # 数据源未接入指标的占位渲染（红色"暂时无数据"）
 _NO_DATA = {"value": "暂时无数据", "valueCls": "v-red"}
 
-# 近30天动态指标（本期数据源未接入，仅输出占位，01 文档第十一节 / 02 拓展文档 3.2）
+# 近30天动态指标（毛利额/退货金额/成交金额/最近成交时间/平台·线下成交次数已接入，
+# 平台询价等其余指标数据源未接入仍输出占位，01 文档第十一节 / 02 拓展文档 3.2）
 _DYNAMIC_LABELS = [
     "平台询价次数", "平台询价转化率", "平台成交次数", "线下成交次数",
     "成交金额", "毛利额", "退货金额", "最近成交时间",
@@ -64,8 +72,9 @@ def _fmt_date(dt):
 
 
 def _build_metrics(visit_count, last_visit_time, total_amount, refund_amount,
-                   refund_qty, total_qty, online_amount, unpaid_amount):
-    """核心指标卡 8 项渲染契约（拜访转化率已删除；退货率 badge 按件数口径）"""
+                   refund_qty, total_qty, online_amount, unpaid_amount,
+                   profit_total, profit_missing_lines, expense_total):
+    """核心指标卡 8 项渲染契约（拜访转化率已删除；退货率 badge 按件数口径；利润卡见 06-利润指标设计）"""
     # 退货率 = 退货件数 ÷ 常规订单件数（业务确认按件数统计）；无常规订单时不展示
     refund_badge = None
     if total_qty > 0:
@@ -89,20 +98,37 @@ def _build_metrics(visit_count, last_visit_time, total_amount, refund_amount,
         }
     else:
         unpaid_item = {"label": "欠款余额", "value": _fmt_amount(unpaid_amount), "valueCls": "v-green"}
+    # 累计利润 = 常规订单 Σ(total_price − quantity × 现行成本)（crmapp_compare_summary.cost_price
+    # 经 frey_no 关联，06-利润指标设计 第三节）；成本缺失行不计入利润，badge 标注缺失明细行数
+    profit_item = {
+        "label": "累计利润",
+        "value": _fmt_amount(profit_total),
+        "valueCls": "v-green" if profit_total >= 0 else "v-red",
+        "sub": "按现行成本估算", "subCls": "v-metric-sub--gray",
+    }
+    if profit_missing_lines > 0:
+        profit_item["badge"] = {
+            "text": "成本缺失 {} 行".format(profit_missing_lines),
+            "cls": "v-metric-extra--red",
+        }
+    # 费用投入合计（原"累计拜访投入"）= 该客户全部历史费用合计
+    # （visit_expense SUM(amount)，status=1 排除作废，不限时间窗口，与"累计投入"Tab all=1 口径一致）
+    expense_item = {"label": "累计费用投入", "value": _fmt_amount(expense_total), "valueCls": "v-blue"}
     return [
         {"label": "累计拜访次数", "value": "{} 次".format(visit_count)},
         {"label": "最近拜访时间", "value": _fmt_date(last_visit_time)},
         {"label": "累计拿货额", "value": _fmt_amount(total_amount), "valueCls": "v-green"},
         {"label": "累计退货金额", "value": _fmt_amount(refund_amount), "valueCls": "v-red", "badge": refund_badge},
-        dict({"label": "累计利润"}, **_NO_DATA),
+        profit_item,
         online_item,
-        dict({"label": "累计拜访投入"}, **_NO_DATA),
+        expense_item,
         unpaid_item,
     ]
 
 
-def _build_dynamics(refund_amount_30d, sales_amount_30d, last_order_ts, online_count, offline_count):
-    """近30天动态 8 项渲染（退货金额/成交金额/最近成交时间/平台·线下成交次数已接入，其余数据源接入后在此补充）"""
+def _build_dynamics(refund_amount_30d, sales_amount_30d, last_order_ts, online_count, offline_count,
+                    profit_30d):
+    """近30天动态 8 项渲染（退货金额/成交金额/毛利额/最近成交时间/平台·线下成交次数已接入，其余数据源接入后在此补充）"""
     items = []
     for label in _DYNAMIC_LABELS:
         if label == "退货金额":
@@ -111,6 +137,10 @@ def _build_dynamics(refund_amount_30d, sales_amount_30d, last_order_ts, online_c
         elif label == "成交金额":
             # 近30天累计拿货额（常规订单订单级金额 + 30天窗口，业务口径 2026-10-23）
             items.append({"label": label, "value": _fmt_amount(sales_amount_30d), "valueCls": "v-green"})
+        elif label == "毛利额":
+            # 近30天常规订单利润（口径同累计利润 + 30天窗口，06-利润指标设计 第三节）
+            items.append({"label": label, "value": _fmt_amount(profit_30d),
+                          "valueCls": "v-green" if profit_30d >= 0 else "v-red"})
         elif label == "最近成交时间":
             # 常规订单最近下单时间（不限窗口），秒级时间戳 → 日期
             dt = datetime.fromtimestamp(last_order_ts) if last_order_ts else None
@@ -135,6 +165,9 @@ def get_customer_stats(customer_id):
       取全部 partner_id 后按客户集合聚合，未关联 CRM 时订单指标为 0
     - 金额口径与拿货订单 Tab 一致：明细级 → 订单级聚合（见 visit_order_dao）；
       退货率按件数口径：退货明细 ABS(quantity) 合计 ÷ 常规订单明细 quantity 合计
+    - 利润口径：常规订单明细 Σ(total_price − quantity × 现行成本)，成本价经 frey_no
+      关联 crmapp_compare_summary.cost_price；成本缺失行不计入利润并以 badge 标注
+      （06-利润指标设计.md）
 
     :param customer_id: visit_amap_customer 物理主键 id
     :return: {'metrics': [...8项...], 'dynamics': [...8项...]}
@@ -154,6 +187,11 @@ def get_customer_stats(customer_id):
         # 拜访维度：按 POI 编码统计（status=1 排除作废），单次扫描同时取次数与最近拜访时间
         visit_count, last_visit_time = visit_stats_dao.fetch_visit_stats(session, row.amap_poi_id)
 
+        # 费用投入合计：visit_expense 按 POI 汇总（status=1 排除作废，不限时间窗口，全部历史累计）
+        visit_expense_dao.ensure_table()
+        expense_total = float(visit_expense_dao.get_expense_sum(
+            session, amap_customer_id=row.amap_poi_id) or 0)
+
         # 订单维度：1:N 绑定 → 全部 partner_id 集合聚合；未关联 CRM 时订单指标为 0
         relations = visit_customer_relation_dao.list_by_amap_customer_id(session, row.amap_poi_id)
         partner_ids = [r.partner_id for r in relations]
@@ -168,6 +206,9 @@ def get_customer_stats(customer_id):
         last_order_ts = 0
         online_count = 0
         offline_count = 0
+        profit_total = 0.0
+        profit_30d = 0.0
+        profit_missing_lines = 0
         if partner_ids:
             # 近30天动态窗口起始（成交金额/退货金额/成交次数共用）
             since_30d = int((datetime.now() - timedelta(days=30)).timestamp())
@@ -188,6 +229,10 @@ def get_customer_stats(customer_id):
             refund_qty, total_qty = visit_stats_dao.fetch_refund_qty_stats(session, partner_ids)
             # 欠款余额：crm_sales_order 常规订单未结算金额合计（独立数据源，有固定更新渠道）
             unpaid_amount = visit_stats_dao.fetch_unpaid_amount(session, partner_ids)
+            # 累计利润 + 近30天毛利额：成本价经 frey_no 关联 crmapp_compare_summary
+            # （比价表 JOIN 在订单级基表内完成，单次扫描，06-利润指标设计 4.2）
+            profit_total, profit_30d, profit_missing_lines = visit_stats_dao.fetch_profit_stats(
+                session, partner_ids, since_30d)
             # 近30天动态·退货金额：退货订单订单级金额合计（30天窗口，口径同累计退货金额）
             refund_amount_30d = visit_stats_dao.fetch_refund_amount(session, partner_ids, since_ts=since_30d)
             # 近30天动态·最近成交时间：常规订单最后下单时间（不限窗口）
@@ -202,6 +247,8 @@ def get_customer_stats(customer_id):
     # 会话外仅操作已序列化的标量值，避免 DetachedInstanceError
     return {
         "metrics": _build_metrics(visit_count, last_visit_time, total_amount, refund_amount,
-                                  refund_qty, total_qty, online_amount, unpaid_amount),
-        "dynamics": _build_dynamics(refund_amount_30d, sales_amount_30d, last_order_ts, online_count, offline_count),
+                                  refund_qty, total_qty, online_amount, unpaid_amount,
+                                  profit_total, profit_missing_lines, expense_total),
+        "dynamics": _build_dynamics(refund_amount_30d, sales_amount_30d, last_order_ts,
+                                    online_count, offline_count, profit_30d),
     }

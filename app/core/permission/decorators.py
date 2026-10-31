@@ -143,6 +143,48 @@ def require_page_permission(
     return decorator
 
 
+def require_page_role(
+    role_code: str,
+    login_template: str = 'login.html',
+    forbidden_template: str = 'forbidden.html',
+):
+    """
+    页面角色检查装饰器（页面版）
+
+    检查用户是否已登录并拥有指定角色。
+    未登录则渲染登录页面，角色不满足则渲染权限不足页面。
+    适用于页面路由，与 require_role（API 版）对应；
+    与 require_page_permission（权限编码检查）的区别：本装饰器检查的是角色编码。
+
+    Args:
+        role_code: 角色编码，如 'super_admin'
+        login_template: 登录页面模板路径
+        forbidden_template: 权限不足页面模板路径
+
+    使用示例:
+        @bp.route('/admin/page')
+        @require_page_role('super_admin')
+        def admin_page():
+            return render_template('admin/page.html')
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            user_id = PermissionCheckerRegistry.get_user_id()
+            if user_id is None:
+                return render_template(login_template)
+
+            if not PermissionCheckerRegistry.check_role(user_id, role_code):
+                return render_template(forbidden_template, required_permission=f"{role_code} 角色")
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 # ======================================================================
 # 权限检查装饰器
 # ======================================================================
@@ -471,6 +513,7 @@ __all__ = [
     'require_authentication',
     'require_page_login',
     'require_page_permission',
+    'require_page_role',
     'require_permission',
     'require_any_permission',
     'require_all_permissions',

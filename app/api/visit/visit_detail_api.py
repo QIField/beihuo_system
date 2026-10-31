@@ -11,12 +11,13 @@
 from flask import jsonify, request
 
 from . import visit_bp
-from app.core.permission.decorators import require_authentication
+# 权限控制：客户详情聚合接口统一要求「汽配客访管理」权限（visit:view）
+from app.core.permission.decorators import require_permission
 from app.services.visit_service import customer_detail_service, customer_order_service, customer_stats_service
 
 
 @visit_bp.route("/customers/stats", methods=["GET"])
-@require_authentication()
+@require_permission('visit:view')
 def get_visit_customer_stats():
     """客户详情-指标卡聚合（M3：核心指标 + 近30天动态，01 文档第六节）
 
@@ -37,7 +38,7 @@ def get_visit_customer_stats():
 
 
 @visit_bp.route("/customers/detail", methods=["GET"])
-@require_authentication()
+@require_permission('visit:view')
 def get_visit_customer_detail():
     """客户详情聚合（详情头部 + 基础档案，01 文档第六节）
 
@@ -59,7 +60,7 @@ def get_visit_customer_detail():
 
 
 @visit_bp.route("/customers/orders", methods=["GET"])
-@require_authentication()
+@require_permission('visit:view')
 def get_visit_customer_orders():
     """客户详情-拿货订单 Tab 聚合（M5：汇总卡 + 订单分页列表，01 文档第六节）
 

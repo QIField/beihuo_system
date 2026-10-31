@@ -12,13 +12,18 @@
 2. 位置编码存在性查询（导入时精确区分新增/更新）
 3. 按"名称+地址"查重（无编码行防重，设计文档 2.2）
 4. 幂等建表（对应 sql/visit/visit_amap_customer.sql）
+5. 客户列表高级筛选：拜访时间（超 X 天未拜访）+ 累计拿货额（金额区间）
 """
+
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, or_
 from sqlalchemy.dialects.mysql import insert
 
 from app.models.orm_models.base_models import BaseModels
+from app.models.orm_models.crm.sales_order_history import SalesOrderHistory
 from app.models.orm_models.visit.visit_amap_customer import VisitAmapCustomer
+from app.models.orm_models.visit.visit_customer_relation import VisitCustomerRelation
 from app.utils.orm.session import get_engine
 
 # 建表幂等标记（每进程只执行一次）
@@ -142,10 +147,80 @@ def _multi_value_cond(column, value):
     return func.concat('|', column, '|').like(f'%|{value}|%')
 
 
-def page_customers(session, page=1, limit=20, customer_type=None, purchase_channels=None, keyword=None):
+# 常规订单类型ID（累计拿货额口径仅统计常规订单，排除退货）
+_ORDER_TYPE_NORMAL = 1
+
+
+def _fetch_amount_poi_ids(session, min_amount=None, max_amount=None):
     """
-    客户列表分页查询（M1，设计文档 doc/客访管理/01-主设计文档.md 第六节）
-    支持客户类型/拿货渠道筛选 + 客户名称/地址关键词搜索；固定排除 status=2（无效客户不参与列表）。
+    查询累计拿货额达标的高德客户 POI 编码集合（金额筛选专用，两步法避免 JOIN 分页问题）
+
+    口径：常规订单（order_type_id=1，排除退货），明细级 → 订单级金额聚合
+    （与 visit_order_dao / visit_stats_dao 金额口径一致，避免明细 SUM 重复累加）。
+
+    实现策略：
+    - 金额筛选独立查询，返回 POI 编码集合
+    - 主查询用 `amap_poi_id IN (...)` 筛选，彻底避免 JOIN 污染 count/limit
+    - 未绑定 CRM 的客户累计拿货额视为 0（子查询不含这些客户），
+      仅设上限不设下限时这些客户也被保留
+
+    :param session: SQLAlchemy Session 对象
+    :param min_amount: 累计拿货额下限（≥），None = 不限
+    :param max_amount: 累计拿货额上限（≤），None = 不限
+    :return: set[str] 达标的 POI 编码集合；仅设上限时含空集（未绑定客户视为 0 ≤ max）
+             ；返回 None 表示"金额筛选无结果，应全部排除"
+    """
+    # 订单级金额子查询：明细级 GROUP BY (orders_id, ddno) 取 SUM(total_price)
+    order_sub = session.query(
+        SalesOrderHistory.orders_id.label("orders_id"),
+        SalesOrderHistory.ddno.label("ddno"),
+        func.max(SalesOrderHistory.customer_id).label("customer_id"),
+        func.sum(SalesOrderHistory.total_price).label("order_amount"),
+    ).filter(
+        SalesOrderHistory.order_type_id == _ORDER_TYPE_NORMAL,
+    ).group_by(
+        SalesOrderHistory.orders_id, SalesOrderHistory.ddno,
+    ).subquery()
+
+    # 按高德客户 POI 编码聚合金额（LEFT JOIN 订单，避免"客户无订单但被排除"）
+    amt_rows = session.query(
+        VisitCustomerRelation.amap_customer_id.label("poi"),
+        func.coalesce(func.sum(order_sub.c.order_amount), 0.0).label("total_amt"),
+    ).outerjoin(
+        order_sub, order_sub.c.customer_id == VisitCustomerRelation.partner_id,
+    ).group_by(
+        VisitCustomerRelation.amap_customer_id,
+    ).all()
+
+    poi_ids = set()
+    for r in amt_rows:
+        total = float(r.total_amt or 0)
+        if min_amount is not None and total < min_amount:
+            continue
+        if max_amount is not None and total > max_amount:
+            continue
+        poi_ids.add(r.poi)
+
+    # 仅设上限（无下限）时，未绑定 CRM 的客户金额视为 0，应包含在筛选结果内
+    if min_amount is None and max_amount is not None:
+        return "__INCLUDE_UNBOUND__", poi_ids
+
+    # 仅设下限 或 同时设上下限 —— 未绑定客户金额为 0，默认不满足下限，不包含
+    return "__EXCLUDE_UNBOUND__", poi_ids
+
+
+def page_customers(session, page=1, limit=20, customer_type=None, purchase_channels=None,
+                   keyword=None, visit_days=None, min_amount=None, max_amount=None,
+                   province=None, city=None, district=None, town=None):
+    """
+    客户列表分页查询（M1，设计文档 doc/客访管理/01-主设计文档.md 第六节
+    + 08-客户筛选功能：拜访时间筛选 + 累计拿货额筛选
+    + 省市区镇地址筛选：四级下拉选择后逐级对 address 做 LIKE 模糊匹配）
+
+    支持：客户类型/拿货渠道筛选 + 客户名称/地址关键词搜索 +
+          拜访时间筛选（超 X 天未拜访）+ 累计拿货额筛选（金额区间）+
+          省/市/区县/镇街地址筛选（模糊匹配）；
+          固定排除 status=2（无效客户不参与列表）。
 
     :param session: SQLAlchemy Session 对象
     :param page: 页码，从 1 开始
@@ -153,12 +228,23 @@ def page_customers(session, page=1, limit=20, customer_type=None, purchase_chann
     :param customer_type: 客户类型筛选，选填（多值字段，见 _multi_value_cond）
     :param purchase_channels: 拿货渠道筛选，选填（多值字段，见 _multi_value_cond）
     :param keyword: 搜索关键词，选填（客户名称/地址模糊匹配，任一命中即返回）
+    :param visit_days: 拜访时间筛选 —— 仅返回"超过 visit_days 天未拜访"的客户，选填；
+                       None 或 <= 0 表示不启用；0 表示筛选"从未拜访过"的客户；
+                       条件：last_visit_time < now - visit_days 天 （含 NULL 从未拜访）
+    :param min_amount: 累计拿货额下限（≥），选填；None 表示不限下限
+    :param max_amount: 累计拿货额上限（≤），选填；None 表示不限上限
+    :param province: 省份筛选，选填；地址 LIKE '%广东省%'
+    :param city: 城市筛选，选填；地址 LIKE '%佛山市%'
+    :param district: 区县筛选，选填；地址 LIKE '%禅城区%'
+    :param town: 镇街筛选，选填；地址 LIKE '%张槎街道%'
     :return: (total, rows) 命中总数与当前页 ORM 对象列表
     """
     page = max(1, page or 1)
     limit = max(1, limit or 20)
 
     query = session.query(VisitAmapCustomer).filter(VisitAmapCustomer.status != 2)
+
+    # —— 基础筛选 ——
     if customer_type:
         query = query.filter(_multi_value_cond(VisitAmapCustomer.customer_type, customer_type))
     if purchase_channels:
@@ -169,6 +255,64 @@ def page_customers(session, page=1, limit=20, customer_type=None, purchase_chann
             VisitAmapCustomer.customer_name.like(like),
             VisitAmapCustomer.address.like(like),
         ))
+
+    # —— 省市区镇地址筛选：逐级 LIKE 模糊匹配（地址为"省+市+区+镇+详址"连续文本） ——
+    for column, value in (
+        (VisitAmapCustomer.address, province),
+        (VisitAmapCustomer.address, city),
+        (VisitAmapCustomer.address, district),
+        (VisitAmapCustomer.address, town),
+    ):
+        if value:
+            query = query.filter(column.like(f'%{value}%'))
+
+    # —— 拜访时间筛选：超 X 天未拜访 ——
+    # visit_days = 0 → 筛选"从未拜访"（last_visit_time IS NULL）
+    # visit_days > 0 → 筛选 last_visit_time < now - X 天（含 NULL）
+    if visit_days is not None:
+        try:
+            visit_days = int(visit_days)
+        except (TypeError, ValueError):
+            visit_days = None
+        if visit_days is not None:
+            threshold = datetime.now() - timedelta(days=visit_days)
+            # 超 X 天未拜访 = 最近拜访时间为空 或 早于阈值
+            query = query.filter(or_(
+                VisitAmapCustomer.last_visit_time.is_(None),
+                VisitAmapCustomer.last_visit_time < threshold,
+            ))
+
+    # —— 累计拿货额筛选：金额区间（两步法，避免 JOIN 污染 count/limit）——
+    # 1) 独立查询：按高德客户 POI 编码聚合常规订单金额，筛选出达标的 POI 集合
+    # 2) 主查询用 amap_poi_id IN (poi_ids) 或 NOT IN 过滤
+    amount_needed = min_amount is not None or max_amount is not None
+    if amount_needed:
+        # 金额边界值校验
+        try:
+            ma = float(min_amount) if min_amount is not None else None
+            xa = float(max_amount) if max_amount is not None else None
+        except (TypeError, ValueError):
+            ma = xa = None
+            amount_needed = (ma is not None or xa is not None)
+
+        if amount_needed:
+            strategy, poi_ids = _fetch_amount_poi_ids(session, ma, xa)
+            if not poi_ids and strategy == "__EXCLUDE_UNBOUND__":
+                # 仅设下限（或上下限都有）且没有任何绑定客户达标 → 结果集必空
+                query = query.filter(VisitAmapCustomer.amap_poi_id.in_([]))
+            elif not poi_ids and strategy == "__INCLUDE_UNBOUND__":
+                # 仅设上限，所有绑定客户金额都超出上限 → 只保留未绑定客户（金额视为 0 ≤ max）
+                query = query.filter(VisitAmapCustomer.status == 0)
+            else:
+                # 分批 IN 过滤（避免 POI 集合过大导致 IN 子句过长）
+                chunk_size = 500
+                chunks = [list(poi_ids)[i:i + chunk_size] for i in range(0, len(poi_ids), chunk_size)]
+                conds = [VisitAmapCustomer.amap_poi_id.in_(c) for c in chunks]
+                if strategy == "__INCLUDE_UNBOUND__":
+                    # 仅设上限：未绑定客户（status=0，无任何绑定记录）也应包含
+                    conds.append(VisitAmapCustomer.status == 0)
+                query = query.filter(or_(*conds))
+
     total = query.count()
 
     # 默认排序：最近拜访时间倒序（从未拜访排最后），时间相同时按更新时间倒序
@@ -220,6 +364,24 @@ def get_distinct_customer_types(session):
 def get_distinct_purchase_channels(session):
     """拿货渠道原始值（多值字段下拉选项，见 get_distinct_multi_values）"""
     return get_distinct_multi_values(session, VisitAmapCustomer.purchase_channels)
+
+
+def get_all_addresses(session):
+    """
+    查询全部客户地址（省市区镇级联下拉选项解析用，排除无效客户与空地址）
+
+    数据量 = 库内有效客户数（千级别），一次性载入内存由服务层解析，
+    与 get_distinct_multi_values「取库中实际数据动态生成下拉」的口径一致。
+
+    :param session: SQLAlchemy Session 对象
+    :return: list[str] 非空地址列表（不去重，重复地址由服务层聚合时自然去重）
+    """
+    rows = session.query(VisitAmapCustomer.address).filter(
+        VisitAmapCustomer.status != 2,
+        VisitAmapCustomer.address.isnot(None),
+        VisitAmapCustomer.address != '',
+    ).all()
+    return [r[0] for r in rows]
 
 
 def bump_last_visit_times(session, poi_max_times):

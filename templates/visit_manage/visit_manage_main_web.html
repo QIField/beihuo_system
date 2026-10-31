@@ -221,10 +221,10 @@
             <div class="v-header-tabs" id="header-tabs"></div>
 
             <!-- 右侧用户 -->
-            <div class="v-user">
+            <!-- <div class="v-user">
                 <span>区域经理</span>
                 <span class="v-user-avatar">经</span>
-            </div>
+            </div> -->
         </div>
 
         <!-- 第二行：筛选栏（M1 筛选与全局搜索暂不实现，已下线） -->
@@ -255,14 +255,78 @@
 
     <script src="{{ url_for('static', filename='layui/layui.js') }}"></script>
     <script>
-        layui.use(['jquery', 'laytpl'], function () {
+        layui.use(['jquery', 'laytpl', 'layer'], function () {
             var $ = layui.jquery;
             var laytpl = layui.laytpl;
+            var layer = layui.layer;
+
+            // ==================== 全局权限提示（401/403） ====================
+            // 后端权限装饰器统一返回 JSON {code, msg, data}：未登录 401、权限不足 403。
+            // 这里包装 $.ajax 把 401/403 的响应 msg 改写为友好文案：
+            // 片段内已有 error 回调（layer.msg(xhr.responseJSON.msg)）无需改动即展示该提示；
+            // 没有写 error 回调的请求则在此兜底弹一次提示。
+            var PERM_NAMES = {
+                'visit:view': '汽配客访管理',
+                'visit:expense': '汽配客访管理费用'
+            };
+
+            // 根据状态码生成友好权限文案（非 401/403 返回 null，表示不干预）
+            function friendlyAuthMsg(xhr) {
+                if (xhr.status === 401) return '登录已过期，请刷新页面重新登录';
+                if (xhr.status !== 403) return null;
+                // 从后端原始 msg（如"权限不足，需要权限: visit:view"）中提取权限编码，翻译为中文权限名
+                var raw = (xhr.responseJSON && xhr.responseJSON.msg) || '';
+                var codes = raw.match(/[a-zA-Z_]+:[a-zA-Z_]+/g) || [];
+                if (!codes.length) return '权限不足，请联系管理员开通权限';
+                var names = [];
+                for (var i = 0; i < codes.length; i++) {
+                    var name = PERM_NAMES[codes[i]] || codes[i];
+                    if (names.indexOf(name) === -1) names.push(name);
+                }
+                return '权限不足：您还没有「' + names.join('」「') + '」权限，请联系管理员开通';
+            }
+
+            // 包装 $.ajax（兼容 $.ajax(options) 与 $.ajax(url, options) 两种调用形式）
+            (function () {
+                var rawAjax = $.ajax;
+                function patchOpts(opts) {
+                    var origError = opts.error;
+                    opts.error = function (xhr) {
+                        var msg = friendlyAuthMsg(xhr);
+                        if (msg) {
+                            // 改写响应体 msg，让片段已有的 error 提示逻辑直接展示友好文案
+                            try {
+                                xhr.responseJSON = { code: xhr.status, msg: msg, data: null };
+                            } catch (e) { /* 改写失败时按原始文案提示 */ }
+                            if (!origError) {
+                                // 请求未写 error 回调：此处兜底弹一次，避免权限问题静默无反馈
+                                layer.msg(msg, { icon: 2, time: 3000 });
+                            }
+                        }
+                        if (origError) return origError.apply(this, arguments);
+                    };
+                    return opts;
+                }
+                $.ajax = function (url, settings) {
+                    if (typeof url === 'string') {
+                        // 浅拷贝 settings，避免污染调用方对象
+                        var opts = settings ? $.extend({}, settings) : {};
+                        opts.url = url;
+                        return rawAjax(patchOpts(opts));
+                    }
+                    return rawAjax(patchOpts(url));
+                };
+            })();
 
             // ==================== 路由与模板配置 ====================
             // 子页面为 HTML 片段（多文件拆分），由本主页面按 hash 按需加载并渲染。
             // 接入后端时仅需把 FRAGMENT_BASE 改为后端片段路由前缀，片段文件本身不需要改动。
             var FRAGMENT_BASE = 'views/';
+
+            // 最近访问客户记忆键（sessionStorage，仅当前标签页有效）：
+            // 客户 ID 只存在于 hash 第三段，切到客户列表/费用分析后 hash 被整体替换、ID 丢失，
+            // 靠此快照在返回详情页时回填，避免"未选择客户/无数据"
+            var LAST_CUSTOMER_KEY = 'visit_manage.last_customer';
 
             // 页面级路由（对应头部 #header-tabs，页面切换唯一入口）
             var PAGES = [
@@ -274,9 +338,11 @@
                         { key: 'visit',  title: '拜访历史', file: 'detail_visit_tab.html' },
                         { key: 'order',  title: '拿货订单', file: 'detail_order_tab.html' },
                         { key: 'info',   title: '基础档案', file: 'detail_info_tab.html' },
-                        { key: 'follow', title: '跟进记录', file: 'detail_follow_tab.html' }
+                        { key: 'follow', title: '跟进记录', file: 'detail_follow_tab.html' },
+                        { key: 'invest', title: '客户累计投入', file: 'detail_invest_tab.html' }
                     ]
                 },
+                { key: 'expense', title: '费用分析', file: 'expense_analysis.html' },
                 { key: 'settings', title: '设置', file: 'settings.html' }
             ];
 
@@ -298,7 +364,8 @@
 
             function parseHash() {
                 var parts = location.hash.replace(/^#\/?/, '').split('/');
-                return { page: parts[0] || '', tab: parts[1] || '' };
+                // poi = 第三段客户 ID（保持编码原样，详情片段读取时自行 decode）
+                return { page: parts[0] || '', tab: parts[1] || '', poi: parts[2] || '' };
             }
 
             function render() {
@@ -307,6 +374,27 @@
                 var tab = null;
                 if (page.tabs) {
                     tab = findBy(page.tabs, h.tab) || findBy(page.tabs, page.defaultTab);
+                }
+
+                // 记住/恢复最近访问的客户：进入详情页或切换详情子 Tab 时（hash 完整）刷新快照；
+                // 从列表/费用分析切回详情时 hash 缺第三段，用快照回填上次的客户 ID 与 Tab
+                if (page.key === 'customer_detail') {
+                    if (h.poi) {
+                        try {
+                            sessionStorage.setItem(LAST_CUSTOMER_KEY, JSON.stringify({ id: h.poi, tab: tab ? tab.key : 'visit' }));
+                        } catch (e) { /* 隐私模式等存储不可用时忽略，不影响页面 */ }
+                    } else {
+                        var last = null;
+                        try {
+                            last = JSON.parse(sessionStorage.getItem(LAST_CUSTOMER_KEY) || 'null');
+                        } catch (e) { last = null; }
+                        if (last && last.id) {
+                            // id 保持编码原样直接拼接（与 hash 一致），避免二次编码；
+                            // replace 不产生新历史记录，hash 变更会自动触发下一次 render
+                            location.replace('#/customer_detail/' + (last.tab || 'visit') + '/' + last.id);
+                            return;
+                        }
+                    }
                 }
 
                 // 头部 Tab 与面包屑同步
