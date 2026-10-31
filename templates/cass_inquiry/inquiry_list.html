@@ -178,6 +178,10 @@
                     <input type="text" class="search-input" id="searchBrand" placeholder="请输入品牌">
                 </div>
                 <div class="filter-item">
+                    <label>车辆品牌</label>
+                    <input type="text" class="search-input" id="searchCarModel" placeholder="请输入车型，如：奔驰">
+                </div>
+                <div class="filter-item">
                     <label>供应商</label>
                     <input type="text" class="search-input" id="searchStore" placeholder="请输入供应商">
                 </div>
@@ -210,7 +214,7 @@
                         <span class="toolbar-label">供应商</span>
                         <div class="store-select">
                             <input type="text" class="text-input" id="compareStoreInput"
-                                   placeholder="输入名称过滤或直接选择" autocomplete="off">
+                                   placeholder="输入名称过滤，留空查全部供应商" autocomplete="off">
                             <span class="store-arrow"></span>
                             <div class="store-options" id="compareStoreOptions"></div>
                         </div>
@@ -219,7 +223,7 @@
                         <span class="toolbar-label">结束日期</span>
                         <input type="date" class="text-input date-input" id="compareEndDate">
                         <button type="button" class="btn btn-primary" id="compareStartBtn">开始比对</button>
-                        <span class="toolbar-tip">与「佛山巴博瑞汽配」按译码OE号+品牌一对一比对，价格取卖家价格；日期留空为全部；基准为巴博瑞同OE同品牌最低价</span>
+                        <span class="toolbar-tip">与「佛山巴博瑞汽配」按译码OE号+品牌一对一比对，价格取卖家价格；供应商留空为全部供应商，日期留空为全部；基准为巴博瑞同OE同品牌最低价</span>
                     </div>
                     <div class="data-container compare-data-container">
                         <div class="data-header">

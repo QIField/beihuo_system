@@ -1,8 +1,9 @@
 """
 修理厂询价单 · 供应商价格对比服务
 
-以译码OE号(decode_num) + 品牌(brand_name) 严格一对一比对：所选供应商的报价行，
-仅当巴博瑞（佛山巴博瑞汽配）存在同译码OE号且同品牌的记录时才展示；
+以译码OE号(decode_num) + 品牌(brand_name) 严格一对一比对：供应商（留空=全部供应商，
+排除巴博瑞自身与空值）的报价行，仅当巴博瑞（佛山巴博瑞汽配）存在同译码OE号且同品牌的
+记录时才展示；
 价格字段取卖家价格(seller_price，varchar 转数值)，巴博瑞同 OE+品牌多条记录时取最低价作基准。
 无基准或价格非法的行不比对、不展示。
 连接方式：PyMySQL db_cursor，与 query_service 同源（跟随启动菜单选库）。
@@ -104,7 +105,7 @@ def query_price_compare(store_name=None, page=1, page_size=20, sort_column=None,
     """
     分页查询供应商与巴博瑞的价格对比（单方向）
 
-    :param store_name: 供应商名称（必填，精确匹配）
+    :param store_name: 供应商名称（可空=全部供应商，排除巴博瑞；填写时精确匹配）
     :param page: 页码（从1开始）
     :param page_size: 每页条数
     :param sort_column: 排序列（白名单内，含计算列 bbri_price/diff；白名单外回落默认排序）
@@ -118,8 +119,6 @@ def query_price_compare(store_name=None, page=1, page_size=20, sort_column=None,
              warehouse/seller_price/bbri_price/diff；无基准行不返回
     """
     store = (store_name or '').strip()
-    if not store:
-        raise ValueError('请选择供应商')
     if store == BBRI_STORE_NAME:
         raise ValueError('巴博瑞自身无需比对')
     if status not in ('higher', 'lower'):
@@ -170,8 +169,8 @@ def filter_values(column, store_name, column_filters=None, start_date=None, end_
     if column not in FILTERABLE_COLUMNS:
         raise ValueError(f'不支持的筛选列: {column}')
     store = (store_name or '').strip()
-    if not store:
-        raise ValueError('请选择供应商')
+    if store == BBRI_STORE_NAME:
+        raise ValueError('巴博瑞自身无需比对')
     if status not in ('higher', 'lower'):
         raise ValueError('对比方向无效')
     start_date = _validate_date(start_date, '开始日期')
@@ -244,21 +243,25 @@ def _fetch_store_quotes(store, start_date=None, end_date=None):
     """
     全量查询供应商报价记录（含译码OE号非空行），默认按译码OE号升序、同OE内卖家价格降序
 
-    单供应商记录量为几百~几千行级，全量取出后在内存排序分页，
-    使计算列（巴博瑞基准价/价差）也能参与排序
+    store 为空时查询全部供应商（排除巴博瑞自身与空值），供"仅按日期查全部"场景；
+    单/全量均取出后内存排序分页，使计算列（巴博瑞基准价/价差）也能参与排序
     """
+    if store:
+        store_cond, params = 'store_name = %s', [store]
+    else:
+        store_cond = "store_name IS NOT NULL AND store_name != '' AND store_name != %s"
+        params = [BBRI_STORE_NAME]
     sql = """
         SELECT decode_num, merchant_parts_num, brand_name, parts_name, quality_name, num,
                location_name AS warehouse, seller_price
         FROM cass_inquiry_quote
-        WHERE store_name = %s AND decode_num IS NOT NULL AND decode_num != ''
+        WHERE {store_cond} AND decode_num IS NOT NULL AND decode_num != ''
         {date_cond}
         ORDER BY decode_num, seller_price + 0 DESC, id DESC
     """
-    params = [store]
     date_cond = _date_condition_sql(start_date, end_date, params)
     with db_cursor(dict_cursor=False) as cursor:
-        cursor.execute(sql.format(date_cond=date_cond), params)
+        cursor.execute(sql.format(store_cond=store_cond, date_cond=date_cond), params)
         return cursor.fetchall()
 
 

@@ -127,6 +127,9 @@ var CassInquiryList = (function() {
         var brand = document.getElementById('searchBrand').value.trim();
         if (brand) params.brand_name = brand;
 
+        var carModel = document.getElementById('searchCarModel').value.trim();
+        if (carModel) params.car_model = carModel;
+
         var store = document.getElementById('searchStore').value.trim();
         if (store) params.store_name = store;
 
@@ -200,12 +203,12 @@ var CassInquiryList = (function() {
         });
 
         resetBtn.addEventListener('click', function() {
-            ['inquiryDateRange', 'searchDecodeNum', 'searchBrand', 'searchStore', 'searchInquiryId']
+            ['inquiryDateRange', 'searchDecodeNum', 'searchBrand', 'searchCarModel', 'searchStore', 'searchInquiryId']
                 .forEach(function(id) { document.getElementById(id).value = ''; });
             if (builder) builder.refresh(1);
         });
 
-        ['searchDecodeNum', 'searchBrand', 'searchStore', 'searchInquiryId'].forEach(function(id) {
+        ['searchDecodeNum', 'searchBrand', 'searchCarModel', 'searchStore', 'searchInquiryId'].forEach(function(id) {
             document.getElementById(id).addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') searchBtn.click();
             });
