@@ -1,6 +1,6 @@
 # coding:utf-8
 """
-对比测试 Chrome 启动耗时，复刻 v5_automation.py 的参数组合。
+对比测试 Chrome 启动耗时，复刻 下推收款单.py 的参数组合。
 只打开浏览器并访问金蝶登录页（不登录、不操作），然后关闭。
 """
 import logging
@@ -41,7 +41,7 @@ def _build_options(
 ):
     opts = Options()
     if original:
-        # 完全复刻 v5_automation.py 原参数
+        # 完全复刻 下推收款单.py 原参数
         opts.add_argument("--log-level=1")
         opts.add_experimental_option(
             "excludeSwitches", ["enable-logging", "enable-automation"]

@@ -7,7 +7,7 @@ v5_coupon_handler.py —— 开思券场景下推收款单/收款退款单。
   - execute_coupon_return: 开思券退货单（平台已结算金额 < 0）下推收款退款单
 
 「修改收款单/退款单明细网格」使用纯 HTML/Selenium；
-其余填单/保存操作沿用 v5_automation.py 的模拟点击坐标。
+其余填单/保存操作沿用 下推收款单.py 的模拟点击坐标。
 """
 import time
 
@@ -16,7 +16,7 @@ import pyperclip
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 
-from v5_automation import (
+from 下推收款单 import (
     BANK_ACCOUNT_NO_INVOICE,
     BANK_ACCOUNT_INVOICED,
     SETTLE_TYPE_NAME,

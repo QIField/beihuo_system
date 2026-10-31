@@ -1,12 +1,12 @@
 # coding:utf-8
 """
-v5_automation.py —— 用 Selenium + pyautogui 模拟人工从金蝶应收单下推生成收款单。
+下推收款单.py —— 用 Selenium + pyautogui 模拟人工从金蝶应收单下推生成收款单。
 
 复用思路来自 tests/External/old_script/开思对账V5.py，但做如下改进：
 - 不再按客户代码搜索，而是按对账结果里的「单据编号-金蝶」（应收单号）
   在应收单列表的「单据编号」筛选框定位到那一张单，再逐单下推；
 - 登录信息、URL、业务日期、坐标等参数化；
-- 仅处理一次性收款：create_excel.py 已排除非一次性场景，下推时不再修改源单明细金额；
+- 仅处理一次性收款：生成对账Excel.py 已排除非一次性场景，下推时不再修改源单明细金额；
 - 银行账号按发票类型选择：无需发票/不开票 → 无需发票账户；其余 → 已开票账户；
 - 收款/退款不区分：下推时金蝶根据源单蓝字/红字自动生成销售收款单或收款退款单。
 
@@ -538,7 +538,7 @@ def execute_refund(driver, bill_no, skd_date, refund_amount, invoice_type="已�
 # ======================================================================
 
 def load_reconcile_excel(skd_date=None):
-    """读取 create_excel.py 生成的最新对账 Excel。
+    """读取 生成对账Excel.py 生成的最新对账 Excel。
 
     同时读取「模拟点击数据源」和「开思卷明细」两个 sheet，后者用于券场景逐行填单。
     自动新增「是否模拟点击状态」列，并过滤掉已标记为「已写入金蝶」的行。
@@ -551,7 +551,7 @@ def load_reconcile_excel(skd_date=None):
     os.makedirs(data_dir, exist_ok=True)
     files = glob.glob(os.path.join(data_dir, "开思对账_行合并_*.xlsx"))
     if not files:
-        raise FileNotFoundError(f"{data_dir} 下未找到 开思对账_行合并_*.xlsx，请先运行 create_excel.py")
+        raise FileNotFoundError(f"{data_dir} 下未找到 开思对账_行合并_*.xlsx，请先运行 生成对账Excel.py")
     latest = sorted(files)[-1]  # 按文件名（含时间戳）升序，取最后一个
     print(f"读取对账文件 -> {latest}")
 

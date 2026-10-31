@@ -1,8 +1,8 @@
 # coding:utf-8
 """
-coupon_v5_automation.py —— 开思券下推金蝶自动化（独立脚本）
+开思券下推.py —— 开思券下推金蝶自动化（独立脚本）
 
-输入：ks_coupon_reconcile.py 生成的最新「开思券对账_*.xlsx」中的「金蝶写入数据源」sheet。
+输入：开思券对账.py 生成的最新「开思券对账_*.xlsx」中的「金蝶写入数据源」sheet。
       该 sheet 仅包含「对账状态 == 只缺开思卷」的行。
 
 流程：
@@ -16,7 +16,7 @@ coupon_v5_automation.py —— 开思券下推金蝶自动化（独立脚本）
   5. 成功后回写「是否写入金蝶 = 已写入金蝶」。
 
 依赖：selenium、pyautogui、pyperclip、webdriver（Chrome）
-运行环境：1920x1080 高分屏（坐标与 v5_automation.py 一致）
+运行环境：1920x1080 高分屏（坐标与 下推收款单.py 一致）
 """
 import datetime
 import glob
@@ -317,14 +317,14 @@ def execute_coupon_push(driver, bill_no, skd_date, coupon_amount, invoice_type="
 # ======================================================================
 
 def load_coupon_excel(skd_date=None):
-    """读取 ks_coupon_reconcile.py 生成的最新 Excel 中的「金蝶写入数据源」sheet。"""
+    """读取 开思券对账.py 生成的最新 Excel 中的「金蝶写入数据源」sheet。"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(script_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
 
     files = glob.glob(os.path.join(data_dir, "开思券对账_*.xlsx"))
     if not files:
-        raise FileNotFoundError(f"{data_dir} 下未找到 开思券对账_*.xlsx，请先运行 ks_coupon_reconcile.py")
+        raise FileNotFoundError(f"{data_dir} 下未找到 开思券对账_*.xlsx，请先运行 开思券对账.py")
     latest = sorted(files)[-1]
     print(f"读取对账文件 -> {latest}")
 

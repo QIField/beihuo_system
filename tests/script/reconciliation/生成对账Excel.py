@@ -1,6 +1,6 @@
 # coding:utf-8
 """
-create_excel.py —— 开思对账数据处理脚本
+生成对账Excel.py —— 开思对账数据处理脚本
 
 功能：
   1. 读取开思电子对账单 + 订单结算明细，合并为开思数据；
@@ -8,7 +8,7 @@ create_excel.py —— 开思对账数据处理脚本
   3. 输出对账结果 Excel（对账结果/模拟点击数据源/开思卷明细/开思人工核对/金蝶人工核对 5 个 sheet）。
 
 使用方式：
-  python tests/script/reconciliation/create_excel.py
+  python tests/script/reconciliation/生成对账Excel.py
 
 默认读取本脚本所在目录下的：
   - 开思电子对账单*.xlsx（按前缀自动匹配）
@@ -18,7 +18,7 @@ create_excel.py —— 开思对账数据处理脚本
 输出到本脚本所在目录下：
   - 开思对账_行合并_时间戳.xlsx
 
-模拟点击下推收款单由 v5_automation.py 负责（数据处理与模拟点击分离）。
+模拟点击下推收款单由 下推收款单.py 负责（数据处理与模拟点击分离）。
 """
 import datetime
 import os
@@ -108,5 +108,5 @@ def main_generate_excel(skd_date=None):
 
 if __name__ == "__main__":
     # 本脚本只负责数据处理：生成对账 Excel。
-    # 模拟点击下推收款单请单独运行 v5_automation.py（数据处理与模拟点击分离）。
+    # 模拟点击下推收款单请单独运行 下推收款单.py（数据处理与模拟点击分离）。
     main_generate_excel()
