@@ -13,7 +13,7 @@ MYSQL_CONFIG = {
     'host': '113.45.176.129',
     'port': 3306,
     'user': 'fsbbr_data',
-    'password': 'wRCA8AGn3a568f4X',
+    'password': 'n3Mepj4JD4JxWCJM',
     'database': 'fsbbr_data',
     'charset': 'utf8mb4',
     'autocommit': True,

@@ -75,7 +75,7 @@ def _create_config(choice):
             'host': os.environ.get('MYSQL_ONLINE_HOST', '113.45.176.129'),
             'port': int(os.environ.get('MYSQL_ONLINE_PORT', 3306)),
             'user': os.environ.get('MYSQL_ONLINE_USER', 'fsbbr_data'),
-            'password': os.environ.get('MYSQL_ONLINE_PASSWORD', 'wRCA8AGn3a568f4X'),
+            'password': os.environ.get('MYSQL_ONLINE_PASSWORD', 'n3Mepj4JD4JxWCJM'),
             'database': os.environ.get('MYSQL_ONLINE_DATABASE', 'fsbbr_data'),
             'charset': 'utf8mb4',
             'autocommit': True,

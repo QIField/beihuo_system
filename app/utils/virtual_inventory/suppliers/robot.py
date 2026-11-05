@@ -167,7 +167,7 @@ def fetch_and_process_latest_data():
     host = '113.45.176.129'
     port = 3306
     user = 'fsbbr_data'
-    password = 'wRCA8AGn3a568f4X'
+    password = 'n3Mepj4JD4JxWCJM'
     database = 'fsbbr_data'
 
     # 连接MySQL数据库
