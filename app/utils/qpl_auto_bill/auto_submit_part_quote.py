@@ -626,9 +626,9 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                     c['brand_type_desc'] == '原厂' for c in candidates
                 )
 
-                # 调用 CRM 接口
+                # 调用 CRM 接口（fetch 请求超时/连接失败返回 None，按临时错误跳过，等下轮重试）
                 response = spider.get_product_product_list(numberlist=item_oe, is_stock="1")
-                if response.status_code != 200:
+                if response is None or response.status_code != 200:
                     continue
 
                 crm_data = response.json()
