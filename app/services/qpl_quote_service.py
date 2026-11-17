@@ -8,9 +8,11 @@
 
 原则：
   1. 减少逻辑判断，必要情况下采取字典分发
-  2. 问题直接暴露，不写错误处理语句
+  2. 异常按层级隔离：条目级记录后跳过、订单级跳过继续、公司级跳过继续，
+     不让单点异常中断整轮任务
 """
 
+import logging
 from datetime import datetime
 from app.utils.qpl_auto_bill.auto_submit_part_quote import (
     submit_all_quotes,
@@ -22,9 +24,13 @@ from app.utils.qpl_auto_bill.auto_submit_part_quote import (
     FAIL_PART_NO_MISMATCH,
     FAIL_NO_EFFECTIVE_PRICE,
     FAIL_PRICE_CHECK_FAILED,
+    FAIL_NO_CANDIDATE,
+    FAIL_CRM_API_ERROR,
 )
 from app.utils.qpl_auto_bill.qpl_config import get_supported_companies, qpl_log
 from app.utils.database_connection import get_db_connection
+
+_qpl_logger = logging.getLogger('qpl_auto_bill')
 
 
 # ============================================================================
@@ -192,14 +198,19 @@ def _collect_item_details(demand_list, extra_quote_items, failed_items,
                 )
                 continue
             else:
+                # 状态异常：不中断整单，按业务失败明细落库（下轮按已处理跳过）
                 qpl_log(
                     f"[{company or 'unknown'}] 项目 {enquiry_item_id} 状态异常 "
-                    f"(quote_status={quote_status}) 无报价记录",
+                    f"(quote_status={quote_status}) 无报价记录，按失败明细落库",
                     order_no=enquiry_no
                 )
-                raise RuntimeError(
-                    f"订单 {enquiry_no} 项目 {enquiry_item_id} 状态异常，"
-                    f"quote_status={quote_status}，无报价记录"
+                _extract_without_quotes(
+                    details=details, supplier_demand_id=supplier_demand_id,
+                    enquiry_item_id=enquiry_item_id, item_oe=item_oe,
+                    item_name=item_name, item_description=item_description,
+                    quote_status=quote_status,
+                    failed_items={enquiry_item_id: f'状态异常({quote_status})'},
+                    enquiry_no=enquiry_no
                 )
     return details
 
@@ -453,6 +464,10 @@ _CRM_FAIL_STAGE_MAP = {
     FAIL_PART_NO_MISMATCH: 'partNo匹配',
     FAIL_NO_EFFECTIVE_PRICE: '价格校验',
     FAIL_PRICE_CHECK_FAILED: 'priceCheck',
+    FAIL_NO_CANDIDATE: '品牌匹配',
+    FAIL_CRM_API_ERROR: '接口请求',
+    FAIL_ADAPT_LIST_EMPTY: '品牌匹配',
+    FAIL_NO_STOCK: '库存检查',
 }
 
 _BC_FAIL_STAGE_MAP = {
@@ -548,6 +563,66 @@ def _build_item_submit_results(order_success, crm_quote_item_ids, crm_failed_ite
     return item_results
 
 
+def _persist_order_result(result, company):
+    """保存单个订单的报价结果与流程追踪（明细提取 + 落库）"""
+    # 判定提交状态
+    message = result.get('message', '')
+    is_cannot_quote = message.startswith('cannotQuote')
+    if is_cannot_quote:
+        submit_status = 'cannot_quote成功' if result.get('success') else 'cannot_quote失败'
+    elif result.get('success'):
+        submit_status = '提交成功'
+    else:
+        submit_status = '提交失败'
+
+    # 构造每个项目的新表字段
+    item_submit_results = _build_item_submit_results(
+        result.get('success', False),
+        result.get('crm_quote_item_ids', set()),
+        result.get('crm_failed_items', {}),
+        result.get('original_quoted_ids', set()),
+        result.get('bc_quote_item_ids', set()),
+        result.get('bc_failed_items', {}),
+        result.get('order_category', 'A'),
+        submit_message=message
+    )
+
+    # 覆盖提交状态（根据订单级别统一）
+    for item_id in item_submit_results:
+        item_submit_results[item_id]['submit_status'] = submit_status
+
+    # 提取明细并保存（所有结果都保存，不再判断 success）
+    failed_items = result.get('failed_items', {})
+    extra_quote_items = result.get('extra_quote_items', {})
+    failed_brand_names = result.get('failed_brand_names', {})
+    failed_item_prices = result.get('failed_item_prices', {})
+    failure_categories = result.get('failure_categories', {})
+    retry_counts = result.get('retry_counts', {})
+    details = extract_quote_details(
+        result['detail_data'], failed_items, extra_quote_items,
+        item_submit_results, result.get('success', False),
+        failed_brand_names=failed_brand_names,
+        failed_item_prices=failed_item_prices,
+        failure_categories=failure_categories,
+        retry_counts=retry_counts,
+        company=company
+    )
+
+    if details:
+        save_quote_records(
+            enquiry_no=result['enquiry_no'],
+            details=details,
+            submit_result=message,
+            submit_time=result['submit_time'],
+            company=company
+        )
+
+    # 保存流程追踪记录
+    flow_trace_list = result.get('flow_trace_list', [])
+    if flow_trace_list:
+        save_flow_trace_records(flow_trace_list, company=company)
+
+
 def process_and_save_quotes_for_company(company, begin_date=None, end_date=None):
     """
     处理指定组织的报价并保存结果
@@ -571,64 +646,15 @@ def process_and_save_quotes_for_company(company, begin_date=None, end_date=None)
     fail_count = 0
 
     for result in results:
-        # 判定提交状态
-        message = result.get('message', '')
-        is_cannot_quote = message.startswith('cannotQuote')
-        if is_cannot_quote:
-            submit_status = 'cannot_quote成功' if result.get('success') else 'cannot_quote失败'
-        elif result.get('success'):
-            submit_status = '提交成功'
-        else:
-            submit_status = '提交失败'
-
-        # 构造每个项目的新表字段
-        item_submit_results = _build_item_submit_results(
-            result.get('success', False),
-            result.get('crm_quote_item_ids', set()),
-            result.get('crm_failed_items', {}),
-            result.get('original_quoted_ids', set()),
-            result.get('bc_quote_item_ids', set()),
-            result.get('bc_failed_items', {}),
-            result.get('order_category', 'A'),
-            submit_message=message
-        )
-
-        # 覆盖提交状态（根据订单级别统一）
-        for item_id in item_submit_results:
-            item_submit_results[item_id]['submit_status'] = submit_status
-
-        # 提取明细并保存（所有结果都保存，不再判断 success）
-        failed_items = result.get('failed_items', {})
-        extra_quote_items = result.get('extra_quote_items', {})
-        failed_brand_names = result.get('failed_brand_names', {})
-        failed_item_prices = result.get('failed_item_prices', {})
-        failure_categories = result.get('failure_categories', {})
-        retry_counts = result.get('retry_counts', {})
-        details = extract_quote_details(
-            result['detail_data'], failed_items, extra_quote_items,
-            item_submit_results, result.get('success', False),
-            failed_brand_names=failed_brand_names,
-            failed_item_prices=failed_item_prices,
-            failure_categories=failure_categories,
-            retry_counts=retry_counts,
-            company=company
-        )
-
-        if details:
-            save_quote_records(
-                enquiry_no=result['enquiry_no'],
-                details=details,
-                submit_result=message,
-                submit_time=result['submit_time'],
-                company=company
+        try:
+            _persist_order_result(result, company)
+        except Exception as save_error:
+            # 落库级异常隔离：单个订单保存失败不影响其余订单
+            _qpl_logger.exception(
+                f"[{company}] 报价结果落库失败: {result.get('enquiry_no')}: {save_error}"
             )
 
-        # 保存流程追踪记录
-        flow_trace_list = result.get('flow_trace_list', [])
-        if flow_trace_list:
-            save_flow_trace_records(flow_trace_list, company=company)
-
-        # 统计
+        # 统计（无论保存是否成功，该订单本轮均已处理）
         category_counts[result['order_category']] += 1
         if result['success']:
             success_count += 1
@@ -661,7 +687,20 @@ def process_and_save_quotes_for_all_companies(begin_date=None, end_date=None):
     all_results = []
 
     for company in companies:
-        result = process_and_save_quotes_for_company(company, begin_date, end_date)
+        try:
+            result = process_and_save_quotes_for_company(company, begin_date, end_date)
+        except Exception:
+            # 公司级异常隔离：单个公司失败不影响其他公司
+            _qpl_logger.exception(f"[汽配龙报价] 组织 {company} 本轮处理异常，跳过该公司继续")
+            result = {
+                'company': company,
+                'success_count': 0,
+                'fail_count': 0,
+                'total': 0,
+                'category_a': 0,
+                'category_b': 0,
+                'category_c': 0
+            }
         all_results.append(result)
 
     # 汇总统计

@@ -155,20 +155,26 @@ FAIL_INVALID_PRICE = "价格无效"
 FAIL_PART_NO_MISMATCH = "partNo未匹配"
 FAIL_NO_EFFECTIVE_PRICE = "无有效价格"
 FAIL_PRICE_CHECK_FAILED = "价格检测失败"
+FAIL_NO_CANDIDATE = "无候选产品"
+FAIL_CRM_API_ERROR = "CRM接口异常"
 
 # 失败分类常量
 FAILURE_CATEGORY_BUSINESS = "business"
 FAILURE_CATEGORY_TEMPORARY = "temporary"
 FAILURE_CATEGORY_RETRY_EXHAUSTED = "retry_exhausted"
 
-# 临时错误：网络/服务抖动等，允许重试
+# 临时错误：网络/服务抖动等，允许冷却后重试
+# 注意：FAIL_PRICE_CHECK_FAILED（价格检测失败）属于价格问题，重试无意义，归入业务错误
 TEMPORARY_FAILURE_REASONS = {
     FAIL_OE_DATA_MISSING,
-    FAIL_PRICE_CHECK_FAILED,
+    FAIL_CRM_API_ERROR,
 }
 
 # 最大重试次数
 MAX_RETRY_COUNT = 3
+
+# 临时错误冷却时长（小时）：失败后需间隔该时长才允许下一次重试
+COOLDOWN_HOURS = 4
 
 
 # 通用工具函数
@@ -250,7 +256,7 @@ def _filter_processed_orders(order_nos, company, begin_date, end_date):
         with conn.cursor(DictCursor) as cursor:
             placeholders = ','.join(['%s'] * len(order_nos))
             sql = f"""
-                SELECT supplier_enquiry_no, enquiry_item_id, retry_count, fail_type
+                SELECT supplier_enquiry_no, enquiry_item_id, retry_count, fail_type, submit_time
                 FROM qpl_quote_result_v2
                 WHERE company = %s
                   AND supplier_enquiry_no IN ({placeholders})
@@ -261,20 +267,39 @@ def _filter_processed_orders(order_nos, company, begin_date, end_date):
             cursor.execute(sql, params)
             rows = cursor.fetchall()
 
-            processed_items = set()
-            item_retry_info = {}
+            # 同一 item 可能有多条记录（多品牌报价），按 item 聚合后统一判定
+            grouped = {}
             for row in rows:
                 item_key = (row['supplier_enquiry_no'], row['enquiry_item_id'])
-                retry_count = row.get('retry_count', 0) or 0
-                fail_type = row.get('fail_type')
+                grouped.setdefault(item_key, []).append(row)
+
+            now = datetime.now()
+            cooldown_delta = timedelta(hours=COOLDOWN_HOURS)
+
+            processed_items = set()
+            item_retry_info = {}
+            for item_key, item_rows in grouped.items():
+                fail_types = {r.get('fail_type') for r in item_rows}
+                non_null_fail_types = fail_types - {None}
+                retry_count = max((r.get('retry_count') or 0) for r in item_rows)
+                last_time = max((r.get('submit_time') for r in item_rows), default=None)
+
+                if '成功' in fail_types:
+                    primary_fail_type = '成功'
+                    processed_items.add(item_key)
+                elif '临时错误' in fail_types and retry_count < MAX_RETRY_COUNT:
+                    primary_fail_type = '临时错误'
+                    # 冷却期内视为已处理（跳过本轮），冷却结束后允许重试
+                    if last_time and (now - last_time) < cooldown_delta:
+                        processed_items.add(item_key)
+                else:
+                    primary_fail_type = next(iter(non_null_fail_types)) if non_null_fail_types else None
+                    processed_items.add(item_key)
+
                 item_retry_info[item_key] = {
                     'retry_count': retry_count,
-                    'fail_type': fail_type,
+                    'fail_type': primary_fail_type,
                 }
-                # 成功的记录 fail_type 为 '成功'；临时错误未达上限才不算处理完成
-                if fail_type == '临时错误' and retry_count < MAX_RETRY_COUNT:
-                    continue
-                processed_items.add(item_key)
             return processed_items, item_retry_info
     except Exception as e:
         qpl_log(f"[{company}] 查询已处理订单失败: {e}")
@@ -594,6 +619,18 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                 brand_list = adapt_result.get('data', {}).get('brandList', [])
 
                 if not brand_list:
+                    # 无适配品牌：业务失败，落库退出循环（原逻辑静默跳过导致每轮死循环重跑）
+                    crm_failed_items[enquiry_item_id] = (FAIL_ADAPT_LIST_EMPTY, False)
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no, 'company': company,
+                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                        'flow_name': 'CRM现货', 'flow_status': '失败', 'fail_stage': '品牌匹配',
+                        'fail_reason': FAIL_ADAPT_LIST_EMPTY, 'stage_detail': None,
+                    })
+                    qpl_log(
+                        f"[{company}] [CRM现货] item={enquiry_item_id} oe={item_oe} 结果=失败({FAIL_ADAPT_LIST_EMPTY})",
+                        order_no=enquiry_no
+                    )
                     continue
 
                 # 构建候选产品：遍历适配列表所有品牌
@@ -619,6 +656,18 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                         })
 
                 if not candidates:
+                    # 全部候选 pid 已报过或被车型过滤：业务失败，落库退出循环
+                    crm_failed_items[enquiry_item_id] = (FAIL_NO_CANDIDATE, False)
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no, 'company': company,
+                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                        'flow_name': 'CRM现货', 'flow_status': '失败', 'fail_stage': '品牌匹配',
+                        'fail_reason': FAIL_NO_CANDIDATE, 'stage_detail': None,
+                    })
+                    qpl_log(
+                        f"[{company}] [CRM现货] item={enquiry_item_id} oe={item_oe} 结果=失败({FAIL_NO_CANDIDATE})",
+                        order_no=enquiry_no
+                    )
                     continue
 
                 # 该 item 是否包含原厂品牌候选
@@ -626,13 +675,54 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                     c['brand_type_desc'] == '原厂' for c in candidates
                 )
 
-                # 调用 CRM 接口（fetch 请求超时/连接失败返回 None，按临时错误跳过，等下轮重试）
+                # 调用 CRM 接口：请求失败/响应异常按临时错误落库，冷却后重试
+                qpl_log(
+                    f"[{company}] [CRM现货] 调用CRM接口 item={enquiry_item_id} oe={item_oe}",
+                    order_no=enquiry_no
+                )
                 response = spider.get_product_product_list(numberlist=item_oe, is_stock="1")
                 if response is None or response.status_code != 200:
+                    crm_failed_items[enquiry_item_id] = (FAIL_CRM_API_ERROR, False)
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no, 'company': company,
+                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                        'flow_name': 'CRM现货', 'flow_status': '失败', 'fail_stage': '接口请求',
+                        'fail_reason': FAIL_CRM_API_ERROR, 'stage_detail': '响应不可用(超时或HTTP非200)',
+                    })
+                    qpl_log(
+                        f"[{company}] [CRM现货] item={enquiry_item_id} oe={item_oe} 结果=失败({FAIL_CRM_API_ERROR}: 响应不可用)",
+                        order_no=enquiry_no
+                    )
                     continue
 
-                crm_data = response.json()
+                try:
+                    crm_data = response.json()
+                except Exception as json_error:
+                    crm_failed_items[enquiry_item_id] = (FAIL_CRM_API_ERROR, False)
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no, 'company': company,
+                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                        'flow_name': 'CRM现货', 'flow_status': '失败', 'fail_stage': '接口请求',
+                        'fail_reason': FAIL_CRM_API_ERROR, 'stage_detail': f'响应解析失败: {json_error}',
+                    })
+                    qpl_log(
+                        f"[{company}] [CRM现货] item={enquiry_item_id} oe={item_oe} 结果=失败({FAIL_CRM_API_ERROR}: 响应解析失败)",
+                        order_no=enquiry_no
+                    )
+                    continue
+
                 if crm_data.get('status') != 200:
+                    crm_failed_items[enquiry_item_id] = (FAIL_CRM_API_ERROR, False)
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no, 'company': company,
+                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                        'flow_name': 'CRM现货', 'flow_status': '失败', 'fail_stage': '接口请求',
+                        'fail_reason': FAIL_CRM_API_ERROR, 'stage_detail': f"业务status={crm_data.get('status')}",
+                    })
+                    qpl_log(
+                        f"[{company}] [CRM现货] item={enquiry_item_id} oe={item_oe} 结果=失败({FAIL_CRM_API_ERROR}: status={crm_data.get('status')})",
+                        order_no=enquiry_no
+                    )
                     continue
 
                 crm_products = []
@@ -640,6 +730,18 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                     crm_products.extend(group.get('child', []))
 
                 if not crm_products:
+                    # CRM 无现货：业务失败，落库退出循环
+                    crm_failed_items[enquiry_item_id] = (FAIL_NO_STOCK, False)
+                    flow_trace_list.append({
+                        'supplier_enquiry_no': enquiry_no, 'company': company,
+                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                        'flow_name': 'CRM现货', 'flow_status': '失败', 'fail_stage': '库存检查',
+                        'fail_reason': FAIL_NO_STOCK, 'stage_detail': None,
+                    })
+                    qpl_log(
+                        f"[{company}] [CRM现货] item={enquiry_item_id} oe={item_oe} 结果=失败({FAIL_NO_STOCK})",
+                        order_no=enquiry_no
+                    )
                     continue
 
                 category_id = _extract_category_id(item)
@@ -770,8 +872,8 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
                         'fail_reason': None,
                         'stage_detail': None,
                     })
-                elif is_waiting and max_failure_stage > 0:
-                    # 等待报价项：品牌已匹配但后续失败才记录；品牌未匹配（stage=0）不记录
+                elif max_failure_stage > 0:
+                    # 品牌已匹配但后续失败：等待报价项与已报价项均记录，确保条目下轮退出
                     reason_map = {
                         1: FAIL_PART_NO_MISMATCH,
                         2: FAIL_NO_EFFECTIVE_PRICE,
@@ -800,7 +902,15 @@ def process_crm_spot_quote(detail_data, company='fsbbr', processed_item_ids=None
 
             except Exception as e:
                 qpl_log(f"[{company}] CRM现货流程处理异常: {e}", order_no=enquiry_no)
-                raise
+                # 单条目异常不再中断整轮任务：记录为临时错误后跳过，冷却后重试
+                crm_failed_items[enquiry_item_id] = (FAIL_CRM_API_ERROR, False)
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': 'CRM现货', 'flow_status': '失败', 'fail_stage': '接口请求',
+                    'fail_reason': FAIL_CRM_API_ERROR, 'stage_detail': f'处理异常: {e}',
+                })
+                continue
 
     return crm_quote_items, original_quoted_ids, crm_failed_items, crm_failed_brand_names, crm_failed_item_prices, flow_trace_list
 
@@ -857,16 +967,15 @@ def process_mercedes_order(detail_data, company='fsbbr', skip_item_ids=None, pro
                 enquiry_item_id, enquiry_no, company, expected_factory_brand
             )
             if error:
-                if error == FAIL_ADAPT_LIST_EMPTY:
-                    failed_items[enquiry_item_id] = error
-                    failed_brand_names[enquiry_item_id] = '无法报价'
-                    flow_trace_list.append({
-                        'supplier_enquiry_no': enquiry_no, 'company': company,
-                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
-                        'flow_name': '奔驰接口', 'flow_status': '失败', 'fail_stage': '无',
-                        'fail_reason': FAIL_ADAPT_LIST_EMPTY, 'stage_detail': None,
-                    })
-                # 无原厂产品：不记录
+                # 适配失败全部落库（含无原厂产品），确保条目下轮退出，不再每轮死循环重跑
+                failed_items[enquiry_item_id] = error
+                failed_brand_names[enquiry_item_id] = '无法报价' if error == FAIL_ADAPT_LIST_EMPTY else '无原厂'
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': '奔驰接口', 'flow_status': '失败', 'fail_stage': '无',
+                    'fail_reason': error, 'stage_detail': None,
+                })
                 continue
 
             factory_brand = adapt_data['brand']
@@ -1046,16 +1155,15 @@ def process_bmw_order(detail_data, company='fsbbr', skip_item_ids=None, processe
                 enquiry_item_id, enquiry_no, company, expected_factory_brand
             )
             if error:
-                if error == FAIL_ADAPT_LIST_EMPTY:
-                    failed_items[enquiry_item_id] = error
-                    failed_brand_names[enquiry_item_id] = '无法报价'
-                    flow_trace_list.append({
-                        'supplier_enquiry_no': enquiry_no, 'company': company,
-                        'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
-                        'flow_name': '宝马接口', 'flow_status': '失败', 'fail_stage': '无',
-                        'fail_reason': FAIL_ADAPT_LIST_EMPTY, 'stage_detail': None,
-                    })
-                # 无原厂产品：不记录
+                # 适配失败全部落库（含无原厂产品），确保条目下轮退出，不再每轮死循环重跑
+                failed_items[enquiry_item_id] = error
+                failed_brand_names[enquiry_item_id] = '无法报价' if error == FAIL_ADAPT_LIST_EMPTY else '无原厂'
+                flow_trace_list.append({
+                    'supplier_enquiry_no': enquiry_no, 'company': company,
+                    'enquiry_item_id': enquiry_item_id, 'item_oe': item_oe, 'item_name': item_name,
+                    'flow_name': '宝马接口', 'flow_status': '失败', 'fail_stage': '无',
+                    'fail_reason': error, 'stage_detail': None,
+                })
                 continue
 
             factory_brand = adapt_data['brand']
@@ -1792,10 +1900,14 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
         # 先处理 A/B 类订单
         ab_orders = [(c, no) for c, no in categorized if c in ('A', 'B')]
         for idx, (category, enquiry_no) in enumerate(ab_orders, start=1):
-            _process_single_order(
-                enquiry_no, category, company, idx, len(ab_orders), results,
-                processed_item_ids=processed_items, item_retry_info=item_retry_info
-            )
+            try:
+                _process_single_order(
+                    enquiry_no, category, company, idx, len(ab_orders), results,
+                    processed_item_ids=processed_items, item_retry_info=item_retry_info
+                )
+            except Exception as order_error:
+                # 订单级异常隔离：单个订单失败不影响本轮其余订单
+                qpl_log(f"[{company}] 订单 {enquiry_no} 处理异常，跳过继续: {order_error}")
 
         # 收集 C 类订单原厂 OE 并补齐本地库（只收集未处理 item）
         c_order_nos = {no for c, no in categorized if c == 'C'}
@@ -1826,10 +1938,14 @@ def submit_all_quotes(begin_date=None, end_date=None, company='fsbbr'):
                 if enquiry_no not in fresh_unique_orders:
                     continue
                 c_count += 1
-                _process_single_order(
-                    enquiry_no, 'C', company, c_count, len(c_order_nos), results,
-                    processed_item_ids=processed_items, item_retry_info=item_retry_info
-                )
+                try:
+                    _process_single_order(
+                        enquiry_no, 'C', company, c_count, len(c_order_nos), results,
+                        processed_item_ids=processed_items, item_retry_info=item_retry_info
+                    )
+                except Exception as order_error:
+                    # 订单级异常隔离：单个订单失败不影响本轮其余订单
+                    qpl_log(f"[{company}] 订单 {enquiry_no} 处理异常，跳过继续: {order_error}")
 
         # 任务完成统计
         processed_category_counts = {'A': 0, 'B': 0, 'C': 0}
