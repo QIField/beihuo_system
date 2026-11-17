@@ -16,6 +16,7 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
 
 from app.services import qpl_quote_service as qs
+from app.services.qpl_quote_detail_extract import _collect_item_details
 from app.utils.qpl_auto_bill import auto_submit_part_quote as asp
 
 
@@ -183,7 +184,7 @@ def test_status_abnormal_item_saved_as_failure():
         }],
     }]
 
-    details = qs._collect_item_details(
+    details = _collect_item_details(
         demand_list, extra_quote_items={}, failed_items={},
         failed_brand_names={}, failed_item_prices={},
         failure_categories={}, retry_counts={},
