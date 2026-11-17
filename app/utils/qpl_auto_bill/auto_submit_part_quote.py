@@ -170,11 +170,11 @@ TEMPORARY_FAILURE_REASONS = {
     FAIL_CRM_API_ERROR,
 }
 
-# 最大重试次数
-MAX_RETRY_COUNT = 3
+# 临时错误最大失败次数（首失败 + 1 次重试）：达到后记"重试耗尽"，不再重试
+MAX_RETRY_COUNT = 2
 
-# 临时错误冷却时长（小时）：失败后需间隔该时长才允许下一次重试
-COOLDOWN_HOURS = 4
+# 临时错误冷却时长（分钟）：询价单时效短，冷却按分钟计，失败后间隔该时长才允许重试一次
+COOLDOWN_MINUTES = 15
 
 
 # 通用工具函数
@@ -274,7 +274,7 @@ def _filter_processed_orders(order_nos, company, begin_date, end_date):
                 grouped.setdefault(item_key, []).append(row)
 
             now = datetime.now()
-            cooldown_delta = timedelta(hours=COOLDOWN_HOURS)
+            cooldown_delta = timedelta(minutes=COOLDOWN_MINUTES)
 
             processed_items = set()
             item_retry_info = {}

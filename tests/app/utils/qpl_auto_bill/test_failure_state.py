@@ -22,7 +22,7 @@ from app.utils.qpl_auto_bill.auto_submit_part_quote import (
     FAIL_OE_DATA_MISSING,
     FAIL_NO_STOCK,
     MAX_RETRY_COUNT,
-    COOLDOWN_HOURS,
+    COOLDOWN_MINUTES,
     FAILURE_CATEGORY_BUSINESS,
     FAILURE_CATEGORY_TEMPORARY,
     FAILURE_CATEGORY_RETRY_EXHAUSTED,
@@ -138,15 +138,15 @@ def test_success_and_business_items_are_processed(monkeypatch):
 
 
 def test_temporary_item_in_cooldown_is_skipped(monkeypatch):
-    rows = [_row('EN1', 'i1', '临时错误', 1, minutes_ago=30)]
+    rows = [_row('EN1', 'i1', '临时错误', 1, minutes_ago=5)]
     processed, retry_info = _load(monkeypatch, rows)
-    # 冷却期内（COOLDOWN_HOURS 小时内）视为已处理，本轮跳过
+    # 冷却期内（COOLDOWN_MINUTES 分钟内）视为已处理，本轮跳过
     assert ('EN1', 'i1') in processed
     assert retry_info[('EN1', 'i1')]['retry_count'] == 1
 
 
 def test_temporary_item_after_cooldown_is_retryable(monkeypatch):
-    minutes_ago = COOLDOWN_HOURS * 60 + 30
+    minutes_ago = COOLDOWN_MINUTES + 3
     rows = [_row('EN1', 'i1', '临时错误', 1, minutes_ago=minutes_ago)]
     processed, retry_info = _load(monkeypatch, rows)
     # 冷却到期 → 不算已处理，允许本轮重试
@@ -155,7 +155,7 @@ def test_temporary_item_after_cooldown_is_retryable(monkeypatch):
 
 
 def test_temporary_item_exhausted_is_processed(monkeypatch):
-    minutes_ago = COOLDOWN_HOURS * 60 + 30
+    minutes_ago = COOLDOWN_MINUTES + 3
     rows = [_row('EN1', 'i1', '临时错误', MAX_RETRY_COUNT, minutes_ago=minutes_ago)]
     processed, _ = _load(monkeypatch, rows)
     assert ('EN1', 'i1') in processed  # 重试耗尽，永久跳过
