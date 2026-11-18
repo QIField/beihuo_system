@@ -28,6 +28,7 @@ from app.services.qpl_auto_quote.constants import (
     RESULT_SUCCESS,
     SOURCE_CRM,
     STATUS_QUOTED,
+    TARGET_REMOTE_STATUSES,
 )
 from app.services.qpl_auto_quote.bmw_oe import ensure_bmw_oes_for_order
 from app.services.qpl_auto_quote.enquiry_api import get_enquiry_detail_all, submit_enquiry_page
@@ -71,9 +72,9 @@ def process_order(company, enquiry_no, round_id):
     _fill_pickup_info(detail, company)
 
     # P2 过滤：本地终态/冷却中的明细本轮跳过
-    waiting_ids = _collect_waiting_item_ids(detail)
-    skip_ids = _get_skip_item_ids(company, waiting_ids)
-    target_ids = waiting_ids - skip_ids
+    target_candidate_ids = _collect_target_item_ids(detail)
+    skip_ids = _get_skip_item_ids(company, target_candidate_ids)
+    target_ids = target_candidate_ids - skip_ids
 
     if not target_ids:
         update_order_progress(company, enquiry_no)
@@ -174,14 +175,24 @@ def _join_names(names):
     return names
 
 
-def _collect_waiting_item_ids(detail):
-    """收集详情中 quoteStatus=WAITING_QUOTE 的明细 ID"""
-    waiting = set()
+def _collect_target_item_ids(detail):
+    """
+    收集详情中本轮需要处理的明细 ID。
+
+    范围与旧 CRM 现货流程一致（process_crm_spot_quote）：
+    - WAITING_QUOTE：从未报价，走完整匹配链（CRM/奔驰/宝马）
+    - PART_QUOTE：部分报价，仍有未报完需求，走 CRM 现货补报
+      （旧流程实测：全 PART_QUOTE 订单正是 A 类 CRM 现货的主战场，
+      新页面"待报价"tab 的存量单大多处于该状态）
+    - QUOTED 不入 target：已全部报价，P1 同步为本地 quoted 终态
+    """
+    target = set()
     for demand in detail.get('supplierEnquiryDemandList') or []:
         for item in demand.get('supplierEnquiryItemList') or []:
-            if item.get('quoteStatus') == 'WAITING_QUOTE' and item.get('enquiryItemId'):
-                waiting.add(item['enquiryItemId'])
-    return waiting
+            if item.get('quoteStatus') in TARGET_REMOTE_STATUSES \
+                    and item.get('enquiryItemId'):
+                target.add(item['enquiryItemId'])
+    return target
 
 
 def _sync_quoted_from_detail(company, enquiry_no, detail):

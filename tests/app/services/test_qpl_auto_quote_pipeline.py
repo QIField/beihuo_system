@@ -196,6 +196,32 @@ def test_pipeline_submit_fail_marks_temp(monkeypatch):
     assert submit_attempts and submit_attempts[0]['result'] == '失败'
 
 
+def test_pipeline_part_quote_item_enters_target(monkeypatch):
+    """PART_QUOTE 明细（部分报价，仍有未报完需求）必须进入处理范围，不能静默跳过"""
+    match_called = []
+    calls = {}
+    monkeypatch.setattr(pl, 'get_enquiry_detail_all', lambda no, c: _make_detail(
+        [(101, 'PART_QUOTE', [{"supplierQuoteItemId": "sq1", "brandName": "菲尔"}])]))
+    monkeypatch.setattr(pl, 'upsert_order', lambda c, o: None)
+    monkeypatch.setattr(pl, 'upsert_items', lambda c, no, items: None)
+    monkeypatch.setattr(pl, 'mark_item_quoted', lambda *a, **k: calls.setdefault('q', []).append(a))
+    monkeypatch.setattr(pl, 'mark_item_failed', lambda *a, **k: calls.setdefault('f', []).append(a))
+    monkeypatch.setattr(pl, 'record_attempt', lambda *a, **k: None)
+    monkeypatch.setattr(pl, 'update_order_progress', lambda c, no: None)
+    monkeypatch.setattr(pl, 'fetch_item_statuses', lambda c, ids: {})
+    monkeypatch.setattr(pl, 'match_order_by_brand',
+                        lambda d, c, skip_item_ids=None: match_called.append(1) or
+                        {'extra_quote_items': {}, 'failed_items': {}, 'failed_brand_names': {},
+                         'quote_item_ids': set(), 'category': 'A'})
+    monkeypatch.setattr(pl, 'submit_enquiry_page', lambda dl, no, c: {'code': 10000})
+
+    submitted = pl.process_order('fsbbr', 'SIQR001', 'r1')
+
+    assert submitted is True
+    assert match_called                     # 未在 P2 提前 return，进入了匹配
+    assert not calls.get('f')               # PART_QUOTE 明细未被误落失败
+
+
 def test_pipeline_skips_terminal_and_cooling_items(monkeypatch):
     local = {
         101: {'status': 'failed_biz', 'next_retry_time': None},

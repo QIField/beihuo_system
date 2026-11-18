@@ -62,3 +62,13 @@ SOURCE_BMW = '宝马接口'
 QUOTE_TYPE_PAGE_QUOTE = 'PAGE_QUOTE'  # 提交接口 quoteType 固定值
 DETAIL_QUERY_TYPE_PAGE = 'PAGE'       # 详情接口 queryType
 DETAIL_PAGE_SIZE = 20                 # 详情接口分页大小
+
+# 远端明细 quoteStatus（汽配龙返回值）
+REMOTE_WAITING = 'WAITING_QUOTE'   # 从未报价 → 完整匹配链
+REMOTE_PART_QUOTE = 'PART_QUOTE'   # 部分报价（仍有未报完需求）→ CRM 现货补报
+REMOTE_QUOTED = 'QUOTED'           # 全部已报 → 仅同步状态，不处理
+
+# P2 需要处理的远端明细状态（与旧 CRM 现货流程范围一致：
+# auto_submit_part_quote.process_crm_spot_quote 处理 WAITING/PART_QUOTE/QUOTED，
+# 其中 QUOTED 由本地 quoted 终态跳过，故 target 只含前两种）
+TARGET_REMOTE_STATUSES = (REMOTE_WAITING, REMOTE_PART_QUOTE)
