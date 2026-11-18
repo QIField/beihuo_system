@@ -236,29 +236,29 @@ def _persist_round_result(company, enquiry_no, round_id, match, extra,
         _mark_submit_failed(company, enquiry_no, round_id, request, resp, message)
 
     failed_items = match.get('failed_items') or {} if match else {}
+    covered = set(extra.keys()) | set(failed_items.keys())
+
+    # 1) matcher 明确返回的 failed_items（跳过已有报价项的明细）
     for item_id, reason in failed_items.items():
         if item_id in extra:
-            continue  # 该明细已有报价项，失败原因不影响结果
-        mark_item_failed(company, item_id,
-                         fail_stage='品牌匹配', fail_reason=reason, is_temp=False)
-        record_attempt(company, enquiry_no, item_id, round_id,
-                       ACTION_MATCH, RESULT_FAIL,
-                       fail_stage='品牌匹配', fail_reason=reason)
+            continue
+        _mark_match_failed(company, enquiry_no, item_id, round_id, reason)
 
-    # 兜底：旧处理器对部分明细（有 OE 但 CRM 查不到）不会放进 failed_items，
-    # 导致它们永远 pending。target_ids 里既没进 extra（报价项）也没进 failed_items
-    # 的明细，强制落 failed_biz，reason 说明为匹配链漏回。
+    # 2) 兜底：target_ids 内 matcher 漏回的明细（旧 A 类 handler 有 OE 但 CRM
+    # 查不到时不会进 failed_items，导致明细永远 pending）——强制落 failed_biz
     if target_ids:
-        covered = set(extra.keys()) | set(failed_items.keys())
         for item_id in target_ids - covered:
-            mark_item_failed(company, item_id,
-                             fail_stage='品牌匹配',
-                             fail_reason='匹配链未返回结果（CRM无可报价项）',
-                             is_temp=False)
-            record_attempt(company, enquiry_no, item_id, round_id,
-                           ACTION_MATCH, RESULT_FAIL,
-                           fail_stage='品牌匹配',
-                           fail_reason='匹配链未返回结果（CRM无可报价项）')
+            _mark_match_failed(company, enquiry_no, item_id, round_id,
+                               '匹配链未返回结果（CRM无可报价项）')
+
+
+def _mark_match_failed(company, enquiry_no, item_id, round_id, reason):
+    """统一：明细落 failed_biz + 写 match_attempt（品牌匹配阶段确定性失败）"""
+    mark_item_failed(company, item_id,
+                     fail_stage='品牌匹配', fail_reason=reason, is_temp=False)
+    record_attempt(company, enquiry_no, item_id, round_id,
+                   ACTION_MATCH, RESULT_FAIL,
+                   fail_stage='品牌匹配', fail_reason=reason)
 
 
 def _mark_quoted_items(company, enquiry_no, round_id, extra):
