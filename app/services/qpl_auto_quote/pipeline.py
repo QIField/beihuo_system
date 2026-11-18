@@ -151,21 +151,27 @@ def _extract_items(detail, company):
     """从详情扁平化明细列表（含订单冗余字段）"""
     car_brand = detail.get('carBrand')
     items = []
+    for demand, item in _iter_demand_items(detail):
+        items.append({
+            'supplier_demand_id': demand.get('supplerDemandId'),
+            'enquiry_item_id': item.get('enquiryItemId'),
+            'item_name': item.get('itemName'),
+            'item_nick_names': _join_names(item.get('itemNickNames')),
+            'item_oe': item.get('itemOe'),
+            'item_amount': item.get('itemAmount', 1),
+            'assembly_quantity': item.get('assemblyQuantity', 1),
+            'item_quality_list': _join_names(item.get('itemQualityList')),
+            'sale_category_name': item.get('saleCategoryName'),
+            'car_brand': car_brand,
+        })
+    return items
+
+
+def _iter_demand_items(detail):
+    """统一迭代 supplierEnquiryDemandList → supplierEnquiryItemList（防御性空列表兜底）"""
     for demand in detail.get('supplierEnquiryDemandList') or []:
         for item in demand.get('supplierEnquiryItemList') or []:
-            items.append({
-                'supplier_demand_id': demand.get('supplerDemandId'),
-                'enquiry_item_id': item.get('enquiryItemId'),
-                'item_name': item.get('itemName'),
-                'item_nick_names': _join_names(item.get('itemNickNames')),
-                'item_oe': item.get('itemOe'),
-                'item_amount': item.get('itemAmount', 1),
-                'assembly_quantity': item.get('assemblyQuantity', 1),
-                'item_quality_list': _join_names(item.get('itemQualityList')),
-                'sale_category_name': item.get('saleCategoryName'),
-                'car_brand': car_brand,
-            })
-    return items
+            yield demand, item
 
 
 def _join_names(names):
@@ -186,22 +192,19 @@ def _collect_target_item_ids(detail):
       新页面"待报价"tab 的存量单大多处于该状态）
     - QUOTED 不入 target：已全部报价，P1 同步为本地 quoted 终态
     """
-    target = set()
-    for demand in detail.get('supplierEnquiryDemandList') or []:
-        for item in demand.get('supplierEnquiryItemList') or []:
-            if item.get('quoteStatus') in TARGET_REMOTE_STATUSES \
-                    and item.get('enquiryItemId'):
-                target.add(item['enquiryItemId'])
-    return target
+    return {
+        item['enquiryItemId']
+        for _, item in _iter_demand_items(detail)
+        if item.get('quoteStatus') in TARGET_REMOTE_STATUSES and item.get('enquiryItemId')
+    }
 
 
 def _sync_quoted_from_detail(company, enquiry_no, detail):
     """详情中已 QUOTED 的明细同步本地为 quoted（已有报价）"""
-    for demand in detail.get('supplierEnquiryDemandList') or []:
-        for item in demand.get('supplierEnquiryItemList') or []:
-            if item.get('quoteStatus') == 'QUOTED' and item.get('enquiryItemId'):
-                mark_item_quoted(company, item['enquiryItemId'],
-                                 quote_source='已有报价')
+    for _, item in _iter_demand_items(detail):
+        if item.get('quoteStatus') == 'QUOTED' and item.get('enquiryItemId'):
+            mark_item_quoted(company, item['enquiryItemId'],
+                             quote_source='已有报价')
 
 
 def _get_skip_item_ids(company, waiting_ids):
