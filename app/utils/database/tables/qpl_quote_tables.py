@@ -137,6 +137,15 @@ def _fill_qpl_result_v2_brand_null(conn):
             cursor.execute("SELECT COUNT(*) AS cnt FROM qpl_quote_result_v2 WHERE brand_name IS NULL")
             if cursor.fetchone()['cnt'] == 0:
                 return
+            # 同 (组织, 单号, item) 已有空串品牌行时，直接删除 NULL 行（避免归一化后撞唯一键）
+            cursor.execute("""
+                DELETE t1 FROM qpl_quote_result_v2 t1
+                JOIN qpl_quote_result_v2 t2
+                  ON t1.company = t2.company
+                 AND t1.supplier_enquiry_no = t2.supplier_enquiry_no
+                 AND t1.enquiry_item_id = t2.enquiry_item_id
+                WHERE t1.brand_name IS NULL AND t2.brand_name = ''
+            """)
             # 同 (组织, 单号, item) 的 NULL 品牌重复行仅保留最新一条
             cursor.execute("""
                 DELETE t1 FROM qpl_quote_result_v2 t1
