@@ -275,6 +275,38 @@ def fetch_pending_items(company):
         conn.close()
 
 
+def fetch_retry_order_nos(company, limit=20):
+    """
+    本地驱动的待重试订单号（轮次入口第二数据源）：
+    含 pending 或冷却到期 failed_temp 明细的订单。
+
+    背景：订单一旦提交过报价（哪怕部分明细失败），就会掉出列表接口的
+    "待报价"筛选范围，重试必须由本地状态机驱动，不能依赖拉单列表。
+
+    Returns:
+        list[str]: supplier_enquiry_no 列表
+    """
+    conn = get_db_connection()
+    try:
+        cursor = get_dict_cursor(conn)
+        try:
+            cursor.execute("""
+                SELECT i.supplier_enquiry_no
+                FROM qpl_order_item i
+                WHERE i.company = %s
+                  AND i.status IN ('pending', 'failed_temp')
+                  AND (i.next_retry_time IS NULL OR i.next_retry_time <= NOW())
+                GROUP BY i.supplier_enquiry_no
+                ORDER BY MIN(i.id)
+                LIMIT %s
+            """, (company, limit))
+            return [r['supplier_enquiry_no'] for r in cursor.fetchall()]
+        finally:
+            cursor.close()
+    finally:
+        conn.close()
+
+
 def fetch_item_statuses(company, item_ids):
     """
     查询明细本地状态（P2 过滤依据）。

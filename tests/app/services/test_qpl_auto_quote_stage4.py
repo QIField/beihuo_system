@@ -120,6 +120,7 @@ def test_runner_round_serial_and_stats(monkeypatch):
     orders = [_order('SI1'), _order('SI2'), _order('SI3')]
     monkeypatch.setattr(rn, 'list_enquiry_orders',
                         lambda b, e, page_num=1, company=None, **k: {'data': orders})
+    monkeypatch.setattr(rn, 'fetch_retry_order_nos', lambda c, limit=20: [])
     monkeypatch.setattr(rn, 'classify_order', lambda o: 'A')
     monkeypatch.setattr(rn, 'record_attempt', lambda *a, **k: None)
     seq = []
@@ -137,6 +138,7 @@ def test_runner_round_order_exception_isolated(monkeypatch):
     monkeypatch.setattr(rn, 'list_enquiry_orders',
                         lambda b, e, page_num=1, company=None, **k:
                         {'data': [_order('SI1'), _order('SI2')]})
+    monkeypatch.setattr(rn, 'fetch_retry_order_nos', lambda c, limit=20: [])
     monkeypatch.setattr(rn, 'classify_order', lambda o: 'A')
     monkeypatch.setattr(rn, 'record_attempt', lambda *a, **k: None)
     monkeypatch.setattr(rn, 'process_order',
@@ -156,6 +158,7 @@ def test_runner_round_a_category_first(monkeypatch):
 
     monkeypatch.setattr(rn, 'list_enquiry_orders',
                         lambda b, e, page_num=1, company=None, **k: {'data': orders})
+    monkeypatch.setattr(rn, 'fetch_retry_order_nos', lambda c, limit=20: [])
     monkeypatch.setattr(rn, 'classify_order', classify)
     monkeypatch.setattr(rn, 'record_attempt', lambda *a, **k: None)
     seq = []
@@ -171,6 +174,7 @@ def test_runner_round_fetch_list_fail(monkeypatch):
     monkeypatch.setattr(rn, 'list_enquiry_orders',
                         lambda b, e, page_num=1, company=None, **k:
                         (_ for _ in ()).throw(RuntimeError('api down')))
+    monkeypatch.setattr(rn, 'fetch_retry_order_nos', lambda c, limit=20: [])
     monkeypatch.setattr(rn, 'record_attempt', lambda *a, **k: None)
     monkeypatch.setattr(rn, 'process_order',
                         lambda *a: (_ for _ in ()).throw(AssertionError('拉单失败不应处理订单')))
@@ -178,6 +182,24 @@ def test_runner_round_fetch_list_fail(monkeypatch):
     stats = rn.run_round('fsbbr')
 
     assert stats == {'total': 0, 'submitted': 0, 'no_action': 0, 'error': 0}
+
+
+def test_runner_retry_orders_merged_and_deduped(monkeypatch):
+    """本地待重试订单合并进本轮，且与新订单去重"""
+    monkeypatch.setattr(rn, 'list_enquiry_orders',
+                        lambda b, e, page_num=1, company=None, **k:
+                        {'data': [_order('SI-NEW'), _order('SI-BOTH')]})
+    monkeypatch.setattr(rn, 'fetch_retry_order_nos',
+                        lambda c, limit=20: ['SI-BOTH', 'SI-RETRY'])
+    monkeypatch.setattr(rn, 'classify_order', lambda o: 'A')
+    monkeypatch.setattr(rn, 'record_attempt', lambda *a, **k: None)
+    seq = []
+    monkeypatch.setattr(rn, 'process_order', lambda c, no, rid: seq.append(no) or False)
+
+    stats = rn.run_round('fsbbr', begin_date='2026-11-16', end_date='2026-11-18')
+
+    assert seq == ['SI-NEW', 'SI-BOTH', 'SI-RETRY']   # 去重后逐单处理
+    assert stats == {'total': 3, 'submitted': 0, 'no_action': 3, 'error': 0}
 
 
 def test_runner_all_companies_isolated(monkeypatch):

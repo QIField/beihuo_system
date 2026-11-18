@@ -23,7 +23,7 @@ from app.utils.qpl_auto_bill.qpl_config import qpl_log, get_supported_companies
 from app.utils.qpl_auto_bill.auto_submit_part_quote import classify_order
 from app.services.qpl_auto_quote.constants import ACTION_FETCH_LIST, RESULT_FAIL
 from app.services.qpl_auto_quote.enquiry_api import list_enquiry_orders
-from app.services.qpl_auto_quote.persistence import make_round_id, record_attempt
+from app.services.qpl_auto_quote.persistence import fetch_retry_order_nos, make_round_id, record_attempt
 from app.services.qpl_auto_quote.pipeline import process_order
 
 # 订单优先级：A 类（全 PART_QUOTE，最快路径）在前，B/C 类在后
@@ -36,6 +36,11 @@ FETCH_WINDOW_DAYS = 30
 def run_round(company, begin_date=None, end_date=None):
     """
     执行单组织的一个报价轮次。
+
+    双数据源：
+    1. 列表接口（新单）：待报价tab + 灰度 + 仅含待报价明细
+    2. 本地状态机（重试）：含 pending / 冷却到期 failed_temp 明细的订单
+       （订单提交过报价后会掉出列表筛选范围，重试必须本地驱动）
 
     Args:
         company: 组织代码
@@ -51,30 +56,40 @@ def run_round(company, begin_date=None, end_date=None):
         end_date = datetime.now().strftime('%Y-%m-%d')
 
     round_id = make_round_id(company)
-    orders = _fetch_orders(company, begin_date, end_date, round_id)
-    if not orders:
-        return {'total': 0, 'submitted': 0, 'no_action': 0, 'error': 0}
+    new_orders = _fetch_orders(company, begin_date, end_date, round_id)
+    retry_nos = [no for no in fetch_retry_order_nos(company)
+                 if no not in {no for no, _ in new_orders}]
+    qpl_log(f"[{company}] 轮次 {round_id} 开始 | "
+            f"新订单 {len(new_orders)} 个，本地待重试订单 {len(retry_nos)} 个")
 
-    sorted_orders = _sort_orders_by_priority(orders)
-    qpl_log(f"[{company}] 轮次 {round_id} 开始 | 拉到 {len(sorted_orders)} 个订单")
-
-    stats = {'total': len(sorted_orders), 'submitted': 0, 'no_action': 0, 'error': 0}
-    for idx, (enquiry_no, _) in enumerate(sorted_orders, start=1):
-        try:
-            submitted = process_order(company, enquiry_no, round_id)
-            stats['submitted' if submitted else 'no_action'] += 1
-            qpl_log(f"[{company}] 轮次 {round_id} [{idx}/{stats['total']}] "
-                    f"{enquiry_no} 处理完成（提交={submitted}）")
-        except Exception as order_error:
-            # 订单级异常隔离：单个订单失败不影响本轮其余订单
-            stats['error'] += 1
-            qpl_log(f"[{company}] 轮次 {round_id} 订单 {enquiry_no} 处理异常，跳过继续: {order_error}")
+    stats = {'total': len(new_orders) + len(retry_nos),
+             'submitted': 0, 'no_action': 0, 'error': 0}
+    idx = 0
+    for enquiry_no, _ in _sort_orders_by_priority(new_orders):
+        idx += 1
+        _process_one(company, enquiry_no, round_id, idx, stats)
+    for enquiry_no in retry_nos:
+        idx += 1
+        _process_one(company, enquiry_no, round_id, idx, stats)
 
     qpl_log(
         f"[{company}] 轮次 {round_id} 完成 | "
         f"提交={stats['submitted']} 无动作={stats['no_action']} 异常={stats['error']}"
     )
     return stats
+
+
+def _process_one(company, enquiry_no, round_id, idx, stats):
+    """处理单个订单并更新轮次统计（订单级异常隔离）"""
+    try:
+        submitted = process_order(company, enquiry_no, round_id)
+        stats['submitted' if submitted else 'no_action'] += 1
+        qpl_log(f"[{company}] 轮次 {round_id} [{idx}/{stats['total']}] "
+                f"{enquiry_no} 处理完成（提交={submitted}）")
+    except Exception as order_error:
+        # 订单级异常隔离：单个订单失败不影响本轮其余订单
+        stats['error'] += 1
+        qpl_log(f"[{company}] 轮次 {round_id} 订单 {enquiry_no} 处理异常，跳过继续: {order_error}")
 
 
 def run_all_companies(begin_date=None, end_date=None):
