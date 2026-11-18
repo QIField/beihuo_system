@@ -105,9 +105,10 @@ def list_enquiry_orders(begin_date, end_date, page_num=1, page_size=100, company
     拉取询价单列表（网页版参数，实测验证）。
 
     与旧 query_enquiry_list 差异（依据网页请求体）：
-    - multiQuoteGray=true：只拉灰度新页面订单（1 个月窗口 11 单 vs 100 单）
-    - hasWaitingQuoteItem=1（Integer，传 true 会 400）：只拉含待报价明细的订单
-      （叠加后 1 个月窗口仅 6 单，全部是真正需要报价的单）
+    - multiQuoteGray=true：只拉灰度新页面订单（1 个月窗口约 12 单 vs 100 单）
+    - hasWaitingQuoteItem 必须传 None：实测该字段语义是"从未应答过的订单"，
+      一旦提交过报价（哪怕部分明细失败）就会掉出筛选范围，导致失败明细
+      永远无法重试；不传则返回待报价tab全部 PART/NEVER 订单
     - supplierEnquiryStatus=0：待报价标签
     - 时间范围不能超过 1 个月
     """
@@ -119,7 +120,7 @@ def list_enquiry_orders(begin_date, end_date, page_num=1, page_size=100, company
         "pageNum": page_num, "pageSize": page_size,
         "beginDate": begin_date, "endDate": end_date,
         "acceptStatus": None, "onlyMine": None,
-        "hasWaitingQuoteItem": 1, "onlyManualQuote": None,
+        "hasWaitingQuoteItem": None, "onlyManualQuote": None,
         "multiQuoteGray": True,
     }
     resp = requests.post(url, headers=get_headers(company), json=payload, timeout=30)
