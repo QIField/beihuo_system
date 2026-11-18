@@ -219,7 +219,10 @@ def test_pipeline_part_quote_item_enters_target(monkeypatch):
 
     assert submitted is True
     assert match_called                     # 未在 P2 提前 return，进入了匹配
-    assert not calls.get('f')               # PART_QUOTE 明细未被误落失败
+    # matcher 对 item=101 返回空的 extra/failed_items → 兜底逻辑强制落 failed_biz
+    # （有 OE 但匹配链无报价，不能让明细永远 pending）
+    assert calls.get('f')
+    assert any(a[1] == 101 for a in calls['f'])
 
 
 def test_pipeline_skips_terminal_and_cooling_items(monkeypatch):
