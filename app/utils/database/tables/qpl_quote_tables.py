@@ -93,7 +93,7 @@ def init_qpl_quote_result_v2_table():
                 item_name VARCHAR(255) COMMENT '产品名称',
                 item_description TEXT COMMENT '产品描述',
                 brand_id VARCHAR(100) COMMENT '品牌ID',
-                brand_name VARCHAR(100) COMMENT '品牌名称',
+                brand_name VARCHAR(100) NOT NULL DEFAULT '' COMMENT '品牌名称(参与唯一键,不允许NULL)',
                 item_sell_price DECIMAL(10,2) COMMENT '销售价格',
                 delivery_aging INT COMMENT '交货周期(天)',
                 item_quality VARCHAR(50) COMMENT '产品品质',
@@ -119,9 +119,41 @@ def init_qpl_quote_result_v2_table():
             """
             cursor.execute(create_table_sql)
             conn.commit()
-            print("[数据库] qpl_quote_result_v2 表初始化完成")
+        _fill_qpl_result_v2_brand_null(conn)
+        print("[数据库] qpl_quote_result_v2 表初始化完成")
     finally:
         conn.close()
+
+
+def _fill_qpl_result_v2_brand_null(conn):
+    """
+    存量数据自愈：清理 brand_name 为 NULL 的行。
+
+    brand_name 参与唯一键 uk_company_order_item_brand，MySQL 唯一索引对 NULL 不去重，
+    NULL 行永远无法命中 ON DUPLICATE KEY UPDATE，会导致同一订单明细重复堆积。
+    """
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) AS cnt FROM qpl_quote_result_v2 WHERE brand_name IS NULL")
+            if cursor.fetchone()['cnt'] == 0:
+                return
+            # 同 (组织, 单号, item) 的 NULL 品牌重复行仅保留最新一条
+            cursor.execute("""
+                DELETE t1 FROM qpl_quote_result_v2 t1
+                JOIN qpl_quote_result_v2 t2
+                  ON t1.company = t2.company
+                 AND t1.supplier_enquiry_no = t2.supplier_enquiry_no
+                 AND t1.enquiry_item_id = t2.enquiry_item_id
+                 AND t1.id < t2.id
+                WHERE t1.brand_name IS NULL AND t2.brand_name IS NULL
+            """)
+            # NULL 归一化为空串，保证 upsert 可命中唯一键
+            cursor.execute("UPDATE qpl_quote_result_v2 SET brand_name = '' WHERE brand_name IS NULL")
+            conn.commit()
+            print("[数据库] qpl_quote_result_v2 存量 NULL 品牌行已归一化为空串")
+    except Exception as e:
+        conn.rollback()
+        print(f"[警告] qpl_quote_result_v2 NULL 品牌行归一化失败（不影响启动）: {e}")
 
 
 def init_qpl_quote_flow_trace_table():
@@ -145,14 +177,49 @@ def init_qpl_quote_flow_trace_table():
                 fail_reason VARCHAR(500) COMMENT '具体失败原因',
                 stage_detail JSON COMMENT '各阶段明细',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                UNIQUE INDEX uk_flow_trace (company, supplier_enquiry_no, enquiry_item_id, flow_name),
                 INDEX idx_enquiry_item (company, supplier_enquiry_no, enquiry_item_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报价流程备查日志';
             """
             cursor.execute(create_table_sql)
             conn.commit()
-            print("[数据库] qpl_quote_flow_trace 表初始化完成")
+        _ensure_qpl_flow_trace_unique_key(conn)
+        print("[数据库] qpl_quote_flow_trace 表初始化完成")
     finally:
         conn.close()
+
+
+def _ensure_qpl_flow_trace_unique_key(conn):
+    """
+    存量表自愈：补唯一键 uk_flow_trace（多轮任务每轮重复 INSERT 会导致追踪记录无限堆积）。
+
+    CREATE TABLE IF NOT EXISTS 不会修改已存在的表，需先清理历史重复行再补键，幂等执行。
+    """
+    with conn.cursor() as cursor:
+        cursor.execute("SHOW INDEX FROM qpl_quote_flow_trace WHERE Key_name = 'uk_flow_trace'")
+        if cursor.fetchall():
+            return
+    try:
+        with conn.cursor() as cursor:
+            # 清理历史重复行：同 (组织, 单号, item, 流程) 仅保留最新一条
+            cursor.execute("""
+                DELETE t1 FROM qpl_quote_flow_trace t1
+                JOIN qpl_quote_flow_trace t2
+                  ON t1.company = t2.company
+                 AND t1.supplier_enquiry_no = t2.supplier_enquiry_no
+                 AND t1.enquiry_item_id = t2.enquiry_item_id
+                 AND t1.flow_name <=> t2.flow_name
+                 AND t1.id < t2.id
+            """)
+            cursor.execute(
+                "ALTER TABLE qpl_quote_flow_trace "
+                "ADD UNIQUE INDEX uk_flow_trace (company, supplier_enquiry_no, enquiry_item_id, flow_name)"
+            )
+            conn.commit()
+            print("[数据库] qpl_quote_flow_trace 已补唯一键 uk_flow_trace（历史重复行已清理）")
+    except Exception as e:
+        conn.rollback()
+        print(f"[警告] qpl_quote_flow_trace 补唯一键失败（不影响启动）: {e}")
 
 
 if __name__ == '__main__':

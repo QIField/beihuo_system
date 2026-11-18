@@ -34,7 +34,8 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
     保存报价记录到 qpl_quote_result_v2（含失败项目），幂等写入。
 
     同一个 (company, supplier_enquiry_no, enquiry_item_id, brand_name) 已存在时更新，
-    不存在时插入。brand_name 为 NULL 时也被视为唯一键的一部分。
+    不存在时插入。brand_name 统一兜底为空串（MySQL 唯一索引对 NULL 不去重，
+    NULL 行永远无法命中 ON DUPLICATE KEY UPDATE，会导致重复插入）。
 
     Args:
         enquiry_no: 询价单号
@@ -45,8 +46,9 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
     """
     conn = get_db_connection()
 
-    with conn.cursor() as cursor:
-        sql = """
+    try:
+        with conn.cursor() as cursor:
+            sql = """
         INSERT INTO qpl_quote_result_v2 (
             supplier_enquiry_no, company, enquiry_item_id, supplier_demand_id,
             item_oe, item_name, item_description, brand_id, brand_name,
@@ -79,44 +81,47 @@ def save_quote_records(enquiry_no, details, submit_result, submit_time, company=
             submit_time = VALUES(submit_time)
         """
 
-        for detail in details:
-            cursor.execute(sql, (
-                enquiry_no,
-                company,
-                detail.get('enquiry_item_id'),
-                detail.get('supplier_demand_id'),
-                detail.get('item_oe'),
-                detail.get('item_name'),
-                detail.get('item_description'),
-                detail.get('brand_id'),
-                detail.get('brand_name'),
-                detail.get('item_sell_price'),
-                detail.get('delivery_aging'),
-                detail.get('item_quality'),
-                detail.get('parts_no'),
-                detail.get('quote_source'),
-                detail.get('is_quoted', 0),
-                detail.get('fail_stage'),
-                detail.get('fail_reason'),
-                detail.get('fail_type'),
-                detail.get('retry_count', 0),
-                detail.get('submit_status'),
-                detail.get('submit_message'),
-                detail.get('order_status'),
-                detail.get('created_time'),
-                detail.get('vin_code'),
-                submit_time,
-            ))
+            for detail in details:
+                cursor.execute(sql, (
+                    enquiry_no,
+                    company,
+                    detail.get('enquiry_item_id'),
+                    detail.get('supplier_demand_id'),
+                    detail.get('item_oe'),
+                    detail.get('item_name'),
+                    detail.get('item_description'),
+                    detail.get('brand_id'),
+                    detail.get('brand_name') or '',
+                    detail.get('item_sell_price'),
+                    detail.get('delivery_aging'),
+                    detail.get('item_quality'),
+                    detail.get('parts_no'),
+                    detail.get('quote_source'),
+                    detail.get('is_quoted', 0),
+                    detail.get('fail_stage'),
+                    detail.get('fail_reason'),
+                    detail.get('fail_type'),
+                    detail.get('retry_count', 0),
+                    detail.get('submit_status'),
+                    detail.get('submit_message'),
+                    detail.get('order_status'),
+                    detail.get('created_time'),
+                    detail.get('vin_code'),
+                    submit_time,
+                ))
 
-        conn.commit()
-        qpl_log(f"[{company}] 保存报价记录到v2表 {len(details)} 条", order_no=enquiry_no)
-
-    conn.close()
+            conn.commit()
+            qpl_log(f"[{company}] 保存报价记录到v2表 {len(details)} 条", order_no=enquiry_no)
+    finally:
+        conn.close()
 
 
 def save_flow_trace_records(flow_trace_list, company='fsbbr'):
     """
-    保存流程追踪记录到 qpl_quote_flow_trace。
+    保存流程追踪记录到 qpl_quote_flow_trace（幂等写入）。
+
+    同一 (company, supplier_enquiry_no, enquiry_item_id, flow_name) 已存在时更新，
+    不存在时插入；依赖唯一键 uk_flow_trace，防止多轮任务重复插入堆积。
 
     Args:
         flow_trace_list: 流程追踪列表，每个元素为 dict
@@ -133,6 +138,13 @@ def save_flow_trace_records(flow_trace_list, company='fsbbr'):
                 supplier_enquiry_no, company, enquiry_item_id, item_oe, item_name,
                 flow_name, flow_status, fail_stage, fail_reason, stage_detail
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                item_oe = VALUES(item_oe),
+                item_name = VALUES(item_name),
+                flow_status = VALUES(flow_status),
+                fail_stage = VALUES(fail_stage),
+                fail_reason = VALUES(fail_reason),
+                stage_detail = VALUES(stage_detail)
             """
             for trace in flow_trace_list:
                 cursor.execute(sql, (
