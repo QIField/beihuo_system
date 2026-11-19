@@ -351,6 +351,9 @@ def record_attempt(company, enquiry_no, item_id, round_id, action, result,
     追加一条尝试流水（只插不改）。
 
     request_snapshot / response_snapshot 为 dict 时序列化为 JSON 字符串存储。
+
+    Returns:
+        int: 新插入 attempt 的自增 id（供后续 brand_detail 外键引用）
     """
     conn = get_db_connection()
     try:
@@ -365,6 +368,46 @@ def record_attempt(company, enquiry_no, item_id, round_id, action, result,
                 company, enquiry_no, item_id, round_id,
                 action, result, quote_source, fail_stage, fail_reason,
                 _to_json(request_snapshot), _to_json(response_snapshot),
+            ))
+            attempt_id = cursor.lastrowid
+        conn.commit()
+        return attempt_id
+    finally:
+        conn.close()
+
+
+def record_brand_detail(attempt_id, company, enquiry_item_id, quote_item):
+    """
+    追加一条品牌报价明细（attempt 成功后 append-only 写）。
+
+    一条 quote_item = 一个品牌的独立报价，每个 attempt_id 可挂多条品牌。
+    """
+    if not quote_item:
+        return
+    brand_name = quote_item.get('brandName') or ''
+    if not brand_name:
+        return  # 无品牌名跳过
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO qpl_quote_brand_detail (
+                    attempt_id, company, enquiry_item_id,
+                    brand_name, brand_id, item_sell_price,
+                    delivery_aging, item_quality, parts_no,
+                    pid, standard_name, quote_source
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                attempt_id, company, enquiry_item_id,
+                brand_name,
+                quote_item.get('brandId'),
+                quote_item.get('itemSellPrice'),
+                quote_item.get('deliveryAging'),
+                quote_item.get('itemQuality'),
+                quote_item.get('partsNo') or '',
+                quote_item.get('pid') or '',
+                quote_item.get('standardName') or '',
+                quote_item.get('quoteSource') or '',
             ))
         conn.commit()
     finally:

@@ -39,6 +39,7 @@ from app.services.qpl_auto_quote.persistence import (
     mark_item_failed,
     mark_item_quoted,
     record_attempt,
+    record_brand_detail,
     update_order_progress,
     upsert_items,
     upsert_order,
@@ -262,17 +263,21 @@ def _mark_match_failed(company, enquiry_no, item_id, round_id, reason):
 
 
 def _mark_quoted_items(company, enquiry_no, round_id, extra):
-    """报价项明细落终态 quoted + attempt 成功流水"""
+    """报价项明细落终态 quoted + attempt 成功流水 + 每行品牌独立 detail"""
     for item_id, quote_items in extra.items():
         if not quote_items:
             continue
         summary = extract_quote_summary(quote_items[0])
         mark_item_quoted(company, item_id, quote_source=SOURCE_CRM, **summary)
-        record_attempt(company, enquiry_no, item_id, round_id,
-                       ACTION_SUBMIT, RESULT_SUCCESS,
-                       quote_source=SOURCE_CRM,
-                       request_snapshot={'quoteItems': quote_items},
-                       response_snapshot=summary)
+        attempt_id = record_attempt(
+            company, enquiry_no, item_id, round_id,
+            ACTION_SUBMIT, RESULT_SUCCESS,
+            quote_source=SOURCE_CRM,
+            request_snapshot={'quoteItems': quote_items},
+            response_snapshot=summary,
+        )
+        for qi in quote_items:
+            record_brand_detail(attempt_id, company, item_id, qi)
 
 
 def _mark_submit_failed(company, enquiry_no, round_id, request, resp, message):
